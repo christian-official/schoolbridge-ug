@@ -73,7 +73,7 @@ function App() {
   const [studentError, setStudentError] = useState('')
   const [studentSuccess, setStudentSuccess] = useState('')
   const [studentForm, setStudentForm] = useState({
-    admission_number: '', first_name: '', last_name: '', gender: '',
+    first_name: '', last_name: '', gender: '',
     date_of_birth: '', class_id: '',
   })
   const [mobileMenu, setMobileMenu] = useState(false)
@@ -124,10 +124,9 @@ function App() {
     setStudentError('')
     setStudentSuccess('')
     try {
-      await api<RecordItem>('students', token, {
+      const createdStudent = await api<RecordItem>('students', token, {
         method: 'POST',
         body: JSON.stringify({
-          admission_number: studentForm.admission_number.trim(),
           first_name: studentForm.first_name.trim(),
           last_name: studentForm.last_name.trim(),
           gender: studentForm.gender || null,
@@ -136,11 +135,11 @@ function App() {
         }),
       })
       setStudentForm({
-        admission_number: '', first_name: '', last_name: '', gender: '',
+        first_name: '', last_name: '', gender: '',
         date_of_birth: '', class_id: '',
       })
       setShowStudentForm(false)
-      setStudentSuccess('Student registered successfully.')
+      setStudentSuccess(`Student registered successfully. Admission number: ${createdStudent.admission_number}`)
       await loadSchoolData(token)
     } catch (error) {
       setStudentError(error instanceof Error ? error.message : 'Unable to register student.')
@@ -317,7 +316,7 @@ function App() {
                 <form className="student-form" onSubmit={registerStudent}>
                   <div className="form-heading"><div><h3>New student registration</h3><p>Enter the student's details below.</p></div><span className="required-note">* Required fields</span></div>
                   <div className="student-form-grid">
-                    <label>Admission number *<input value={studentForm.admission_number} onChange={e => setStudentForm({ ...studentForm, admission_number: e.target.value })} placeholder="e.g. SB-2026-001" required /></label>
+                    <div className="generated-admission"><strong>Admission number</strong><span>Generated automatically when you save</span></div>
                     <label>First name *<input value={studentForm.first_name} onChange={e => setStudentForm({ ...studentForm, first_name: e.target.value })} placeholder="First name" required /></label>
                     <label>Last name *<input value={studentForm.last_name} onChange={e => setStudentForm({ ...studentForm, last_name: e.target.value })} placeholder="Last name" required /></label>
                     <label>Class *<select value={studentForm.class_id} onChange={e => setStudentForm({ ...studentForm, class_id: e.target.value })} required><option value="">Select class</option>{classes.map(item => <option key={item.id} value={item.id}>{item.name}{item.section ? ` — ${item.section}` : ''}</option>)}</select></label>
