@@ -5,6 +5,7 @@ import {
   Search, Bell, Plus, Menu, X, ArrowUpRight, UserPlus,
   CalendarDays, TrendingUp, ShieldCheck, LoaderCircle,
 } from 'lucide-react'
+import StaffFinance from './StaffFinance'
 import './App.css'
 
 type User = {
@@ -38,8 +39,9 @@ type RecordItem = {
 const menu = [
   { label: 'Overview', icon: LayoutDashboard },
   { label: 'Students', icon: GraduationCap },
-  { label: 'Teachers', icon: Users },
+  { label: 'Staff', icon: Users },
   { label: 'Classes', icon: BookOpen },
+  { label: 'Fees & Finance', icon: FileText },
   { label: 'Attendance', icon: ClipboardCheck },
   { label: 'Examinations', icon: FileText },
 ]
@@ -380,7 +382,7 @@ function App() {
             </section>
           )}
 
-          {active === 'Teachers' && <ComingSoon title="Teacher management" description="Teacher accounts and class assignments will be managed here." />}
+          <StaffFinance token={token} active={active} />
           {active === 'Attendance' && <ComingSoon title="Attendance management" description="Daily attendance records and summaries will appear here." />}
           {active === 'Examinations' && <ComingSoon title="Examinations and results" description="Exam setup, marks entry and student results will be managed here." />}
           {active === 'Settings' && (
