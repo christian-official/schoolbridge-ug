@@ -5,6 +5,7 @@ import {
   Search, Bell, Plus, Menu, X, ArrowUpRight, UserPlus,
   CalendarDays, TrendingUp, ShieldCheck, LoaderCircle,
 } from 'lucide-react'
+import StaffFinance from './StaffFinance'
 import './App.css'
 
 type User = {
@@ -14,6 +15,9 @@ type User = {
   role: string
   active: boolean
 }
+
+type StudentPage = { items: RecordItem[]; total: number; page: number; pages: number }
+type FinanceSummary = { fees_expected: number; fees_collected: number; outstanding: number }
 
 type AdmissionSettings = {
   admission_prefix: string
@@ -38,8 +42,9 @@ type RecordItem = {
 const menu = [
   { label: 'Overview', icon: LayoutDashboard },
   { label: 'Students', icon: GraduationCap },
-  { label: 'Teachers', icon: Users },
+  { label: 'Staff', icon: Users },
   { label: 'Classes', icon: BookOpen },
+  { label: 'Fees & Finance', icon: FileText },
   { label: 'Attendance', icon: ClipboardCheck },
   { label: 'Examinations', icon: FileText },
 ]
@@ -67,8 +72,11 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [active, setActive] = useState('Overview')
   const [students, setStudents] = useState<RecordItem[]>([])
+  const [studentTotal, setStudentTotal] = useState(0)
+  const [financeSummary, setFinanceSummary] = useState<FinanceSummary>({ fees_expected: 0, fees_collected: 0, outstanding: 0 })
+  const [studentPage, setStudentPage] = useState(1)
+  const [studentClassFilter, setStudentClassFilter] = useState('')
   const [classes, setClasses] = useState<RecordItem[]>([])
-  const [subjects, setSubjects] = useState<RecordItem[]>([])
   const [dataError, setDataError] = useState('')
   const [search, setSearch] = useState('')
   const [showStudentForm, setShowStudentForm] = useState(false)
@@ -81,8 +89,9 @@ function App() {
   const [studentError, setStudentError] = useState('')
   const [studentSuccess, setStudentSuccess] = useState('')
   const [studentForm, setStudentForm] = useState({
-    first_name: '', last_name: '', gender: '',
-    date_of_birth: '', class_id: '',
+    first_name: '', middle_name: '', last_name: '', gender: '', date_of_birth: '', class_id: '',
+    religion: '', nationality: '', phone: '', address: '', guardian_name: '', guardian_relationship: '', guardian_phone: '', previous_school: '',
+    admission_date: new Date().toISOString().slice(0, 10), term1_fee: '0', term2_fee: '0', term3_fee: '0',
   })
   const [mobileMenu, setMobileMenu] = useState(false)
   const [admissionSettings, setAdmissionSettings] = useState<AdmissionSettings>({
@@ -96,16 +105,18 @@ function App() {
   async function loadSchoolData(authToken: string) {
     setDataError('')
     try {
-      const [studentData, classData, subjectData, admissionData] = await Promise.all([
-        api<RecordItem[]>('students', authToken),
+      const [studentData, classData, admissionData, financeData] = await Promise.all([
+        api<StudentPage>('students/search?page=1&page_size=25', authToken),
         api<RecordItem[]>('classes', authToken),
-        api<RecordItem[]>('subjects', authToken),
         api<AdmissionSettings>('settings/admission-number', authToken),
+        api<FinanceSummary>('finance/summary', authToken),
       ])
-      setStudents(studentData)
+      setStudents(studentData.items)
+      setStudentTotal(studentData.total)
+      setStudentPage(1)
       setClasses(classData)
-      setSubjects(subjectData)
       setAdmissionSettings(admissionData)
+      setFinanceSummary(financeData)
     } catch {
       setDataError('Some school records could not be loaded. Check your connection and permissions.')
     }
@@ -145,16 +156,26 @@ function App() {
         method: 'POST',
         body: JSON.stringify({
           first_name: studentForm.first_name.trim(),
+          middle_name: studentForm.middle_name.trim() || null,
           last_name: studentForm.last_name.trim(),
+          religion: studentForm.religion || null,
+          nationality: studentForm.nationality.trim() || null,
+          phone: studentForm.phone.trim() || null,
+          address: studentForm.address.trim() || null,
+          guardian_name: studentForm.guardian_name.trim() || null,
+          guardian_relationship: studentForm.guardian_relationship || null,
+          guardian_phone: studentForm.guardian_phone.trim() || null,
+          previous_school: studentForm.previous_school.trim() || null,
+          admission_date: studentForm.admission_date || null,
+          term1_fee: Number(studentForm.term1_fee || 0),
+          term2_fee: Number(studentForm.term2_fee || 0),
+          term3_fee: Number(studentForm.term3_fee || 0),
           gender: studentForm.gender || null,
           date_of_birth: studentForm.date_of_birth || null,
           class_id: Number(studentForm.class_id),
         }),
       })
-      setStudentForm({
-        first_name: '', last_name: '', gender: '',
-        date_of_birth: '', class_id: '',
-      })
+      setStudentForm({ first_name: '', middle_name: '', last_name: '', gender: '', date_of_birth: '', class_id: '', religion: '', nationality: '', phone: '', address: '', guardian_name: '', guardian_relationship: '', guardian_phone: '', previous_school: '', admission_date: new Date().toISOString().slice(0, 10), term1_fee: '0', term2_fee: '0', term3_fee: '0' })
       setShowStudentForm(false)
       setStudentSuccess(`Student registered successfully. Admission number: ${createdStudent.admission_number}`)
       await loadSchoolData(token)
@@ -184,6 +205,17 @@ function App() {
       setSavingSettings(false)
     }
   }
+
+  async function loadStudentPage(page = 1, query = search) {
+    try {
+      const params = new URLSearchParams({ page: String(page), page_size: '25', search: query })
+      if (studentClassFilter) params.set('class_id', studentClassFilter)
+      const result = await api<StudentPage>('students/search?' + params.toString(), token)
+      setStudents(result.items); setStudentTotal(result.total); setStudentPage(result.page)
+    } catch (error) { setDataError(error instanceof Error ? error.message : 'Unable to load student records.') }
+  }
+
+  useEffect(() => { if (token && active === 'Students') void loadStudentPage(1, search) }, [search, studentClassFilter, active, token])
 
   async function loadUser(authToken: string) {
     try {
@@ -232,13 +264,9 @@ function App() {
     setUser(null)
     setStudents([])
     setClasses([])
-    setSubjects([])
   }
 
-  const filteredStudents = students.filter((student) => {
-    const name = `${student.first_name || ''} ${student.last_name || ''} ${student.admission_number || ''}`.toLowerCase()
-    return name.includes(search.toLowerCase())
-  })
+  const filteredStudents = students
 
   if (!token || !user) {
     return (
@@ -323,15 +351,19 @@ function App() {
           {active === 'Overview' && (
             <>
               <section className="stats-grid">
-                <StatCard title="Total students" value={students.length} icon={<GraduationCap />} note="Registered students" />
+                <StatCard title="Total students" value={studentTotal} icon={<GraduationCap />} note="Registered students" />
                 <StatCard title="Classes" value={classes.length} icon={<BookOpen />} note="School classes" />
-                <StatCard title="Subjects" value={subjects.length} icon={<FileText />} note="Available subjects" />
+                <StatCard title="Fees expected" value={`UGX ${financeSummary.fees_expected.toLocaleString()}`} icon={<FileText />} note="Recorded term charges" />
+                <StatCard title="Fees collected" value={`UGX ${financeSummary.fees_collected.toLocaleString()}`} icon={<TrendingUp />} note="Payments received" />
+                <StatCard title="Outstanding fees" value={`UGX ${financeSummary.outstanding.toLocaleString()}`} icon={<Bell />} note="Remaining balances" />
                 <StatCard title="Account status" value="Active" icon={<ShieldCheck />} note="Administrator access" />
               </section>
               <section className="dashboard-grid">
                 <div className="panel recent-panel">
-                  <div className="panel-heading"><div><h2>Recent students</h2><p>Latest registered student records</p></div><button className="text-button" onClick={() => setActive('Students')}>View all <ArrowUpRight size={15} /></button></div>
-                  <StudentTable students={students.slice(-5).reverse()} classes={classes} />
+                  <div className="panel-heading"><div><h2>School records</h2><p>Keep large registers inside their own modules</p></div></div>
+                  <button className="quick-action" onClick={() => setActive('Students')}><span className="quick-icon blue"><GraduationCap /></span><span><strong>Student register</strong><small>{studentTotal.toLocaleString()} student records · searchable</small></span><ArrowUpRight size={17} /></button>
+                  <button className="quick-action" onClick={() => setActive('Staff')}><span className="quick-icon purple"><Users /></span><span><strong>Staff directory</strong><small>Teaching and non-teaching staff</small></span><ArrowUpRight size={17} /></button>
+                  <button className="quick-action" onClick={() => setActive('Fees & Finance')}><span className="quick-icon green"><FileText /></span><span><strong>Fees and finance</strong><small>Charges, payments and balances</small></span><ArrowUpRight size={17} /></button>
                 </div>
                 <div className="panel quick-panel">
                   <div className="panel-heading"><div><h2>Quick actions</h2><p>Common school operations</p></div></div>
@@ -346,7 +378,7 @@ function App() {
 
           {active === 'Students' && (
             <section className="panel">
-              <div className="panel-heading"><div><h2>Student records</h2><p>{students.length} registered students</p></div><button className="primary-button add-student-button" onClick={() => { setShowStudentForm(v => !v); setStudentError(''); setStudentSuccess('') }}><UserPlus size={16} /> {showStudentForm ? 'Close form' : 'Register student'}</button></div>
+              <div className="panel-heading"><div><h2>Student records</h2><p>{studentTotal.toLocaleString()} registered students · 25 records per page</p></div><button className="primary-button add-student-button" onClick={() => { setShowStudentForm(v => !v); setStudentError(''); setStudentSuccess('') }}><UserPlus size={16} /> {showStudentForm ? 'Close form' : 'Register student'}</button></div>
               {studentSuccess && <div className="success-notice">{studentSuccess}</div>}
               {studentError && <div className="form-error">{studentError}</div>}
               {showStudentForm && (
@@ -355,17 +387,31 @@ function App() {
                   <div className="student-form-grid">
                     <div className="generated-admission"><strong>Admission number</strong><span>Generated automatically when you save</span></div>
                     <label>First name *<input value={studentForm.first_name} onChange={e => setStudentForm({ ...studentForm, first_name: e.target.value })} placeholder="First name" required /></label>
+                    <label>Middle name<input value={studentForm.middle_name} onChange={e => setStudentForm({ ...studentForm, middle_name: e.target.value })} /></label>
                     <label>Last name *<input value={studentForm.last_name} onChange={e => setStudentForm({ ...studentForm, last_name: e.target.value })} placeholder="Last name" required /></label>
                     <label>Class *<select value={studentForm.class_id} onChange={e => setStudentForm({ ...studentForm, class_id: e.target.value })} required><option value="">Select class</option>{classes.map(item => <option key={item.id} value={item.id}>{item.name}{item.section ? ` — ${item.section}` : ''}</option>)}</select></label>
                     <label>Gender<select value={studentForm.gender} onChange={e => setStudentForm({ ...studentForm, gender: e.target.value })}><option value="">Select gender</option><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select></label>
                     <label>Date of birth<input type="date" value={studentForm.date_of_birth} onChange={e => setStudentForm({ ...studentForm, date_of_birth: e.target.value })} /></label>
+                    <label>Religion<input value={studentForm.religion} onChange={e => setStudentForm({ ...studentForm, religion: e.target.value })} /></label>
+                    <label>Nationality<input value={studentForm.nationality} onChange={e => setStudentForm({ ...studentForm, nationality: e.target.value })} /></label>
+                    <label>Student phone<input value={studentForm.phone} onChange={e => setStudentForm({ ...studentForm, phone: e.target.value })} /></label>
+                    <label>Home address<input value={studentForm.address} onChange={e => setStudentForm({ ...studentForm, address: e.target.value })} /></label>
+                    <label>Parent / guardian name<input value={studentForm.guardian_name} onChange={e => setStudentForm({ ...studentForm, guardian_name: e.target.value })} /></label>
+                    <label>Guardian relationship<select value={studentForm.guardian_relationship} onChange={e => setStudentForm({ ...studentForm, guardian_relationship: e.target.value })}><option value="">Select relationship</option><option>Parent</option><option>Guardian</option><option>Other relative</option></select></label>
+                    <label>Guardian phone<input value={studentForm.guardian_phone} onChange={e => setStudentForm({ ...studentForm, guardian_phone: e.target.value })} /></label>
+                    <label>Previous school<input value={studentForm.previous_school} onChange={e => setStudentForm({ ...studentForm, previous_school: e.target.value })} /></label>
+                    <label>Admission date<input type="date" value={studentForm.admission_date} onChange={e => setStudentForm({ ...studentForm, admission_date: e.target.value })} /></label>
+                    <label>Term 1 fees (UGX)<input type="number" min="0" value={studentForm.term1_fee} onChange={e => setStudentForm({ ...studentForm, term1_fee: e.target.value })} /></label>
+                    <label>Term 2 fees (UGX)<input type="number" min="0" value={studentForm.term2_fee} onChange={e => setStudentForm({ ...studentForm, term2_fee: e.target.value })} /></label>
+                    <label>Term 3 fees (UGX)<input type="number" min="0" value={studentForm.term3_fee} onChange={e => setStudentForm({ ...studentForm, term3_fee: e.target.value })} /></label>
                   </div>
                   {classes.length === 0 && <p className="form-hint">Add a school class first before registering students.</p>}
                   <div className="form-actions"><button type="button" className="secondary-button" onClick={() => setShowStudentForm(false)}>Cancel</button><button className="primary-button" disabled={savingStudent || classes.length === 0}>{savingStudent ? <><LoaderCircle className="spin" size={16} /> Saving...</> : 'Save student'}</button></div>
                 </form>
               )}
-              <div className="table-tools"><div className="search-box"><Search size={17} /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name or admission number..." /></div></div>
+              <div className="table-tools student-tools"><div className="search-box"><Search size={17} /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name or admission number..." /></div><select className="filter-select" value={studentClassFilter} onChange={e => setStudentClassFilter(e.target.value)}><option value="">All classes</option>{classes.map(item => <option key={item.id} value={item.id}>{item.name}{item.section ? ` — ${item.section}` : ""}</option>)}</select></div>
               <StudentTable students={filteredStudents} classes={classes} />
+              <div className="pagination-row"><span>Showing {students.length ? (studentPage - 1) * 25 + 1 : 0}–{Math.min(studentPage * 25, studentTotal)} of {studentTotal}</span><div><button className="secondary-button" disabled={studentPage <= 1} onClick={() => void loadStudentPage(studentPage - 1)}>Previous</button><button className="secondary-button" disabled={studentPage * 25 >= studentTotal} onClick={() => void loadStudentPage(studentPage + 1)}>Next</button></div></div>
             </section>
           )}
 
@@ -380,7 +426,7 @@ function App() {
             </section>
           )}
 
-          {active === 'Teachers' && <ComingSoon title="Teacher management" description="Teacher accounts and class assignments will be managed here." />}
+          <StaffFinance token={token} active={active} />
           {active === 'Attendance' && <ComingSoon title="Attendance management" description="Daily attendance records and summaries will appear here." />}
           {active === 'Examinations' && <ComingSoon title="Examinations and results" description="Exam setup, marks entry and student results will be managed here." />}
           {active === 'Settings' && (

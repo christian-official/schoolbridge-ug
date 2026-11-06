@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import update
+from sqlalchemy import update, func, or_
 
 from .database import Base, engine, get_db, SessionLocal
 from . import models
@@ -40,10 +40,23 @@ class SubjectCreate(BaseModel):
 class StudentCreate(BaseModel):
     admission_number: str | None = None
     first_name: str
+    middle_name: str | None = None
     last_name: str
     gender: str | None = None
     date_of_birth: date | None = None
+    religion: str | None = None
+    nationality: str | None = None
+    phone: str | None = None
+    address: str | None = None
+    guardian_name: str | None = None
+    guardian_relationship: str | None = None
+    guardian_phone: str | None = None
+    previous_school: str | None = None
+    admission_date: date | None = None
     class_id: int | None = None
+    term1_fee: int = Field(default=0, ge=0)
+    term2_fee: int = Field(default=0, ge=0)
+    term3_fee: int = Field(default=0, ge=0)
 
 
 
@@ -200,7 +213,8 @@ def list_subjects(db: Session = Depends(get_db)):
 def create_student(data: StudentCreate, db: Session = Depends(get_db)):
     if data.class_id is not None and not db.get(models.SchoolClass, data.class_id):
         raise HTTPException(404, "Class not found.")
-    student_data = data.model_dump()
+    student_data = data.model_dump(exclude={"term1_fee", "term2_fee", "term3_fee"})
+    term_fees = {"Term 1": data.term1_fee, "Term 2": data.term2_fee, "Term 3": data.term3_fee}
     supplied_number = (student_data.pop("admission_number") or "").strip()
     settings = get_or_create_school_settings(db)
     item = models.Student(
@@ -226,6 +240,10 @@ def create_student(data: StudentCreate, db: Session = Depends(get_db)):
                 parts.append(str(date.today().year))
             parts.append(str(next_value).zfill(settings.admission_padding))
             item.admission_number = settings.admission_separator.join(parts)
+        db.flush()
+        for term, amount in term_fees.items():
+            if amount > 0:
+                db.add(models.FeeCharge(student_id=item.id, term=term, year=date.today().year, amount=amount))
         db.commit()
         db.refresh(item)
     except IntegrityError:
@@ -560,3 +578,108 @@ def my_assignments(
         }
         for a in assignments
     ]
+
+
+class StaffCreate(BaseModel):
+    first_name: str
+    last_name: str
+    category: str = Field(default="Teaching", pattern="^(Teaching|Non-teaching)$")
+    position: str | None = None
+    department: str | None = None
+    phone: str | None = None
+    email: str | None = None
+
+class FeePaymentCreate(BaseModel):
+    charge_id: int
+    amount: int = Field(gt=0)
+    payment_date: date = Field(default_factory=date.today)
+    method: str = Field(default="Cash", max_length=30)
+    reference: str | None = Field(default=None, max_length=80)
+
+def upgrade_existing_database():
+    from sqlalchemy import inspect, text
+    inspector = inspect(engine)
+    if "students" not in inspector.get_table_names(): return
+    existing = {column["name"] for column in inspector.get_columns("students")}
+    additions = {
+        "middle_name": "VARCHAR(80)", "religion": "VARCHAR(60)", "nationality": "VARCHAR(60)",
+        "phone": "VARCHAR(30)", "address": "VARCHAR(255)", "guardian_name": "VARCHAR(160)",
+        "guardian_relationship": "VARCHAR(60)", "guardian_phone": "VARCHAR(30)",
+        "previous_school": "VARCHAR(160)", "admission_date": "DATE",
+        "status": "VARCHAR(20) NOT NULL DEFAULT 'active'",
+    }
+    with engine.begin() as connection:
+        for name, sql_type in additions.items():
+            if name not in existing: connection.execute(text("ALTER TABLE students ADD COLUMN " + name + " " + sql_type))
+
+upgrade_existing_database()
+@app.get("/api/students/search", tags=["Students"])
+def search_students(page: int = 1, page_size: int = 25, search: str = "", class_id: int | None = None, db: Session = Depends(get_db)):
+    page_size = min(max(page_size, 1), 100)
+    query = db.query(models.Student)
+    if search.strip():
+        term = "%" + search.strip() + "%"
+        query = query.filter(or_(models.Student.admission_number.ilike(term), models.Student.first_name.ilike(term), models.Student.middle_name.ilike(term), models.Student.last_name.ilike(term)))
+    if class_id is not None:
+        query = query.filter(models.Student.class_id == class_id)
+    total = query.count()
+    rows = query.order_by(models.Student.last_name, models.Student.first_name).offset((page - 1) * page_size).limit(page_size).all()
+    return {"items": rows, "total": total, "page": page, "page_size": page_size, "pages": (total + page_size - 1) // page_size}
+
+
+@app.post("/api/staff", tags=["Staff"])
+def create_staff(data: StaffCreate, db: Session = Depends(get_db)):
+    item = models.StaffMember(staff_number="STF-" + str(date.today().year) + "-" + uuid4().hex[:6].upper(), **data.model_dump())
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@app.get("/api/staff", tags=["Staff"])
+def list_staff(search: str = "", category: str | None = None, page: int = 1, page_size: int = 25, db: Session = Depends(get_db)):
+    page_size = min(max(page_size, 1), 100)
+    query = db.query(models.StaffMember)
+    if search.strip():
+        term = "%" + search.strip() + "%"
+        query = query.filter(or_(models.StaffMember.staff_number.ilike(term), models.StaffMember.first_name.ilike(term), models.StaffMember.last_name.ilike(term)))
+    if category:
+        query = query.filter(models.StaffMember.category == category)
+    total = query.count()
+    rows = query.order_by(models.StaffMember.last_name).offset((page - 1) * page_size).limit(page_size).all()
+    return {"items": rows, "total": total, "page": page, "page_size": page_size, "pages": (total + page_size - 1) // page_size}
+
+
+@app.get("/api/finance/summary", tags=["Finance"])
+def finance_summary(db: Session = Depends(get_db)):
+    charged = db.query(func.coalesce(func.sum(models.FeeCharge.amount), 0)).scalar() or 0
+    paid = db.query(func.coalesce(func.sum(models.FeePayment.amount), 0)).scalar() or 0
+    return {"fees_expected": float(charged), "fees_collected": float(paid), "outstanding": float(charged - paid)}
+
+
+@app.get("/api/finance/charges", tags=["Finance"])
+def list_fee_charges(search: str = "", db: Session = Depends(get_db)):
+    query = db.query(models.FeeCharge, models.Student).join(models.Student, models.Student.id == models.FeeCharge.student_id)
+    if search.strip():
+        term = "%" + search.strip() + "%"
+        query = query.filter(or_(models.Student.admission_number.ilike(term), models.Student.first_name.ilike(term), models.Student.last_name.ilike(term)))
+    results = []
+    for charge, student in query.order_by(models.FeeCharge.year.desc(), models.FeeCharge.term, models.Student.last_name).limit(500).all():
+        paid = db.query(func.coalesce(func.sum(models.FeePayment.amount), 0)).filter(models.FeePayment.charge_id == charge.id).scalar() or 0
+        results.append({"id": charge.id, "student_id": student.id, "student_name": student.first_name + " " + student.last_name, "admission_number": student.admission_number, "term": charge.term, "year": charge.year, "amount": charge.amount, "paid": float(paid), "balance": float(charge.amount - paid)})
+    return results
+
+
+@app.post("/api/finance/payments", tags=["Finance"])
+def record_fee_payment(data: FeePaymentCreate, db: Session = Depends(get_db)):
+    charge = db.get(models.FeeCharge, data.charge_id)
+    if not charge:
+        raise HTTPException(404, "Fee charge not found.")
+    paid = db.query(func.coalesce(func.sum(models.FeePayment.amount), 0)).filter(models.FeePayment.charge_id == charge.id).scalar() or 0
+    if data.amount > charge.amount - paid:
+        raise HTTPException(400, "Payment exceeds the outstanding balance.")
+    item = models.FeePayment(**data.model_dump())
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return {"id": item.id, "charge_id": item.charge_id, "amount": item.amount, "payment_date": item.payment_date, "method": item.method, "reference": item.reference}
