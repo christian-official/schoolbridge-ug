@@ -1,13 +1,21 @@
-from fastapi import FastAPI
+from datetime import date
+from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
+
+from .database import Base, engine, get_db
+from . import models
+
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="SchoolBridge API",
     description="Offline-first school management system API.",
-    version="0.1.0",
+    version="0.2.0",
 )
 
-# Development-only origins. Production origins will be restricted in deployment.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],
@@ -17,11 +25,448 @@ app.add_middleware(
 )
 
 
-@app.get("/api/health", tags=["System"])
-def health_check() -> dict[str, str]:
-    return {"status": "ok", "application": "SchoolBridge", "version": "0.1.0"}
+class ClassCreate(BaseModel):
+    name: str
+    section: str | None = None
+
+
+class SubjectCreate(BaseModel):
+    name: str
+    code: str | None = None
+
+
+class StudentCreate(BaseModel):
+    admission_number: str
+    first_name: str
+    last_name: str
+    gender: str | None = None
+    date_of_birth: date | None = None
+    class_id: int | None = None
+
+
+class AttendanceCreate(BaseModel):
+    student_id: int
+    attendance_date: date = Field(default_factory=date.today)
+    status: str
+
+
+class ExamCreate(BaseModel):
+    name: str
+    term: str
+    year: int
+
+
+class MarkCreate(BaseModel):
+    student_id: int
+    subject_id: int
+    exam_id: int
+    score: float = Field(ge=0, le=100)
+
+
+class ClassOut(ClassCreate):
+    id: int
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SubjectOut(SubjectCreate):
+    id: int
+    model_config = ConfigDict(from_attributes=True)
+
+
+class StudentOut(StudentCreate):
+    id: int
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AttendanceOut(AttendanceCreate):
+    id: int
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ExamOut(ExamCreate):
+    id: int
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MarkOut(MarkCreate):
+    id: int
+    model_config = ConfigDict(from_attributes=True)
 
 
 @app.get("/", include_in_schema=False)
-def root() -> dict[str, str]:
+def root():
     return {"message": "SchoolBridge API is running. Visit /docs for API documentation."}
+
+
+@app.get("/api/health", tags=["System"])
+def health_check():
+    return {"status": "ok", "application": "SchoolBridge", "version": "0.2.0"}
+
+
+@app.post("/api/classes", response_model=ClassOut, tags=["Classes"])
+def create_class(data: ClassCreate, db: Session = Depends(get_db)):
+    item = models.SchoolClass(**data.model_dump())
+    db.add(item)
+    try:
+        db.commit()
+        db.refresh(item)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "A class with that name already exists.")
+    return item
+
+
+@app.get("/api/classes", response_model=list[ClassOut], tags=["Classes"])
+def list_classes(db: Session = Depends(get_db)):
+    return db.query(models.SchoolClass).order_by(models.SchoolClass.name).all()
+
+
+@app.post("/api/subjects", response_model=SubjectOut, tags=["Subjects"])
+def create_subject(data: SubjectCreate, db: Session = Depends(get_db)):
+    item = models.Subject(**data.model_dump())
+    db.add(item)
+    try:
+        db.commit()
+        db.refresh(item)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "That subject already exists.")
+    return item
+
+
+@app.get("/api/subjects", response_model=list[SubjectOut], tags=["Subjects"])
+def list_subjects(db: Session = Depends(get_db)):
+    return db.query(models.Subject).order_by(models.Subject.name).all()
+
+
+@app.post("/api/students", response_model=StudentOut, tags=["Students"])
+def create_student(data: StudentCreate, db: Session = Depends(get_db)):
+    if data.class_id is not None and not db.get(models.SchoolClass, data.class_id):
+        raise HTTPException(404, "Class not found.")
+    item = models.Student(**data.model_dump())
+    db.add(item)
+    try:
+        db.commit()
+        db.refresh(item)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "That admission number is already registered.")
+    return item
+
+
+@app.get("/api/students", response_model=list[StudentOut], tags=["Students"])
+def list_students(db: Session = Depends(get_db)):
+    return db.query(models.Student).order_by(models.Student.last_name).all()
+
+
+@app.post("/api/attendance", response_model=AttendanceOut, tags=["Attendance"])
+def record_attendance(data: AttendanceCreate, db: Session = Depends(get_db)):
+    if not db.get(models.Student, data.student_id):
+        raise HTTPException(404, "Student not found.")
+    item = models.Attendance(**data.model_dump())
+    db.add(item)
+    try:
+        db.commit()
+        db.refresh(item)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "Attendance has already been recorded for this student on that date.")
+    return item
+
+
+@app.get("/api/attendance", response_model=list[AttendanceOut], tags=["Attendance"])
+def list_attendance(db: Session = Depends(get_db)):
+    return db.query(models.Attendance).order_by(
+        models.Attendance.attendance_date.desc()
+    ).all()
+
+
+@app.post("/api/exams", response_model=ExamOut, tags=["Exams"])
+def create_exam(data: ExamCreate, db: Session = Depends(get_db)):
+    item = models.Exam(**data.model_dump())
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@app.get("/api/exams", response_model=list[ExamOut], tags=["Exams"])
+def list_exams(db: Session = Depends(get_db)):
+    return db.query(models.Exam).order_by(models.Exam.year.desc()).all()
+
+
+@app.post("/api/marks", response_model=MarkOut, tags=["Marks"])
+def record_mark(data: MarkCreate, db: Session = Depends(get_db)):
+    for model, record_id, label in [
+        (models.Student, data.student_id, "Student"),
+        (models.Subject, data.subject_id, "Subject"),
+        (models.Exam, data.exam_id, "Exam"),
+    ]:
+        if not db.get(model, record_id):
+            raise HTTPException(404, f"{label} not found.")
+    item = models.Mark(**data.model_dump())
+    db.add(item)
+    try:
+        db.commit()
+        db.refresh(item)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "A mark already exists for this student, subject and exam.")
+    return item
+
+
+@app.get("/api/marks", response_model=list[MarkOut], tags=["Marks"])
+def list_marks(db: Session = Depends(get_db)):
+    return db.query(models.Mark).all()
+
+
+# ========== AUTHENTICATION AND USER MANAGEMENT ==========
+
+import os
+from dotenv import load_dotenv
+import jwt
+from datetime import datetime, timedelta, timezone
+from pwdlib import PasswordHash
+from jwt.exceptions import InvalidTokenError
+from fastapi import Request
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from sqlalchemy.exc import IntegrityError
+
+password_hash = PasswordHash.recommended()
+load_dotenv()
+JWT_SECRET = os.environ["SCHOOLBRIDGE_SECRET_KEY"]
+JWT_ALGORITHM = "HS256"
+TOKEN_HOURS = 8
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+
+
+class LoginInput(BaseModel):
+    username: str
+    password: str
+
+
+class TeacherCreate(BaseModel):
+    username: str
+    email: str
+    password: str = Field(min_length=12)
+
+
+class AssignmentCreate(BaseModel):
+    teacher_id: int
+    class_id: int
+    subject_id: int
+
+
+def create_access_token(user):
+    expires = datetime.now(timezone.utc) + timedelta(hours=TOKEN_HOURS)
+    payload = {
+        "sub": str(user.id),
+        "role": user.role,
+        "exp": expires,
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+
+def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
+):
+    try:
+        payload = jwt.decode(
+            token, JWT_SECRET, algorithms=[JWT_ALGORITHM]
+        )
+        user_id = int(payload["sub"])
+    except (InvalidTokenError, ValueError, KeyError):
+        raise HTTPException(401, "Invalid or expired login token.")
+
+    user = db.get(models.User, user_id)
+    if not user or not user.is_active:
+        raise HTTPException(401, "Account is unavailable.")
+    return user
+
+
+def require_admin(user=Depends(get_current_user)):
+    if user.role != "admin":
+        raise HTTPException(403, "Administrator permission required.")
+    return user
+
+
+@app.middleware("http")
+async def protect_school_data(request: Request, call_next):
+    path = request.url.path
+
+    public_paths = {
+        "/api/health",
+        "/api/auth/login",
+    }
+
+    if path.startswith("/api/") and path not in public_paths:
+        auth = request.headers.get("Authorization", "")
+
+        if not auth.startswith("Bearer "):
+            return __import__("starlette.responses").responses.JSONResponse(
+                {"detail": "Login required."}, status_code=401
+            )
+
+        try:
+            payload = jwt.decode(
+                auth[7:], JWT_SECRET, algorithms=[JWT_ALGORITHM]
+            )
+            role = payload.get("role")
+
+            if path == "/api/auth/me":
+                pass
+            elif path == "/api/teacher/my-assignments":
+                if role != "teacher":
+                    return __import__("starlette.responses").responses.JSONResponse(
+                        {"detail": "Teacher permission required."},
+                        status_code=403
+                    )
+            elif role != "admin":
+                return __import__("starlette.responses").responses.JSONResponse(
+                    {"detail": "Administrator permission required."},
+                    status_code=403
+                )
+        except InvalidTokenError:
+            return __import__("starlette.responses").responses.JSONResponse(
+                {"detail": "Invalid or expired login token."},
+                status_code=401
+            )
+
+    return await call_next(request)
+
+
+@app.post("/api/auth/login", tags=["Authentication"])
+def login(
+    data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db)
+):
+    user = db.query(models.User).filter(
+        models.User.username == data.username
+    ).first()
+
+    if not user or not user.is_active:
+        raise HTTPException(401, "Incorrect username or password.")
+
+    if not password_hash.verify(data.password, user.hashed_password):
+        raise HTTPException(401, "Incorrect username or password.")
+
+    return {
+        "access_token": create_access_token(user),
+        "token_type": "bearer",
+        "role": user.role,
+        "username": user.username,
+    }
+
+
+@app.get("/api/auth/me", tags=["Authentication"])
+def current_account(user=Depends(get_current_user)):
+    return {
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "role": user.role,
+        "active": user.is_active,
+    }
+
+
+@app.post("/api/auth/teachers", tags=["User Management"])
+def create_teacher(
+    data: TeacherCreate,
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+):
+    teacher = models.User(
+        username=data.username,
+        email=data.email,
+        hashed_password=password_hash.hash(data.password),
+        role="teacher",
+    )
+    db.add(teacher)
+
+    try:
+        db.commit()
+        db.refresh(teacher)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            409, "Username or email is already registered."
+        )
+
+    return {
+        "id": teacher.id,
+        "username": teacher.username,
+        "email": teacher.email,
+        "role": teacher.role,
+    }
+
+
+@app.get("/api/auth/users", tags=["User Management"])
+def list_users(
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+):
+    users = db.query(models.User).order_by(models.User.username).all()
+    return [
+        {
+            "id": u.id,
+            "username": u.username,
+            "email": u.email,
+            "role": u.role,
+            "active": u.is_active,
+        }
+        for u in users
+    ]
+
+
+@app.post("/api/teacher-assignments", tags=["Teacher Management"])
+def assign_teacher(
+    data: AssignmentCreate,
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+):
+    teacher = db.get(models.User, data.teacher_id)
+
+    if not teacher or teacher.role != "teacher":
+        raise HTTPException(404, "Teacher account not found.")
+
+    if not db.get(models.SchoolClass, data.class_id):
+        raise HTTPException(404, "Class not found.")
+
+    if not db.get(models.Subject, data.subject_id):
+        raise HTTPException(404, "Subject not found.")
+
+    assignment = models.TeacherAssignment(**data.model_dump())
+    db.add(assignment)
+
+    try:
+        db.commit()
+        db.refresh(assignment)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "This assignment already exists.")
+
+    return {"message": "Teacher assigned successfully.", "id": assignment.id}
+
+
+@app.get("/api/teacher/my-assignments", tags=["Teacher Management"])
+def my_assignments(
+    db: Session = Depends(get_db),
+    teacher=Depends(get_current_user),
+):
+    if teacher.role != "teacher":
+        raise HTTPException(403, "Teacher account required.")
+
+    assignments = db.query(models.TeacherAssignment).filter(
+        models.TeacherAssignment.teacher_id == teacher.id
+    ).all()
+
+    return [
+        {
+            "assignment_id": a.id,
+            "class": db.get(models.SchoolClass, a.class_id).name,
+            "subject": db.get(models.Subject, a.subject_id).name,
+        }
+        for a in assignments
+    ]
