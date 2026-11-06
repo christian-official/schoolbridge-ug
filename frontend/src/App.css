@@ -134,3 +134,22 @@ td strong { color: #34445e; font-size: 11px; }
   .footer-version { float: none; display: block; margin-top: 5px; }
   .login-card { padding: 28px 22px; }
 }
+
+.add-student-button { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; padding: 10px 14px; }
+.student-form { border: 1px solid #e5eaf4; background: #fbfcff; border-radius: 11px; padding: 20px; margin: 0 0 20px; }
+.form-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 17px; }
+.form-heading h3 { color: #243550; font: 800 14px Manrope,sans-serif; margin: 0 0 5px; }
+.form-heading p,.required-note { color: #98a4b6; font-size: 10px; margin: 0; }
+.student-form-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 15px; }
+.student-form-grid label { display: grid; gap: 7px; color: #52617a; font-size: 11px; font-weight: 700; }
+.student-form-grid input,.student-form-grid select { width: 100%; min-width: 0; border: 1px solid #e3e8f1; border-radius: 7px; background: #fff; color: #34445e; padding: 11px; font: inherit; font-weight: 400; outline: none; }
+.student-form-grid input:focus,.student-form-grid select:focus { border-color: #7893f3; box-shadow: 0 0 0 3px #315ee812; }
+.form-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 18px; }
+.secondary-button { border: 1px solid #e1e7f0; background: #fff; color: #65748b; border-radius: 8px; padding: 10px 14px; font-size: 11px; font-weight: 700; }
+.form-actions .primary-button { padding: 10px 16px; }
+.form-actions .primary-button:disabled { opacity: .55; cursor: not-allowed; }
+.form-hint { color: #9a6a27; background: #fff6e9; padding: 10px 12px; border-radius: 7px; font-size: 11px; margin: 13px 0 0; }
+.form-error { color: #b53d3d; background: #fff0f0; border-radius: 7px; padding: 11px 13px; margin-bottom: 13px; font-size: 11px; }
+.success-notice { color: #187a55; background: #eaf8f2; border-radius: 7px; padding: 11px 13px; margin-bottom: 13px; font-size: 11px; }
+@media(max-width:900px) { .student-form-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media(max-width:520px) { .student-form-grid { grid-template-columns: 1fr; } .form-heading { flex-direction: column; } .panel-heading .add-student-button { padding: 9px 10px; font-size: 10px; } }
