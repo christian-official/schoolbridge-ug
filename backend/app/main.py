@@ -40,10 +40,23 @@ class SubjectCreate(BaseModel):
 class StudentCreate(BaseModel):
     admission_number: str | None = None
     first_name: str
+    middle_name: str | None = None
     last_name: str
     gender: str | None = None
     date_of_birth: date | None = None
+    religion: str | None = None
+    nationality: str | None = None
+    phone: str | None = None
+    address: str | None = None
+    guardian_name: str | None = None
+    guardian_relationship: str | None = None
+    guardian_phone: str | None = None
+    previous_school: str | None = None
+    admission_date: date | None = None
     class_id: int | None = None
+    term1_fee: float = Field(default=0, ge=0)
+    term2_fee: float = Field(default=0, ge=0)
+    term3_fee: float = Field(default=0, ge=0)
 
 
 
