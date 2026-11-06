@@ -87,8 +87,9 @@ function App() {
   const [studentError, setStudentError] = useState('')
   const [studentSuccess, setStudentSuccess] = useState('')
   const [studentForm, setStudentForm] = useState({
-    first_name: '', last_name: '', gender: '',
-    date_of_birth: '', class_id: '',
+    first_name: '', middle_name: '', last_name: '', gender: '', date_of_birth: '', class_id: '',
+    religion: '', nationality: '', phone: '', address: '', guardian_name: '', guardian_relationship: '', guardian_phone: '', previous_school: '',
+    admission_date: new Date().toISOString().slice(0, 10), term1_fee: '0', term2_fee: '0', term3_fee: '0',
   })
   const [mobileMenu, setMobileMenu] = useState(false)
   const [admissionSettings, setAdmissionSettings] = useState<AdmissionSettings>({
@@ -153,16 +154,26 @@ function App() {
         method: 'POST',
         body: JSON.stringify({
           first_name: studentForm.first_name.trim(),
+          middle_name: studentForm.middle_name.trim() || null,
           last_name: studentForm.last_name.trim(),
+          religion: studentForm.religion || null,
+          nationality: studentForm.nationality.trim() || null,
+          phone: studentForm.phone.trim() || null,
+          address: studentForm.address.trim() || null,
+          guardian_name: studentForm.guardian_name.trim() || null,
+          guardian_relationship: studentForm.guardian_relationship || null,
+          guardian_phone: studentForm.guardian_phone.trim() || null,
+          previous_school: studentForm.previous_school.trim() || null,
+          admission_date: studentForm.admission_date || null,
+          term1_fee: Number(studentForm.term1_fee || 0),
+          term2_fee: Number(studentForm.term2_fee || 0),
+          term3_fee: Number(studentForm.term3_fee || 0),
           gender: studentForm.gender || null,
           date_of_birth: studentForm.date_of_birth || null,
           class_id: Number(studentForm.class_id),
         }),
       })
-      setStudentForm({
-        first_name: '', last_name: '', gender: '',
-        date_of_birth: '', class_id: '',
-      })
+      setStudentForm({ first_name: '', middle_name: '', last_name: '', gender: '', date_of_birth: '', class_id: '', religion: '', nationality: '', phone: '', address: '', guardian_name: '', guardian_relationship: '', guardian_phone: '', previous_school: '', admission_date: new Date().toISOString().slice(0, 10), term1_fee: '0', term2_fee: '0', term3_fee: '0' })
       setShowStudentForm(false)
       setStudentSuccess(`Student registered successfully. Admission number: ${createdStudent.admission_number}`)
       await loadSchoolData(token)
@@ -370,10 +381,23 @@ function App() {
                   <div className="student-form-grid">
                     <div className="generated-admission"><strong>Admission number</strong><span>Generated automatically when you save</span></div>
                     <label>First name *<input value={studentForm.first_name} onChange={e => setStudentForm({ ...studentForm, first_name: e.target.value })} placeholder="First name" required /></label>
+                    <label>Middle name<input value={studentForm.middle_name} onChange={e => setStudentForm({ ...studentForm, middle_name: e.target.value })} /></label>
                     <label>Last name *<input value={studentForm.last_name} onChange={e => setStudentForm({ ...studentForm, last_name: e.target.value })} placeholder="Last name" required /></label>
                     <label>Class *<select value={studentForm.class_id} onChange={e => setStudentForm({ ...studentForm, class_id: e.target.value })} required><option value="">Select class</option>{classes.map(item => <option key={item.id} value={item.id}>{item.name}{item.section ? ` — ${item.section}` : ''}</option>)}</select></label>
                     <label>Gender<select value={studentForm.gender} onChange={e => setStudentForm({ ...studentForm, gender: e.target.value })}><option value="">Select gender</option><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select></label>
                     <label>Date of birth<input type="date" value={studentForm.date_of_birth} onChange={e => setStudentForm({ ...studentForm, date_of_birth: e.target.value })} /></label>
+                    <label>Religion<input value={studentForm.religion} onChange={e => setStudentForm({ ...studentForm, religion: e.target.value })} /></label>
+                    <label>Nationality<input value={studentForm.nationality} onChange={e => setStudentForm({ ...studentForm, nationality: e.target.value })} /></label>
+                    <label>Student phone<input value={studentForm.phone} onChange={e => setStudentForm({ ...studentForm, phone: e.target.value })} /></label>
+                    <label>Home address<input value={studentForm.address} onChange={e => setStudentForm({ ...studentForm, address: e.target.value })} /></label>
+                    <label>Parent / guardian name<input value={studentForm.guardian_name} onChange={e => setStudentForm({ ...studentForm, guardian_name: e.target.value })} /></label>
+                    <label>Guardian relationship<select value={studentForm.guardian_relationship} onChange={e => setStudentForm({ ...studentForm, guardian_relationship: e.target.value })}><option value="">Select relationship</option><option>Parent</option><option>Guardian</option><option>Other relative</option></select></label>
+                    <label>Guardian phone<input value={studentForm.guardian_phone} onChange={e => setStudentForm({ ...studentForm, guardian_phone: e.target.value })} /></label>
+                    <label>Previous school<input value={studentForm.previous_school} onChange={e => setStudentForm({ ...studentForm, previous_school: e.target.value })} /></label>
+                    <label>Admission date<input type="date" value={studentForm.admission_date} onChange={e => setStudentForm({ ...studentForm, admission_date: e.target.value })} /></label>
+                    <label>Term 1 fees (UGX)<input type="number" min="0" value={studentForm.term1_fee} onChange={e => setStudentForm({ ...studentForm, term1_fee: e.target.value })} /></label>
+                    <label>Term 2 fees (UGX)<input type="number" min="0" value={studentForm.term2_fee} onChange={e => setStudentForm({ ...studentForm, term2_fee: e.target.value })} /></label>
+                    <label>Term 3 fees (UGX)<input type="number" min="0" value={studentForm.term3_fee} onChange={e => setStudentForm({ ...studentForm, term3_fee: e.target.value })} /></label>
                   </div>
                   {classes.length === 0 && <p className="form-hint">Add a school class first before registering students.</p>}
                   <div className="form-actions"><button type="button" className="secondary-button" onClick={() => setShowStudentForm(false)}>Cancel</button><button className="primary-button" disabled={savingStudent || classes.length === 0}>{savingStudent ? <><LoaderCircle className="spin" size={16} /> Saving...</> : 'Save student'}</button></div>
