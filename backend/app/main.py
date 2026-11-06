@@ -54,9 +54,9 @@ class StudentCreate(BaseModel):
     previous_school: str | None = None
     admission_date: date | None = None
     class_id: int | None = None
-    term1_fee: float = Field(default=0, ge=0)
-    term2_fee: float = Field(default=0, ge=0)
-    term3_fee: float = Field(default=0, ge=0)
+    term1_fee: int = Field(default=0, ge=0)
+    term2_fee: int = Field(default=0, ge=0)
+    term3_fee: int = Field(default=0, ge=0)
 
 
 
@@ -591,7 +591,7 @@ class StaffCreate(BaseModel):
 
 class FeePaymentCreate(BaseModel):
     charge_id: int
-    amount: float = Field(gt=0)
+    amount: int = Field(gt=0)
     payment_date: date = Field(default_factory=date.today)
     method: str = Field(default="Cash", max_length=30)
     reference: str | None = Field(default=None, max_length=80)
