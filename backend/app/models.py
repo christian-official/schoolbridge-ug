@@ -32,6 +32,17 @@ class Student(Base):
     gender: Mapped[str | None] = mapped_column(String(20), nullable=True)
     date_of_birth: Mapped[date | None] = mapped_column(Date, nullable=True)
     class_id: Mapped[int | None] = mapped_column(ForeignKey("classes.id"), nullable=True)
+    middle_name: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    religion: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    nationality: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    address: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    guardian_name: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    guardian_relationship: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    guardian_phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    previous_school: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    admission_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="active")
 
 
 class Attendance(Base):
@@ -100,3 +111,36 @@ class SchoolSettings(Base):
     admission_separator: Mapped[str] = mapped_column(String(5), default="-")
     admission_padding: Mapped[int] = mapped_column(Integer, default=4)
     next_admission_number: Mapped[int] = mapped_column(Integer, default=1)
+
+class StaffMember(Base):
+    __tablename__ = "staff_members"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    staff_number: Mapped[str] = mapped_column(String(40), unique=True, index=True)
+    first_name: Mapped[str] = mapped_column(String(80))
+    last_name: Mapped[str] = mapped_column(String(80))
+    category: Mapped[str] = mapped_column(String(30), default="Teaching")
+    position: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    department: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="active")
+
+class FeeCharge(Base):
+    __tablename__ = "fee_charges"
+    __table_args__ = (UniqueConstraint("student_id", "term", "year"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    student_id: Mapped[int] = mapped_column(ForeignKey("students.id"), index=True)
+    term: Mapped[str] = mapped_column(String(20))
+    year: Mapped[int] = mapped_column(Integer)
+    amount: Mapped[float] = mapped_column(default=0)
+    description: Mapped[str] = mapped_column(String(160), default="Tuition fees")
+
+class FeePayment(Base):
+    __tablename__ = "fee_payments"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    charge_id: Mapped[int] = mapped_column(ForeignKey("fee_charges.id"), index=True)
+    amount: Mapped[float] = mapped_column()
+    payment_date: Mapped[date] = mapped_column(Date, default=date.today)
+    method: Mapped[str] = mapped_column(String(30), default="Cash")
+    reference: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    received_by: Mapped[str | None] = mapped_column(String(80), nullable=True)
