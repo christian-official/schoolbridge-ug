@@ -153,3 +153,11 @@ td strong { color: #34445e; font-size: 11px; }
 .success-notice { color: #187a55; background: #eaf8f2; border-radius: 7px; padding: 11px 13px; margin-bottom: 13px; font-size: 11px; }
 @media(max-width:900px) { .student-form-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
 @media(max-width:520px) { .student-form-grid { grid-template-columns: 1fr; } .form-heading { flex-direction: column; } .panel-heading .add-student-button { padding: 9px 10px; font-size: 10px; } }
+
+
+.settings-panel { max-width: 900px; }
+.settings-checkbox { display: flex !important; align-items: center; gap: 10px !important; min-height: 40px; }
+.settings-checkbox input { width: 17px !important; height: 17px; accent-color: #315ee8; }
+.number-preview { display: flex; flex-direction: column; gap: 8px; border: 1px dashed #cbd6f5; background: #f4f7ff; border-radius: 9px; padding: 16px; margin-top: 18px; }
+.number-preview span { color: #7c8ba5; font-size: 11px; }
+.number-preview strong { color: #315ee8; font: 800 22px Manrope,sans-serif; letter-spacing: .5px; overflow-wrap: anywhere; }
