@@ -5,18 +5,36 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import update
+from sqlalchemy import update, inspect
 
 from .database import Base, engine, get_db, SessionLocal
 from . import models
+from .extended_routes import router as extended_router
 
 Base.metadata.create_all(bind=engine)
+
+# Safe additive migration for existing SQLite school databases. Existing student rows are preserved.
+if engine.dialect.name == "sqlite":
+    student_columns = {column["name"] for column in inspect(engine).get_columns("students")}
+    additions = {
+        "middle_name": "VARCHAR(80)", "religion": "VARCHAR(60)",
+        "nationality": "VARCHAR(60)", "phone": "VARCHAR(30)",
+        "address": "TEXT", "guardian_name": "VARCHAR(160)",
+        "guardian_relationship": "VARCHAR(60)", "guardian_phone": "VARCHAR(30)",
+        "previous_school": "VARCHAR(160)", "admission_date": "DATE",
+    }
+    with engine.begin() as connection:
+        for column_name, column_type in additions.items():
+            if column_name not in student_columns:
+                connection.exec_driver_sql(f"ALTER TABLE students ADD COLUMN {column_name} {column_type}")
 
 app = FastAPI(
     title="SchoolBridge API",
     description="Offline-first school management system API.",
     version="0.2.0",
 )
+
+app.include_router(extended_router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -41,8 +59,18 @@ class StudentCreate(BaseModel):
     admission_number: str | None = None
     first_name: str
     last_name: str
+    middle_name: str | None = None
     gender: str | None = None
     date_of_birth: date | None = None
+    religion: str | None = None
+    nationality: str | None = None
+    phone: str | None = None
+    address: str | None = None
+    guardian_name: str | None = None
+    guardian_relationship: str | None = None
+    guardian_phone: str | None = None
+    previous_school: str | None = None
+    admission_date: date | None = None
     class_id: int | None = None
 
 
