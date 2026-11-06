@@ -15,6 +15,14 @@ type User = {
   active: boolean
 }
 
+type AdmissionSettings = {
+  admission_prefix: string
+  include_year: boolean
+  admission_separator: string
+  admission_padding: number
+  next_admission_number: number
+}
+
 type RecordItem = {
   id: number
   name?: string
@@ -77,18 +85,27 @@ function App() {
     date_of_birth: '', class_id: '',
   })
   const [mobileMenu, setMobileMenu] = useState(false)
+  const [admissionSettings, setAdmissionSettings] = useState<AdmissionSettings>({
+    admission_prefix: 'SB', include_year: true, admission_separator: '-',
+    admission_padding: 4, next_admission_number: 1,
+  })
+  const [settingsError, setSettingsError] = useState('')
+  const [settingsSuccess, setSettingsSuccess] = useState('')
+  const [savingSettings, setSavingSettings] = useState(false)
 
   async function loadSchoolData(authToken: string) {
     setDataError('')
     try {
-      const [studentData, classData, subjectData] = await Promise.all([
+      const [studentData, classData, subjectData, admissionData] = await Promise.all([
         api<RecordItem[]>('students', authToken),
         api<RecordItem[]>('classes', authToken),
         api<RecordItem[]>('subjects', authToken),
+        api<AdmissionSettings>('settings/admission-number', authToken),
       ])
       setStudents(studentData)
       setClasses(classData)
       setSubjects(subjectData)
+      setAdmissionSettings(admissionData)
     } catch {
       setDataError('Some school records could not be loaded. Check your connection and permissions.')
     }
@@ -145,6 +162,26 @@ function App() {
       setStudentError(error instanceof Error ? error.message : 'Unable to register student.')
     } finally {
       setSavingStudent(false)
+    }
+  }
+
+
+  async function saveAdmissionSettings(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setSavingSettings(true)
+    setSettingsError('')
+    setSettingsSuccess('')
+    try {
+      const saved = await api<AdmissionSettings & { message: string }>('settings/admission-number', token, {
+        method: 'PUT',
+        body: JSON.stringify(admissionSettings),
+      })
+      setAdmissionSettings(saved)
+      setSettingsSuccess('Admission numbering settings saved successfully.')
+    } catch (error) {
+      setSettingsError(error instanceof Error ? error.message : 'Unable to save settings.')
+    } finally {
+      setSavingSettings(false)
     }
   }
 
@@ -346,7 +383,25 @@ function App() {
           {active === 'Teachers' && <ComingSoon title="Teacher management" description="Teacher accounts and class assignments will be managed here." />}
           {active === 'Attendance' && <ComingSoon title="Attendance management" description="Daily attendance records and summaries will appear here." />}
           {active === 'Examinations' && <ComingSoon title="Examinations and results" description="Exam setup, marks entry and student results will be managed here." />}
-          {active === 'Settings' && <ComingSoon title="School settings" description="Configure your school profile, preferences and system options." />}
+          {active === 'Settings' && (
+            <section className="panel settings-panel">
+              <div className="panel-heading"><div><h2>Admission number settings</h2><p>Choose the format used for newly registered students at this school.</p></div></div>
+              {settingsSuccess && <div className="success-notice">{settingsSuccess}</div>}
+              {settingsError && <div className="form-error">{settingsError}</div>}
+              <form className="student-form" onSubmit={saveAdmissionSettings}>
+                <div className="student-form-grid">
+                  <label>School prefix<input maxLength={20} value={admissionSettings.admission_prefix} onChange={e => setAdmissionSettings({ ...admissionSettings, admission_prefix: e.target.value })} placeholder="e.g. KIS" /></label>
+                  <label>Separator<select value={admissionSettings.admission_separator} onChange={e => setAdmissionSettings({ ...admissionSettings, admission_separator: e.target.value })}><option value="-">Hyphen (-)</option><option value="/">Slash (/)</option><option value="">None</option></select></label>
+                  <label>Number of digits<select value={admissionSettings.admission_padding} onChange={e => setAdmissionSettings({ ...admissionSettings, admission_padding: Number(e.target.value) })}>{[3,4,5,6,7,8].map(n => <option key={n} value={n}>{n} digits</option>)}</select></label>
+                  <label>Next sequence number<input type="number" min="1" value={admissionSettings.next_admission_number} onChange={e => setAdmissionSettings({ ...admissionSettings, next_admission_number: Math.max(1, Number(e.target.value)) })} required /></label>
+                  <label className="settings-checkbox"><input type="checkbox" checked={admissionSettings.include_year} onChange={e => setAdmissionSettings({ ...admissionSettings, include_year: e.target.checked })} /> Include current year</label>
+                </div>
+                <div className="number-preview"><span>Example of next admission number</span><strong>{[admissionSettings.admission_prefix.trim(), ...(admissionSettings.include_year ? [String(new Date().getFullYear())] : []), String(admissionSettings.next_admission_number).padStart(admissionSettings.admission_padding, '0')].filter(Boolean).join(admissionSettings.admission_separator)}</strong></div>
+                <p className="form-hint">These settings affect new registrations only. Existing admission numbers will not be changed.</p>
+                <div className="form-actions"><button className="primary-button" disabled={savingSettings}>{savingSettings ? 'Saving...' : 'Save numbering settings'}</button></div>
+              </form>
+            </section>
+          )}
 
           <footer className="footer"><span>SchoolBridge</span> · School management made simpler <span className="footer-version">Version 0.1 · Local workspace</span></footer>
         </div>
