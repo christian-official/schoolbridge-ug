@@ -201,7 +201,7 @@ def create_student(data: StudentCreate, db: Session = Depends(get_db)):
     if data.class_id is not None and not db.get(models.SchoolClass, data.class_id):
         raise HTTPException(404, "Class not found.")
     student_data = data.model_dump(exclude={"term1_fee", "term2_fee", "term3_fee"})
-    term_fees = {f"Term {n}": student_data.pop(f"term{n}_fee", 0) for n in (1, 2, 3)}
+    term_fees = {"Term 1": data.term1_fee, "Term 2": data.term2_fee, "Term 3": data.term3_fee}
     supplied_number = (student_data.pop("admission_number") or "").strip()
     settings = get_or_create_school_settings(db)
     item = models.Student(
