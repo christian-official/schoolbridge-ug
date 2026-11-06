@@ -40,6 +40,9 @@ function App() {
   const [active, setActive] = useState('Overview')
   const [mobileMenu, setMobileMenu] = useState(false)
   const [classes, setClasses] = useState<Item[]>([])
+  const [showClassForm, setShowClassForm] = useState(false)
+  const [classForm, setClassForm] = useState({ name: '', section: '' })
+  const [classError, setClassError] = useState('')
   const [subjects, setSubjects] = useState<Item[]>([])
   const [summary, setSummary] = useState<DashboardSummary>({ students: 0, classes: 0, staff: 0, fees_expected: 0, fees_collected: 0, outstanding: 0 })
   const [dataError, setDataError] = useState('')
@@ -161,6 +164,17 @@ function App() {
     } catch (error) { setStaffError(error instanceof Error ? error.message : 'Unable to add staff member.') }
   }
 
+  async function registerClass(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault(); setClassError('')
+    try {
+      await api('classes', token, { method: 'POST', body: JSON.stringify({
+        name: classForm.name.trim(), section: classForm.section.trim() || null,
+      }) })
+      setClassForm({ name: '', section: '' }); setShowClassForm(false)
+      await loadSummary(token)
+    } catch (error) { setClassError(error instanceof Error ? error.message : 'Unable to create class.') }
+  }
+
   async function saveAdmissionSettings(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); setSavingSettings(true); setSettingsError(''); setSettingsSuccess('')
     try { const saved = await api<AdmissionSettings>('settings/admission-number', token, { method: 'PUT', body: JSON.stringify(admissionSettings) }); setAdmissionSettings(saved); setSettingsSuccess('Admission numbering settings saved.') }
@@ -280,7 +294,7 @@ function App() {
         </>}
       </section>}
 
-      {active === 'Classes' && <section className="panel"><div className="panel-heading"><div><h2>School classes</h2><p>{classes.length} classes registered</p></div></div><div className="class-grid">{classes.map(c => <div className="class-card" key={c.id}><BookOpen size={22} /><strong>{c.name}</strong><span>{c.section || 'General section'}</span></div>)}</div>{!classes.length && <EmptyState text="No classes have been added yet." />}</section>}
+      {active === 'Classes' && <section className="panel"><div className="panel-heading"><div><h2>School classes</h2><p>{classes.length} classes registered</p></div><button className="primary-button add-student-button" onClick={() => { setShowClassForm(!showClassForm); setClassError('') }}><Plus size={16} /> {showClassForm ? 'Close form' : 'Add class'}</button></div>{classError && <div className="form-error">{classError}</div>}{showClassForm && <form className="student-form" onSubmit={registerClass}><div className="student-form-grid"><label>Class name *<input required value={classForm.name} onChange={e => setClassForm({ ...classForm, name: e.target.value })} placeholder="e.g. Primary 1" /></label><label>Section (optional)<input value={classForm.section} onChange={e => setClassForm({ ...classForm, section: e.target.value })} placeholder="e.g. East or A" /></label></div><div className="form-actions"><button type="button" className="secondary-button" onClick={() => setShowClassForm(false)}>Cancel</button><button className="primary-button">Save class</button></div></form>}<div className="class-grid">{classes.map(c => <div className="class-card" key={c.id}><BookOpen size={22} /><strong>{c.name}</strong><span>{c.section || 'General section'}</span></div>)}</div>{!classes.length && <EmptyState text="No classes have been added yet." />}</section>}
       {active === 'Settings' && <section className="panel settings-panel"><div className="panel-heading"><div><h2>Admission number settings</h2><p>Choose the format used for new student registrations.</p></div></div>{settingsSuccess && <div className="success-notice">{settingsSuccess}</div>}{settingsError && <div className="form-error">{settingsError}</div>}<form className="student-form" onSubmit={saveAdmissionSettings}><div className="student-form-grid">
         <label>School prefix<input maxLength={20} value={admissionSettings.admission_prefix} onChange={e => setAdmissionSettings({ ...admissionSettings, admission_prefix: e.target.value })} /></label>
         <label>Separator<select value={admissionSettings.admission_separator} onChange={e => setAdmissionSettings({ ...admissionSettings, admission_separator: e.target.value })}><option value="-">Hyphen (-)</option><option value="/">Slash (/)</option><option value="">None</option></select></label>
