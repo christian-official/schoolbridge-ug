@@ -62,7 +62,7 @@ class FeeStructure(Base):
     class_id: Mapped[int] = mapped_column(ForeignKey("classes.id"))
     academic_year: Mapped[int] = mapped_column(Integer, index=True)
     term: Mapped[str] = mapped_column(String(20))
-    amount: Mapped[float] = mapped_column(Float)
+    amount: Mapped[int] = mapped_column(Integer)
     description: Mapped[str] = mapped_column(String(160), default="Tuition and school fees")
 
 
