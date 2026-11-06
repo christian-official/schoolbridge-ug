@@ -161,3 +161,10 @@ td strong { color: #34445e; font-size: 11px; }
 .number-preview { display: flex; flex-direction: column; gap: 8px; border: 1px dashed #cbd6f5; background: #f4f7ff; border-radius: 9px; padding: 16px; margin-top: 18px; }
 .number-preview span { color: #7c8ba5; font-size: 11px; }
 .number-preview strong { color: #315ee8; font: 800 22px Manrope,sans-serif; letter-spacing: .5px; overflow-wrap: anywhere; }
+
+.student-tools { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+.filter-select { border:1px solid var(--line); border-radius:8px; padding:10px 12px; color:#52617a; background:white; font-size:11px; min-width:150px; }
+.pagination-row { display:flex; justify-content:space-between; align-items:center; gap:12px; padding-top:16px; color:#8793a8; font-size:11px; }
+.pagination-row > div { display:flex; gap:8px; }
+.finance-stats { grid-template-columns:repeat(3,minmax(0,1fr)); margin:0 0 22px; }
+@media(max-width:700px) { .pagination-row { align-items:flex-start; flex-direction:column; } .student-tools .search-box { max-width:none; width:100%; } .finance-stats { grid-template-columns:1fr; } }
