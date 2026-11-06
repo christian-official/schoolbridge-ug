@@ -77,7 +77,6 @@ function App() {
   const [studentPage, setStudentPage] = useState(1)
   const [studentClassFilter, setStudentClassFilter] = useState('')
   const [classes, setClasses] = useState<RecordItem[]>([])
-  const [subjects, setSubjects] = useState<RecordItem[]>([])
   const [dataError, setDataError] = useState('')
   const [search, setSearch] = useState('')
   const [showStudentForm, setShowStudentForm] = useState(false)
@@ -106,10 +105,9 @@ function App() {
   async function loadSchoolData(authToken: string) {
     setDataError('')
     try {
-      const [studentData, classData, subjectData, admissionData, financeData] = await Promise.all([
+      const [studentData, classData, admissionData, financeData] = await Promise.all([
         api<StudentPage>('students/search?page=1&page_size=25', authToken),
         api<RecordItem[]>('classes', authToken),
-        api<RecordItem[]>('subjects', authToken),
         api<AdmissionSettings>('settings/admission-number', authToken),
         api<FinanceSummary>('finance/summary', authToken),
       ])
@@ -117,7 +115,6 @@ function App() {
       setStudentTotal(studentData.total)
       setStudentPage(1)
       setClasses(classData)
-      setSubjects(subjectData)
       setAdmissionSettings(admissionData)
       setFinanceSummary(financeData)
     } catch {
