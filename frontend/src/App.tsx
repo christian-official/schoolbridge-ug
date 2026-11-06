@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import {
   LayoutDashboard, Users, GraduationCap, BookOpen,
   ClipboardCheck, FileText, Settings, LogOut,
-  Search, Bell, Plus, Menu, X, ArrowUpRight,
+  Search, Bell, Plus, Menu, X, ArrowUpRight, UserPlus,
   CalendarDays, TrendingUp, ShieldCheck, LoaderCircle,
 } from 'lucide-react'
 import './App.css'
@@ -23,6 +23,8 @@ type RecordItem = {
   admission_number?: string
   section?: string
   gender?: string
+  class_id?: number | null
+  date_of_birth?: string | null
 }
 
 const menu = [
@@ -34,12 +36,18 @@ const menu = [
   { label: 'Examinations', icon: FileText },
 ]
 
-async function api<T>(path: string, token: string): Promise<T> {
+async function api<T>(path: string, token: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`/api/${path}`, {
-    headers: { Authorization: `Bearer ${token}` },
+    ...options,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+      ...options.headers,
+    },
   })
-  if (!response.ok) throw new Error(`Request failed: ${response.status}`)
-  return response.json()
+  const result = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(result.detail || `Request failed: ${response.status}`)
+  return result as T
 }
 
 function App() {
@@ -55,6 +63,14 @@ function App() {
   const [subjects, setSubjects] = useState<RecordItem[]>([])
   const [dataError, setDataError] = useState('')
   const [search, setSearch] = useState('')
+  const [showStudentForm, setShowStudentForm] = useState(false)
+  const [savingStudent, setSavingStudent] = useState(false)
+  const [studentError, setStudentError] = useState('')
+  const [studentSuccess, setStudentSuccess] = useState('')
+  const [studentForm, setStudentForm] = useState({
+    admission_number: '', first_name: '', last_name: '', gender: '',
+    date_of_birth: '', class_id: '',
+  })
   const [mobileMenu, setMobileMenu] = useState(false)
 
   async function loadSchoolData(authToken: string) {
@@ -70,6 +86,37 @@ function App() {
       setSubjects(subjectData)
     } catch {
       setDataError('Some school records could not be loaded. Check your connection and permissions.')
+    }
+  }
+
+  async function registerStudent(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setSavingStudent(true)
+    setStudentError('')
+    setStudentSuccess('')
+    try {
+      await api<RecordItem>('students', token, {
+        method: 'POST',
+        body: JSON.stringify({
+          admission_number: studentForm.admission_number.trim(),
+          first_name: studentForm.first_name.trim(),
+          last_name: studentForm.last_name.trim(),
+          gender: studentForm.gender || null,
+          date_of_birth: studentForm.date_of_birth || null,
+          class_id: Number(studentForm.class_id),
+        }),
+      })
+      setStudentForm({
+        admission_number: '', first_name: '', last_name: '', gender: '',
+        date_of_birth: '', class_id: '',
+      })
+      setShowStudentForm(false)
+      setStudentSuccess('Student registered successfully.')
+      await loadSchoolData(token)
+    } catch (error) {
+      setStudentError(error instanceof Error ? error.message : 'Unable to register student.')
+    } finally {
+      setSavingStudent(false)
     }
   }
 
@@ -219,7 +266,7 @@ function App() {
               <section className="dashboard-grid">
                 <div className="panel recent-panel">
                   <div className="panel-heading"><div><h2>Recent students</h2><p>Latest registered student records</p></div><button className="text-button" onClick={() => setActive('Students')}>View all <ArrowUpRight size={15} /></button></div>
-                  <StudentTable students={students.slice(-5).reverse()} />
+                  <StudentTable students={students.slice(-5).reverse()} classes={classes} />
                 </div>
                 <div className="panel quick-panel">
                   <div className="panel-heading"><div><h2>Quick actions</h2><p>Common school operations</p></div></div>
@@ -234,9 +281,26 @@ function App() {
 
           {active === 'Students' && (
             <section className="panel">
-              <div className="panel-heading"><div><h2>Student records</h2><p>{students.length} registered students</p></div><span className="record-count"><Users size={16} /> {students.length} records</span></div>
+              <div className="panel-heading"><div><h2>Student records</h2><p>{students.length} registered students</p></div><button className="primary-button add-student-button" onClick={() => { setShowStudentForm(v => !v); setStudentError(''); setStudentSuccess('') }}><UserPlus size={16} /> {showStudentForm ? 'Close form' : 'Register student'}</button></div>
+              {studentSuccess && <div className="success-notice">{studentSuccess}</div>}
+              {studentError && <div className="form-error">{studentError}</div>}
+              {showStudentForm && (
+                <form className="student-form" onSubmit={registerStudent}>
+                  <div className="form-heading"><div><h3>New student registration</h3><p>Enter the student's details below.</p></div><span className="required-note">* Required fields</span></div>
+                  <div className="student-form-grid">
+                    <label>Admission number *<input value={studentForm.admission_number} onChange={e => setStudentForm({ ...studentForm, admission_number: e.target.value })} placeholder="e.g. SB-2026-001" required /></label>
+                    <label>First name *<input value={studentForm.first_name} onChange={e => setStudentForm({ ...studentForm, first_name: e.target.value })} placeholder="First name" required /></label>
+                    <label>Last name *<input value={studentForm.last_name} onChange={e => setStudentForm({ ...studentForm, last_name: e.target.value })} placeholder="Last name" required /></label>
+                    <label>Class *<select value={studentForm.class_id} onChange={e => setStudentForm({ ...studentForm, class_id: e.target.value })} required><option value="">Select class</option>{classes.map(item => <option key={item.id} value={item.id}>{item.name}{item.section ? ` — ${item.section}` : ''}</option>)}</select></label>
+                    <label>Gender<select value={studentForm.gender} onChange={e => setStudentForm({ ...studentForm, gender: e.target.value })}><option value="">Select gender</option><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select></label>
+                    <label>Date of birth<input type="date" value={studentForm.date_of_birth} onChange={e => setStudentForm({ ...studentForm, date_of_birth: e.target.value })} /></label>
+                  </div>
+                  {classes.length === 0 && <p className="form-hint">Add a school class first before registering students.</p>}
+                  <div className="form-actions"><button type="button" className="secondary-button" onClick={() => setShowStudentForm(false)}>Cancel</button><button className="primary-button" disabled={savingStudent || classes.length === 0}>{savingStudent ? <><LoaderCircle className="spin" size={16} /> Saving...</> : 'Save student'}</button></div>
+                </form>
+              )}
               <div className="table-tools"><div className="search-box"><Search size={17} /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name or admission number..." /></div></div>
-              <StudentTable students={filteredStudents} />
+              <StudentTable students={filteredStudents} classes={classes} />
             </section>
           )}
 
@@ -264,11 +328,11 @@ function StatCard({ title, value, icon, note }: { title: string; value: string |
   return <div className="stat-card"><div className="stat-top"><span>{title}</span><span className="stat-icon">{icon}</span></div><strong className="stat-value">{value}</strong><small><TrendingUp size={14} /> {note}</small></div>
 }
 
-function StudentTable({ students }: { students: RecordItem[] }) {
+function StudentTable({ students, classes = [] }: { students: RecordItem[]; classes?: RecordItem[] }) {
   if (!students.length) return <EmptyState text="No student records to display yet." />
   return (
-    <div className="table-wrap"><table><thead><tr><th>Student</th><th>Admission no.</th><th>Gender</th><th>Class ID</th></tr></thead><tbody>
-      {students.map(student => <tr key={student.id}><td><div className="student-cell"><div className="student-avatar">{(student.first_name || '?').slice(0, 1).toUpperCase()}</div><strong>{student.first_name} {student.last_name}</strong></div></td><td>{student.admission_number}</td><td>{student.gender || '—'}</td><td>{student.id ? student.id : '—'}</td></tr>)}
+    <div className="table-wrap"><table><thead><tr><th>Student</th><th>Admission no.</th><th>Gender</th><th>Class</th></tr></thead><tbody>
+      {students.map(student => <tr key={student.id}><td><div className="student-cell"><div className="student-avatar">{(student.first_name || '?').slice(0, 1).toUpperCase()}</div><strong>{student.first_name} {student.last_name}</strong></div></td><td>{student.admission_number}</td><td>{student.gender || '—'}</td><td>{classes.find(item => item.id === student.class_id)?.name || '—'}</td></tr>)}
     </tbody></table></div>
   )
 }
