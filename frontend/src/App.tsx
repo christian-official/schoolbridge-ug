@@ -64,6 +64,11 @@ function App() {
   const [dataError, setDataError] = useState('')
   const [search, setSearch] = useState('')
   const [showStudentForm, setShowStudentForm] = useState(false)
+  const [showClassForm, setShowClassForm] = useState(false)
+  const [classForm, setClassForm] = useState({ name: '', section: '' })
+  const [classError, setClassError] = useState('')
+  const [classSuccess, setClassSuccess] = useState('')
+  const [savingClass, setSavingClass] = useState(false)
   const [savingStudent, setSavingStudent] = useState(false)
   const [studentError, setStudentError] = useState('')
   const [studentSuccess, setStudentSuccess] = useState('')
@@ -86,6 +91,30 @@ function App() {
       setSubjects(subjectData)
     } catch {
       setDataError('Some school records could not be loaded. Check your connection and permissions.')
+    }
+  }
+
+  async function registerClass(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setSavingClass(true)
+    setClassError('')
+    setClassSuccess('')
+    try {
+      await api<RecordItem>('classes', token, {
+        method: 'POST',
+        body: JSON.stringify({
+          name: classForm.name.trim(),
+          section: classForm.section.trim() || null,
+        }),
+      })
+      setClassForm({ name: '', section: '' })
+      setShowClassForm(false)
+      setClassSuccess('Class created successfully.')
+      await loadSchoolData(token)
+    } catch (error) {
+      setClassError(error instanceof Error ? error.message : 'Unable to create class.')
+    } finally {
+      setSavingClass(false)
     }
   }
 
@@ -306,7 +335,10 @@ function App() {
 
           {active === 'Classes' && (
             <section className="panel">
-              <div className="panel-heading"><div><h2>School classes</h2><p>Classes registered in the system</p></div><span className="record-count">{classes.length} classes</span></div>
+              <div className="panel-heading"><div><h2>School classes</h2><p>Classes registered in the system</p></div><button className="primary-button add-student-button" onClick={() => { setShowClassForm(v => !v); setClassError(''); setClassSuccess('') }}><Plus size={16} /> {showClassForm ? 'Close form' : 'Add class'}</button></div>
+              {classSuccess && <div className="success-notice">{classSuccess}</div>}
+              {classError && <div className="form-error">{classError}</div>}
+              {showClassForm && <form className="student-form class-form" onSubmit={registerClass}><div className="form-heading"><div><h3>Create a school class</h3><p>Examples: Primary 1, Senior 1, Senior 2.</p></div></div><div className="student-form-grid class-form-grid"><label>Class name *<input value={classForm.name} onChange={e => setClassForm({ ...classForm, name: e.target.value })} placeholder="e.g. Primary 1" required /></label><label>Section (optional)<input value={classForm.section} onChange={e => setClassForm({ ...classForm, section: e.target.value })} placeholder="e.g. East or A" /></label></div><div className="form-actions"><button type="button" className="secondary-button" onClick={() => setShowClassForm(false)}>Cancel</button><button className="primary-button" disabled={savingClass}>{savingClass ? 'Saving...' : 'Save class'}</button></div></form>}
               <div className="class-grid">{classes.map(item => <div className="class-card" key={item.id}><BookOpen size={22} /><strong>{item.name}</strong><span>{item.section || 'General section'}</span></div>)}</div>
               {classes.length === 0 && <EmptyState text="No classes have been added yet." />}
             </section>
