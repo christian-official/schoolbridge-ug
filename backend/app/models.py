@@ -1,6 +1,6 @@
 from datetime import date, datetime
 from sqlalchemy import (
-    String, Integer, Date, DateTime, ForeignKey, UniqueConstraint, Float, Boolean, Text
+    String, Integer, Date, DateTime, ForeignKey, UniqueConstraint, Boolean, Text
 )
 from sqlalchemy.orm import Mapped, mapped_column
 from .database import Base
@@ -73,7 +73,7 @@ class FeeCharge(Base):
     academic_year: Mapped[int] = mapped_column(Integer, index=True)
     term: Mapped[str] = mapped_column(String(20))
     description: Mapped[str] = mapped_column(String(160))
-    amount: Mapped[float] = mapped_column(Float)
+    amount: Mapped[float] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
