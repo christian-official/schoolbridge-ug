@@ -227,6 +227,10 @@ def create_student(data: StudentCreate, db: Session = Depends(get_db)):
                 parts.append(str(date.today().year))
             parts.append(str(next_value).zfill(settings.admission_padding))
             item.admission_number = settings.admission_separator.join(parts)
+        db.flush()
+        for term, amount in term_fees.items():
+            if amount > 0:
+                db.add(models.FeeCharge(student_id=item.id, term=term, year=date.today().year, amount=amount))
         db.commit()
         db.refresh(item)
     except IntegrityError:
@@ -563,6 +567,39 @@ def my_assignments(
     ]
 
 
+class StaffCreate(BaseModel):
+    first_name: str
+    last_name: str
+    category: str = Field(default="Teaching", pattern="^(Teaching|Non-teaching)$")
+    position: str | None = None
+    department: str | None = None
+    phone: str | None = None
+    email: str | None = None
+
+class FeePaymentCreate(BaseModel):
+    charge_id: int
+    amount: float = Field(gt=0)
+    payment_date: date = Field(default_factory=date.today)
+    method: str = Field(default="Cash", max_length=30)
+    reference: str | None = Field(default=None, max_length=80)
+
+def upgrade_existing_database():
+    from sqlalchemy import inspect, text
+    inspector = inspect(engine)
+    if "students" not in inspector.get_table_names(): return
+    existing = {column["name"] for column in inspector.get_columns("students")}
+    additions = {
+        "middle_name": "VARCHAR(80)", "religion": "VARCHAR(60)", "nationality": "VARCHAR(60)",
+        "phone": "VARCHAR(30)", "address": "VARCHAR(255)", "guardian_name": "VARCHAR(160)",
+        "guardian_relationship": "VARCHAR(60)", "guardian_phone": "VARCHAR(30)",
+        "previous_school": "VARCHAR(160)", "admission_date": "DATE",
+        "status": "VARCHAR(20) NOT NULL DEFAULT 'active'",
+    }
+    with engine.begin() as connection:
+        for name, sql_type in additions.items():
+            if name not in existing: connection.execute(text("ALTER TABLE students ADD COLUMN " + name + " " + sql_type))
+
+upgrade_existing_database()
 @app.get("/api/students/search", tags=["Students"])
 def search_students(page: int = 1, page_size: int = 25, search: str = "", class_id: int | None = None, db: Session = Depends(get_db)):
     page_size = min(max(page_size, 1), 100)
