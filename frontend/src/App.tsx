@@ -139,16 +139,10 @@ function App() {
         guardian_relationship: studentForm.guardian_relationship || null, guardian_phone: studentForm.guardian_phone || null,
         previous_school: studentForm.previous_school || null, admission_date: studentForm.admission_date || null,
         class_id: Number(studentForm.class_id),
+        term1_fee: Number(studentForm.term1_fee || 0), term2_fee: Number(studentForm.term2_fee || 0),
+        term3_fee: Number(studentForm.term3_fee || 0),
       }) })
-      const fees = [
-        { term: 'Term 1', amount: studentForm.term1_fee }, { term: 'Term 2', amount: studentForm.term2_fee },
-        { term: 'Term 3', amount: studentForm.term3_fee },
-      ].filter(item => Number(item.amount) > 0)
-      for (const fee of fees) await api('finance/charges', token, { method: 'POST', body: JSON.stringify({
-        student_id: created.id, academic_year: new Date().getFullYear(), term: fee.term,
-        description: 'School fees', amount: Number(fee.amount),
-      }) })
-      setStudentSuccess(`Student registered: ${created.admission_number}. Initial term charges have been added.`)
+      setStudentSuccess(`Student registered: ${created.admission_number}. Initial term charges have been saved.`)
       setStudentForm({ first_name: '', middle_name: '', last_name: '', gender: '', date_of_birth: '', religion: '', nationality: 'Ugandan', phone: '', address: '', guardian_name: '', guardian_relationship: '', guardian_phone: '', previous_school: '', admission_date: new Date().toISOString().slice(0, 10), class_id: '', term1_fee: '', term2_fee: '', term3_fee: '' })
       setShowStudentForm(false); await loadStudents(token, 1, studentSearch, studentClass, studentGender); setStudentPage(1); await loadSummary(token)
     } catch (error) { setStudentError(error instanceof Error ? error.message : 'Unable to register student. Check the student and fee records.') }
