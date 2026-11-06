@@ -1,0 +1,1 @@
+"""SchoolBridge backend application."""
