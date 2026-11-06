@@ -17,6 +17,7 @@ type User = {
 }
 
 type StudentPage = { items: RecordItem[]; total: number; page: number; pages: number }
+type FinanceSummary = { fees_expected: number; fees_collected: number; outstanding: number }
 
 type AdmissionSettings = {
   admission_prefix: string
@@ -72,6 +73,7 @@ function App() {
   const [active, setActive] = useState('Overview')
   const [students, setStudents] = useState<RecordItem[]>([])
   const [studentTotal, setStudentTotal] = useState(0)
+  const [financeSummary, setFinanceSummary] = useState<FinanceSummary>({ fees_expected: 0, fees_collected: 0, outstanding: 0 })
   const [studentPage, setStudentPage] = useState(1)
   const [studentClassFilter, setStudentClassFilter] = useState('')
   const [classes, setClasses] = useState<RecordItem[]>([])
@@ -104,11 +106,12 @@ function App() {
   async function loadSchoolData(authToken: string) {
     setDataError('')
     try {
-      const [studentData, classData, subjectData, admissionData] = await Promise.all([
+      const [studentData, classData, subjectData, admissionData, financeData] = await Promise.all([
         api<StudentPage>('students/search?page=1&page_size=25', authToken),
         api<RecordItem[]>('classes', authToken),
         api<RecordItem[]>('subjects', authToken),
         api<AdmissionSettings>('settings/admission-number', authToken),
+        api<FinanceSummary>('finance/summary', authToken),
       ])
       setStudents(studentData.items)
       setStudentTotal(studentData.total)
@@ -116,6 +119,7 @@ function App() {
       setClasses(classData)
       setSubjects(subjectData)
       setAdmissionSettings(admissionData)
+      setFinanceSummary(financeData)
     } catch {
       setDataError('Some school records could not be loaded. Check your connection and permissions.')
     }
@@ -351,9 +355,11 @@ function App() {
           {active === 'Overview' && (
             <>
               <section className="stats-grid">
-                <StatCard title="Total students" value={students.length} icon={<GraduationCap />} note="Registered students" />
+                <StatCard title="Total students" value={studentTotal} icon={<GraduationCap />} note="Registered students" />
                 <StatCard title="Classes" value={classes.length} icon={<BookOpen />} note="School classes" />
-                <StatCard title="Subjects" value={subjects.length} icon={<FileText />} note="Available subjects" />
+                <StatCard title="Fees expected" value={`UGX ${financeSummary.fees_expected.toLocaleString()}`} icon={<FileText />} note="Recorded term charges" />
+                <StatCard title="Fees collected" value={`UGX ${financeSummary.fees_collected.toLocaleString()}`} icon={<TrendingUp />} note="Payments received" />
+                <StatCard title="Outstanding fees" value={`UGX ${financeSummary.outstanding.toLocaleString()}`} icon={<Bell />} note="Remaining balances" />
                 <StatCard title="Account status" value="Active" icon={<ShieldCheck />} note="Administrator access" />
               </section>
               <section className="dashboard-grid">
