@@ -89,3 +89,14 @@ class TeacherAssignment(Base):
     teacher_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     class_id: Mapped[int] = mapped_column(ForeignKey("classes.id"))
     subject_id: Mapped[int] = mapped_column(ForeignKey("subjects.id"))
+
+
+class SchoolSettings(Base):
+    __tablename__ = "school_settings"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    admission_prefix: Mapped[str] = mapped_column(String(20), default="SB")
+    include_year: Mapped[bool] = mapped_column(default=True)
+    admission_separator: Mapped[str] = mapped_column(String(5), default="-")
+    admission_padding: Mapped[int] = mapped_column(Integer, default=4)
+    next_admission_number: Mapped[int] = mapped_column(Integer, default=1)
