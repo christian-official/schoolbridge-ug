@@ -356,8 +356,10 @@ function App() {
               </section>
               <section className="dashboard-grid">
                 <div className="panel recent-panel">
-                  <div className="panel-heading"><div><h2>Recent students</h2><p>Latest registered student records</p></div><button className="text-button" onClick={() => setActive('Students')}>View all <ArrowUpRight size={15} /></button></div>
-                  <StudentTable students={students.slice(-5).reverse()} classes={classes} />
+                  <div className="panel-heading"><div><h2>School records</h2><p>Keep large registers inside their own modules</p></div></div>
+                  <button className="quick-action" onClick={() => setActive('Students')}><span className="quick-icon blue"><GraduationCap /></span><span><strong>Student register</strong><small>{studentTotal.toLocaleString()} student records · searchable</small></span><ArrowUpRight size={17} /></button>
+                  <button className="quick-action" onClick={() => setActive('Staff')}><span className="quick-icon purple"><Users /></span><span><strong>Staff directory</strong><small>Teaching and non-teaching staff</small></span><ArrowUpRight size={17} /></button>
+                  <button className="quick-action" onClick={() => setActive('Fees & Finance')}><span className="quick-icon green"><FileText /></span><span><strong>Fees and finance</strong><small>Charges, payments and balances</small></span><ArrowUpRight size={17} /></button>
                 </div>
                 <div className="panel quick-panel">
                   <div className="panel-heading"><div><h2>Quick actions</h2><p>Common school operations</p></div></div>
