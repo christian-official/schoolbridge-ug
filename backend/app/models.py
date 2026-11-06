@@ -132,14 +132,14 @@ class FeeCharge(Base):
     student_id: Mapped[int] = mapped_column(ForeignKey("students.id"), index=True)
     term: Mapped[str] = mapped_column(String(20))
     year: Mapped[int] = mapped_column(Integer)
-    amount: Mapped[float] = mapped_column(default=0)
+    amount: Mapped[int] = mapped_column(Integer, default=0)
     description: Mapped[str] = mapped_column(String(160), default="Tuition fees")
 
 class FeePayment(Base):
     __tablename__ = "fee_payments"
     id: Mapped[int] = mapped_column(primary_key=True)
     charge_id: Mapped[int] = mapped_column(ForeignKey("fee_charges.id"), index=True)
-    amount: Mapped[float] = mapped_column()
+    amount: Mapped[int] = mapped_column(Integer)
     payment_date: Mapped[date] = mapped_column(Date, default=date.today)
     method: Mapped[str] = mapped_column(String(30), default="Cash")
     reference: Mapped[str | None] = mapped_column(String(80), nullable=True)
