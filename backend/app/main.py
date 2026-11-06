@@ -72,6 +72,9 @@ class StudentCreate(BaseModel):
     previous_school: str | None = None
     admission_date: date | None = None
     class_id: int | None = None
+    term1_fee: int = Field(default=0, ge=0, exclude=True)
+    term2_fee: int = Field(default=0, ge=0, exclude=True)
+    term3_fee: int = Field(default=0, ge=0, exclude=True)
 
 
 
@@ -254,6 +257,20 @@ def create_student(data: StudentCreate, db: Session = Depends(get_db)):
                 parts.append(str(date.today().year))
             parts.append(str(next_value).zfill(settings.admission_padding))
             item.admission_number = settings.admission_separator.join(parts)
+        # Create any initial term charges in the same transaction as admission.
+        # This prevents a student being registered without their requested fee records.
+        for term_name, amount in [
+            ("Term 1", data.term1_fee), ("Term 2", data.term2_fee),
+            ("Term 3", data.term3_fee),
+        ]:
+            if amount > 0:
+                db.add(models.FeeCharge(
+                    student_id=item.id,
+                    academic_year=date.today().year,
+                    term=term_name,
+                    description="School fees",
+                    amount=amount,
+                ))
         db.commit()
         db.refresh(item)
     except IntegrityError:
