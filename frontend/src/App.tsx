@@ -73,6 +73,7 @@ function App() {
   const [students, setStudents] = useState<RecordItem[]>([])
   const [studentTotal, setStudentTotal] = useState(0)
   const [studentPage, setStudentPage] = useState(1)
+  const [studentClassFilter, setStudentClassFilter] = useState('')
   const [classes, setClasses] = useState<RecordItem[]>([])
   const [subjects, setSubjects] = useState<RecordItem[]>([])
   const [dataError, setDataError] = useState('')
@@ -207,12 +208,13 @@ function App() {
   async function loadStudentPage(page = 1, query = search) {
     try {
       const params = new URLSearchParams({ page: String(page), page_size: '25', search: query })
+      if (studentClassFilter) params.set('class_id', studentClassFilter)
       const result = await api<StudentPage>('students/search?' + params.toString(), token)
       setStudents(result.items); setStudentTotal(result.total); setStudentPage(result.page)
     } catch (error) { setDataError(error instanceof Error ? error.message : 'Unable to load student records.') }
   }
 
-  useEffect(() => { if (token && active === 'Students') void loadStudentPage(1, search) }, [search, active, token])
+  useEffect(() => { if (token && active === 'Students') void loadStudentPage(1, search) }, [search, studentClassFilter, active, token])
 
   async function loadUser(authToken: string) {
     try {
@@ -405,7 +407,7 @@ function App() {
                   <div className="form-actions"><button type="button" className="secondary-button" onClick={() => setShowStudentForm(false)}>Cancel</button><button className="primary-button" disabled={savingStudent || classes.length === 0}>{savingStudent ? <><LoaderCircle className="spin" size={16} /> Saving...</> : 'Save student'}</button></div>
                 </form>
               )}
-              <div className="table-tools"><div className="search-box"><Search size={17} /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name or admission number..." /></div></div>
+              <div className="table-tools student-tools"><div className="search-box"><Search size={17} /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name or admission number..." /></div><select className="filter-select" value={studentClassFilter} onChange={e => setStudentClassFilter(e.target.value)}><option value="">All classes</option>{classes.map(item => <option key={item.id} value={item.id}>{item.name}{item.section ? ` — ${item.section}` : ""}</option>)}</select></div>
               <StudentTable students={filteredStudents} classes={classes} />
               <div className="pagination-row"><span>Showing {students.length ? (studentPage - 1) * 25 + 1 : 0}–{Math.min(studentPage * 25, studentTotal)} of {studentTotal}</span><div><button className="secondary-button" disabled={studentPage <= 1} onClick={() => void loadStudentPage(studentPage - 1)}>Previous</button><button className="secondary-button" disabled={studentPage * 25 >= studentTotal} onClick={() => void loadStudentPage(studentPage + 1)}>Next</button></div></div>
             </section>
