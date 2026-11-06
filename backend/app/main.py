@@ -1,4 +1,5 @@
 from datetime import date
+from uuid import uuid4
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field
@@ -36,7 +37,7 @@ class SubjectCreate(BaseModel):
 
 
 class StudentCreate(BaseModel):
-    admission_number: str
+    admission_number: str | None = None
     first_name: str
     last_name: str
     gender: str | None = None
@@ -143,9 +144,19 @@ def list_subjects(db: Session = Depends(get_db)):
 def create_student(data: StudentCreate, db: Session = Depends(get_db)):
     if data.class_id is not None and not db.get(models.SchoolClass, data.class_id):
         raise HTTPException(404, "Class not found.")
-    item = models.Student(**data.model_dump())
+    student_data = data.model_dump()
+    supplied_number = (student_data.pop("admission_number") or "").strip()
+    # Flush first to obtain a database-generated ID. This keeps generated
+    # admission numbers unique even when multiple devices register students.
+    item = models.Student(
+        **student_data,
+        admission_number=supplied_number or f"PENDING-{uuid4().hex}",
+    )
     db.add(item)
     try:
+        db.flush()
+        if not supplied_number:
+            item.admission_number = f"SB-{date.today().year}-{item.id:04d}"
         db.commit()
         db.refresh(item)
     except IntegrityError:
