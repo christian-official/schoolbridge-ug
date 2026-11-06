@@ -5,7 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
-from .database import Base, engine, get_db
+from .database import Base, engine, get_db, SessionLocal
 from . import models
 
 Base.metadata.create_all(bind=engine)
@@ -295,46 +295,56 @@ def require_admin(user=Depends(get_current_user)):
 @app.middleware("http")
 async def protect_school_data(request: Request, call_next):
     path = request.url.path
+    public_paths = {"/api/health", "/api/auth/login"}
 
-    public_paths = {
-        "/api/health",
-        "/api/auth/login",
-    }
+    if not path.startswith("/api/") or path in public_paths:
+        return await call_next(request)
 
-    if path.startswith("/api/") and path not in public_paths:
-        auth = request.headers.get("Authorization", "")
+    from starlette.responses import JSONResponse
 
-        if not auth.startswith("Bearer "):
-            return __import__("starlette.responses").responses.JSONResponse(
-                {"detail": "Login required."}, status_code=401
-            )
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        return JSONResponse({"detail": "Login required."}, status_code=401)
 
+    db = SessionLocal()
+    try:
         try:
             payload = jwt.decode(
                 auth[7:], JWT_SECRET, algorithms=[JWT_ALGORITHM]
             )
-            role = payload.get("role")
-
-            if path == "/api/auth/me":
-                pass
-            elif path == "/api/teacher/my-assignments":
-                if role != "teacher":
-                    return __import__("starlette.responses").responses.JSONResponse(
-                        {"detail": "Teacher permission required."},
-                        status_code=403
-                    )
-            elif role != "admin":
-                return __import__("starlette.responses").responses.JSONResponse(
-                    {"detail": "Administrator permission required."},
-                    status_code=403
-                )
-        except InvalidTokenError:
-            return __import__("starlette.responses").responses.JSONResponse(
+            user_id = int(payload["sub"])
+        except (InvalidTokenError, ValueError, KeyError, TypeError):
+            return JSONResponse(
                 {"detail": "Invalid or expired login token."},
-                status_code=401
+                status_code=401,
             )
 
-    return await call_next(request)
+        # Always load the current account from the database. Never trust a
+        # role stored in a token: account deactivation and role changes must
+        # take effect immediately, even for tokens issued earlier.
+        user = db.get(models.User, user_id)
+        if not user or not user.is_active:
+            return JSONResponse(
+                {"detail": "Account is unavailable."}, status_code=401
+            )
+
+        if path == "/api/auth/me":
+            pass
+        elif path == "/api/teacher/my-assignments":
+            if user.role != "teacher":
+                return JSONResponse(
+                    {"detail": "Teacher permission required."},
+                    status_code=403,
+                )
+        elif user.role != "admin":
+            return JSONResponse(
+                {"detail": "Administrator permission required."},
+                status_code=403,
+            )
+
+        return await call_next(request)
+    finally:
+        db.close()
 
 
 @app.post("/api/auth/login", tags=["Authentication"])
