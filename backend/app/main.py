@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import update
 
 from .database import Base, engine, get_db, SessionLocal
 from . import models
@@ -43,6 +44,25 @@ class StudentCreate(BaseModel):
     gender: str | None = None
     date_of_birth: date | None = None
     class_id: int | None = None
+
+
+
+class AdmissionSettingsUpdate(BaseModel):
+    admission_prefix: str = Field(default="SB", max_length=20)
+    include_year: bool = True
+    admission_separator: str = Field(default="-", max_length=5)
+    admission_padding: int = Field(default=4, ge=1, le=8)
+    next_admission_number: int = Field(default=1, ge=1)
+
+
+def get_or_create_school_settings(db: Session):
+    settings = db.get(models.SchoolSettings, 1)
+    if settings is None:
+        settings = models.SchoolSettings(id=1)
+        db.add(settings)
+        db.commit()
+        db.refresh(settings)
+    return settings
 
 
 class AttendanceCreate(BaseModel):
@@ -92,6 +112,42 @@ class ExamOut(ExamCreate):
 class MarkOut(MarkCreate):
     id: int
     model_config = ConfigDict(from_attributes=True)
+
+
+
+@app.get("/api/settings/admission-number", tags=["School Settings"])
+def read_admission_settings(db: Session = Depends(get_db)):
+    settings = get_or_create_school_settings(db)
+    return {
+        "admission_prefix": settings.admission_prefix,
+        "include_year": settings.include_year,
+        "admission_separator": settings.admission_separator,
+        "admission_padding": settings.admission_padding,
+        "next_admission_number": settings.next_admission_number,
+    }
+
+
+@app.put("/api/settings/admission-number", tags=["School Settings"])
+def update_admission_settings(
+    data: AdmissionSettingsUpdate,
+    db: Session = Depends(get_db),
+):
+    settings = get_or_create_school_settings(db)
+    settings.admission_prefix = data.admission_prefix.strip()
+    settings.include_year = data.include_year
+    settings.admission_separator = data.admission_separator
+    settings.admission_padding = data.admission_padding
+    settings.next_admission_number = data.next_admission_number
+    db.commit()
+    db.refresh(settings)
+    return {
+        "message": "Admission numbering settings saved.",
+        "admission_prefix": settings.admission_prefix,
+        "include_year": settings.include_year,
+        "admission_separator": settings.admission_separator,
+        "admission_padding": settings.admission_padding,
+        "next_admission_number": settings.next_admission_number,
+    }
 
 
 @app.get("/", include_in_schema=False)
@@ -146,8 +202,7 @@ def create_student(data: StudentCreate, db: Session = Depends(get_db)):
         raise HTTPException(404, "Class not found.")
     student_data = data.model_dump()
     supplied_number = (student_data.pop("admission_number") or "").strip()
-    # Flush first to obtain a database-generated ID. This keeps generated
-    # admission numbers unique even when multiple devices register students.
+    settings = get_or_create_school_settings(db)
     item = models.Student(
         **student_data,
         admission_number=supplied_number or f"PENDING-{uuid4().hex}",
@@ -156,12 +211,26 @@ def create_student(data: StudentCreate, db: Session = Depends(get_db)):
     try:
         db.flush()
         if not supplied_number:
-            item.admission_number = f"SB-{date.today().year}-{item.id:04d}"
+            # Atomic counter increment prevents two concurrent registrations
+            # from receiving the same sequence number.
+            next_value = db.execute(
+                update(models.SchoolSettings)
+                .where(models.SchoolSettings.id == 1)
+                .values(next_admission_number=models.SchoolSettings.next_admission_number + 1)
+                .returning(models.SchoolSettings.next_admission_number)
+            ).scalar_one() - 1
+            parts = []
+            if settings.admission_prefix.strip():
+                parts.append(settings.admission_prefix.strip())
+            if settings.include_year:
+                parts.append(str(date.today().year))
+            parts.append(str(next_value).zfill(settings.admission_padding))
+            item.admission_number = settings.admission_separator.join(parts)
         db.commit()
         db.refresh(item)
     except IntegrityError:
         db.rollback()
-        raise HTTPException(409, "That admission number is already registered.")
+        raise HTTPException(409, "That admission number is already registered. Check the school's numbering sequence.")
     return item
 
 
