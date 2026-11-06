@@ -264,7 +264,6 @@ function App() {
     setUser(null)
     setStudents([])
     setClasses([])
-    setSubjects([])
   }
 
   const filteredStudents = students
