@@ -1097,7 +1097,7 @@ function LeadershipDuty({token}:{token:string}) {
 
   async function loadAll() {
     setLoading(true)
-    try { {
+    try {
     const [p,d,s,t]=await Promise.all([
       api<PrefectRow[]>('leadership/prefects?active_only=false',token),
       api<DutyRow[]>('leadership/teacher-duties',token),
@@ -1152,8 +1152,8 @@ function LeadershipDuty({token}:{token:string}) {
       <div className="leadership-summary-card"><span>Duty today</span><strong>{currentDuty?.teacher_name||'Not assigned'}</strong><small>{today}</small></div>
       <div className="leadership-summary-card"><span>Duty records</span><strong>{duties.length}</strong><small>Recent scheduled assignments</small></div>
     </section>
-    {message&&<div className="success-notice">{message}</div>}
-    {error&&<div className="form-error">{error}</div>}
+    {message&&<div className="success-notice" role="status">{message}</div>}
+    {error&&<div className="form-error" role="alert">{error}</div>}
     <section className="panel">
       <div className="panel-heading"><div><h2>Prefectorial body</h2><p>Appoint student leaders and keep track of their service terms.</p></div><button type="button" className="secondary-button" onClick={()=>void loadAll().catch(e=>setError(e instanceof Error?e.message:'Unable to refresh leadership records.'))} disabled={loading||busy}>{loading?'Loading...':'Refresh records'}</button></div>
       <details className="form-disclosure"><summary>Appoint a student prefect</summary><form className="student-form" onSubmit={appoint}>
