@@ -521,20 +521,17 @@ function App() {
                 <StatCard title="Active staff" value={dashboardSummary.active_staff} icon={<Users />} note="Teaching and non-teaching" />
                 <StatCard title="Total classes" value={dashboardSummary.total_classes} icon={<BookOpen />} note="Classes and streams" />
               </section>
-              <section className="dashboard-grid">
-                <div className="panel recent-panel">
-                  <div className="panel-heading"><div><h2>School setup & administration</h2><p>Important settings to keep your school workspace organised</p></div></div>
-                  <button className="quick-action" onClick={() => { setActive('Settings'); setSettingsSection('academic') }}><span className="quick-icon blue"><CalendarDays /></span><span><strong>Academic year & terms</strong><small>Set the current school year and active term</small></span><ArrowUpRight size={17} /></button>
-                  <button className="quick-action" onClick={() => { setActive('Settings'); setSettingsSection('school') }}><span className="quick-icon purple"><GraduationCap /></span><span><strong>School profile</strong><small>Maintain school name and contact details</small></span><ArrowUpRight size={17} /></button>
-                  <button className="quick-action" onClick={() => { setActive('Settings'); setSettingsSection('users') }}><span className="quick-icon blue"><ShieldCheck /></span><span><strong>Users & permissions</strong><small>Manage staff accounts and teacher access</small></span><ArrowUpRight size={17} /></button>
-                  <button className="quick-action" onClick={() => { setActive('Settings'); setSettingsSection('backups') }}><span className="quick-icon orange"><Settings /></span><span><strong>Backups & restore</strong><small>Protect school records with regular backups</small></span><ArrowUpRight size={17} /></button>
+              <section className="dashboard-grid overview-workflow-grid">
+                <div className="panel quick-panel">
+                  <div className="panel-heading"><div><h2>Daily registers</h2><p>Complete the records that keep today’s operations accurate.</p></div></div>
+                  <button className="quick-action" onClick={() => setActive('Attendance')}><span className="quick-icon blue"><CalendarDays /></span><span><strong>Record class attendance</strong><small>Mark students present, absent or late for each class.</small></span><ArrowUpRight size={17} /></button>
+                  <button className="quick-action" onClick={() => setActive('Staff Attendance')}><span className="quick-icon purple"><Users /></span><span><strong>Complete staff daily register</strong><small>Review teaching and non-teaching staff attendance and unmarked records.</small></span><ArrowUpRight size={17} /></button>
                 </div>
                 <div className="panel quick-panel">
-                  <div className="panel-heading"><div><h2>Quick actions</h2><p>Common school operations</p></div></div>
-                  <button className="quick-action" onClick={() => setActive('Students')}><span className="quick-icon blue"><Plus /></span><span><strong>Manage students</strong><small>View student records</small></span><ArrowUpRight size={17} /></button>
-                  <button className="quick-action" onClick={() => { setActive('Settings'); setSettingsSection('classes') }}><span className="quick-icon purple"><BookOpen /></span><span><strong>Manage classes</strong><small>Classes and streams in Settings</small></span><ArrowUpRight size={17} /></button>
-                  <button className="quick-action" onClick={() => setActive('Examinations')}><span className="quick-icon orange"><FileText /></span><span><strong>Examinations</strong><small>View exams and marks</small></span><ArrowUpRight size={17} /></button>
-                  <button className="quick-action" onClick={() => setActive('Leadership & Duty')}><span className="quick-icon purple"><ShieldCheck /></span><span><strong>Prefectorial body & duty roster</strong><small>Appoint student leaders and assign teachers on duty</small></span><ArrowUpRight size={17} /></button>
+                  <div className="panel-heading"><div><h2>Academic & finance follow-through</h2><p>Move directly to the next important school task.</p></div></div>
+                  <button className="quick-action" onClick={() => setActive('Examinations')}><span className="quick-icon orange"><FileText /></span><span><strong>Enter and verify assessment marks</strong><small>Open subject registers, class performance and report cards.</small></span><ArrowUpRight size={17} /></button>
+                  <button className="quick-action" onClick={() => setActive('Fees & Finance')}><span className="quick-icon blue"><ShieldCheck /></span><span><strong>Review fee balances and payments</strong><small>Follow up outstanding charges and recorded collections.</small></span><ArrowUpRight size={17} /></button>
+                  <button className="quick-action" onClick={() => setActive('Timetable')}><span className="quick-icon purple"><BookOpen /></span><span><strong>Review the whole-school timetable</strong><small>Check lesson allocation by class, day and teacher.</small></span><ArrowUpRight size={17} /></button>
                 </div>
               </section>
               <section className="panel overview-leadership">
