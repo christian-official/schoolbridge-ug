@@ -438,7 +438,7 @@ function App() {
           {active === 'Overview' && (
             <>
               <section className="stats-grid">
-                <StatCard title="Active students" value={dashboardSummary.active_students} icon={<GraduationCap />} note="Currently enrolled" />
+                <StatCard title="Total students" value={studentTotal} icon={<GraduationCap />} note="All registered students" />
                 <StatCard title="New admissions" value={dashboardSummary.new_admissions_this_year} icon={<UserPlus />} note={`Admitted in ${dashboardSummary.academic_year}`} />
                 <StatCard title="Active staff" value={dashboardSummary.active_staff} icon={<Users />} note="Teaching and non-teaching" />
                 <StatCard title="Total classes" value={dashboardSummary.total_classes} icon={<BookOpen />} note="Classes and streams" />
