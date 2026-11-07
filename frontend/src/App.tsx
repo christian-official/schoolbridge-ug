@@ -1052,15 +1052,17 @@ function LeadershipDuty({token}:{token:string}) {
   }
   async function endAppointment(id:number) {
     if(!window.confirm('End this prefect appointment?'))return
-    setError('');setMessage('')
+    setBusy(true);setError('');setMessage('')
     try {await api('leadership/prefects/'+id+'/end',token,{method:'PATCH'});setMessage('Prefect appointment ended.');await loadAll()}
     catch(e){setError(e instanceof Error?e.message:'Unable to update prefect appointment.')}
+    finally {setBusy(false)}
   }
   async function removeDuty(id:number) {
     if(!window.confirm('Remove this duty assignment?'))return
-    setError('');setMessage('')
+    setBusy(true);setError('');setMessage('')
     try {await api('leadership/teacher-duties/'+id,token,{method:'DELETE'});setMessage('Duty assignment removed.');await loadAll()}
     catch(e){setError(e instanceof Error?e.message:'Unable to remove duty assignment.')}
+    finally {setBusy(false)}
   }
   const activePrefects=prefects.filter(x=>x.active)
   const today=new Date().toISOString().slice(0,10)
@@ -1086,7 +1088,7 @@ function LeadershipDuty({token}:{token:string}) {
         <div className="form-actions"><button className="primary-button" disabled={busy||!studentId}>{busy?'Saving...':'Appoint prefect'}</button></div>
       </form></details>
       <div className="table-wrap"><table><thead><tr><th>Position</th><th>Student</th><th>Admission no.</th><th>Class</th><th>Term</th><th>Status</th><th>Action</th></tr></thead><tbody>
-        {prefects.map(p=><tr key={p.id}><td>{p.position}</td><td>{p.student_name}</td><td>{p.admission_number}</td><td>{p.class_name}{p.stream?' · '+p.stream:''}</td><td>{p.start_date}{p.end_date?' – '+p.end_date:''}</td><td>{p.active?'Active':'Ended'}</td><td>{p.active&&<button className="secondary-button" type="button" onClick={()=>void endAppointment(p.id)}>End term</button>}</td></tr>)}
+        {prefects.map(p=><tr key={p.id}><td>{p.position}</td><td>{p.student_name}</td><td>{p.admission_number}</td><td>{p.class_name}{p.stream?' · '+p.stream:''}</td><td>{p.start_date}{p.end_date?' – '+p.end_date:''}</td><td>{p.active?'Active':'Ended'}</td><td>{p.active&&<button className="secondary-button" type="button" disabled={busy} onClick={()=>void endAppointment(p.id)}>End term</button>}</td></tr>)}
         {!prefects.length&&<tr><td colSpan={7}>No prefect appointments recorded yet.</td></tr>}
       </tbody></table></div>
     </section>
@@ -1102,7 +1104,7 @@ function LeadershipDuty({token}:{token:string}) {
         {staff.length===0&&<p className="form-hint">Add active teaching staff in the Staff section before assigning duty.</p>}
       </form></details>
       <div className="table-wrap"><table><thead><tr><th>Duty date</th><th>Teacher</th><th>Staff no.</th><th>Notes / duty area</th><th>Action</th></tr></thead><tbody>
-        {duties.map(d=><tr key={d.id}><td>{d.duty_date}</td><td>{d.teacher_name}</td><td>{d.staff_number}</td><td>{d.notes||'—'}</td><td><button className="secondary-button" type="button" onClick={()=>void removeDuty(d.id)}>Remove</button></td></tr>)}
+        {duties.map(d=><tr key={d.id}><td>{d.duty_date}</td><td>{d.teacher_name}</td><td>{d.staff_number}</td><td>{d.notes||'—'}</td><td><button className="secondary-button" type="button" disabled={busy} onClick={()=>void removeDuty(d.id)}>Remove</button></td></tr>)}
         {!duties.length&&<tr><td colSpan={5}>No teacher duty assignments recorded yet.</td></tr>}
       </tbody></table></div>
     </section>
