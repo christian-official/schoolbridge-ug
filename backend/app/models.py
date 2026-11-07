@@ -44,6 +44,9 @@ class Student(Base):
     previous_school: Mapped[str | None] = mapped_column(String(160), nullable=True)
     admission_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="active")
+    academic_level: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    combination: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    optional_subjects: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class Attendance(Base):
@@ -129,6 +132,7 @@ class StaffMember(Base):
     status: Mapped[str] = mapped_column(String(20), default="active")
     salary_amount: Mapped[int | None] = mapped_column(Integer, nullable=True)
     salary_frequency: Mapped[str] = mapped_column(String(20), default="Monthly")
+    subjects: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 class FeeCharge(Base):
     __tablename__ = "fee_charges"
@@ -202,6 +206,10 @@ class SchoolProfile(Base):
     phone: Mapped[str | None] = mapped_column(String(40), nullable=True)
     email: Mapped[str | None] = mapped_column(String(150), nullable=True)
     motto: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    school_type: Mapped[str] = mapped_column(String(20), default="Secondary")
+    a_level_combinations: Mapped[str | None] = mapped_column(Text, nullable=True)
+    o_level_optional_subjects: Mapped[str | None] = mapped_column(Text, nullable=True)
+    a_level_subsidiary_subjects: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class PrefectAssignment(Base):
