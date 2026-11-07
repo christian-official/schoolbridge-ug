@@ -528,7 +528,7 @@ function App() {
               )}
               {settingsSection === 'school' && <SchoolProfileSettings token={token} />}
               {settingsSection === 'fees' && <FeeStructure token={token} classes={classes} />}
-              {settingsSection === 'academic' && <AcademicSettings token={token} />}
+              {settingsSection === 'academic' && <><AcademicSettings token={token} /><SubjectSettings token={token} /></>}
               {settingsSection === 'users' && <TeacherUsersSettings token={token} classes={classes} />}
               {settingsSection === 'backups' && <BackupSettings token={token} />}
               {settingsSection === 'audit' && <AuditLogSettings token={token} />}
@@ -670,4 +670,15 @@ function AuditLogSettings({token}:{token:string}) {
   const [message,setMessage]=useState('')
   useEffect(()=>{api<{items:any[]}>('audit-logs?page=1&page_size=100',token).then(r=>setItems(r.items)).catch(e=>setMessage(e.message))},[token])
   return <section className="panel settings-panel"><div className="panel-heading"><div><h2>Audit log</h2><p>Recent administrator actions, financial entries and profile changes. Financial records are retained rather than silently deleted.</p></div></div>{message&&<div className="form-error">{message}</div>}<div className="table-wrap"><table><thead><tr><th>Date and time</th><th>User</th><th>Action</th><th>Record</th><th>Details</th></tr></thead><tbody>{items.map(item=><tr key={item.id}><td>{new Date(item.created_at).toLocaleString()}</td><td>{item.actor_username}</td><td>{item.action}</td><td>{item.entity_type} #{item.entity_id}</td><td>{item.details||'—'}</td></tr>)}</tbody></table></div>{!items.length&&!message&&<div className="empty-state"><ShieldCheck size={30}/><p>No audit events have been recorded yet.</p></div>}</section>
+}
+
+function SubjectSettings({token}:{token:string}) {
+  const [subjects,setSubjects]=useState<any[]>([])
+  const [name,setName]=useState('')
+  const [code,setCode]=useState('')
+  const [message,setMessage]=useState('')
+  async function load(){try{setSubjects(await api<any[]>('subjects',token))}catch(e){setMessage(e instanceof Error?e.message:'Unable to load subjects.')}}
+  useEffect(()=>{void load()},[token])
+  async function add(e:React.FormEvent){e.preventDefault();setMessage('');try{await api('subjects',token,{method:'POST',body:JSON.stringify({name:name.trim(),code:code.trim()||null})});setName('');setCode('');setMessage('Subject added.');await load()}catch(e){setMessage(e instanceof Error?e.message:'Unable to add subject.')}}
+  return <section className="panel settings-panel"><div className="panel-heading"><div><h2>School subjects</h2><p>Manage subjects used for examinations and teacher assignments.</p></div></div>{message&&<div className="success-notice">{message}</div>}<form className="student-form" onSubmit={add}><div className="student-form-grid"><label>Subject name *<input required value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Mathematics"/></label><label>Subject code<input value={code} onChange={e=>setCode(e.target.value)} placeholder="Optional code"/></label></div><div className="form-actions"><button className="primary-button">Add subject</button></div></form><div className="table-wrap"><table><thead><tr><th>Subject</th><th>Code</th></tr></thead><tbody>{subjects.map(subject=><tr key={subject.id}><td>{subject.name}</td><td>{subject.code||'—'}</td></tr>)}</tbody></table></div></section>
 }
