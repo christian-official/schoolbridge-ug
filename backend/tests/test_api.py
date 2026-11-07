@@ -5,6 +5,7 @@ os.environ["SCHOOLBRIDGE_DATABASE_URL"] = "sqlite:///./schoolbridge_test.db"
 os.environ["SCHOOLBRIDGE_SECRET_KEY"] = "test-only-secret-key-that-is-not-used-in-production"
 
 from fastapi.testclient import TestClient
+from types import SimpleNamespace
 
 from app.database import Base, engine, SessionLocal
 from app.main import app, create_access_token, password_hash
@@ -29,7 +30,7 @@ def create_admin():
         db.add(admin)
         db.commit()
         db.refresh(admin)
-        return admin
+        return SimpleNamespace(id=admin.id, role=admin.role)
     finally:
         db.close()
 
