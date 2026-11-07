@@ -1243,3 +1243,20 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .overview-finance-metrics small { color:#7b879b; font-size:9px; font-weight:850; letter-spacing:.5px; }
 .overview-finance-metrics strong { color:#263e70; font-size:clamp(13px,1.6vw,19px); overflow-wrap:anywhere; }
 @media(max-width:640px) { .overview-finance-metrics { grid-template-columns:1fr; } }
+
+
+/* Report printing, uploaded school identity, and recorded-mark filters */
+.report-school-logo { object-fit:contain; padding:5px; background:#fff; }
+.recorded-marks-filters { display:flex; flex-wrap:wrap; gap:12px; margin:12px 0 4px; }
+.recorded-marks-filters label,.report-customisation-panel label { display:grid; gap:6px; min-width:180px; color:#52617a; font-size:12px; font-weight:750; }
+.recorded-marks-filters select { min-width:190px; }
+.report-customisation-panel { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; padding:16px; margin:14px 0; border:1px solid #e2e8f1; border-radius:11px; background:#f8faff; }
+.report-customisation-panel > div { display:grid; align-content:start; gap:8px; color:#34445e; font-size:13px; }
+.report-customisation-panel p { margin:0; color:#7b879b; font-size:11px; }
+.report-customisation-panel input:not([type=file]) { box-sizing:border-box; width:100%; min-height:42px; padding:9px 11px; border:1px solid #d8e1ed; border-radius:8px; background:#fff; color:#293a55; }
+.report-customisation-panel input[type=file] { max-width:100%; font-size:12px; }
+@media(max-width:640px) { .report-customisation-panel { grid-template-columns:1fr; } }
+@media print {
+ body[data-schoolbridge-print="class-reports"] .class-reports-print-batch .report-card-sheet { break-after:page !important; page-break-after:always !important; margin:0 !important; padding:0 !important; border:0 !important; border-radius:0 !important; box-shadow:none !important; }
+ body[data-schoolbridge-print="class-reports"] .class-reports-print-batch .report-card-sheet:last-child { break-after:auto !important; page-break-after:auto !important; }
+}
