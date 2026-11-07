@@ -68,7 +68,8 @@ export default function StaffFinance({token,active,classes=[]}:{token:string;act
   }
   function printReminders(){
     const rows=charges.filter(c=>c.balance>0)
-    const escape=(value:string)=>value.replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]||ch))
+    const entities:Record<string,string>={'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}
+    const escape=(value:string)=>value.replace(/[&<>"']/g,ch=>entities[ch]||ch)
     const content=rows.map(c=>'<tr><td>'+escape(c.student_name)+'</td><td>'+escape(c.admission_number)+'</td><td>'+escape((c.class_name||'')+' '+(c.stream||''))+'</td><td>'+escape(c.term+' '+c.year)+'</td><td>UGX '+c.balance.toLocaleString()+'</td></tr>').join('')
     const page=window.open('','_blank')
     if(!page){setMessage('Allow pop-ups to print fee reminders.');return}
