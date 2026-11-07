@@ -1,3 +1,4 @@
+import os
 from datetime import date, datetime
 from uuid import uuid4
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
@@ -46,10 +47,12 @@ app = FastAPI(
     version="0.2.0",
 )
 
+cors_origins = [origin.strip() for origin in os.getenv("SCHOOLBRIDGE_CORS_ORIGINS", "*").split(",") if origin.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
-    allow_credentials=True,
+    allow_origins=cors_origins,
+    allow_credentials=False,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
     allow_headers=["*"],
 )
