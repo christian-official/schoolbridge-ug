@@ -1173,7 +1173,7 @@ function LeadershipDuty({token}:{token:string}) {
       {loading?<p className="form-hint">Loading leadership records...</p>:<div className="table-wrap"><table><thead><tr><th>Position</th><th>Student</th><th>Admission no.</th><th>Class</th><th>Term</th><th>Status</th><th>Action</th></tr></thead><tbody>
         {prefects.map(p=><tr key={p.id}><td>{p.position}</td><td>{p.student_name}</td><td>{p.admission_number}</td><td>{p.class_name}{p.stream?' · '+p.stream:''}</td><td>{p.start_date}{p.end_date?' – '+p.end_date:''}</td><td>{p.active?'Active':'Ended'}</td><td>{p.active&&<button className="secondary-button" type="button" disabled={busy} onClick={()=>void endAppointment(p.id)}>End term</button>}</td></tr>)}
         {!prefects.length&&<tr><td colSpan={7}>No prefect appointments recorded yet.</td></tr>}
-      </tbody></table></div>
+      </tbody></table></div>}
     </section>
     <section className="panel">
       <div className="panel-heading"><div><h2>Teachers on duty</h2><p>Schedule active teaching staff and maintain a duty roster.</p></div></div>
@@ -1189,7 +1189,7 @@ function LeadershipDuty({token}:{token:string}) {
       {loading?<p className="form-hint">Loading duty records...</p>:<div className="table-wrap"><table><thead><tr><th>Duty date</th><th>Teacher</th><th>Staff no.</th><th>Notes / duty area</th><th>Action</th></tr></thead><tbody>
         {duties.map(d=><tr key={d.id}><td>{d.duty_date}</td><td>{d.teacher_name}</td><td>{d.staff_number}</td><td>{d.notes||'—'}</td><td><button className="secondary-button" type="button" disabled={busy} onClick={()=>void removeDuty(d.id)}>Remove</button></td></tr>)}
         {!duties.length&&<tr><td colSpan={5}>No teacher duty assignments recorded yet.</td></tr>}
-      </tbody></table></div>
+      </tbody></table></div>}
     </section>
   </div>
 }
