@@ -397,6 +397,47 @@ JWT_SECRET = os.environ["SCHOOLBRIDGE_SECRET_KEY"]
 JWT_ALGORITHM = "HS256"
 TOKEN_HOURS = 8
 
+
+def bootstrap_initial_admin():
+    """Create the first administrator only when explicitly configured by environment."""
+    username = os.getenv("SCHOOLBRIDGE_INITIAL_ADMIN_USERNAME", "").strip()
+    email = os.getenv("SCHOOLBRIDGE_INITIAL_ADMIN_EMAIL", "").strip()
+    initial_password = os.getenv("SCHOOLBRIDGE_INITIAL_ADMIN_PASSWORD", "")
+
+    supplied = [bool(username), bool(email), bool(initial_password)]
+    if any(supplied) and not all(supplied):
+        raise RuntimeError(
+            "Set all three SCHOOLBRIDGE_INITIAL_ADMIN_* variables to bootstrap "
+            "the first administrator."
+        )
+    if not all(supplied):
+        return
+
+    if len(initial_password) < 12:
+        raise RuntimeError("SCHOOLBRIDGE_INITIAL_ADMIN_PASSWORD must be at least 12 characters.")
+
+    db = SessionLocal()
+    try:
+        if db.query(models.User).count() == 0:
+            admin = models.User(
+                username=username,
+                email=email,
+                hashed_password=password_hash.hash(initial_password),
+                role="admin",
+                is_active=True,
+            )
+            db.add(admin)
+            try:
+                db.commit()
+            except IntegrityError:
+                db.rollback()
+                raise
+    finally:
+        db.close()
+
+
+bootstrap_initial_admin()
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 
