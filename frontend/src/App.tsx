@@ -98,7 +98,7 @@ function App() {
   const [studentForm, setStudentForm] = useState({
     first_name: '', middle_name: '', last_name: '', gender: '', date_of_birth: '', class_id: '',
     religion: '', nationality: '', phone: '', address: '', guardian_name: '', guardian_relationship: '', guardian_phone: '', previous_school: '',
-    admission_date: new Date().toISOString().slice(0, 10),
+    admission_date: new Date().toISOString().slice(0, 10), fee_amount: '',
   })
   const [mobileMenu, setMobileMenu] = useState(false)
   const [admissionSettings, setAdmissionSettings] = useState<AdmissionSettings>({
@@ -179,9 +179,10 @@ function App() {
           gender: studentForm.gender || null,
           date_of_birth: studentForm.date_of_birth || null,
           class_id: Number(studentForm.class_id),
+          fee_amount: studentForm.fee_amount === '' ? null : Number(studentForm.fee_amount),
         }),
       })
-      setStudentForm({ first_name: '', middle_name: '', last_name: '', gender: '', date_of_birth: '', class_id: '', religion: '', nationality: '', phone: '', address: '', guardian_name: '', guardian_relationship: '', guardian_phone: '', previous_school: '', admission_date: new Date().toISOString().slice(0, 10) })
+      setStudentForm({ first_name: '', middle_name: '', last_name: '', gender: '', date_of_birth: '', class_id: '', religion: '', nationality: '', phone: '', address: '', guardian_name: '', guardian_relationship: '', guardian_phone: '', previous_school: '', admission_date: new Date().toISOString().slice(0, 10), fee_amount: '' })
       setShowStudentForm(false)
       setStudentSuccess(`Student registered successfully. Admission number: ${createdStudent.admission_number}`)
       await loadSchoolData(token)
@@ -217,6 +218,18 @@ function App() {
     catch(error) { setDataError(error instanceof Error?error.message:'Unable to open student profile.') }
   }
 
+  async function dismissStudent(id:number) {
+    if (!window.confirm('Dismiss this student? Their academic and financial history will be retained.')) return
+    try {
+      await api('students/' + id + '/status?status=dismissed', token, { method: 'PATCH' })
+      setStudentProfile((current:any) => current ? {...current, student:{...current.student,status:'dismissed'}} : current)
+      setProfileMessage('Student dismissed. Historical records have been retained.')
+      await loadStudentPage(studentPage, search)
+    } catch (error) {
+      setProfileMessage(error instanceof Error ? error.message : 'Unable to dismiss student.')
+    }
+  }
+
   async function saveStudentProfile(event:React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); if(!studentProfile)return
     setProfileSaving(true);setProfileMessage('')
@@ -247,6 +260,23 @@ function App() {
   }
 
   useEffect(() => { if (token && active === 'Students') void loadStudentPage(1, search) }, [search, studentClassFilter, active, token])
+
+  useEffect(() => {
+    if (!token || !studentForm.class_id) { setStudentForm(old => ({ ...old, fee_amount: '' })); return }
+    let cancelled = false
+    async function loadClassFee() {
+      try {
+        const academic = await api<{academic_year:number;active_term:string}>('settings/academic', token)
+        const result = await api<{fees:{term:string;amount:number}[]}>('classes/' + studentForm.class_id + '/fees?year=' + academic.academic_year, token)
+        const amount = result.fees.find(item => item.term === academic.active_term)?.amount ?? 0
+        if (!cancelled) setStudentForm(old => ({ ...old, fee_amount: String(amount) }))
+      } catch {
+        if (!cancelled) setStudentForm(old => ({ ...old, fee_amount: '' }))
+      }
+    }
+    void loadClassFee()
+    return () => { cancelled = true }
+  }, [studentForm.class_id, token])
 
   async function loadUser(authToken: string) {
     try {
@@ -362,6 +392,7 @@ function App() {
           <button className="mobile-menu-button" onClick={() => setMobileMenu(true)}><Menu /></button>
           <div className="breadcrumb">School workspace <span>/</span> <strong>{active}</strong></div>
           <div className="top-actions">
+            <button className="secondary-button refresh-button" type="button" onClick={() => { void loadSchoolData(token); if (active === 'Students') void loadStudentPage(1, search) }}>Refresh</button>
             <span className="online-status"><i /> System online</span>
             <button className="icon-button" title="Notifications"><Bell size={19} /></button>
             <div className="top-avatar">{user.username.slice(0, 1).toUpperCase()}</div>
@@ -428,6 +459,7 @@ function App() {
                     <label>Middle name<input value={studentForm.middle_name} onChange={e => setStudentForm({ ...studentForm, middle_name: e.target.value })} /></label>
                     <label>Last name *<input value={studentForm.last_name} onChange={e => setStudentForm({ ...studentForm, last_name: e.target.value })} placeholder="Last name" required /></label>
                     <label>Class *<select value={studentForm.class_id} onChange={e => setStudentForm({ ...studentForm, class_id: e.target.value })} required><option value="">Select class</option>{classes.map(item => <option key={item.id} value={item.id}>{item.name}{item.section ? ` — ${item.section}` : ''}</option>)}</select></label>
+                    <label>Term fee (UGX)<input type="number" min="0" value={studentForm.fee_amount} onChange={e => setStudentForm({ ...studentForm, fee_amount: e.target.value })} placeholder="Enter fee amount" /></label>
                     <label>Gender<select value={studentForm.gender} onChange={e => setStudentForm({ ...studentForm, gender: e.target.value })}><option value="">Select gender</option><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select></label>
                     <label>Date of birth<input type="date" value={studentForm.date_of_birth} onChange={e => setStudentForm({ ...studentForm, date_of_birth: e.target.value })} /></label>
                     <label>Religion<input value={studentForm.religion} onChange={e => setStudentForm({ ...studentForm, religion: e.target.value })} /></label>
@@ -457,7 +489,7 @@ function App() {
           {studentProfile && (
             <div className="modal-backdrop" onClick={()=>setStudentProfile(null)}>
               <section className="panel student-profile-modal" onClick={e=>e.stopPropagation()}>
-                <div className="panel-heading"><div><h2>Student profile</h2><p>{studentProfile.student.admission_number} · {studentProfile.student.status}</p></div><button className="secondary-button" type="button" onClick={()=>setStudentProfile(null)}>Close</button></div>
+                <div className="panel-heading"><div><h2>Student profile</h2><p>{studentProfile.student.admission_number} · {studentProfile.student.status}</p></div><div className="profile-actions"><button className="secondary-button" type="button" onClick={()=>void dismissStudent(studentProfile.student.id)} disabled={studentProfile.student.status==='dismissed'}>Dismiss student</button><button className="secondary-button" type="button" onClick={()=>setStudentProfile(null)}>Close</button></div></div>
                 {profileMessage&&<div className="success-notice">{profileMessage}</div>}
                 <form className="student-form" onSubmit={saveStudentProfile}>
                   <div className="student-form-grid">
@@ -495,7 +527,6 @@ function App() {
               <div className="settings-category-grid">
                 <button className="settings-category" onClick={() => setSettingsSection('school')}><span className="settings-category-icon"><GraduationCap /></span><strong>School Profile</strong><small>School name, contacts and identity</small><ArrowUpRight /></button>
                 <button className="settings-category" onClick={() => setSettingsSection('classes')}><span className="settings-category-icon"><BookOpen /></span><strong>Classes & Streams</strong><small>Create classes, streams and manage class fees</small><ArrowUpRight /></button>
-                <button className="settings-category" onClick={() => setSettingsSection('fees')}><span className="settings-category-icon"><FileText /></span><strong>Fee Structure</strong><small>Term fees and billing preferences</small><ArrowUpRight /></button>
                 <button className="settings-category" onClick={() => setSettingsSection('admission')}><span className="settings-category-icon"><Users /></span><strong>Admission Numbers</strong><small>Set the format for student admission numbers</small><ArrowUpRight /></button>
                 <button className="settings-category" onClick={() => setSettingsSection('academic')}><span className="settings-category-icon"><CalendarDays /></span><strong>Academic Year & Terms</strong><small>Set the active academic year and term</small><ArrowUpRight /></button>
                 <button className="settings-category" onClick={() => setSettingsSection('users')}><span className="settings-category-icon"><ShieldCheck /></span><strong>Users & Permissions</strong><small>Administrator and teacher access</small><ArrowUpRight /></button>
@@ -527,7 +558,6 @@ function App() {
             </section>
               )}
               {settingsSection === 'school' && <SchoolProfileSettings token={token} />}
-              {settingsSection === 'fees' && <FeeStructure token={token} classes={classes} />}
               {settingsSection === 'academic' && <><AcademicSettings token={token} /><SubjectSettings token={token} /></>}
               {settingsSection === 'users' && <TeacherUsersSettings token={token} classes={classes} />}
               {settingsSection === 'backups' && <BackupSettings token={token} />}
