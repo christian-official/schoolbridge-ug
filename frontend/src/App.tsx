@@ -1093,8 +1093,11 @@ function LeadershipDuty({token}:{token:string}) {
   const [message,setMessage]=useState('')
   const [error,setError]=useState('')
   const [busy,setBusy]=useState(false)
+  const [loading,setLoading]=useState(true)
 
   async function loadAll() {
+    setLoading(true)
+    try { {
     const [p,d,s,t]=await Promise.all([
       api<PrefectRow[]>('leadership/prefects?active_only=false',token),
       api<DutyRow[]>('leadership/teacher-duties',token),
@@ -1102,6 +1105,7 @@ function LeadershipDuty({token}:{token:string}) {
       api<{items:LeadershipStaff[]}>('staff?page=1&page_size=100&category=Teaching',token),
     ])
     setPrefects(p);setDuties(d);setStudents(s.items);setStaff(t.items.filter(x=>x.status==='active'))
+    } finally { setLoading(false) }
   }
   useEffect(()=>{void loadAll().catch(e=>setError(e instanceof Error?e.message:'Unable to load leadership records.'))},[token,studentSearch])
 
@@ -1151,7 +1155,7 @@ function LeadershipDuty({token}:{token:string}) {
     {message&&<div className="success-notice">{message}</div>}
     {error&&<div className="form-error">{error}</div>}
     <section className="panel">
-      <div className="panel-heading"><div><h2>Prefectorial body</h2><p>Appoint student leaders and keep track of their service terms.</p></div></div>
+      <div className="panel-heading"><div><h2>Prefectorial body</h2><p>Appoint student leaders and keep track of their service terms.</p></div><button type="button" className="secondary-button" onClick={()=>void loadAll().catch(e=>setError(e instanceof Error?e.message:'Unable to refresh leadership records.'))} disabled={loading||busy}>{loading?'Loading...':'Refresh records'}</button></div>
       <details className="form-disclosure"><summary>Appoint a student prefect</summary><form className="student-form" onSubmit={appoint}>
         <div className="student-form-grid">
           <label>Find student<input value={studentSearch} onChange={e=>setStudentSearch(e.target.value)} placeholder="Search name or admission number"/></label>
@@ -1162,7 +1166,7 @@ function LeadershipDuty({token}:{token:string}) {
         </div>
         <div className="form-actions"><button className="primary-button" disabled={busy||!studentId}>{busy?'Saving...':'Appoint prefect'}</button></div>
       </form></details>
-      <div className="table-wrap"><table><thead><tr><th>Position</th><th>Student</th><th>Admission no.</th><th>Class</th><th>Term</th><th>Status</th><th>Action</th></tr></thead><tbody>
+      {loading?<p className="form-hint">Loading leadership records...</p>:<div className="table-wrap"><table><thead><tr><th>Position</th><th>Student</th><th>Admission no.</th><th>Class</th><th>Term</th><th>Status</th><th>Action</th></tr></thead><tbody>
         {prefects.map(p=><tr key={p.id}><td>{p.position}</td><td>{p.student_name}</td><td>{p.admission_number}</td><td>{p.class_name}{p.stream?' · '+p.stream:''}</td><td>{p.start_date}{p.end_date?' – '+p.end_date:''}</td><td>{p.active?'Active':'Ended'}</td><td>{p.active&&<button className="secondary-button" type="button" disabled={busy} onClick={()=>void endAppointment(p.id)}>End term</button>}</td></tr>)}
         {!prefects.length&&<tr><td colSpan={7}>No prefect appointments recorded yet.</td></tr>}
       </tbody></table></div>
@@ -1178,7 +1182,7 @@ function LeadershipDuty({token}:{token:string}) {
         <div className="form-actions"><button className="primary-button" disabled={busy||!staffId||staff.length===0}>{busy?'Saving...':'Assign teacher on duty'}</button></div>
         {staff.length===0&&<p className="form-hint">Add active teaching staff in the Staff section before assigning duty.</p>}
       </form></details>
-      <div className="table-wrap"><table><thead><tr><th>Duty date</th><th>Teacher</th><th>Staff no.</th><th>Notes / duty area</th><th>Action</th></tr></thead><tbody>
+      {loading?<p className="form-hint">Loading duty records...</p>:<div className="table-wrap"><table><thead><tr><th>Duty date</th><th>Teacher</th><th>Staff no.</th><th>Notes / duty area</th><th>Action</th></tr></thead><tbody>
         {duties.map(d=><tr key={d.id}><td>{d.duty_date}</td><td>{d.teacher_name}</td><td>{d.staff_number}</td><td>{d.notes||'—'}</td><td><button className="secondary-button" type="button" disabled={busy} onClick={()=>void removeDuty(d.id)}>Remove</button></td></tr>)}
         {!duties.length&&<tr><td colSpan={5}>No teacher duty assignments recorded yet.</td></tr>}
       </tbody></table></div>
