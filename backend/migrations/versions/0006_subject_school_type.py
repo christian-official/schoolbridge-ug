@@ -23,6 +23,15 @@ def upgrade() -> None:
             "subjects",
             sa.Column("school_type", sa.String(length=20), nullable=False, server_default="Secondary"),
         )
+    indexes = {index["name"]: index for index in inspect(op.get_bind()).get_indexes("subjects")}
+    # Replace global name uniqueness with uniqueness within each school type.
+    if "ix_subjects_name" in indexes:
+        op.drop_index("ix_subjects_name", table_name="subjects")
+    op.create_index("ix_subjects_name", "subjects", ["name"], unique=False)
+    current_indexes = {index["name"] for index in inspect(op.get_bind()).get_indexes("subjects")}
+    if "uq_subjects_name_school_type" not in current_indexes:
+        op.create_index("uq_subjects_name_school_type", "subjects", ["name", "school_type"], unique=True)
+
     tables = set(inspect(op.get_bind()).get_table_names())
     if "school_profile" in tables:
         op.execute(
@@ -37,5 +46,11 @@ def downgrade() -> None:
     inspector = inspect(op.get_bind())
     if "subjects" in set(inspector.get_table_names()):
         columns = {column["name"] for column in inspector.get_columns("subjects")}
+        indexes = {index["name"] for index in inspector.get_indexes("subjects")}
+        if "uq_subjects_name_school_type" in indexes:
+            op.drop_index("uq_subjects_name_school_type", table_name="subjects")
+        if "ix_subjects_name" in indexes:
+            op.drop_index("ix_subjects_name", table_name="subjects")
         if "school_type" in columns:
             op.drop_column("subjects", "school_type")
+        op.create_index("ix_subjects_name", "subjects", ["name"], unique=True)
