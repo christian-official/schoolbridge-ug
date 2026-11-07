@@ -126,6 +126,8 @@ class StaffMember(Base):
     phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
     email: Mapped[str | None] = mapped_column(String(150), nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="active")
+    salary_amount: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    salary_frequency: Mapped[str] = mapped_column(String(20), default="Monthly")
 
 class FeeCharge(Base):
     __tablename__ = "fee_charges"
@@ -146,6 +148,7 @@ class FeePayment(Base):
     method: Mapped[str] = mapped_column(String(30), default="Cash")
     reference: Mapped[str | None] = mapped_column(String(80), nullable=True)
     received_by: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    receipt_number: Mapped[str | None] = mapped_column(String(50), unique=True, nullable=True, index=True)
 
 
 class ClassFee(Base):
@@ -156,3 +159,23 @@ class ClassFee(Base):
     term: Mapped[str] = mapped_column(String(20))
     year: Mapped[int] = mapped_column(Integer)
     amount: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class SalaryPayment(Base):
+    __tablename__ = "salary_payments"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    staff_id: Mapped[int] = mapped_column(ForeignKey("staff_members.id"), index=True)
+    amount: Mapped[int] = mapped_column(Integer)
+    payment_date: Mapped[date] = mapped_column(Date, default=date.today)
+    period: Mapped[str] = mapped_column(String(40))
+    reference: Mapped[str | None] = mapped_column(String(80), nullable=True)
+
+
+class OtherExpense(Base):
+    __tablename__ = "other_expenses"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    description: Mapped[str] = mapped_column(String(160))
+    category: Mapped[str] = mapped_column(String(60), default="General")
+    amount: Mapped[int] = mapped_column(Integer)
+    expense_date: Mapped[date] = mapped_column(Date, default=date.today)
+    reference: Mapped[str | None] = mapped_column(String(80), nullable=True)
