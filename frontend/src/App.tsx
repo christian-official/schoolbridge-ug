@@ -758,10 +758,6 @@ function EmptyState({ text }: { text: string }) {
   return <div className="empty-state"><GraduationCap size={30} /><p>{text}</p></div>
 }
 
-function ComingSoon({ title, description }: { title: string; description: string }) {
-  return <section className="panel coming-soon"><div className="coming-icon"><Settings size={28} /></div><h2>{title}</h2><p>{description}</p><span>Module in development</span></section>
-}
-
 export default App
 
 
