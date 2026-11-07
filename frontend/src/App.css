@@ -1041,3 +1041,20 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   .timetable-day table { min-width: 650px; }
   .date-field { width: 100%; }
 }
+
+.teacher-attendance-identity {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 14px 0;
+  padding: 14px 16px;
+  border: 1px solid #e2e9f4;
+  border-radius: 10px;
+  background: #f8faff;
+}
+.teacher-attendance-identity strong { color: #293e65; font-size: 14px; }
+.teacher-attendance-identity span { color: #72809a; font-size: 12px; font-weight: 750; }
+@media(max-width:640px) {
+  .teacher-attendance-identity { align-items: flex-start; flex-direction: column; }
+}
