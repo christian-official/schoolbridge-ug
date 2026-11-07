@@ -109,6 +109,8 @@ export default function StaffFinance({token,active,classes=[]}:{token:string;act
       <div className="stat-card"><div className="stat-top">Other expenses <Wallet size={18}/></div><strong className="stat-value">UGX {(summary.other_expenses||0).toLocaleString()}</strong><small>Recorded school expenses</small></div>
       <div className="stat-card"><div className="stat-top">Net cash position <Wallet size={18}/></div><strong className="stat-value">UGX {(summary.net_cash_position||0).toLocaleString()}</strong><small>Collected fees less recorded expenses</small></div>
     </div>
+    <div className="panel-heading"><div><h2>Find the student first</h2><p>Search by name or admission number before choosing a fee charge. Class and stream are shown to distinguish students with the same name.</p></div></div>
+    <div className="table-tools"><div className="search-box"><Search size={17}/><input placeholder="Enter student name or admission number..." value={feeSearch} onChange={e=>setFeeSearch(e.target.value)}/></div></div>
     <div className="panel-heading"><div><h2>Record a payment</h2><p>Partial payments are supported; overpayments are blocked.</p></div></div>
     <form className="student-form" onSubmit={pay}><div className="student-form-grid">
       <label>Student term charge *<select required value={payment.charge_id} onChange={e=>setPayment({...payment,charge_id:e.target.value})}><option value="">Select outstanding charge</option>{charges.filter(c=>c.balance>0).map(c=><option key={c.id} value={c.id}>{c.student_name} · {c.admission_number} · {c.class_name||'No class'} {c.stream?'— '+c.stream:''} · {c.term} {c.year} · UGX {c.balance.toLocaleString()}</option>)}</select></label>
