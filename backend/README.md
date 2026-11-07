@@ -20,3 +20,36 @@ On Windows PowerShell, activate with:
 Health check: `/api/health`
 
 Interactive API documentation: `/docs`
+
+## Database migrations
+
+SchoolBridge applies pending Alembic migrations automatically when the backend
+starts. The first baseline migration creates tables that are missing from an
+existing database and records the migration version. It does not drop existing
+tables or rewrite existing records.
+
+**Back up the school's database before deploying any application update.**
+The baseline is intentionally not reversible because an automatic downgrade
+could destroy school data. Future schema changes must use reviewed,
+forward-only migration files.
+
+To create a migration after changing SQLAlchemy models, run from the repository
+root:
+
+```bash
+PYTHONPATH=backend alembic -c backend/alembic.ini revision --autogenerate -m "describe the schema change"
+```
+
+Review the generated migration carefully before committing it. Apply pending
+migrations manually when needed with:
+
+```bash
+PYTHONPATH=backend alembic -c backend/alembic.ini upgrade head
+```
+
+On Windows PowerShell, set the import path for the command session first:
+
+```powershell
+$env:PYTHONPATH = "backend"
+alembic -c backend/alembic.ini upgrade head
+```
