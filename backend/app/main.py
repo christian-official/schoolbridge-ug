@@ -12,6 +12,31 @@ from sqlalchemy import update, func, or_
 from .database import Base, engine, get_db, SessionLocal
 from . import models
 
+def apply_pending_database_restore():
+    """Apply a validated restore before SQLAlchemy opens the database at startup."""
+    import os, sqlite3
+    if engine.dialect.name != "sqlite":
+        return
+    db_path = engine.url.database
+    if not db_path or db_path == ":memory:":
+        return
+    absolute_path = os.path.abspath(db_path)
+    pending_path = absolute_path + ".restore_pending"
+    if not os.path.exists(pending_path):
+        return
+    if os.path.exists(absolute_path):
+        safety_path = absolute_path + ".before_restore_" + str(int(datetime.now().timestamp())) + ".bak"
+        current = sqlite3.connect(absolute_path)
+        safety = sqlite3.connect(safety_path)
+        try:
+            current.backup(safety)
+        finally:
+            safety.close()
+            current.close()
+    os.replace(pending_path, absolute_path)
+
+
+apply_pending_database_restore()
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
@@ -1169,7 +1194,7 @@ def create_database_backup(admin=Depends(require_admin)):
 
 @app.post("/api/backups/restore", tags=["Backups"])
 async def restore_database_backup(file: UploadFile = File(...), admin=Depends(require_admin)):
-    import os, sqlite3, tempfile, shutil
+    import os, sqlite3, tempfile
     if engine.dialect.name != "sqlite":
         raise HTTPException(501, "Direct file restore is currently supported for the local SQLite installation.")
     db_path = engine.url.database
@@ -1178,10 +1203,11 @@ async def restore_database_backup(file: UploadFile = File(...), admin=Depends(re
     payload = await file.read(512 * 1024 * 1024 + 1)
     if len(payload) > 512 * 1024 * 1024:
         raise HTTPException(413, "Backup file is larger than 512 MB.")
-    directory = os.path.dirname(os.path.abspath(db_path))
+    absolute_path = os.path.abspath(db_path)
+    directory = os.path.dirname(absolute_path)
     fd, uploaded_path = tempfile.mkstemp(prefix="schoolbridge-restore-", suffix=".sqlite3", dir=directory)
     os.close(fd)
-    safety_path = os.path.abspath(db_path) + ".before_restore_" + str(int(datetime.now().timestamp())) + ".bak"
+    pending_path = absolute_path + ".restore_pending"
     try:
         with open(uploaded_path, "wb") as output:
             output.write(payload)
@@ -1194,28 +1220,12 @@ async def restore_database_backup(file: UploadFile = File(...), admin=Depends(re
                 raise HTTPException(400, "This file is not a valid SchoolBridge database backup.")
         finally:
             candidate.close()
-        current = sqlite3.connect(os.path.abspath(db_path))
-        safety = sqlite3.connect(safety_path)
-        try:
-            current.backup(safety)
-        finally:
-            safety.close()
-            current.close()
-        engine.dispose()
-        os.replace(uploaded_path, os.path.abspath(db_path))
-        engine.dispose()
-        Base.metadata.create_all(bind=engine)
-        upgrade_existing_database()
-        upgrade_class_stream_uniqueness()
-        return {"message": "School database restored successfully. A safety copy of the previous database was kept beside the database file."}
+        os.replace(uploaded_path, pending_path)
+        return {"message": "Backup validated and staged. Restart the SchoolBridge backend to apply it. The current database will be copied to a safety backup before replacement."}
     except HTTPException:
         raise
     except Exception as exc:
-        if os.path.exists(safety_path):
-            engine.dispose()
-            shutil.copy2(safety_path, os.path.abspath(db_path))
-            engine.dispose()
-        raise HTTPException(500, "Restore failed. The previous database was restored from its safety copy.") from exc
+        raise HTTPException(500, "Could not stage the database restore.") from exc
     finally:
         if os.path.exists(uploaded_path):
             os.unlink(uploaded_path)
