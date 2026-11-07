@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import update, func, or_
 
-from .database import Base, engine, get_db, SessionLocal
+from .database import DATABASE_URL, Base, engine, get_db, SessionLocal
 from .migrations import upgrade_database
 from . import models
 
@@ -40,7 +40,7 @@ def apply_pending_database_restore():
 
 
 apply_pending_database_restore()
-upgrade_database()
+upgrade_database(DATABASE_URL)
 
 app = FastAPI(
     title="SchoolBridge API",
