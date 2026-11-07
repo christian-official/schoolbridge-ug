@@ -147,9 +147,9 @@ export default function AcademicManagement({ token, classes }: { token: string; 
     })).sort((a, b) => b.average - a.average || b.total - a.total || a.studentId - b.studentId)
       .map((result, index, rows) => ({
         ...result,
-        position: index > 0 && Number(rows[index - 1].average.toFixed(2)) === Number(result.average.toFixed(2))
-          ? rows[index - 1].position
-          : index + 1,
+        position: index + 1 - rows.slice(0, index).filter(previous =>
+          Number(previous.average.toFixed(2)) === Number(result.average.toFixed(2))
+        ).length,
       }))
   }, [marks, gradingBands])
 
@@ -337,7 +337,7 @@ export default function AcademicManagement({ token, classes }: { token: string; 
       <section className="panel academic-results-print">
         <div className="panel-heading"><div><h2>Class performance</h2><p>{selectedExam.name} · {selectedClass?.name || 'Class'}{selectedClass?.section ? ' — ' + selectedClass.section : ''} · {selectedExam.term} {selectedExam.year}</p><p>Provisional ranking uses average scores. Complete and verify all subject marks before issuing final results.</p></div></div>
         <div className="table-wrap"><table><thead><tr><th>Position</th><th>Student</th><th>Admission no.</th><th>Subjects entered</th><th>Total</th><th>Average</th><th>Grade</th></tr></thead><tbody>
-          {results.map((result, index) => <tr key={result.studentId}><td>{result.position}</td><td>{studentName(studentById.get(result.studentId))}</td><td>{studentById.get(result.studentId)?.admission_number || '—'}</td><td>{result.count}</td><td>{result.total.toFixed(2)}</td><td>{result.average.toFixed(2)}%</td><td>{result.grade}</td></tr>)}
+          {results.map(result => <tr key={result.studentId}><td>{result.position}</td><td>{studentName(studentById.get(result.studentId))}</td><td>{studentById.get(result.studentId)?.admission_number || '—'}</td><td>{result.count}</td><td>{result.total.toFixed(2)}</td><td>{result.average.toFixed(2)}%</td><td>{result.grade}</td></tr>)}
           {!results.length && <tr><td colSpan={7}>Performance positions will appear after marks are entered.</td></tr>}
         </tbody></table></div>
         <div className="panel-heading"><div><h3>Subject analysis</h3><p>Average score for each subject with recorded marks.</p></div></div>
