@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import {
   LayoutDashboard, Users, GraduationCap, BookOpen,
   FileText, Settings, LogOut,
-  Search, Bell, Plus, Menu, X, ArrowUpRight, UserPlus,
+  Search, Plus, Menu, X, ArrowUpRight, UserPlus,
   CalendarDays, TrendingUp, ShieldCheck, LoaderCircle, Wallet, RefreshCw,
 } from 'lucide-react'
 import StaffFinance from './StaffFinance'
