@@ -717,7 +717,7 @@ function App() {
             </section>
               )}
               {settingsSection === 'school' && <SchoolProfileSettings token={token} onSaved={() => { api<any>('settings/school-profile',token).then(setSchoolConfig).catch(()=>{}); setSettingsSection('home') }} />}
-              {settingsSection === 'academic' && <><AcademicSettings token={token} onSaved={() => setSettingsSection('home')} /><SubjectSettings token={token} onSaved={() => setSettingsSection('home')} /></>}
+              {settingsSection === 'academic' && <><AcademicSettings token={token} onSaved={() => setSettingsSection('home')} /><SubjectSettings token={token} /></>}
               {settingsSection === 'curriculum' && <AcademicCurriculumSettings token={token} onSaved={() => setSettingsSection('home')} />}
               {settingsSection === 'users' && <TeacherUsersSettings token={token} classes={classes} onSaved={() => setSettingsSection('home')} />}
               {settingsSection === 'backups' && <BackupSettings token={token} />}
@@ -1105,7 +1105,7 @@ const SUBJECT_CATALOGUE = [
   { group: 'Business and technical', names: ['Commerce', 'Entrepreneurship Education', 'Economics', 'Accounting', 'Business Studies', 'Food and Nutrition', 'Home Economics', 'Art and Design', 'Fine Art', 'Music', 'Physical Education', 'Agriculture and Nutrition', 'Technical Drawing', 'Woodwork', 'Metalwork', 'ICT'] },
 ]
 
-function SubjectSettings({token,onSaved}:{token:string;onSaved:()=>void}) {
+function SubjectSettings({token}:{token:string}) {
   const [subjects,setSubjects]=useState<any[]>([])
   const [selected,setSelected]=useState<string[]>([])
   const [customName,setCustomName]=useState('')
