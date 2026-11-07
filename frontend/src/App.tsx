@@ -436,9 +436,11 @@ function App() {
               </section>
               <section className="dashboard-grid">
                 <div className="panel recent-panel">
-                  <div className="panel-heading"><div><h2>School records</h2><p>Keep large registers inside their own modules</p></div></div>
-                  <button className="quick-action" onClick={() => setActive('Students')}><span className="quick-icon blue"><GraduationCap /></span><span><strong>Student register</strong><small>{studentTotal.toLocaleString()} student records · searchable</small></span><ArrowUpRight size={17} /></button>
-                  <button className="quick-action" onClick={() => setActive('Staff')}><span className="quick-icon purple"><Users /></span><span><strong>Staff directory</strong><small>Teaching and non-teaching staff</small></span><ArrowUpRight size={17} /></button>
+                  <div className="panel-heading"><div><h2>School setup & administration</h2><p>Important settings to keep your school workspace organised</p></div></div>
+                  <button className="quick-action" onClick={() => { setActive('Settings'); setSettingsSection('academic') }}><span className="quick-icon blue"><CalendarDays /></span><span><strong>Academic year & terms</strong><small>Set the current school year and active term</small></span><ArrowUpRight size={17} /></button>
+                  <button className="quick-action" onClick={() => { setActive('Settings'); setSettingsSection('school') }}><span className="quick-icon purple"><GraduationCap /></span><span><strong>School profile</strong><small>Maintain school name and contact details</small></span><ArrowUpRight size={17} /></button>
+                  <button className="quick-action" onClick={() => { setActive('Settings'); setSettingsSection('users') }}><span className="quick-icon blue"><ShieldCheck /></span><span><strong>Users & permissions</strong><small>Manage staff accounts and teacher access</small></span><ArrowUpRight size={17} /></button>
+                  <button className="quick-action" onClick={() => { setActive('Settings'); setSettingsSection('backups') }}><span className="quick-icon orange"><Settings /></span><span><strong>Backups & restore</strong><small>Protect school records with regular backups</small></span><ArrowUpRight size={17} /></button>
                 </div>
                 <div className="panel quick-panel">
                   <div className="panel-heading"><div><h2>Quick actions</h2><p>Common school operations</p></div></div>
