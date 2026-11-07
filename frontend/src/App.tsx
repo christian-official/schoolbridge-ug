@@ -112,7 +112,7 @@ function App() {
   async function loadSchoolData(authToken: string) {
     setDataError('')
     try {
-      const [studentData, classData, admissionData, financeData, staffData] = await Promise.all([
+      const [studentData, classData, admissionData, staffData] = await Promise.all([
         api<StudentPage>('students/search?page=1&page_size=25', authToken),
         api<RecordItem[]>('classes', authToken),
         api<AdmissionSettings>('settings/admission-number', authToken),
