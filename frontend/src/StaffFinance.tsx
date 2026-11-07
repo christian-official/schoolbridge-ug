@@ -4,7 +4,7 @@ import { Users, Plus, Search, Wallet, ReceiptText } from 'lucide-react'
 type Staff = { id:number; staff_number:string; first_name:string; last_name:string; category:string; position?:string; department?:string; phone?:string; email?:string; salary_amount?:number|null; salary_frequency?:string; status?:string }
 type Page<T> = { items:T[]; total:number; page:number; pages:number }
 type Summary = { fees_expected:number; fees_collected:number; outstanding:number; salary_expenses?:number; other_expenses?:number; total_expenses?:number; net_cash_position?:number }
-type Charge = { id:number; student_id:number; student_name:string; admission_number:string; class_name?:string; stream?:string; term:string; year:number; amount:number; paid:number; balance:number }
+type Charge = { id:number; student_id:number; student_name:string; admission_number:string; class_id?:number|null; class_name?:string; stream?:string; term:string; year:number; amount:number; paid:number; balance:number }
 
 async function request<T>(path:string, token:string, options:RequestInit={}):Promise<T> {
   const response = await fetch('/api/'+path, { ...options, headers:{ Authorization:'Bearer '+token, ...(options.body?{'Content-Type':'application/json'}:{}), ...options.headers } })
@@ -13,7 +13,7 @@ async function request<T>(path:string, token:string, options:RequestInit={}):Pro
   return data as T
 }
 
-export default function StaffFinance({token,active}:{token:string;active:string}) {
+export default function StaffFinance({token,active,classes=[]}:{token:string;active:string;classes?:{id:number;name?:string;section?:string}[]}) {
   const [staff,setStaff]=useState<Staff[]>([])
   const [staffTotal,setStaffTotal]=useState(0)
   const [search,setSearch]=useState('')
@@ -24,6 +24,8 @@ export default function StaffFinance({token,active}:{token:string;active:string}
   const [summary,setSummary]=useState<Summary>({fees_expected:0,fees_collected:0,outstanding:0})
   const [charges,setCharges]=useState<Charge[]>([])
   const [feeSearch,setFeeSearch]=useState('')
+  const [feeClass,setFeeClass]=useState('')
+  const [outstandingOnly,setOutstandingOnly]=useState(false)
   const [payment,setPayment]=useState({charge_id:'',amount:'',method:'Cash',reference:''})
 
   useEffect(()=>{
@@ -34,10 +36,10 @@ export default function StaffFinance({token,active}:{token:string;active:string}
   },[active,search,category,token])
 
   async function refreshFinance(){
-    const [s,c]=await Promise.all([request<Summary>('finance/summary',token),request<Charge[]>('finance/charges?search='+encodeURIComponent(feeSearch),token)])
+    const [s,c]=await Promise.all([request<Summary>('finance/summary',token),request<Charge[]>('finance/charges?search='+encodeURIComponent(feeSearch)+'&class_id='+encodeURIComponent(feeClass)+'&outstanding_only='+String(outstandingOnly),token)])
     setSummary(s);setCharges(c)
   }
-  useEffect(()=>{if(active==='Fees & Finance') refreshFinance().catch(e=>setMessage(e.message))},[active,feeSearch,token])
+  useEffect(()=>{if(active==='Fees & Finance') refreshFinance().catch(e=>setMessage(e.message))},[active,feeSearch,feeClass,outstandingOnly,token])
 
   async function addStaff(e:FormEvent){
     e.preventDefault();setMessage('')
@@ -86,9 +88,9 @@ export default function StaffFinance({token,active}:{token:string;active:string}
       <label>Reference / receipt number<input value={payment.reference} onChange={e=>setPayment({...payment,reference:e.target.value})}/></label>
     </div><div className="form-actions"><button className="primary-button" disabled={!charges.some(c=>c.balance>0)}>Record payment</button></div></form>
     <div className="panel-heading"><div><h2>Student fee balances</h2><p>Search by student name or admission number</p></div></div>
-    <div className="table-tools"><div className="search-box"><Search size={17}/><input placeholder="Search fee records..." value={feeSearch} onChange={e=>setFeeSearch(e.target.value)}/></div></div>
+    <div className="table-tools"><div className="search-box"><Search size={17}/><input placeholder="Search by name or admission number..." value={feeSearch} onChange={e=>setFeeSearch(e.target.value)}/></div><select className="filter-select" value={feeClass} onChange={e=>setFeeClass(e.target.value)}><option value="">All classes and streams</option>{classes.map(c=><option key={c.id} value={c.id}>{c.name}{c.section?' — '+c.section:''}</option>)}</select><label className="settings-checkbox"><input type="checkbox" checked={outstandingOnly} onChange={e=>setOutstandingOnly(e.target.checked)}/> Outstanding only</label><button className="secondary-button" type="button" onClick={()=>window.print()}>Print reminders</button></div>
     <div className="table-wrap"><table><thead><tr><th>Student</th><th>Admission no.</th><th>Term</th><th>Year</th><th>Charged (UGX)</th><th>Paid (UGX)</th><th>Balance (UGX)</th></tr></thead><tbody>{charges.map(c=><tr key={c.id}><td>{c.student_name}</td><td>{c.admission_number}</td><td>{c.term}</td><td>{c.year}</td><td>{c.amount.toLocaleString()}</td><td>{c.paid.toLocaleString()}</td><td><strong>{c.balance.toLocaleString()}</strong></td></tr>)}</tbody></table></div>
-    {!charges.length&&<div className="empty-state"><Wallet size={30}/><p>No fee charges yet. Enter term fees when registering a student.</p></div>}
+    {!charges.length&&<div className="empty-state"><Wallet size={30}/><p>No fee charges match this search. Set standard fees in Settings → Fee Structure.</p></div>}
   </section>
   return null
 }
