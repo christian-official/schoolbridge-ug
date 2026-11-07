@@ -24,6 +24,7 @@ type StudentPage = { items: RecordItem[]; total: number; page: number; pages: nu
 type DashboardSummary = {
   active_students: number
   new_admissions_this_year: number
+  students_present_today: number
   active_staff: number
   total_classes: number
   academic_year: number
@@ -111,7 +112,7 @@ function App() {
   const [settingsSection, setSettingsSection] = useState('home')
   const [students, setStudents] = useState<RecordItem[]>([])
   const [studentTotal, setStudentTotal] = useState(0)
-  const [dashboardSummary, setDashboardSummary] = useState<DashboardSummary>({ active_students: 0, new_admissions_this_year: 0, active_staff: 0, total_classes: 0, academic_year: new Date().getFullYear() })
+  const [dashboardSummary, setDashboardSummary] = useState<DashboardSummary>({ active_students: 0, new_admissions_this_year: 0, students_present_today: 0, active_staff: 0, total_classes: 0, academic_year: new Date().getFullYear() })
   const [studentPage, setStudentPage] = useState(1)
   const [studentClassFilter, setStudentClassFilter] = useState('')
   const [classes, setClasses] = useState<RecordItem[]>([])
@@ -154,7 +155,7 @@ function App() {
         api<StudentPage>('students/search?page=1&page_size=25', authToken),
         api<RecordItem[]>('classes', authToken),
         api<AdmissionSettings>('settings/admission-number', authToken),
-        api<DashboardSummary>('dashboard/summary', authToken),
+        api<DashboardSummary>(`dashboard/summary?attendance_date=${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`, authToken),
       ])
       setStudents(studentData.items)
       setStudentTotal(studentData.total)
@@ -515,7 +516,7 @@ function App() {
             <>
               <section className="stats-grid">
                 <StatCard title="Total students" value={studentTotal} icon={<GraduationCap />} note="All registered students" />
-                <StatCard title="New admissions" value={dashboardSummary.new_admissions_this_year} icon={<UserPlus />} note={`Admitted in ${dashboardSummary.academic_year}`} />
+                <StatCard title="Students present" value={dashboardSummary.students_present_today} icon={<UserPlus />} note="Marked present today" />
                 <StatCard title="Active staff" value={dashboardSummary.active_staff} icon={<Users />} note="Teaching and non-teaching" />
                 <StatCard title="Total classes" value={dashboardSummary.total_classes} icon={<BookOpen />} note="Classes and streams" />
               </section>
