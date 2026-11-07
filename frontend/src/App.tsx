@@ -110,6 +110,7 @@ function App() {
   const [loginError, setLoginError] = useState('')
   const [loading, setLoading] = useState(false)
   const [active, setActive] = useState('Overview')
+  const [financeTabRequest, setFinanceTabRequest] = useState<'overview' | 'payments' | 'balances'>('overview')
   const [refreshKey, setRefreshKey] = useState(0)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [settingsSection, setSettingsSection] = useState('home')
@@ -531,8 +532,8 @@ function App() {
                   <div className="panel-heading"><div><h2>Academic & finance centre</h2><p>Priority school controls, collections and fee follow-up.</p></div></div>
                   <div className="overview-finance-metrics"><div><small>PAYMENTS RECEIVED</small><strong>UGX {financeDashboard.fees_collected.toLocaleString('en-UG')}</strong></div><div><small>OUTSTANDING BALANCES</small><strong>UGX {financeDashboard.outstanding.toLocaleString('en-UG')}</strong></div></div>
                   <button className="quick-action" onClick={() => setActive('Examinations')}><span className="quick-icon orange"><FileText /></span><span><strong>Enter and verify assessment marks</strong><small>Open subject registers, class performance and report cards.</small></span><ArrowUpRight size={17} /></button>
-                  <button className="quick-action" onClick={() => setActive('Fees & Finance')}><span className="quick-icon blue"><ShieldCheck /></span><span><strong>Record student payments</strong><small>Post collections and issue payment receipts.</small></span><ArrowUpRight size={17} /></button>
-                  <button className="quick-action" onClick={() => setActive('Fees & Finance')}><span className="quick-icon purple"><FileText /></span><span><strong>Outstanding fee balances</strong><small>Identify unpaid charges and follow up by class.</small></span><ArrowUpRight size={17} /></button>
+                  <button className="quick-action" onClick={() => { setFinanceTabRequest('payments'); setActive('Fees & Finance') }}><span className="quick-icon blue"><ShieldCheck /></span><span><strong>Record student payments</strong><small>Post collections and issue payment receipts.</small></span><ArrowUpRight size={17} /></button>
+                  <button className="quick-action" onClick={() => { setFinanceTabRequest('balances'); setActive('Fees & Finance') }}><span className="quick-icon purple"><FileText /></span><span><strong>Outstanding fee balances</strong><small>Identify unpaid charges and follow up by class.</small></span><ArrowUpRight size={17} /></button>
                   <button className="quick-action" onClick={() => setActive('Timetable')}><span className="quick-icon purple"><BookOpen /></span><span><strong>Review whole-school timetable</strong><small>Check lesson allocation by class, day and teacher.</small></span><ArrowUpRight size={17} /></button>
                 </div>
                 <div className="panel quick-panel">
@@ -622,7 +623,7 @@ function App() {
 
 
 
-          <StaffFinance token={token} active={active} classes={classes} refreshKey={refreshKey} />
+          <StaffFinance token={token} active={active} classes={classes} refreshKey={refreshKey} initialTab={financeTabRequest} />
           {studentProfile && (
             <div className="modal-backdrop" onClick={()=>setStudentProfile(null)}>
               <section className="panel student-profile-modal" onClick={e=>e.stopPropagation()}>
