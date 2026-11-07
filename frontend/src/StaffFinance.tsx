@@ -1,9 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Users, Plus, Search, Wallet, ReceiptText } from 'lucide-react'
 
-type Staff = { id:number; staff_number:string; first_name:string; last_name:string; category:string; position?:string; department?:string; phone?:string; email?:string }
+type Staff = { id:number; staff_number:string; first_name:string; last_name:string; category:string; position?:string; department?:string; phone?:string; email?:string; salary_amount?:number|null; salary_frequency?:string; status?:string }
 type Page<T> = { items:T[]; total:number; page:number; pages:number }
-type Summary = { fees_expected:number; fees_collected:number; outstanding:number }
+type Summary = { fees_expected:number; fees_collected:number; outstanding:number; salary_expenses?:number; other_expenses?:number; total_expenses?:number; net_cash_position?:number }
 type Charge = { id:number; student_name:string; admission_number:string; term:string; year:number; amount:number; paid:number; balance:number }
 
 async function request<T>(path:string, token:string, options:RequestInit={}):Promise<T> {
@@ -20,7 +20,7 @@ export default function StaffFinance({token,active}:{token:string;active:string}
   const [category,setCategory]=useState('')
   const [showForm,setShowForm]=useState(false)
   const [message,setMessage]=useState('')
-  const [form,setForm]=useState({first_name:'',last_name:'',category:'Teaching',position:'',department:'',phone:'',email:''})
+  const [form,setForm]=useState({first_name:'',last_name:'',category:'Teaching',position:'',department:'',phone:'',email:'',salary_amount:'',salary_frequency:'Monthly'})
   const [summary,setSummary]=useState<Summary>({fees_expected:0,fees_collected:0,outstanding:0})
   const [charges,setCharges]=useState<Charge[]>([])
   const [feeSearch,setFeeSearch]=useState('')
@@ -41,7 +41,7 @@ export default function StaffFinance({token,active}:{token:string;active:string}
 
   async function addStaff(e:FormEvent){
     e.preventDefault();setMessage('')
-    try { await request('staff',token,{method:'POST',body:JSON.stringify(form)});setForm({first_name:'',last_name:'',category:'Teaching',position:'',department:'',phone:'',email:''});setShowForm(false);setMessage('Staff member registered.');const p=new URLSearchParams({search,page:'1',page_size:'100'});if(category)p.set('category',category);const r=await request<Page<Staff>>('staff?'+p.toString(),token);setStaff(r.items);setStaffTotal(r.total) }
+    try { await request('staff',token,{method:'POST',body:JSON.stringify(form)});setForm({first_name:'',last_name:'',category:'Teaching',position:'',department:'',phone:'',email:'',salary_amount:'',salary_frequency:'Monthly'});setShowForm(false);setMessage('Staff member registered.');const p=new URLSearchParams({search,page:'1',page_size:'100'});if(category)p.set('category',category);const r=await request<Page<Staff>>('staff?'+p.toString(),token);setStaff(r.items);setStaffTotal(r.total) }
     catch(e){setMessage(e instanceof Error?e.message:'Unable to save staff member.')}
   }
   async function pay(e:FormEvent){
@@ -60,10 +60,10 @@ export default function StaffFinance({token,active}:{token:string;active:string}
       <label>Position<input value={form.position} onChange={e=>setForm({...form,position:e.target.value})}/></label>
       <label>Department<input value={form.department} onChange={e=>setForm({...form,department:e.target.value})}/></label>
       <label>Phone<input value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})}/></label>
-      <label>Email<input type="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})}/></label>
+      <label>Email<input type="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})}/></label><label>Salary amount (UGX)<input type="number" min="0" value={form.salary_amount} onChange={e=>setForm({...form,salary_amount:e.target.value})}/></label><label>Pay frequency<select value={form.salary_frequency} onChange={e=>setForm({...form,salary_frequency:e.target.value})}><option>Monthly</option><option>Termly</option><option>Weekly</option><option>Daily</option></select></label>
     </div><div className="form-actions"><button className="primary-button">Save staff member</button></div></form>}
     <div className="table-tools student-tools"><div className="search-box"><Search size={17}/><input placeholder="Search name or staff number..." value={search} onChange={e=>setSearch(e.target.value)}/></div><select className="filter-select" value={category} onChange={e=>setCategory(e.target.value)}><option value="">All staff</option><option>Teaching</option><option>Non-teaching</option></select></div>
-    <div className="table-wrap"><table><thead><tr><th>Staff member</th><th>Staff number</th><th>Category</th><th>Position</th><th>Department</th><th>Phone</th></tr></thead><tbody>{staff.map(s=><tr key={s.id}><td>{s.first_name} {s.last_name}</td><td>{s.staff_number}</td><td>{s.category}</td><td>{s.position||'—'}</td><td>{s.department||'—'}</td><td>{s.phone||'—'}</td></tr>)}</tbody></table></div>
+    <div className="table-wrap"><table><thead><tr><th>Staff member</th><th>Staff number</th><th>Category</th><th>Position</th><th>Department</th><th>Phone</th><th>Salary (UGX)</th><th>Status</th></tr></thead><tbody>{staff.map(s=><tr key={s.id}><td>{s.first_name} {s.last_name}</td><td>{s.staff_number}</td><td>{s.category}</td><td>{s.position||'—'}</td><td>{s.department||'—'}</td><td>{s.phone||'—'}</td><td>{s.salary_amount?.toLocaleString()||'—'} {s.salary_frequency||''}</td><td>{s.status||'active'}</td></tr>)}</tbody></table></div>
     {!staff.length&&<div className="empty-state"><Users size={30}/><p>No staff members match this search.</p></div>}
   </section>
 
@@ -74,6 +74,9 @@ export default function StaffFinance({token,active}:{token:string;active:string}
       <div className="stat-card"><div className="stat-top">Fees expected <Wallet size={18}/></div><strong className="stat-value">UGX {summary.fees_expected.toLocaleString()}</strong><small>Total recorded charges</small></div>
       <div className="stat-card"><div className="stat-top">Fees collected <ReceiptText size={18}/></div><strong className="stat-value">UGX {summary.fees_collected.toLocaleString()}</strong><small>Payments received</small></div>
       <div className="stat-card"><div className="stat-top">Outstanding <Wallet size={18}/></div><strong className="stat-value">UGX {summary.outstanding.toLocaleString()}</strong><small>Remaining balances</small></div>
+      <div className="stat-card"><div className="stat-top">Salary expenses <Wallet size={18}/></div><strong className="stat-value">UGX {(summary.salary_expenses||0).toLocaleString()}</strong><small>Recorded salary payments</small></div>
+      <div className="stat-card"><div className="stat-top">Other expenses <Wallet size={18}/></div><strong className="stat-value">UGX {(summary.other_expenses||0).toLocaleString()}</strong><small>Recorded school expenses</small></div>
+      <div className="stat-card"><div className="stat-top">Net cash position <Wallet size={18}/></div><strong className="stat-value">UGX {(summary.net_cash_position||0).toLocaleString()}</strong><small>Collected fees less recorded expenses</small></div>
     </div>
     <div className="panel-heading"><div><h2>Record a payment</h2><p>Partial payments are supported; overpayments are blocked.</p></div></div>
     <form className="student-form" onSubmit={pay}><div className="student-form-grid">
