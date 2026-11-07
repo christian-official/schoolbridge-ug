@@ -372,3 +372,31 @@ button:disabled { cursor: not-allowed; opacity: .58; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
 }
+
+
+/* Prefect and teacher duty management */
+.overview-leadership { margin-top: 18px; }
+.overview-leadership .panel-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.overview-leadership .panel-heading .secondary-button { display:inline-flex; align-items:center; gap:7px; white-space:nowrap; }
+.overview-leadership-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:13px; }
+.leadership-shortcut { display:flex; align-items:center; gap:13px; width:100%; min-width:0; text-align:left; border:1px solid var(--line); border-radius:10px; background:#fbfcff; padding:16px; color:var(--navy); }
+.leadership-shortcut > span:nth-child(2) { display:grid; gap:5px; flex:1; min-width:0; }
+.leadership-shortcut strong { font-size:15px; }
+.leadership-shortcut small { color:var(--muted); font-size:13px; line-height:1.45; }
+.leadership-shortcut > svg { flex:0 0 auto; color:var(--muted); }
+.leadership-shortcut:hover { border-color:#aebff5; background:#f6f8ff; }
+.leadership-workspace { display:grid; gap:18px; }
+.leadership-summary { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:13px; }
+.leadership-summary-card { display:grid; gap:7px; padding:18px; background:#fff; border:1px solid var(--line); border-radius:11px; min-width:0; }
+.leadership-summary-card span { color:var(--muted); font-size:14px; }
+.leadership-summary-card strong { color:var(--navy); font-size:22px; overflow-wrap:anywhere; }
+.leadership-summary-card small { color:var(--muted); font-size:12px; }
+.leadership-workspace .table-wrap { margin-top:14px; }
+.leadership-workspace .table-wrap table { min-width:760px; }
+.leadership-workspace .student-form { margin-bottom:14px; }
+@media(max-width:760px) {
+ .overview-leadership-grid { grid-template-columns:1fr; }
+ .leadership-summary { grid-template-columns:1fr 1fr; }
+ .overview-leadership .panel-heading { align-items:flex-start; flex-direction:column; }
+}
+@media(max-width:480px) { .leadership-summary { grid-template-columns:1fr; } }
