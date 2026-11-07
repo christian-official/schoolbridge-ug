@@ -261,6 +261,7 @@ def create_student(data: StudentCreate, db: Session = Depends(get_db)):
     if data.class_id is not None and not db.get(models.SchoolClass, data.class_id):
         raise HTTPException(404, "Class not found.")
     student_data = data.model_dump()
+    student_data.pop("fee_amount", None)
     supplied_number = (student_data.pop("admission_number") or "").strip()
     settings = get_or_create_school_settings(db)
     item = models.Student(
