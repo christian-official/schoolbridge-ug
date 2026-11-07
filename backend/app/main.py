@@ -86,6 +86,9 @@ class StudentCreate(BaseModel):
     admission_date: date | None = None
     class_id: int | None = None
     fee_amount: int | None = Field(default=None, ge=0)
+    academic_level: str | None = Field(default=None, pattern="^(O-Level|A-Level)$")
+    combination: str | None = None
+    optional_subjects: str | None = None
 
 
 class StudentUpdate(BaseModel):
@@ -105,6 +108,9 @@ class StudentUpdate(BaseModel):
     admission_date: date | None = None
     class_id: int | None = None
     status: str | None = Field(default=None, pattern="^(active|transferred|dismissed|inactive)$")
+    academic_level: str | None = Field(default=None, pattern="^(O-Level|A-Level)$")
+    combination: str | None = None
+    optional_subjects: str | None = None
 
 
 class AdmissionSettingsUpdate(BaseModel):
@@ -690,6 +696,7 @@ def my_assignments(
 class StaffCreate(BaseModel):
     first_name: str
     last_name: str
+    subjects: str | None = None
     category: str = Field(default="Teaching", pattern="^(Teaching|Non-teaching)$")
     position: str | None = None
     department: str | None = None
@@ -724,6 +731,7 @@ def upgrade_existing_database():
         "guardian_relationship": "VARCHAR(60)", "guardian_phone": "VARCHAR(30)",
         "previous_school": "VARCHAR(160)", "admission_date": "DATE",
         "status": "VARCHAR(20) NOT NULL DEFAULT 'active'",
+        "academic_level": "VARCHAR(20)", "combination": "VARCHAR(100)", "optional_subjects": "TEXT",
     }
     settings_columns = {c["name"] for c in inspector.get_columns("school_settings")} if "school_settings" in inspector.get_table_names() else set()
     staff_columns = {c["name"] for c in inspector.get_columns("staff_members")} if "staff_members" in inspector.get_table_names() else set()
@@ -732,12 +740,18 @@ def upgrade_existing_database():
         for name, sql_type in additions.items():
             if name not in existing: connection.execute(text("ALTER TABLE students ADD COLUMN " + name + " " + sql_type))
         if "staff_members" in inspector.get_table_names():
+            if "subjects" not in staff_columns: connection.execute(text("ALTER TABLE staff_members ADD COLUMN subjects TEXT"))
             if "salary_amount" not in staff_columns: connection.execute(text("ALTER TABLE staff_members ADD COLUMN salary_amount INTEGER"))
             if "salary_frequency" not in staff_columns: connection.execute(text("ALTER TABLE staff_members ADD COLUMN salary_frequency VARCHAR(20) NOT NULL DEFAULT 'Monthly'"))
         if "fee_payments" in inspector.get_table_names() and "receipt_number" not in payment_columns:
             connection.execute(text("ALTER TABLE fee_payments ADD COLUMN receipt_number VARCHAR(50)"))
         if "fee_payments" in inspector.get_table_names():
             connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_fee_payments_receipt_number ON fee_payments (receipt_number)"))
+        if "school_profile" in inspector.get_table_names():
+            profile_columns = {c["name"] for c in inspector.get_columns("school_profile")}
+            profile_additions = {"school_type": "VARCHAR(20) NOT NULL DEFAULT 'Secondary'", "a_level_combinations": "TEXT", "o_level_optional_subjects": "TEXT", "a_level_subsidiary_subjects": "TEXT"}
+            for name, sql_type in profile_additions.items():
+                if name not in profile_columns: connection.execute(text("ALTER TABLE school_profile ADD COLUMN " + name + " " + sql_type))
         if "school_settings" in inspector.get_table_names():
             if "academic_year" not in settings_columns:
                 connection.execute(text("ALTER TABLE school_settings ADD COLUMN academic_year INTEGER"))
@@ -1229,6 +1243,7 @@ def change_student_status(student_id: int, status: str, db: Session = Depends(ge
 class StaffUpdate(BaseModel):
     first_name: str | None = None
     last_name: str | None = None
+    subjects: str | None = None
     category: str | None = Field(default=None, pattern="^(Teaching|Non-teaching)$")
     position: str | None = None
     department: str | None = None
@@ -1366,6 +1381,10 @@ class SchoolProfileUpdate(BaseModel):
     phone: str | None = Field(default=None, max_length=40)
     email: str | None = Field(default=None, max_length=150)
     motto: str | None = Field(default=None, max_length=200)
+    school_type: str = Field(default="Secondary", pattern="^(Primary|Secondary)$")
+    a_level_combinations: str | None = None
+    o_level_optional_subjects: str | None = None
+    a_level_subsidiary_subjects: str | None = None
 
 
 @app.get("/api/settings/school-profile", tags=["School Settings"])
