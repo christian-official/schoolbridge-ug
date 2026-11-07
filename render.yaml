@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: schoolbridge-preview-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: SCHOOLBRIDGE_SECRET_KEY
+        generateValue: true
+      - key: SCHOOLBRIDGE_DATABASE_URL
+        value: sqlite:///./schoolbridge.db
+      - key: SCHOOLBRIDGE_CORS_ORIGINS
+        value: "*"
