@@ -31,7 +31,7 @@ export default function StaffFinance({token,active,classes=[],refreshKey=0}:{tok
   const [salaryForm,setSalaryForm]=useState({staff_id:'',amount:'',period:'',reference:''})
   const [feeSearch,setFeeSearch]=useState('')
   const [feeClass,setFeeClass]=useState('')
-  const [outstandingOnly,setOutstandingOnly]=useState(false)
+  const [outstandingOnly,setOutstandingOnly]=useState(true)
   const [payment,setPayment]=useState({charge_id:'',amount:'',method:'Cash',reference:''})
   const [receipt,setReceipt]=useState<{receipt_number:string;charge:Charge;amount:number;method:string;date:string}|null>(null)
   const [schoolProfile,setSchoolProfile]=useState<{name:string;phone?:string;email?:string;address?:string}>({name:'SchoolBridge'})
@@ -171,7 +171,7 @@ export default function StaffFinance({token,active,classes=[],refreshKey=0}:{tok
     {financeTab==='balances'&&<>
     <div className="panel-heading"><div><h2>Outstanding balances by class</h2><p>Select a class to see students with unpaid balances.</p></div></div>
     <div className="finance-class-grid">
-      {classes.map(cls=>{const rows=allOutstanding.filter(x=>x.class_id===cls.id&&x.balance>0);const total=rows.reduce((sum,x)=>sum+x.balance,0);return <button type="button" key={cls.id} className={feeClass===String(cls.id)?'finance-class-card selected':'finance-class-card'} onClick={()=>setFeeClass(String(cls.id))}><Building2 size={20}/><strong>{cls.name}{cls.section?' — '+cls.section:''}</strong><span>{rows.length} students with balances</span><b>UGX {total.toLocaleString()}</b></button>})}
+      {classes.map(cls=>{const rows=allOutstanding.filter(x=>x.class_id===cls.id&&x.balance>0);const total=rows.reduce((sum,x)=>sum+x.balance,0);return <button type="button" key={cls.id} className={feeClass===String(cls.id)?'finance-class-card selected':'finance-class-card'} onClick={()=>{setFeeClass(String(cls.id));setFeeSearch('');setOutstandingOnly(true)}}><Building2 size={20}/><strong>{cls.name}{cls.section?' — '+cls.section:''}</strong><span>{rows.length} students with balances</span><b>UGX {total.toLocaleString()}</b></button>})}
     </div>
     <div className="panel-heading"><div><h2>{feeClass?'Selected class balances':'All class balances'}</h2><p>{feeClass?'Students with outstanding balances in this class':'Choose a class above to narrow the list.'}</p></div><button type="button" className="secondary-button" onClick={()=>setFeeClass('')}>All classes</button></div>
     <div className="table-tools"><label className="settings-checkbox"><input type="checkbox" checked={outstandingOnly} onChange={e=>setOutstandingOnly(e.target.checked)}/> Outstanding only</label><button className="secondary-button" type="button" onClick={printReminders}>Print reminders</button></div>
