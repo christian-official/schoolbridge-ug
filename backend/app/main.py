@@ -105,7 +105,7 @@ def get_or_create_school_settings(db: Session):
 class AttendanceCreate(BaseModel):
     student_id: int
     attendance_date: date = Field(default_factory=date.today)
-    status: str
+    status: str = Field(pattern="^(Present|Absent|Late|Excused)$")
 
 
 class ExamCreate(BaseModel):
