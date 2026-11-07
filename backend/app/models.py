@@ -17,9 +17,10 @@ class SchoolClass(Base):
 
 class Subject(Base):
     __tablename__ = "subjects"
+    __table_args__ = (UniqueConstraint("name", "school_type", name="uq_subjects_name_school_type"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(100), unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(100), index=True)
     code: Mapped[str | None] = mapped_column(String(20), nullable=True)
     school_type: Mapped[str] = mapped_column(String(20), default="Secondary", nullable=False)
 
