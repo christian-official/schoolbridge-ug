@@ -81,7 +81,7 @@ class StudentCreate(BaseModel):
     previous_school: str | None = None
     admission_date: date | None = None
     class_id: int | None = None
-
+    fee_amount: int | None = Field(default=None, ge=0)
 
 
 class StudentUpdate(BaseModel):
@@ -294,10 +294,11 @@ def create_student(data: StudentCreate, db: Session = Depends(get_db)):
             class_fee = db.query(models.ClassFee).filter_by(
                 class_id=item.class_id, term=active_term, year=active_year
             ).first()
-            if class_fee and class_fee.amount > 0:
+            selected_fee = data.fee_amount if data.fee_amount is not None else (class_fee.amount if class_fee else 0)
+            if selected_fee > 0:
                 db.add(models.FeeCharge(
                     student_id=item.id, term=active_term,
-                    year=active_year, amount=class_fee.amount
+                    year=active_year, amount=selected_fee
                 ))
         db.commit()
         db.refresh(item)
