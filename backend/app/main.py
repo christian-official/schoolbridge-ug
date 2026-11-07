@@ -89,6 +89,7 @@ class StudentCreate(BaseModel):
     academic_level: str | None = Field(default=None, pattern="^(O-Level|A-Level)$")
     combination: str | None = None
     optional_subjects: str | None = None
+    subsidiary_subjects: str | None = None
 
 
 class StudentUpdate(BaseModel):
@@ -111,6 +112,7 @@ class StudentUpdate(BaseModel):
     academic_level: str | None = Field(default=None, pattern="^(O-Level|A-Level)$")
     combination: str | None = None
     optional_subjects: str | None = None
+    subsidiary_subjects: str | None = None
 
 
 class AdmissionSettingsUpdate(BaseModel):
@@ -731,7 +733,7 @@ def upgrade_existing_database():
         "guardian_relationship": "VARCHAR(60)", "guardian_phone": "VARCHAR(30)",
         "previous_school": "VARCHAR(160)", "admission_date": "DATE",
         "status": "VARCHAR(20) NOT NULL DEFAULT 'active'",
-        "academic_level": "VARCHAR(20)", "combination": "VARCHAR(100)", "optional_subjects": "TEXT",
+        "academic_level": "VARCHAR(20)", "combination": "VARCHAR(100)", "optional_subjects": "TEXT", "subsidiary_subjects": "TEXT",
     }
     settings_columns = {c["name"] for c in inspector.get_columns("school_settings")} if "school_settings" in inspector.get_table_names() else set()
     staff_columns = {c["name"] for c in inspector.get_columns("staff_members")} if "staff_members" in inspector.get_table_names() else set()
