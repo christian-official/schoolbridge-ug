@@ -1229,3 +1229,26 @@ async def restore_database_backup(file: UploadFile = File(...), admin=Depends(re
     finally:
         if os.path.exists(uploaded_path):
             os.unlink(uploaded_path)
+
+
+class FeeChargeUpdate(BaseModel):
+    amount: int = Field(ge=0)
+    reason: str = Field(min_length=3, max_length=255)
+
+
+@app.patch("/api/finance/charges/{charge_id}", tags=["Finance"])
+def adjust_fee_charge(charge_id: int, data: FeeChargeUpdate, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    charge = db.get(models.FeeCharge, charge_id)
+    if not charge:
+        raise HTTPException(404, "Fee charge not found.")
+    paid = db.query(func.coalesce(func.sum(models.FeePayment.amount), 0)).filter(
+        models.FeePayment.charge_id == charge.id
+    ).scalar() or 0
+    if data.amount < paid:
+        raise HTTPException(400, "The revised charge cannot be less than payments already received.")
+    previous = charge.amount
+    charge.amount = data.amount
+    write_audit(db, admin, "fee_charge_adjusted", "fee_charge", charge.id,
+                f"Previous UGX {previous}; new UGX {data.amount}; reason: {data.reason}")
+    db.commit()
+    return {"message": "Fee charge adjusted and recorded in the audit log.", "charge_id": charge.id, "amount": charge.amount, "paid": paid, "balance": charge.amount-paid}
