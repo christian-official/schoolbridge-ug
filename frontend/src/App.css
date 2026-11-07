@@ -656,3 +656,29 @@ button:disabled { cursor: not-allowed; opacity: .58; }
   .generated-admission { grid-column: 1 / -1; }
   .registration-actions { position: static; }
 }
+
+
+/* Class-first student workspace */
+.student-workspace-heading { align-items: center; gap: 16px; }
+.student-class-browser { margin: 18px 0 16px; padding: 17px; border: 1px solid #e7ecf4; border-radius: 13px; background: #fbfcff; }
+.student-class-browser-heading,.student-list-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:13px; }
+.student-class-browser-heading h3,.student-list-heading h3 { margin:0 0 4px; color:#26364f; font-size:15px; font-weight:800; }
+.student-class-browser-heading p,.student-list-heading p { margin:0; color:#7b879b; font-size:12px; }
+.student-class-browser-heading > span { color:#64748b; font-size:12px; font-weight:700; white-space:nowrap; }
+.student-class-tabs { display:flex; flex-wrap:wrap; gap:9px; }
+.student-class-tab { min-height:40px; padding:9px 14px; border:1px solid #dce3ee; border-radius:9px; background:#fff; color:#46556c; font-size:13px; font-weight:700; cursor:pointer; transition:all .18s ease; }
+.student-class-tab:hover { border-color:#8da8f5; background:#f4f7ff; color:#315ee8; }
+.student-class-tab.active { border-color:#315ee8; background:#315ee8; color:#fff; box-shadow:0 3px 9px #315ee826; }
+.student-search-panel { display:flex; align-items:center; gap:14px; margin:0 0 18px; padding:13px 15px; border:1px solid #e7ecf4; border-radius:12px; background:#fff; }
+.student-search-panel .search-box { flex:1; min-width:0; }
+.student-search-panel > span { color:#8290a5; font-size:11px; white-space:nowrap; }
+.student-list-heading { margin: 6px 0 12px; }
+@media(max-width:640px) {
+ .student-workspace-heading { align-items:flex-start; flex-direction:column; }
+ .student-workspace-heading .add-student-button { width:100%; justify-content:center; }
+ .student-class-browser { padding:13px; }
+ .student-class-tabs { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
+ .student-class-tab { text-align:left; }
+ .student-search-panel { align-items:stretch; flex-direction:column; gap:7px; }
+ .student-search-panel > span { white-space:normal; }
+}
