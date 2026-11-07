@@ -1097,10 +1097,19 @@ function AuditLogSettings({token}:{token:string}) {
   </section>
 }
 
+const SUBJECT_CATALOGUE = [
+  { group: 'Languages', names: ['English Language', 'Literature in English', 'Kiswahili', 'French', 'German', 'Arabic', 'Chinese', 'Luganda', 'Runyankole-Rukiga', 'Lusoga', 'Ateso', 'Luo'] },
+  { group: 'Sciences', names: ['Biology', 'Chemistry', 'Physics', 'Agriculture', 'General Science', 'Computer Studies'] },
+  { group: 'Mathematics', names: ['Mathematics', 'Additional Mathematics', 'Subsidiary Mathematics'] },
+  { group: 'Humanities', names: ['History', 'Geography', 'Religious Education', 'Christian Religious Education', 'Islamic Religious Education', 'Political Education', 'Divinity'] },
+  { group: 'Business and technical', names: ['Commerce', 'Entrepreneurship Education', 'Economics', 'Accounting', 'Business Studies', 'Food and Nutrition', 'Home Economics', 'Art and Design', 'Fine Art', 'Music', 'Physical Education', 'Agriculture and Nutrition', 'Technical Drawing', 'Woodwork', 'Metalwork', 'ICT'] },
+]
+
 function SubjectSettings({token,onSaved}:{token:string;onSaved:()=>void}) {
   const [subjects,setSubjects]=useState<any[]>([])
-  const [name,setName]=useState('')
-  const [code,setCode]=useState('')
+  const [selected,setSelected]=useState<string[]>([])
+  const [customName,setCustomName]=useState('')
+  const [search,setSearch]=useState('')
   const [error,setError]=useState('')
   const [message,setMessage]=useState('')
   const [loading,setLoading]=useState(true)
@@ -1114,32 +1123,77 @@ function SubjectSettings({token,onSaved}:{token:string;onSaved:()=>void}) {
   }
   useEffect(()=>{void load()},[token])
 
-  async function add(e:React.FormEvent) {
+  const existingNames=new Set(subjects.map(subject=>String(subject.name).trim().toLocaleLowerCase()))
+  const available=(name:string)=>!existingNames.has(name.trim().toLocaleLowerCase())
+  const visibleGroups=SUBJECT_CATALOGUE.map(group=>({
+    ...group,
+    names:group.names.filter(name=>available(name)&&name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()))
+  })).filter(group=>group.names.length)
+
+  function toggleSubject(name:string,checked:boolean) {
+    setSelected(current=>checked?[...current,name]:current.filter(item=>item!==name))
+    setError('');setMessage('')
+  }
+
+  async function addSelected(e:React.FormEvent) {
     e.preventDefault()
-    const subjectName=name.trim()
-    if(!subjectName){setError('Enter a subject name before saving.');return}
+    const custom=customName.trim()
+    const names=[...selected,...(custom?[custom]:[])]
+    const unique=[...new Map(names.map(name=>[name.toLocaleLowerCase(),name])).values()]
+    if(!unique.length){setError('Choose at least one subject from the list or enter a custom subject.');return}
+    const alreadyExists=unique.filter(name=>existingNames.has(name.toLocaleLowerCase()))
+    const toCreate=unique.filter(name=>!existingNames.has(name.toLocaleLowerCase()))
+    if(!toCreate.length){setError('All selected subjects already exist. Choose other subjects.');return}
     setBusy(true);setError('');setMessage('')
+    const added:string[]=[]
+    const skipped=[...alreadyExists]
+    const failed:string[]=[]
     try {
-      await api('subjects',token,{method:'POST',body:JSON.stringify({name:subjectName,code:code.trim()||null})})
-      setName('');setCode('')
-      setMessage('Subject added successfully.')
+      for(const subjectName of toCreate) {
+        try {
+          await api('subjects',token,{method:'POST',body:JSON.stringify({name:subjectName,code:null})})
+          added.push(subjectName)
+        } catch(err) {
+          const reason=err instanceof Error?err.message:'Unable to add subject.'
+          if(reason.includes('HTTP 409')) skipped.push(subjectName)
+          else failed.push(subjectName+' ('+reason+')')
+        }
+      }
       await load()
-      onSaved()
-    } catch(e) {setError(e instanceof Error?e.message:'Unable to add subject.')}
-    finally {setBusy(false)}
+      setSelected(current=>current.filter(name=>!added.includes(name)))
+      if(added.length) setCustomName('')
+      setMessage(added.length+' subject'+(added.length===1?'':'s')+' added. '+(skipped.length?skipped.length+' already existed. ':'')+(failed.length?failed.length+' could not be added.':''))
+      if(failed.length) setError('Could not add: '+failed.join('; '))
+    } catch(err) {
+      setError(err instanceof Error?err.message:'Unable to refresh the subject list.')
+    } finally {setBusy(false)}
   }
 
   return <section className="panel settings-panel">
-    <div className="panel-heading"><div><h2>School subjects</h2><p>Manage subjects used for examinations and teacher assignments.</p></div><button type="button" className="secondary-button" onClick={()=>void load()} disabled={loading||busy}>{loading?'Loading...':'Refresh subjects'}</button></div>
+    <div className="panel-heading"><div><h2>School subjects</h2><p>Select several subjects, review your choices, then confirm once to add them together.</p></div><button type="button" className="secondary-button" onClick={()=>void load()} disabled={loading||busy}>{loading?'Loading...':'Refresh subjects'}</button></div>
     {error&&<div className="form-error" role="alert">{error}</div>}
     {message&&<div className="success-notice" role="status">{message}</div>}
-    <details className="form-disclosure"><summary>Add a school subject</summary><form className="student-form" onSubmit={add}>
-      <div className="student-form-grid">
-        <label>Subject name *<input required maxLength={100} value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Mathematics"/></label>
-        <label>Subject code<input maxLength={30} value={code} onChange={e=>setCode(e.target.value)} placeholder="Optional code"/></label>
-      </div>
-      <div className="form-actions"><button className="primary-button" disabled={busy||loading}>{busy?'Saving...':'Add subject'}</button></div>
-    </form></details>
+    <details className="form-disclosure" open><summary>Add school subjects</summary>
+      <form className="student-form" onSubmit={addSelected}>
+        <label>Find a subject<input type="search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search the subject list"/></label>
+        <p className="form-hint">Tick every subject you want. Subjects already registered are hidden from this list.</p>
+        {loading?<p className="form-hint">Loading available subjects...</p>:<div className="subject-catalogue">
+          {visibleGroups.map(group=><fieldset className="subject-catalogue-group" key={group.group}>
+            <legend>{group.group}</legend>
+            <div className="subject-catalogue-options">
+              {group.names.map(name=><label className="subject-choice" key={name}><input type="checkbox" checked={selected.includes(name)} onChange={e=>toggleSubject(name,e.target.checked)}/><span>{name}</span></label>)}
+            </div>
+          </fieldset>)}
+          {!visibleGroups.length&&<p className="form-hint">No more matching subjects in the catalogue.</p>}
+        </div>}
+        <label>Other subject not listed<input maxLength={100} value={customName} onChange={e=>setCustomName(e.target.value)} placeholder="Enter another subject name"/></label>
+        <div className="subject-selection-review"><strong>Selected for addition ({selected.length+(customName.trim()?1:0)})</strong>
+          {selected.length||customName.trim()?<div className="subject-selection-tags">{selected.map(name=><span key={name}>{name}</span>)}{customName.trim()&&<span>{customName.trim()} (custom)</span>}</div>:<p className="form-hint">Your selected subjects will appear here before confirmation.</p>}
+        </div>
+        <div className="form-actions"><button className="primary-button" disabled={busy||loading||(!selected.length&&!customName.trim())}>{busy?'Adding subjects...':'Confirm and add selected subjects'}</button></div>
+      </form>
+    </details>
+    <div className="panel-heading"><div><h3>Registered subjects</h3><p>{subjects.length} subject{subjects.length===1?'':'s'} currently available</p></div></div>
     {loading?<p className="form-hint">Loading subjects...</p>:<div className="table-wrap"><table><thead><tr><th>Subject</th><th>Code</th></tr></thead><tbody>
       {subjects.map(subject=><tr key={subject.id}><td>{subject.name}</td><td>{subject.code||'—'}</td></tr>)}
       {!subjects.length&&<tr><td colSpan={2}>No subjects have been added yet.</td></tr>}
