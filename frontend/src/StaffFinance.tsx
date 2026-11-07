@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Users, Plus, Search, Wallet, ReceiptText } from 'lucide-react'
+import { Users, Plus, Search, Wallet, ReceiptText, RefreshCw, Building2 } from 'lucide-react'
 
 type Staff = { id:number; staff_number:string; first_name:string; last_name:string; category:string; position?:string; department?:string; phone?:string; email?:string; salary_amount?:number|null; salary_frequency?:string; status?:string }
 type Page<T> = { items:T[]; total:number; page:number; pages:number }
@@ -24,6 +24,9 @@ export default function StaffFinance({token,active,classes=[]}:{token:string;act
   const [form,setForm]=useState({first_name:'',last_name:'',category:'Teaching',position:'',department:'',phone:'',email:'',salary_amount:'',salary_frequency:'Monthly'})
   const [summary,setSummary]=useState<Summary>({fees_expected:0,fees_collected:0,outstanding:0})
   const [charges,setCharges]=useState<Charge[]>([])
+  const [allOutstanding,setAllOutstanding]=useState<Charge[]>([])
+  const [financeTab,setFinanceTab]=useState<'overview'|'payments'|'balances'|'expenses'|'fees'>('overview')
+  const [feeSetup,setFeeSetup]=useState({class_id:'',term:'Term 1',year:String(new Date().getFullYear()),amount:''})
   const [expenseForm,setExpenseForm]=useState({description:'',category:'General',amount:'',reference:''})
   const [salaryForm,setSalaryForm]=useState({staff_id:'',amount:'',period:'',reference:''})
   const [feeSearch,setFeeSearch]=useState('')
@@ -34,17 +37,39 @@ export default function StaffFinance({token,active,classes=[]}:{token:string;act
   const [schoolProfile,setSchoolProfile]=useState<{name:string;phone?:string;email?:string;address?:string}>({name:'SchoolBridge'})
 
   useEffect(()=>{
-    if(active!=='Staff' && active!=='Fees & Finance') return
+    if(active!=='Staff') return
     const params=new URLSearchParams({search,page:'1',page_size:'100'})
     if(category) params.set('category',category)
     request<Page<Staff>>('staff?'+params.toString(),token).then(r=>{setStaff(r.items);setStaffTotal(r.total)}).catch(e=>setMessage(e.message))
   },[active,search,category,token])
 
   async function refreshFinance(){
-    const [s,c]=await Promise.all([request<Summary>('finance/summary',token),request<Charge[]>('finance/charges?search='+encodeURIComponent(feeSearch)+'&class_id='+encodeURIComponent(feeClass)+'&outstanding_only='+String(outstandingOnly),token)])
-    setSummary(s);setCharges(c)
+    const params=new URLSearchParams({search:feeSearch,outstanding_only:String(outstandingOnly)})
+    if(feeClass) params.set('class_id',feeClass)
+    const [s,rows,balances]=await Promise.all([
+      request<Summary>('finance/summary',token),
+      request<Charge[]>('finance/charges?'+params.toString(),token),
+      request<Charge[]>('finance/charges?outstanding_only=true',token)
+    ])
+    setSummary(s);setCharges(rows);setAllOutstanding(balances)
   }
   useEffect(()=>{if(active==='Fees & Finance'){refreshFinance().catch(e=>setMessage(e.message));request<any>('settings/school-profile',token).then(setSchoolProfile).catch(()=>{})}},[active,feeSearch,feeClass,outstandingOnly,token])
+
+  useEffect(()=>{
+    if(active!=='Fees & Finance'||!feeSetup.class_id)return
+    request<{fees:{term:string;amount:number}[]}>('classes/'+feeSetup.class_id+'/fees?year='+feeSetup.year,token)
+      .then(data=>setFeeSetup(old=>({...old,amount:String(data.fees.find(x=>x.term===old.term)?.amount??0)})))
+      .catch(e=>setMessage(e.message))
+  },[active,feeSetup.class_id,feeSetup.term,feeSetup.year,token])
+
+  async function saveClassFee(e:FormEvent){
+    e.preventDefault();if(!feeSetup.class_id)return
+    try{
+      await request('classes/'+feeSetup.class_id+'/fees',token,{method:'PUT',body:JSON.stringify({term:feeSetup.term,year:Number(feeSetup.year),amount:Number(feeSetup.amount)})})
+      setMessage('Class fee structure saved.')
+      await refreshFinance()
+    }catch(e){setMessage(e instanceof Error?e.message:'Unable to save class fee.')}
+  }
 
   async function addStaff(e:FormEvent){
     e.preventDefault();setMessage('')
@@ -120,7 +145,12 @@ export default function StaffFinance({token,active,classes=[]}:{token:string;act
       <div className="stat-card"><div className="stat-top">Other expenses <Wallet size={18}/></div><strong className="stat-value">UGX {(summary.other_expenses||0).toLocaleString()}</strong><small>Recorded school expenses</small></div>
       <div className="stat-card"><div className="stat-top">Net cash position <Wallet size={18}/></div><strong className="stat-value">UGX {(summary.net_cash_position||0).toLocaleString()}</strong><small>Collected fees less recorded expenses</small></div>
     </div>
-    <div className="panel-heading"><div><h2>Find the student first</h2><p>Search by name or admission number before choosing a fee charge. Class and stream are shown to distinguish students with the same name.</p></div></div>
+    <div className="finance-toolbar"><div className="finance-tabs">
+      {(['overview','payments','balances','expenses','fees'] as const).map(tab=><button key={tab} type="button" className={financeTab===tab?'finance-tab active':'finance-tab'} onClick={()=>setFinanceTab(tab)}>{({overview:'Overview',payments:'Payments',balances:'Outstanding balances',expenses:'Expenses',fees:'Fee structure'} as const)[tab]}</button>)}
+    </div><button className="secondary-button" type="button" onClick={()=>void refreshFinance().catch(e=>setMessage(e.message))}><RefreshCw size={15}/> Refresh</button></div>
+    {financeTab==='overview'&&<div className="finance-overview"><h3>Finance at a glance</h3><p>Review collections, balances and expenses, or open a workspace below.</p><div className="finance-shortcuts"><button onClick={()=>setFinanceTab('payments')}>Record a payment</button><button onClick={()=>setFinanceTab('balances')}>View class balances</button><button onClick={()=>setFinanceTab('expenses')}>Manage expenses</button><button onClick={()=>setFinanceTab('fees')}>Configure class fees</button></div></div>}
+    {financeTab==='payments'&&<>
+    <div className="panel-heading"><div><h2>Find a student</h2><p>Search by name or admission number. Admission number and class help distinguish similar names.</p></div></div>
     <div className="table-tools"><div className="search-box"><Search size={17}/><input placeholder="Enter student name or admission number..." value={feeSearch} onChange={e=>setFeeSearch(e.target.value)}/></div></div>
     <div className="panel-heading"><div><h2>Record a payment</h2><p>Partial payments are supported; overpayments are blocked.</p></div></div>
     <form className="student-form" onSubmit={pay}><div className="student-form-grid">
@@ -130,14 +160,24 @@ export default function StaffFinance({token,active,classes=[]}:{token:string;act
       <label>Reference / receipt number<input value={payment.reference} onChange={e=>setPayment({...payment,reference:e.target.value})}/></label>
     </div><div className="form-actions"><button className="primary-button" disabled={!feeSearch.trim()||!charges.some(c=>c.balance>0)}>Record payment</button></div></form>
     {receipt&&<section className="panel receipt-print"><div className="panel-heading"><div><h2>{schoolProfile.name||'SchoolBridge'}</h2><p>Official fee payment receipt · {schoolProfile.phone||''} {schoolProfile.email||''}</p></div><button className="secondary-button" type="button" onClick={()=>window.print()}>Print receipt</button></div><div className="receipt-details"><strong>Receipt: {receipt.receipt_number}</strong><p>Student: {receipt.charge.student_name}</p><p>Admission number: {receipt.charge.admission_number}</p><p>Class: {receipt.charge.class_name||'—'} {receipt.charge.stream||''}</p><p>Fee: {receipt.charge.term} {receipt.charge.year}</p><p>Amount received: UGX {receipt.amount.toLocaleString()}</p><p>Payment method: {receipt.method}</p><p>Date: {receipt.date}</p></div></section>}
-    <div className="panel-heading"><div><h2>Record staff salary payment</h2><p>Recorded salary payments contribute to school expenses.</p></div></div>
+    </>}
+    {financeTab==='expenses'&&<>
+    <div className="panel-heading"><div><h2>Staff salary payments</h2><p>Record payments made to school employees.</p></div></div>
     <form className="student-form" onSubmit={saveSalaryPayment}><div className="student-form-grid"><label>Staff member<select required value={salaryForm.staff_id} onChange={e=>setSalaryForm({...salaryForm,staff_id:e.target.value})}><option value="">Select staff member</option>{staff.filter(x=>x.status!=='archived').map(x=><option key={x.id} value={x.id}>{x.first_name} {x.last_name} · {x.staff_number}</option>)}</select></label><label>Amount (UGX)<input required type="number" min="1" value={salaryForm.amount} onChange={e=>setSalaryForm({...salaryForm,amount:e.target.value})}/></label><label>Salary period<input required placeholder="e.g. November 2026" value={salaryForm.period} onChange={e=>setSalaryForm({...salaryForm,period:e.target.value})}/></label><label>Reference<input value={salaryForm.reference} onChange={e=>setSalaryForm({...salaryForm,reference:e.target.value})}/></label></div><div className="form-actions"><button className="primary-button">Record salary payment</button></div></form>
     <div className="panel-heading"><div><h2>Record other school expense</h2></div></div>
     <form className="student-form" onSubmit={saveOtherExpense}><div className="student-form-grid"><label>Description<input required value={expenseForm.description} onChange={e=>setExpenseForm({...expenseForm,description:e.target.value})}/></label><label>Category<select value={expenseForm.category} onChange={e=>setExpenseForm({...expenseForm,category:e.target.value})}><option>General</option><option>Utilities</option><option>Supplies</option><option>Maintenance</option><option>Transport</option><option>Other</option></select></label><label>Amount (UGX)<input required type="number" min="1" value={expenseForm.amount} onChange={e=>setExpenseForm({...expenseForm,amount:e.target.value})}/></label><label>Reference<input value={expenseForm.reference} onChange={e=>setExpenseForm({...expenseForm,reference:e.target.value})}/></label></div><div className="form-actions"><button className="primary-button">Record expense</button></div></form>
-    <div className="panel-heading"><div><h2>Student fee balances</h2><p>Search by student name or admission number</p></div></div>
-    <div className="table-tools"><select className="filter-select" value={feeClass} onChange={e=>setFeeClass(e.target.value)}><option value="">All classes and streams</option>{classes.map(c=><option key={c.id} value={c.id}>{c.name}{c.section?' — '+c.section:''}</option>)}</select><label className="settings-checkbox"><input type="checkbox" checked={outstandingOnly} onChange={e=>setOutstandingOnly(e.target.checked)}/> Outstanding only</label><button className="secondary-button" type="button" onClick={printReminders}>Print reminders</button></div>
+    </>}
+    {financeTab==='balances'&&<>
+    <div className="panel-heading"><div><h2>Outstanding balances by class</h2><p>Select a class to see students with unpaid balances.</p></div></div>
+    <div className="finance-class-grid">
+      {classes.map(cls=>{const rows=allOutstanding.filter(x=>x.class_id===cls.id&&x.balance>0);const total=rows.reduce((sum,x)=>sum+x.balance,0);return <button type="button" key={cls.id} className={feeClass===String(cls.id)?'finance-class-card selected':'finance-class-card'} onClick={()=>setFeeClass(String(cls.id))}><Building2 size={20}/><strong>{cls.name}{cls.section?' — '+cls.section:''}</strong><span>{rows.length} students with balances</span><b>UGX {total.toLocaleString()}</b></button>})}
+    </div>
+    <div className="panel-heading"><div><h2>{feeClass?'Selected class balances':'All class balances'}</h2><p>{feeClass?'Students with outstanding balances in this class':'Choose a class above to narrow the list.'}</p></div><button type="button" className="secondary-button" onClick={()=>setFeeClass('')}>All classes</button></div>
+    <div className="table-tools"><label className="settings-checkbox"><input type="checkbox" checked={outstandingOnly} onChange={e=>setOutstandingOnly(e.target.checked)}/> Outstanding only</label><button className="secondary-button" type="button" onClick={printReminders}>Print reminders</button></div>
     <div className="table-wrap"><table><thead><tr><th>Student</th><th>Admission no.</th><th>Term</th><th>Year</th><th>Charged (UGX)</th><th>Paid (UGX)</th><th>Balance (UGX)</th><th>Action</th></tr></thead><tbody>{charges.map(c=><tr key={c.id}><td>{c.student_name}</td><td>{c.admission_number}</td><td>{c.term}</td><td>{c.year}</td><td>{c.amount.toLocaleString()}</td><td>{c.paid.toLocaleString()}</td><td><strong>{c.balance.toLocaleString()}</strong></td><td><button type="button" className="secondary-button" onClick={()=>void adjustCharge(c)}>Adjust</button></td></tr>)}</tbody></table></div>
-    {!charges.length&&<div className="empty-state"><Wallet size={30}/><p>No fee charges match this search. Set standard fees in Settings → Fee Structure.</p></div>}
+    {!charges.length&&<div className="empty-state"><Wallet size={30}/><p>No fee charges match the selected class or search.</p></div>}
+    </>}
+    {financeTab==='fees'&&<section className="student-form finance-fee-setup"><div className="panel-heading"><div><h2>Class fee structure</h2><p>Set the standard amount for each class and term.</p></div></div><form onSubmit={saveClassFee}><div className="student-form-grid"><label>Class<select required value={feeSetup.class_id} onChange={e=>setFeeSetup({...feeSetup,class_id:e.target.value})}><option value="">Choose class</option>{classes.map(c=><option key={c.id} value={c.id}>{c.name}{c.section?' — '+c.section:''}</option>)}</select></label><label>Term<select value={feeSetup.term} onChange={e=>setFeeSetup({...feeSetup,term:e.target.value})}><option>Term 1</option><option>Term 2</option><option>Term 3</option></select></label><label>Academic year<input type="number" min="2000" max="2100" value={feeSetup.year} onChange={e=>setFeeSetup({...feeSetup,year:e.target.value})}/></label><label>Fee amount (UGX)<input type="number" min="0" required value={feeSetup.amount} onChange={e=>setFeeSetup({...feeSetup,amount:e.target.value})}/></label></div><div className="form-actions"><button className="primary-button" disabled={!feeSetup.class_id}>Save class fee</button></div></form></section>}
   </section>
   return null
 }
