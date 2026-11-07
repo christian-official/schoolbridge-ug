@@ -7,6 +7,7 @@ type Student = { id: number; first_name: string; middle_name?: string | null; la
 type Exam = { id: number; name: string; term: string; year: number; class_id: number | null }
 type Mark = { id: number; student_id: number; subject_id: number; exam_id: number; score: number; verified: boolean }
 type GradeBand = { id?: number; grade: string; min_score: number; max_score: number; remark: string }
+type SchoolProfile = { name?: string; address?: string | null; phone?: string | null; email?: string | null; motto?: string | null }
 type Page<T> = { items: T[]; total: number; pages?: number }
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
@@ -49,6 +50,7 @@ export default function AcademicManagement({ token, classes }: { token: string; 
   const [selectedSubjectId, setSelectedSubjectId] = useState('')
   const [reportRemarks, setReportRemarks] = useState({ classTeacher: '', headOfDepartment: '', headteacher: '', parent: '' })
   const [gradingBands, setGradingBands] = useState<GradeBand[]>([])
+  const [schoolProfile, setSchoolProfile] = useState<SchoolProfile>({})
   const [draftBands, setDraftBands] = useState<GradeBand[]>([])
   const [historyStudentId, setHistoryStudentId] = useState('')
   const [historyMarks, setHistoryMarks] = useState<Mark[]>([])
@@ -66,14 +68,16 @@ export default function AcademicManagement({ token, classes }: { token: string; 
     setLoading(true)
     setError('')
     try {
-      const [examRows, subjectRows, gradeRows] = await Promise.all([
+      const [examRows, subjectRows, gradeRows, profile] = await Promise.all([
         request<Exam[]>('exams', token),
         request<Subject[]>('subjects', token),
         request<GradeBand[]>('grading-scale', token),
+        request<SchoolProfile>('settings/school-profile', token),
       ])
       setExams(examRows)
       setSubjects(subjectRows)
       setGradingBands(gradeRows)
+      setSchoolProfile(profile || {})
       setDraftBands(gradeRows.map(({ grade, min_score, max_score, remark }) => ({ grade, min_score, max_score, remark })))
       if (selectedExamId && examRows.some(exam => String(exam.id) === selectedExamId)) {
         setSelectedExamId(selectedExamId)
@@ -396,7 +400,7 @@ export default function AcademicManagement({ token, classes }: { token: string; 
           <div className="report-card-sheet">
             <header className="report-card-header">
               <div className="report-school-emblem">SB</div>
-              <div className="report-school-title"><span>OFFICIAL ACADEMIC RECORD</span><h2>SCHOOL NAME</h2><p>School address · Telephone · Email</p><strong>STUDENT PROGRESS REPORT</strong></div>
+              <div className="report-school-title"><span>OFFICIAL ACADEMIC RECORD</span><h2>{schoolProfile.name || "SCHOOL NAME"}</h2><p>{[schoolProfile.address, schoolProfile.phone, schoolProfile.email].filter(Boolean).join(" · ") || "School address · Telephone · Email"}</p>{schoolProfile.motto && <em>{schoolProfile.motto}</em>}<strong>STUDENT PROGRESS REPORT</strong></div>
               <div className="report-card-term"><span>ACADEMIC YEAR</span><strong>{selectedExam?.year || new Date().getFullYear()}</strong><span>TERM</span><strong>{selectedExam?.term || '—'}</strong></div>
             </header>
             <div className="report-student-details">
