@@ -361,7 +361,7 @@ export default function AcademicManagement({ token, classes }: { token: string; 
 
     {selectedExam && <>
       <section className="panel">
-        <div className="panel-heading"><div><h2>{selectedExam.name}</h2><p>{selectedClass?.name || 'Class'}{selectedClass?.section ? ' — ' + selectedClass.section : ''} · {selectedExam.term} {selectedExam.year}</p></div><button type="button" className="secondary-button" onClick={() => printAcademicSection('results')}><Printer size={15}/> Print results</button></div>
+        <div className="panel-heading"><div><h2>{selectedExam.name}</h2><p>{selectedClass?.name || 'Class'}{selectedClass?.section ? ' — ' + selectedClass.section : ''} · {selectedExam.term} {selectedExam.year}</p></div></div>
         <div className="stats-grid finance-stats">
           <div className="stat-card"><span>Students in class</span><strong className="stat-value">{students.length}</strong></div>
           <div className="stat-card"><span>Marks recorded</span><strong className="stat-value">{marks.length}</strong></div>
