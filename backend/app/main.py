@@ -1652,7 +1652,8 @@ def search_students(page: int = 1, page_size: int = 25, search: str = "", class_
 
 
 @app.get("/api/dashboard/summary", tags=["Dashboard"])
-def dashboard_summary(db: Session = Depends(get_db)):
+def dashboard_summary(attendance_date: date | None = None, db: Session = Depends(get_db)):
+    selected_attendance_date = attendance_date or date.today()
     settings = get_or_create_school_settings(db)
     academic_year = settings.academic_year or date.today().year
     year_start = date(academic_year, 1, 1)
@@ -1660,7 +1661,7 @@ def dashboard_summary(db: Session = Depends(get_db)):
     students_present_today = db.query(models.Attendance).join(
         models.Student, models.Student.id == models.Attendance.student_id
     ).filter(
-        models.Attendance.attendance_date == date.today(),
+        models.Attendance.attendance_date == selected_attendance_date,
         models.Attendance.status == "Present",
         models.Student.status == "active",
     ).count()
