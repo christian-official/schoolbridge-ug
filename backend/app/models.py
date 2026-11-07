@@ -144,3 +144,13 @@ class FeePayment(Base):
     method: Mapped[str] = mapped_column(String(30), default="Cash")
     reference: Mapped[str | None] = mapped_column(String(80), nullable=True)
     received_by: Mapped[str | None] = mapped_column(String(80), nullable=True)
+
+
+class ClassFee(Base):
+    __tablename__ = "class_fees"
+    __table_args__ = (UniqueConstraint("class_id", "term", "year"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    class_id: Mapped[int] = mapped_column(ForeignKey("classes.id"), index=True)
+    term: Mapped[str] = mapped_column(String(20))
+    year: Mapped[int] = mapped_column(Integer)
+    amount: Mapped[int] = mapped_column(Integer, default=0)
