@@ -497,6 +497,10 @@ async def protect_school_data(request: Request, call_next):
     path = request.url.path
     public_paths = {"/api/health", "/api/auth/login"}
 
+    # Browser CORS preflight requests must reach CORSMiddleware without auth.
+    if request.method == "OPTIONS":
+        return await call_next(request)
+
     if not path.startswith("/api/") or path in public_paths:
         return await call_next(request)
 
