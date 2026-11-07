@@ -158,6 +158,18 @@ class MarkUpdate(BaseModel):
     score: float = Field(ge=0, le=100)
 
 
+
+class GradeBandInput(BaseModel):
+    grade: str = Field(min_length=1, max_length=20)
+    min_score: float = Field(ge=0, le=100)
+    max_score: float = Field(gt=0, le=100)
+    remark: str = Field(default="", max_length=100)
+
+
+class GradingScaleUpdate(BaseModel):
+    bands: list[GradeBandInput] = Field(min_length=1, max_length=20)
+
+
 class ClassOut(ClassCreate):
     id: int
     model_config = ConfigDict(from_attributes=True)
@@ -484,6 +496,39 @@ def update_mark(mark_id: int, data: MarkUpdate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(item)
     return item
+
+
+@app.get("/api/grading-scale", tags=["Grading"])
+def get_grading_scale(db: Session = Depends(get_db)):
+    return db.query(models.GradeBand).order_by(
+        models.GradeBand.min_score, models.GradeBand.grade
+    ).all()
+
+
+@app.put("/api/grading-scale", tags=["Grading"])
+def update_grading_scale(data: GradingScaleUpdate, db: Session = Depends(get_db)):
+    bands = sorted(data.bands, key=lambda band: band.min_score)
+    grades = [band.grade.strip().upper() for band in bands]
+    if any(not grade for grade in grades) or len(set(grades)) != len(grades):
+        raise HTTPException(422, "Each grading band must have a unique grade label.")
+    if any(band.min_score >= band.max_score for band in bands):
+        raise HTTPException(422, "Each grading band minimum must be lower than its maximum.")
+    if bands[0].min_score != 0 or bands[-1].max_score != 100:
+        raise HTTPException(422, "The grading scale must start at 0 and end at 100.")
+    for previous, current in zip(bands, bands[1:]):
+        if current.min_score != previous.max_score:
+            raise HTTPException(422, "Grading bands must meet exactly without gaps or overlaps.")
+    db.query(models.GradeBand).delete(synchronize_session=False)
+    db.add_all([
+        models.GradeBand(
+            grade=band.grade.strip().upper(),
+            min_score=band.min_score,
+            max_score=band.max_score,
+            remark=band.remark.strip(),
+        ) for band in bands
+    ])
+    db.commit()
+    return get_grading_scale(db)
 
 
 # ========== AUTHENTICATION AND USER MANAGEMENT ==========
