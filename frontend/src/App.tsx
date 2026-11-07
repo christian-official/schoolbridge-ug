@@ -611,7 +611,7 @@ function App() {
               <section className="panel student-profile-modal" onClick={e=>e.stopPropagation()}>
                 <div className="panel-heading"><div><h2>Student profile</h2><p>{studentProfile.student.admission_number} · {studentProfile.student.status}</p></div><div className="profile-actions"><button className="secondary-button" type="button" onClick={()=>void dismissStudent(studentProfile.student.id)} disabled={studentProfile.student.status==='dismissed'}>Dismiss student</button><button className="secondary-button" type="button" onClick={()=>setStudentProfile(null)}>Close</button></div></div>
                 {profileMessage&&<div className="success-notice">{profileMessage}</div>}
-                <section className="student-profile-details">
+                <section className="student-profile-details" aria-label="Student registration details" style={{display:"block",visibility:"visible",opacity:1,position:"relative",zIndex:1}}>
                   <div className="panel-heading"><div><h3>Admission details</h3><p>Essential information captured during registration</p></div></div>
                   <div className="student-form-grid">
                     <div><small>Admission number</small><strong>{studentProfile.student.admission_number||'—'}</strong></div>
