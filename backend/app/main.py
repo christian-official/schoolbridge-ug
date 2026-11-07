@@ -980,12 +980,9 @@ def upgrade_existing_database():
     settings_columns = {c["name"] for c in inspector.get_columns("school_settings")} if "school_settings" in inspector.get_table_names() else set()
     staff_columns = {c["name"] for c in inspector.get_columns("staff_members")} if "staff_members" in inspector.get_table_names() else set()
     payment_columns = {c["name"] for c in inspector.get_columns("fee_payments")} if "fee_payments" in inspector.get_table_names() else set()
-    mark_columns = {c["name"] for c in inspector.get_columns("marks")} if "marks" in inspector.get_table_names() else set()
     with engine.begin() as connection:
         for name, sql_type in additions.items():
             if name not in existing: connection.execute(text("ALTER TABLE students ADD COLUMN " + name + " " + sql_type))
-        if "marks" in inspector.get_table_names() and "verified" not in mark_columns:
-            connection.execute(text("ALTER TABLE marks ADD COLUMN verified BOOLEAN NOT NULL DEFAULT FALSE"))
         if "staff_members" in inspector.get_table_names():
             if "subjects" not in staff_columns: connection.execute(text("ALTER TABLE staff_members ADD COLUMN subjects TEXT"))
             if "salary_amount" not in staff_columns: connection.execute(text("ALTER TABLE staff_members ADD COLUMN salary_amount INTEGER"))
