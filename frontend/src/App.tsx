@@ -85,7 +85,6 @@ function App() {
   const [settingsSection, setSettingsSection] = useState('home')
   const [students, setStudents] = useState<RecordItem[]>([])
   const [studentTotal, setStudentTotal] = useState(0)
-  const [staffTotal, setStaffTotal] = useState(0)
   const [dashboardSummary, setDashboardSummary] = useState<DashboardSummary>({ active_students: 0, new_admissions_this_year: 0, active_staff: 0, total_classes: 0, academic_year: new Date().getFullYear() })
   const [studentPage, setStudentPage] = useState(1)
   const [studentClassFilter, setStudentClassFilter] = useState('')
@@ -121,11 +120,10 @@ function App() {
   async function loadSchoolData(authToken: string) {
     setDataError('')
     try {
-      const [studentData, classData, admissionData, staffData, summaryData] = await Promise.all([
+      const [studentData, classData, admissionData, summaryData] = await Promise.all([
         api<StudentPage>('students/search?page=1&page_size=25', authToken),
         api<RecordItem[]>('classes', authToken),
         api<AdmissionSettings>('settings/admission-number', authToken),
-        api<{total:number}>('staff?search=&page=1&page_size=1', authToken),
         api<DashboardSummary>('dashboard/summary', authToken),
       ])
       setStudents(studentData.items)
@@ -133,7 +131,6 @@ function App() {
       setStudentPage(1)
       setClasses(classData)
       setAdmissionSettings(admissionData)
-      setStaffTotal(staffData.total)
       setDashboardSummary(summaryData)
     } catch {
       setDataError('Some school records could not be loaded. Check your connection and permissions.')
