@@ -956,9 +956,11 @@ def student_profile(student_id: int, db: Session = Depends(get_db)):
                 "method": p.method, "reference": p.reference, "receipt_number": p.receipt_number
             } for p in payments]
         })
+    school_class = db.get(models.SchoolClass, student.class_id) if student.class_id else None
     return {
         "student": student,
-        "class": db.get(models.SchoolClass, student.class_id).name if student.class_id and db.get(models.SchoolClass, student.class_id) else None,
+        "class": school_class.name if school_class else None,
+        "stream": school_class.section if school_class else None,
         "fees": fee_history,
         "total_charged": sum(x["amount"] for x in fee_history),
         "total_paid": sum(x["paid"] for x in fee_history),
