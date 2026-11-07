@@ -90,7 +90,7 @@ function App() {
   const [studentForm, setStudentForm] = useState({
     first_name: '', middle_name: '', last_name: '', gender: '', date_of_birth: '', class_id: '',
     religion: '', nationality: '', phone: '', address: '', guardian_name: '', guardian_relationship: '', guardian_phone: '', previous_school: '',
-    admission_date: new Date().toISOString().slice(0, 10), term1_fee: '0', term2_fee: '0', term3_fee: '0',
+    admission_date: new Date().toISOString().slice(0, 10),
   })
   const [mobileMenu, setMobileMenu] = useState(false)
   const [admissionSettings, setAdmissionSettings] = useState<AdmissionSettings>({
@@ -166,15 +166,12 @@ function App() {
           guardian_phone: studentForm.guardian_phone.trim() || null,
           previous_school: studentForm.previous_school.trim() || null,
           admission_date: studentForm.admission_date || null,
-          term1_fee: Number(studentForm.term1_fee || 0),
-          term2_fee: Number(studentForm.term2_fee || 0),
-          term3_fee: Number(studentForm.term3_fee || 0),
           gender: studentForm.gender || null,
           date_of_birth: studentForm.date_of_birth || null,
           class_id: Number(studentForm.class_id),
         }),
       })
-      setStudentForm({ first_name: '', middle_name: '', last_name: '', gender: '', date_of_birth: '', class_id: '', religion: '', nationality: '', phone: '', address: '', guardian_name: '', guardian_relationship: '', guardian_phone: '', previous_school: '', admission_date: new Date().toISOString().slice(0, 10), term1_fee: '0', term2_fee: '0', term3_fee: '0' })
+      setStudentForm({ first_name: '', middle_name: '', last_name: '', gender: '', date_of_birth: '', class_id: '', religion: '', nationality: '', phone: '', address: '', guardian_name: '', guardian_relationship: '', guardian_phone: '', previous_school: '', admission_date: new Date().toISOString().slice(0, 10) })
       setShowStudentForm(false)
       setStudentSuccess(`Student registered successfully. Admission number: ${createdStudent.admission_number}`)
       await loadSchoolData(token)
@@ -399,9 +396,7 @@ function App() {
                     <label>Guardian phone<input value={studentForm.guardian_phone} onChange={e => setStudentForm({ ...studentForm, guardian_phone: e.target.value })} /></label>
                     <label>Previous school<input value={studentForm.previous_school} onChange={e => setStudentForm({ ...studentForm, previous_school: e.target.value })} /></label>
                     <label>Admission date<input type="date" value={studentForm.admission_date} onChange={e => setStudentForm({ ...studentForm, admission_date: e.target.value })} /></label>
-                    <label>Term 1 fees (UGX)<input type="number" min="0" value={studentForm.term1_fee} onChange={e => setStudentForm({ ...studentForm, term1_fee: e.target.value })} /></label>
-                    <label>Term 2 fees (UGX)<input type="number" min="0" value={studentForm.term2_fee} onChange={e => setStudentForm({ ...studentForm, term2_fee: e.target.value })} /></label>
-                    <label>Term 3 fees (UGX)<input type="number" min="0" value={studentForm.term3_fee} onChange={e => setStudentForm({ ...studentForm, term3_fee: e.target.value })} /></label>
+                    <div className="generated-admission"><strong>Class fees are assigned automatically</strong><span>The current term fee comes from the selected class fee structure.</span></div>
                   </div>
                   {classes.length === 0 && <p className="form-hint">Add a school class first before registering students.</p>}
                   <div className="form-actions"><button type="button" className="secondary-button" onClick={() => setShowStudentForm(false)}>Cancel</button><button className="primary-button" disabled={savingStudent || classes.length === 0}>{savingStudent ? <><LoaderCircle className="spin" size={16} /> Saving...</> : 'Save student'}</button></div>
@@ -454,8 +449,8 @@ function App() {
             </section>
               )}
               {settingsSection === 'school' && <ComingSoon title="School profile" description="School identity, contact details and official information will be configured here." />}
-              {settingsSection === 'fees' && <ComingSoon title="Fee structure" description="Set standard term fees for each class. This section is being connected to class fee settings." />}
-              {settingsSection === 'academic' && <ComingSoon title="Academic year and terms" description="Choose the active academic year and term used for student billing." />}
+              {settingsSection === 'fees' && <FeeStructure token={token} classes={classes} />}
+              {settingsSection === 'academic' && <AcademicSettings token={token} />}
               {settingsSection === 'users' && <ComingSoon title="Users and permissions" description="Manage administrator and teacher accounts and access permissions." />}
               {settingsSection === 'backups' && <ComingSoon title="Backups and restore" description="Create, download and restore protected school backups." />}
             </div>
@@ -500,3 +495,35 @@ function ComingSoon({ title, description }: { title: string; description: string
 }
 
 export default App
+
+
+function FeeStructure({token, classes}:{token:string;classes:RecordItem[]}) {
+  const [classId,setClassId]=useState('')
+  const [year,setYear]=useState(new Date().getFullYear())
+  const [fees,setFees]=useState([0,0,0])
+  const [message,setMessage]=useState('')
+  const [busy,setBusy]=useState(false)
+  async function load(id=classId, selectedYear=year) {
+    if(!id) return
+    try { const response=await api<{fees:{term:string;amount:number}[]}>('classes/'+id+'/fees?year='+selectedYear,token); setFees([response.fees.find(x=>x.term==='Term 1')?.amount||0,response.fees.find(x=>x.term==='Term 2')?.amount||0,response.fees.find(x=>x.term==='Term 3')?.amount||0]); setMessage('') }
+    catch(e) {setMessage(e instanceof Error?e.message:'Could not load class fees.')}
+  }
+  useEffect(()=>{void load()},[classId,year])
+  async function save(e:React.FormEvent) {
+    e.preventDefault(); if(!classId)return; setBusy(true);setMessage('')
+    try { for(let i=0;i<3;i++) await api('classes/'+classId+'/fees',token,{method:'PUT',body:JSON.stringify({term:'Term '+(i+1),year,amount:fees[i]})}); setMessage('Class fee structure saved. Existing student charges remain unchanged.') }
+    catch(e) {setMessage(e instanceof Error?e.message:'Unable to save fees.')}
+    finally {setBusy(false)}
+  }
+  return <section className="panel settings-panel"><div className="panel-heading"><div><h2>Class fee structure</h2><p>Set one standard fee per class for each term. New registrations use the active term amount.</p></div></div>{message&&<div className="success-notice">{message}</div>}<form className="student-form" onSubmit={save}><div className="student-form-grid"><label>Class<select required value={classId} onChange={e=>setClassId(e.target.value)}><option value="">Choose class</option>{classes.map(c=><option key={c.id} value={c.id}>{c.name}{c.section?' — '+c.section:''}</option>)}</select></label><label>Academic year<input type="number" min="2000" max="2100" value={year} onChange={e=>setYear(Number(e.target.value))}/></label>{[0,1,2].map(i=><label key={i}>Term {i+1} fee (UGX)<input type="number" min="0" value={fees[i]} onChange={e=>setFees(old=>old.map((v,index)=>index===i?Number(e.target.value):v))}/></label>)}</div><p className="form-hint">Changing a class fee will not rewrite charges already issued to students.</p><div className="form-actions"><button className="primary-button" disabled={!classId||busy}>{busy?'Saving...':'Save class fees'}</button></div></form></section>
+}
+
+function AcademicSettings({token}:{token:string}) {
+  const [year,setYear]=useState(new Date().getFullYear())
+  const [term,setTerm]=useState('Term 1')
+  const [message,setMessage]=useState('')
+  const [busy,setBusy]=useState(false)
+  useEffect(()=>{api<{academic_year:number;active_term:string}>('settings/academic',token).then(x=>{setYear(x.academic_year);setTerm(x.active_term)}).catch(e=>setMessage(e.message))},[token])
+  async function save(e:React.FormEvent) {e.preventDefault();setBusy(true);setMessage('');try{await api('settings/academic',token,{method:'PUT',body:JSON.stringify({academic_year:year,active_term:term})});setMessage('Active academic year and term saved. New registrations will use this term.')}catch(e){setMessage(e instanceof Error?e.message:'Unable to save academic settings.')}finally{setBusy(false)}}
+  return <section className="panel settings-panel"><div className="panel-heading"><div><h2>Academic year and active term</h2><p>These settings determine which class fee is assigned to new students.</p></div></div>{message&&<div className="success-notice">{message}</div>}<form className="student-form" onSubmit={save}><div className="student-form-grid"><label>Academic year<input type="number" min="2000" max="2100" value={year} onChange={e=>setYear(Number(e.target.value))}/></label><label>Active term<select value={term} onChange={e=>setTerm(e.target.value)}><option>Term 1</option><option>Term 2</option><option>Term 3</option></select></label></div><div className="form-actions"><button className="primary-button" disabled={busy}>{busy?'Saving...':'Save academic settings'}</button></div></form></section>
+}
