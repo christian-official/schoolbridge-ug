@@ -294,7 +294,13 @@ def list_subjects(db: Session = Depends(get_db)):
 @app.post("/api/students", response_model=StudentOut, tags=["Students"])
 def create_student(data: StudentCreate, db: Session = Depends(get_db)):
     if not data.first_name.strip() or not data.last_name.strip():
-        raise HTTPException(422, "Enter the student's full name before registering.")
+        raise HTTPException(422, "Enter the student's first and last names before registering.")
+    if not data.gender or not data.gender.strip():
+        raise HTTPException(422, "Select the student's gender before registering.")
+    if not data.guardian_name or not data.guardian_name.strip():
+        raise HTTPException(422, "Enter a parent or guardian name before registering.")
+    if not data.guardian_phone or not data.guardian_phone.strip():
+        raise HTTPException(422, "Enter a parent or guardian phone number before registering.")
     if data.class_id is None:
         raise HTTPException(422, "Select a class before registering the student.")
     selected_class = db.get(models.SchoolClass, data.class_id)
@@ -1017,6 +1023,16 @@ def remove_teacher_duty(duty_id: int, db: Session = Depends(get_db), admin=Depen
 
 @app.post("/api/staff", tags=["Staff"])
 def create_staff(data: StaffCreate, db: Session = Depends(get_db)):
+    if not data.first_name.strip() or not data.last_name.strip():
+        raise HTTPException(422, "Enter the staff member's first and last names before saving.")
+    if not data.category:
+        raise HTTPException(422, "Select a staff category before saving.")
+    if not data.position or not data.position.strip():
+        raise HTTPException(422, "Enter the staff member's job title or position.")
+    if not data.department or not data.department.strip():
+        raise HTTPException(422, "Enter the staff member's department.")
+    if data.category == "Teaching" and (not data.subjects or not data.subjects.strip()):
+        raise HTTPException(422, "Enter at least one subject taught by this teacher.")
     item = models.StaffMember(staff_number="STF-" + str(date.today().year) + "-" + uuid4().hex[:6].upper(), **data.model_dump())
     db.add(item)
     db.commit()
