@@ -52,6 +52,7 @@ export default function AcademicManagement({ token, classes }: { token: string; 
   const [historyMarks, setHistoryMarks] = useState<Mark[]>([])
   const [historyError, setHistoryError] = useState('')
   const [selectedExamId, setSelectedExamId] = useState('')
+  const [activeAcademicTab, setActiveAcademicTab] = useState<'marks' | 'results' | 'grading' | 'history'>('marks')
   const [examForm, setExamForm] = useState({ name: '', class_id: '', term: 'Term 1', year: String(new Date().getFullYear()) })
   const [showExamForm, setShowExamForm] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -301,7 +302,10 @@ export default function AcademicManagement({ token, classes }: { token: string; 
           <div className="stat-card"><span>Verified marks</span><strong className="stat-value">{marks.filter(mark => mark.verified).length} / {marks.length}</strong></div>
         </div>
       </section>
+      <nav className="academic-tabs" aria-label="Academic workspace tabs">{([["marks", "Marks entry"], ["results", "Class performance"], ["grading", "Grading scale"], ["history", "Report cards"]] as const).map(([key, label]) => <button key={key} type="button" className={activeAcademicTab === key ? "academic-tab active" : "academic-tab"} aria-current={activeAcademicTab === key ? "page" : undefined} onClick={() => setActiveAcademicTab(key)}>{label}</button>)}</nav>
 
+
+      {activeAcademicTab === 'marks' && (
       <section className="panel">
         <div className="panel-heading"><div><h2>Class marks register</h2><p>Enter scores directly across the class register. No repeated student or subject selection is required. Verified scores are locked.</p></div><button type="button" className="primary-button" onClick={() => void saveClassMarks()} disabled={saving || !students.length || !subjects.length}><Save size={15}/>{saving ? 'Saving class marks…' : 'Save all marks'}</button></div>
         {!students.length && <p className="form-hint">No students are registered in this class yet.</p>}
@@ -320,7 +324,9 @@ export default function AcademicManagement({ token, classes }: { token: string; 
           {!marks.length && <tr><td colSpan={6}>No marks have been recorded for this examination yet.</td></tr>}
         </tbody></table></div>
       </section>
+      )}
 
+      {activeAcademicTab === 'results' && (
       <section className="panel academic-results-print">
         <div className="panel-heading"><div><h2>Class performance</h2><p>{selectedExam.name} · {selectedClass?.name || 'Class'}{selectedClass?.section ? ' — ' + selectedClass.section : ''} · {selectedExam.term} {selectedExam.year}</p><p>Provisional ranking uses average scores. Complete and verify all subject marks before issuing final results.</p></div></div>
         <div className="table-wrap"><table><thead><tr><th>Position</th><th>Student</th><th>Admission no.</th><th>Subjects entered</th><th>Total</th><th>Average</th><th>Grade</th></tr></thead><tbody>
@@ -333,6 +339,8 @@ export default function AcademicManagement({ token, classes }: { token: string; 
           {!subjectAnalysis.length && <tr><td colSpan={3}>Subject analysis will appear after marks are entered.</td></tr>}
         </tbody></table></div>
       </section>
+      )}
+      {activeAcademicTab === 'grading' && (
       <section className="panel">
         <div className="panel-heading"><div><h2>School grading scale</h2><p>Configure the grade boundaries and remarks used for student averages. Bands must cover 0–100 without gaps or overlaps.</p></div></div>
         {gradingBands.length === 0 && <p className="form-hint">No grading scale is configured yet. Add bands to display grades in class performance.</p>}
@@ -350,6 +358,8 @@ export default function AcademicManagement({ token, classes }: { token: string; 
           </div>
         </form>
       </section>
+      )}
+      {activeAcademicTab === 'history' && (
       <section className="panel academic-report-print">
         <div className="panel-heading"><div><h2>Student report card and academic history</h2><p>Review administrator-verified results across examinations. Pending marks are excluded from the report card. Use the browser print option to save as PDF.</p></div><button type="button" className="secondary-button" disabled={!historyStudentId||!historyRows.length} onClick={() => printAcademicSection('report')}><Printer size={15}/> Print report card</button></div>
         <label className="academic-exam-select">Student
@@ -373,6 +383,7 @@ export default function AcademicManagement({ token, classes }: { token: string; 
           </tbody></table></div>
         </>}
       </section>
+      )}
     </>}
     {!selectedExam && !loading && <section className="panel empty-state"><BookOpen size={32}/><h3>No examination selected</h3><p>Create an examination for a class to begin recording results.</p></section>}
   </div>
