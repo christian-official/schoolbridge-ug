@@ -437,7 +437,7 @@ async def protect_school_data(request: Request, call_next):
 
         if path == "/api/auth/me":
             pass
-        elif path == "/api/teacher/my-assignments":
+        elif path in {"/api/teacher/my-assignments", "/api/teacher/students", "/api/teacher/attendance"}:
             if user.role != "teacher":
                 return JSONResponse(
                     {"detail": "Teacher permission required."},
@@ -582,6 +582,7 @@ def my_assignments(
     return [
         {
             "assignment_id": a.id,
+            "class_id": a.class_id,
             "class": db.get(models.SchoolClass, a.class_id).name,
             "subject": db.get(models.Subject, a.subject_id).name,
         }
@@ -997,3 +998,40 @@ def finance_expenses(db: Session = Depends(get_db)):
     salary_total = db.query(func.coalesce(func.sum(models.SalaryPayment.amount), 0)).scalar() or 0
     other_total = db.query(func.coalesce(func.sum(models.OtherExpense.amount), 0)).scalar() or 0
     return {"salary_expenses": int(salary_total), "other_expenses": int(other_total), "total_expenses": int(salary_total + other_total)}
+
+
+@app.get("/api/teacher/students", tags=["Teacher Workspace"])
+def teacher_students(class_id: int, db: Session = Depends(get_db), teacher=Depends(get_current_user)):
+    if teacher.role != "teacher":
+        raise HTTPException(403, "Teacher account required.")
+    assigned = db.query(models.TeacherAssignment).filter_by(
+        teacher_id=teacher.id, class_id=class_id
+    ).first()
+    if not assigned:
+        raise HTTPException(403, "This class is not assigned to your account.")
+    return db.query(models.Student).filter(
+        models.Student.class_id == class_id, models.Student.status == "active"
+    ).order_by(models.Student.last_name, models.Student.first_name).all()
+
+
+@app.post("/api/teacher/attendance", tags=["Teacher Workspace"])
+def teacher_record_attendance(data: AttendanceCreate, db: Session = Depends(get_db), teacher=Depends(get_current_user)):
+    if teacher.role != "teacher":
+        raise HTTPException(403, "Teacher account required.")
+    student = db.get(models.Student, data.student_id)
+    if not student:
+        raise HTTPException(404, "Student not found.")
+    assigned = db.query(models.TeacherAssignment).filter_by(
+        teacher_id=teacher.id, class_id=student.class_id
+    ).first()
+    if not assigned:
+        raise HTTPException(403, "You cannot record attendance for this student's class.")
+    item = models.Attendance(**data.model_dump())
+    db.add(item)
+    try:
+        db.commit()
+        db.refresh(item)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "Attendance already recorded for this student on this date.")
+    return item
