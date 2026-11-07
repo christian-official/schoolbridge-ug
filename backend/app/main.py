@@ -499,53 +499,6 @@ def attendance_summary(
     }
 
 
-@app.put("/api/attendance/register", tags=["Attendance"])
-def save_attendance_register(
-    data: AttendanceRegisterUpdate,
-    db: Session = Depends(get_db),
-    user=Depends(get_current_user),
-):
-    selected_class = db.get(models.SchoolClass, data.class_id)
-    if not selected_class:
-        raise HTTPException(404, "Class not found.")
-    if user.role != "admin":
-        if user.role != "teacher" or not db.query(models.TeacherAssignment).filter_by(
-            teacher_id=user.id, class_id=data.class_id
-        ).first():
-            raise HTTPException(403, "You are not assigned to this class.")
-    student_ids = [entry.student_id for entry in data.records]
-    if len(student_ids) != len(set(student_ids)):
-        raise HTTPException(422, "A student can appear only once in a class register.")
-    students = db.query(models.Student).filter(
-        models.Student.id.in_(student_ids),
-        models.Student.class_id == data.class_id,
-        models.Student.status == "active",
-    ).all()
-    if len(students) != len(student_ids):
-        raise HTTPException(422, "Every selected student must be active and belong to the chosen class.")
-    saved = 0
-    for entry in data.records:
-        record = db.query(models.Attendance).filter_by(
-            student_id=entry.student_id, attendance_date=data.attendance_date
-        ).first()
-        if record:
-            record.status = entry.status
-        else:
-            db.add(models.Attendance(
-                student_id=entry.student_id,
-                attendance_date=data.attendance_date,
-                status=entry.status,
-            ))
-        saved += 1
-    db.commit()
-    return {
-        "message": "Class attendance register saved.",
-        "class_id": data.class_id,
-        "attendance_date": data.attendance_date,
-        "saved": saved,
-    }
-
-
 @app.post("/api/exams", response_model=ExamOut, tags=["Exams"])
 def create_exam(data: ExamCreate, db: Session = Depends(get_db)):
     if not db.get(models.SchoolClass, data.class_id):
@@ -782,6 +735,55 @@ def require_admin(user=Depends(get_current_user)):
     if user.role != "admin":
         raise HTTPException(403, "Administrator permission required.")
     return user
+
+
+@app.put("/api/attendance/register", tags=["Attendance"])
+def save_attendance_register(
+    data: AttendanceRegisterUpdate,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    selected_class = db.get(models.SchoolClass, data.class_id)
+    if not selected_class:
+        raise HTTPException(404, "Class not found.")
+    if user.role != "admin":
+        if user.role != "teacher" or not db.query(models.TeacherAssignment).filter_by(
+            teacher_id=user.id, class_id=data.class_id
+        ).first():
+            raise HTTPException(403, "You are not assigned to this class.")
+    student_ids = [entry.student_id for entry in data.records]
+    if len(student_ids) != len(set(student_ids)):
+        raise HTTPException(422, "A student can appear only once in a class register.")
+    students = db.query(models.Student).filter(
+        models.Student.id.in_(student_ids),
+        models.Student.class_id == data.class_id,
+        models.Student.status == "active",
+    ).all()
+    if len(students) != len(student_ids):
+        raise HTTPException(422, "Every selected student must be active and belong to the chosen class.")
+    saved = 0
+    for entry in data.records:
+        record = db.query(models.Attendance).filter_by(
+            student_id=entry.student_id, attendance_date=data.attendance_date
+        ).first()
+        if record:
+            record.status = entry.status
+        else:
+            db.add(models.Attendance(
+                student_id=entry.student_id,
+                attendance_date=data.attendance_date,
+                status=entry.status,
+            ))
+        saved += 1
+    db.commit()
+    return {
+        "message": "Class attendance register saved.",
+        "class_id": data.class_id,
+        "attendance_date": data.attendance_date,
+        "saved": saved,
+    }
+
+
 
 
 @app.get("/api/staff-attendance", tags=["Attendance"])
