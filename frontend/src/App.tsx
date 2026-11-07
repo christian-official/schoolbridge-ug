@@ -75,6 +75,22 @@ async function api<T>(path: string, token: string, options: RequestInit = {}): P
   return result as T
 }
 
+function validateRequiredFields(event: React.FormEvent<HTMLDivElement>) {
+  const form = event.target as HTMLFormElement
+  if (form.tagName !== 'FORM') return
+  const requiredFields = Array.from(form.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>('[required]'))
+  const emptyTextField = requiredFields.find(field => {
+    const type = field instanceof HTMLInputElement ? field.type : ''
+    return ['text', 'email', 'tel', 'url', 'search', 'password'].includes(type) && !field.value.trim()
+  })
+  if (emptyTextField) {
+    event.preventDefault()
+    emptyTextField.setCustomValidity('Please complete this required field before saving.')
+    emptyTextField.reportValidity()
+    emptyTextField.setCustomValidity('')
+  }
+}
+
 function App() {
   const [token, setToken] = useState(sessionStorage.getItem('sb_token') || '')
   const [user, setUser] = useState<User | null>(null)
@@ -411,7 +427,7 @@ function App() {
   }
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" onSubmitCapture={validateRequiredFields}>
       <aside className={`sidebar ${mobileMenu ? 'sidebar-open' : ''}`}>
         <div className="sidebar-brand">
           <div className="brand-mark"><GraduationCap size={25} /></div>
@@ -706,7 +722,7 @@ function AcademicSettings({token,onSaved}:{token:string;onSaved:()=>void}) {
   const [busy,setBusy]=useState(false)
   useEffect(()=>{api<{academic_year:number;active_term:string}>('settings/academic',token).then(x=>{setYear(x.academic_year);setTerm(x.active_term)}).catch(e=>setMessage(e.message))},[token])
   async function save(e:React.FormEvent) {e.preventDefault();setBusy(true);setMessage('');try{await api('settings/academic',token,{method:'PUT',body:JSON.stringify({academic_year:year,active_term:term})});setMessage('Active academic year and term saved. New registrations will use this term.');onSaved()}catch(e){setMessage(e instanceof Error?e.message:'Unable to save academic settings.')}finally{setBusy(false)}}
-  return <section className="panel settings-panel"><div className="panel-heading"><div><h2>Academic year and active term</h2><p>These settings determine which class fee is assigned to new students.</p></div></div>{message&&<div className="success-notice">{message}</div>}<details className="form-disclosure"><summary>Edit academic year and active term</summary><form className="student-form" onSubmit={save}><div className="student-form-grid"><label>Academic year<input type="number" min="2000" max="2100" value={year} onChange={e=>setYear(Number(e.target.value))}/></label><label>Active term<select value={term} onChange={e=>setTerm(e.target.value)}><option>Term 1</option><option>Term 2</option><option>Term 3</option></select></label></div><div className="form-actions"><button className="primary-button" disabled={busy}>{busy?'Saving...':'Save academic settings'}</button></div></form></details></section>
+  return <section className="panel settings-panel"><div className="panel-heading"><div><h2>Academic year and active term</h2><p>These settings determine which class fee is assigned to new students.</p></div></div>{message&&<div className="success-notice">{message}</div>}<details className="form-disclosure"><summary>Edit academic year and active term</summary><form className="student-form" onSubmit={save}><div className="student-form-grid"><label>Academic year *<input required type="number" min="2000" max="2100" value={year} onChange={e=>setYear(Number(e.target.value))}/></label><label>Active term *<select required value={term} onChange={e=>setTerm(e.target.value)}><option>Term 1</option><option>Term 2</option><option>Term 3</option></select></label></div><div className="form-actions"><button className="primary-button" disabled={busy}>{busy?'Saving...':'Save academic settings'}</button></div></form></details></section>
 }
 
 type TeacherAssignment = {assignment_id:number;class_id:number;class:string;subject:string}
@@ -731,7 +747,7 @@ function SchoolProfileSettings({token,onSaved}:{token:string;onSaved:()=>void}) 
   const [busy,setBusy]=useState(false)
   useEffect(()=>{api<any>('settings/school-profile',token).then(p=>setForm({name:p.name||'My School',address:p.address||'',phone:p.phone||'',email:p.email||'',motto:p.motto||'',school_type:p.school_type||'Secondary',a_level_combinations:p.a_level_combinations||'',o_level_optional_subjects:p.o_level_optional_subjects||'',a_level_subsidiary_subjects:p.a_level_subsidiary_subjects||''})).catch(e=>setMessage(e.message))},[token])
   async function save(e:React.FormEvent){e.preventDefault();setBusy(true);setMessage('');try{await api('settings/school-profile',token,{method:'PUT',body:JSON.stringify({...form,address:form.address||null,phone:form.phone||null,email:form.email||null,motto:form.motto||null})});setMessage('School profile saved. Student registration will now follow this school type.');onSaved()}catch(e){setMessage(e instanceof Error?e.message:'Unable to save school profile.')}finally{setBusy(false)}}
-  return <section className="panel settings-panel"><div className="panel-heading"><div><h2>School profile</h2><p>Set the identity, contact information and school category used throughout SchoolBridge.</p></div></div>{message&&<div className="success-notice">{message}</div>}<form className="student-form" onSubmit={save}><div className="student-form-grid"><label>School name *<input required value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/></label><label>School type *<select value={form.school_type} onChange={e=>setForm({...form,school_type:e.target.value})}><option>Primary</option><option>Secondary</option></select><small className="field-hint">Primary schools will not be shown secondary-level academic options during registration.</small></label><label>Phone number<input value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})}/></label><label>Email address<input type="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})}/></label><label>Address<input value={form.address} onChange={e=>setForm({...form,address:e.target.value})}/></label><label>School motto<input value={form.motto} onChange={e=>setForm({...form,motto:e.target.value})}/></label></div><div className="form-actions"><button className="primary-button" disabled={busy}>{busy?'Saving...':'Save school profile'}</button></div></form></section>
+  return <section className="panel settings-panel"><div className="panel-heading"><div><h2>School profile</h2><p>Set the identity, contact information and school category used throughout SchoolBridge.</p></div></div>{message&&<div className="success-notice">{message}</div>}<form className="student-form" onSubmit={save}><div className="student-form-grid"><label>School name *<input required value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/></label><label>School type *<select required value={form.school_type} onChange={e=>setForm({...form,school_type:e.target.value})}><option>Primary</option><option>Secondary</option></select><small className="field-hint">Primary schools will not be shown secondary-level academic options during registration.</small></label><label>Phone number<input value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})}/></label><label>Email address<input type="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})}/></label><label>Address<input value={form.address} onChange={e=>setForm({...form,address:e.target.value})}/></label><label>School motto<input value={form.motto} onChange={e=>setForm({...form,motto:e.target.value})}/></label></div><div className="form-actions"><button className="primary-button" disabled={busy}>{busy?'Saving...':'Save school profile'}</button></div></form></section>
 }
 
 function AcademicCurriculumSettings({token,onSaved}:{token:string;onSaved:()=>void}) {
