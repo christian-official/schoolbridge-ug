@@ -49,6 +49,7 @@ export default function AcademicManagement({ token, classes }: { token: string; 
   const [markDrafts, setMarkDrafts] = useState<Record<string, string>>({})
   const [selectedSubjectId, setSelectedSubjectId] = useState('')
   const [reportRemarks, setReportRemarks] = useState({ classTeacher: '', headteacher: '' })
+  const [reportTemplate, setReportTemplate] = useState<'classic' | 'modern' | 'detailed'>('modern')
   const [gradingBands, setGradingBands] = useState<GradeBand[]>([])
   const [schoolProfile, setSchoolProfile] = useState<SchoolProfile>({})
   const [draftBands, setDraftBands] = useState<GradeBand[]>([])
@@ -250,7 +251,7 @@ export default function AcademicManagement({ token, classes }: { token: string; 
     }
   }
 
-  function printAcademicSection(target: 'results' | 'report') {
+  function printAcademicSection(target: 'results' | 'report' | 'class-reports') {
     const cleanup = () => { delete document.body.dataset.schoolbridgePrint }
     document.body.dataset.schoolbridgePrint = target
     window.addEventListener('afterprint', cleanup, { once: true })
@@ -266,6 +267,46 @@ export default function AcademicManagement({ token, classes }: { token: string; 
     subject: subjects.find(subject => subject.id === mark.subject_id),
     grade: gradingBands.find(band => mark.score >= band.min_score && (mark.score < band.max_score || band.max_score === 100))?.grade || '—',
   })).sort((a, b) => (b.exam?.year || 0) - (a.exam?.year || 0) || (a.exam?.term || '').localeCompare(b.exam?.term || ''))
+
+  function reportCardMarkup(student: Student, rows: typeof historyRows, index?: number) {
+    const average = rows.length ? rows.reduce((sum, mark) => sum + mark.score, 0) / rows.length : 0
+    const overallGrade = gradingBands.find(band => average >= band.min_score && (average < band.max_score || band.max_score === 100))?.grade || '—'
+    const templateClass = 'report-card-sheet report-template-' + reportTemplate
+    return <article className={templateClass} key={student.id}>
+      <header className="report-card-header">
+        <div className="report-school-emblem">{schoolProfile.name?.slice(0, 2).toUpperCase() || 'SB'}</div>
+        <div className="report-school-title"><span>OFFICIAL ACADEMIC RECORD {index !== undefined ? '· CLASS COPY ' + (index + 1) : ''}</span><h2>{schoolProfile.name || 'SCHOOL NAME'}</h2><p>{[schoolProfile.address, schoolProfile.phone, schoolProfile.email].filter(Boolean).join(' · ') || 'School address · Telephone · Email'}</p>{schoolProfile.motto && <em>{schoolProfile.motto}</em>}<strong>{reportTemplate === 'classic' ? 'STUDENT REPORT CARD' : reportTemplate === 'detailed' ? 'COMPREHENSIVE ACADEMIC REPORT' : 'STUDENT PROGRESS REPORT'}</strong></div>
+        <div className="report-card-term"><span>ACADEMIC YEAR</span><strong>{selectedExam?.year || new Date().getFullYear()}</strong><span>TERM</span><strong>{selectedExam?.term || '—'}</strong></div>
+      </header>
+      <div className="report-student-details">
+        <div><small>STUDENT NAME</small><strong>{studentName(student)}</strong></div><div><small>ADMISSION NUMBER</small><strong>{student.admission_number}</strong></div>
+        <div><small>CLASS</small><strong>{selectedClass?.name || '—'} {selectedClass?.section || ''}</strong></div><div><small>EXAMINATION</small><strong>{selectedExam?.name || 'Academic record'}</strong></div>
+      </div>
+      <div className="report-section-heading"><span>01</span><h3>Academic performance</h3></div>
+      <div className="table-wrap report-results-table"><table><thead><tr><th>SUBJECT</th><th>SCORE / 100</th><th>GRADE</th><th>TEACHER'S SUBJECT REMARK</th></tr></thead><tbody>
+        {rows.map(mark => <tr key={mark.id}><td><strong>{mark.subject?.name || 'Unknown subject'}</strong></td><td>{Math.round(mark.score)}</td><td><strong>{mark.grade}</strong></td><td>{gradingBands.find(band => band.grade === mark.grade)?.remark || '—'}</td></tr>)}
+        {!rows.length && <tr><td colSpan={4}>No verified subject results are available for this examination.</td></tr>}
+      </tbody></table></div>
+      <div className="report-summary-grid"><div><small>SUBJECTS GRADED</small><strong>{rows.length}</strong></div><div><small>AVERAGE SCORE</small><strong>{Math.round(average)}%</strong></div><div><small>OVERALL GRADE</small><strong>{overallGrade}</strong></div></div>
+      {reportTemplate === 'detailed' && <div className="report-section-heading"><span>02</span><h3>Academic guidance</h3></div>}
+      <div className="report-section-heading"><span>{reportTemplate === 'detailed' ? '03' : '02'}</span><h3>Progress remarks and recommendations</h3></div>
+      <div className="report-remarks-grid"><label>Class teacher's remarks<textarea value={reportRemarks.classTeacher} onChange={e => setReportRemarks(v => ({ ...v, classTeacher: e.target.value }))} placeholder="Comment on attendance, conduct, participation and general progress."/></label><label>Headteacher's remarks<textarea value={reportRemarks.headteacher} onChange={e => setReportRemarks(v => ({ ...v, headteacher: e.target.value }))} placeholder="School leadership comments and recommendations."/></label></div>
+      <div className="report-signatures"><div><strong>Class teacher</strong><span>Signature: __________________</span><span>Date: __________________</span></div><div><strong>Headteacher</strong><span>Signature: __________________</span><span>Date: __________________</span></div></div>
+      <footer className="report-card-footer">SchoolBridge · Official student progress report · Keep this report for your records</footer>
+    </article>
+  }
+
+  const selectedReportRows = historyRows.filter(mark => !selectedExam || mark.exam_id === selectedExam.id)
+  const classReportStudents = [...students].sort((a, b) => studentName(a).localeCompare(studentName(b)))
+  const classReportData = classReportStudents.map(student => ({
+    student,
+    rows: marks.filter(mark => mark.student_id === student.id && mark.verified).map(mark => ({
+      ...mark,
+      exam: selectedExam || undefined,
+      subject: subjects.find(subject => subject.id === mark.subject_id),
+      grade: gradingBands.find(band => mark.score >= band.min_score && (mark.score < band.max_score || band.max_score === 100))?.grade || '—',
+    })),
+  }))
 
   return <div className="academic-workspace">
     <section className="panel">
@@ -372,6 +413,18 @@ export default function AcademicManagement({ token, classes }: { token: string; 
       {activeAcademicTab === 'results' && (
       <section className="panel academic-results-print">
         <div className="panel-heading report-screen-controls"><div><h2>Class performance</h2><p>{selectedExam.name} · {selectedClass?.name || 'Class'}{selectedClass?.section ? ' — ' + selectedClass.section : ''} · {selectedExam.term} {selectedExam.year}</p><p>Provisional ranking uses average scores. Complete and verify all subject marks before issuing final results.</p></div><button type="button" className="secondary-button" onClick={() => printAcademicSection('results')}><Printer size={15}/> Print class performance</button></div>
+        <div className="class-results-print-sheet">
+          <header className="class-results-print-header"><div><span>OFFICIAL ACADEMIC RESULTS</span><h1>{schoolProfile.name || 'SCHOOL NAME'}</h1><p>{[schoolProfile.address, schoolProfile.phone, schoolProfile.email].filter(Boolean).join(' · ')}</p></div><strong>CLASS RESULTS</strong></header>
+          <div className="class-results-print-meta"><span><b>CLASS</b>{selectedClass?.name || '—'} {selectedClass?.section || ''}</span><span><b>EXAMINATION</b>{selectedExam.name}</span><span><b>TERM / YEAR</b>{selectedExam.term} {selectedExam.year}</span><span><b>ENROLMENT</b>{students.length} students</span></div>
+          <div className="class-results-print-stats"><div><small>RESULTS RECORDED</small><strong>{results.length}</strong></div><div><small>SUBJECTS ASSESSED</small><strong>{subjectAnalysis.length}</strong></div><div><small>VERIFIED SCORES</small><strong>{marks.filter(mark => mark.verified).length} / {marks.length}</strong></div><div><small>CLASS AVERAGE</small><strong>{Math.round(results.length ? results.reduce((sum, row) => sum + row.average, 0) / results.length : 0)}%</strong></div></div>
+          <h2>Class performance register</h2>
+          <div className="table-wrap"><table><thead><tr><th>POS.</th><th>STUDENT NAME</th><th>ADMISSION NO.</th>{subjectAnalysis.map(row => <th key={row.subject.id}>{row.subject.name}</th>)}<th>TOTAL</th><th>AVERAGE</th><th>GRADE</th></tr></thead><tbody>
+            {results.map(result => <tr key={result.studentId}><td>{result.position}</td><td>{studentName(studentById.get(result.studentId))}</td><td>{studentById.get(result.studentId)?.admission_number || '—'}</td>{subjectAnalysis.map(row => <td key={row.subject.id}>{Math.round(marks.find(mark => mark.student_id === result.studentId && mark.subject_id === row.subject.id)?.score ?? 0)}</td>)}<td>{Math.round(result.total)}</td><td>{Math.round(result.average)}%</td><td>{result.grade}</td></tr>)}
+            {!results.length && <tr><td colSpan={subjectAnalysis.length + 6}>No results recorded.</td></tr>}
+          </tbody></table></div>
+          <h2>Subject performance summary</h2><div className="table-wrap"><table><thead><tr><th>SUBJECT</th><th>STUDENTS ASSESSED</th><th>CLASS AVERAGE</th></tr></thead><tbody>{subjectAnalysis.map(row => <tr key={row.subject.id}><td>{row.subject.name}</td><td>{row.count}</td><td>{Math.round(row.average)}%</td></tr>)}</tbody></table></div>
+          <footer>Prepared by SchoolBridge · Verified results only should be treated as official · Headteacher signature: ____________________</footer>
+        </div>
         <div className="table-wrap"><table><thead><tr><th>Position</th><th>Student</th><th>Admission no.</th><th>Subjects entered</th><th>Total</th><th>Average</th><th>Grade</th></tr></thead><tbody>
           {results.map(result => <tr key={result.studentId}><td>{result.position}</td><td>{studentName(studentById.get(result.studentId))}</td><td>{studentById.get(result.studentId)?.admission_number || '—'}</td><td>{result.count}</td><td>{Math.round(result.total)}</td><td>{Math.round(result.average)}%</td><td>{result.grade}</td></tr>)}
           {!results.length && <tr><td colSpan={7}>Performance positions will appear after marks are entered.</td></tr>}
@@ -404,42 +457,18 @@ export default function AcademicManagement({ token, classes }: { token: string; 
       )}
       {activeAcademicTab === 'history' && (
       <section className="panel academic-report-print">
-        <div className="panel-heading report-screen-controls"><div><h2>Student report cards</h2><p>Prepare a formal academic report with subject results and remarks from the class teacher and headteacher.</p></div><button type="button" className="secondary-button" disabled={!historyStudentId||!historyRows.length} onClick={() => printAcademicSection('report')}><Printer size={15}/> Print report card</button></div>
-        <label className="academic-exam-select report-student-picker">Select student
-          <select value={historyStudentId} onChange={e => setHistoryStudentId(e.target.value)}>
-            <option value="">Choose a student</option>
-            {students.map(student => <option key={student.id} value={student.id}>{studentName(student)} · {student.admission_number}</option>)}
-          </select>
-        </label>
+        <div className="panel-heading report-screen-controls"><div><h2>Report cards</h2><p>Select a design, preview an individual student's report, or print reports for the entire class in one batch.</p></div><button type="button" className="secondary-button" disabled={!classReportData.length} onClick={() => printAcademicSection('class-reports')}><Printer size={15}/> Print whole class ({classReportData.length})</button></div>
+        <div className="report-template-toolbar report-screen-controls">
+          <label>Report template<select value={reportTemplate} onChange={e => setReportTemplate(e.target.value as 'classic' | 'modern' | 'detailed')}><option value="modern">Modern professional</option><option value="classic">Classic school report</option><option value="detailed">Detailed academic report</option></select></label>
+          <label className="academic-exam-select report-student-picker">Preview student<select value={historyStudentId} onChange={e => setHistoryStudentId(e.target.value)}><option value="">Choose a student</option>{students.map(student => <option key={student.id} value={student.id}>{studentName(student)} · {student.admission_number}</option>)}</select></label>
+          <button type="button" className="primary-button" disabled={!historyStudentId} onClick={() => printAcademicSection('report')}><Printer size={15}/> Print selected report</button>
+        </div>
         {historyError && <div className="form-error" role="alert">{historyError}</div>}
-        {historyStudent && <>
-          <div className="report-card-sheet">
-            <header className="report-card-header">
-              <div className="report-school-emblem">SB</div>
-              <div className="report-school-title"><span>OFFICIAL ACADEMIC RECORD</span><h2>{schoolProfile.name || "SCHOOL NAME"}</h2><p>{[schoolProfile.address, schoolProfile.phone, schoolProfile.email].filter(Boolean).join(" · ") || "School address · Telephone · Email"}</p>{schoolProfile.motto && <em>{schoolProfile.motto}</em>}<strong>STUDENT PROGRESS REPORT</strong></div>
-              <div className="report-card-term"><span>ACADEMIC YEAR</span><strong>{selectedExam?.year || new Date().getFullYear()}</strong><span>TERM</span><strong>{selectedExam?.term || '—'}</strong></div>
-            </header>
-            <div className="report-student-details">
-              <div><small>STUDENT NAME</small><strong>{studentName(historyStudent)}</strong></div>
-              <div><small>ADMISSION NUMBER</small><strong>{historyStudent.admission_number}</strong></div>
-              <div><small>CLASS</small><strong>{selectedClass?.name || '—'} {selectedClass?.section || ''}</strong></div>
-              <div><small>EXAMINATION</small><strong>{selectedExam?.name || 'Academic record'}</strong></div>
-            </div>
-            <div className="report-section-heading"><span>01</span><h3>Academic performance</h3></div>
-            <div className="table-wrap report-results-table"><table><thead><tr><th>SUBJECT</th><th>SCORE</th><th>GRADE</th><th>TEACHER'S SUBJECT REMARK</th></tr></thead><tbody>
-              {historyRows.filter(mark => !selectedExam || mark.exam_id === selectedExam.id).map(mark => <tr key={mark.id}><td><strong>{mark.subject?.name || 'Unknown subject'}</strong></td><td>{Math.round(mark.score)}%</td><td><strong>{mark.grade}</strong></td><td>{gradingBands.find(band => band.grade === mark.grade)?.remark || '—'}</td></tr>)}
-              {!historyRows.filter(mark => !selectedExam || mark.exam_id === selectedExam.id).length && <tr><td colSpan={4}>No verified subject results for the selected examination.</td></tr>}
-            </tbody></table></div>
-            <div className="report-summary-grid"><div><small>SUBJECTS GRADED</small><strong>{historyRows.filter(mark => !selectedExam || mark.exam_id === selectedExam.id).length}</strong></div><div><small>AVERAGE SCORE</small><strong>{Math.round(historyRows.filter(mark => !selectedExam || mark.exam_id === selectedExam.id).length ? historyRows.filter(mark => !selectedExam || mark.exam_id === selectedExam.id).reduce((sum, mark) => sum + mark.score, 0) / historyRows.filter(mark => !selectedExam || mark.exam_id === selectedExam.id).length : 0)}%</strong></div><div><small>OVERALL GRADE</small><strong>{gradingBands.find(band => { const rows = historyRows.filter(mark => !selectedExam || mark.exam_id === selectedExam.id); const avg = rows.length ? rows.reduce((sum, mark) => sum + mark.score, 0) / rows.length : 0; return avg >= band.min_score && (avg < band.max_score || band.max_score === 100) })?.grade || '—'}</strong></div></div>
-            <div className="report-section-heading"><span>02</span><h3>Progress remarks and recommendations</h3></div>
-            <div className="report-remarks-grid">
-              <label>Class teacher's remarks<textarea value={reportRemarks.classTeacher} onChange={e => setReportRemarks(v => ({ ...v, classTeacher: e.target.value }))} placeholder="Comment on attendance, conduct, participation and general progress."/></label>
-              <label>Headteacher's remarks<textarea value={reportRemarks.headteacher} onChange={e => setReportRemarks(v => ({ ...v, headteacher: e.target.value }))} placeholder="School leadership comments and recommendations."/></label>
-            </div>
-            <div className="report-signatures"><div><strong>Class teacher</strong><span>Signature: __________________</span><span>Date: __________________</span></div><div><strong>Headteacher</strong><span>Signature: __________________</span><span>Date: __________________</span></div></div>
-            <footer className="report-card-footer">SchoolBridge · Official student progress report · Keep this report for your records</footer>
-          </div>
-        </>}
+        {historyStudent && reportCardMarkup(historyStudent, selectedReportRows)}
+        {!historyStudent && <div className="subject-marks-empty"><BookOpen size={25}/><strong>Choose a student to preview a report</strong><span>Use Print whole class to produce every student's report in one print job.</span></div>}
+        <div className="class-reports-print-batch">
+          {classReportData.map(({student, rows}, index) => reportCardMarkup(student, rows, index))}
+        </div>
       </section>
       )}
 
