@@ -6,11 +6,15 @@
       "version": "22"
     }
   },
-  "forwardPorts": [8000],
+  "forwardPorts": [8001, 5173],
   "portsAttributes": {
-    "8000": {
+    "8001": {
       "label": "SchoolBridge API",
       "onAutoForward": "notify"
+    },
+    "5173": {
+      "label": "SchoolBridge Frontend",
+      "onAutoForward": "openBrowser"
     }
   },
   "postCreateCommand": "python -m pip install --upgrade pip && pip install -r backend/requirements.txt"
