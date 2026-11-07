@@ -85,6 +85,9 @@ function App() {
   const [classSuccess, setClassSuccess] = useState('')
   const [savingClass, setSavingClass] = useState(false)
   const [savingStudent, setSavingStudent] = useState(false)
+  const [studentProfile, setStudentProfile] = useState<any>(null)
+  const [profileSaving, setProfileSaving] = useState(false)
+  const [profileMessage, setProfileMessage] = useState('')
   const [studentError, setStudentError] = useState('')
   const [studentSuccess, setStudentSuccess] = useState('')
   const [studentForm, setStudentForm] = useState({
@@ -200,6 +203,29 @@ function App() {
     } finally {
       setSavingSettings(false)
     }
+  }
+
+  async function openStudentProfile(id:number) {
+    try { const result=await api<any>('students/'+id+'/profile',token); setStudentProfile(result); setProfileMessage('') }
+    catch(error) { setDataError(error instanceof Error?error.message:'Unable to open student profile.') }
+  }
+
+  async function saveStudentProfile(event:React.FormEvent<HTMLFormElement>) {
+    event.preventDefault(); if(!studentProfile)return
+    setProfileSaving(true);setProfileMessage('')
+    try {
+      const student=studentProfile.student
+      const updated=await api<any>('students/'+student.id,token,{method:'PATCH',body:JSON.stringify({
+        first_name:student.first_name,middle_name:student.middle_name||null,last_name:student.last_name,
+        phone:student.phone||null,address:student.address||null,guardian_name:student.guardian_name||null,
+        guardian_relationship:student.guardian_relationship||null,guardian_phone:student.guardian_phone||null,
+        class_id:student.class_id,status:student.status
+      })})
+      setStudentProfile({...studentProfile,student:updated.student})
+      setProfileMessage('Student profile saved. Existing fee and academic records were retained.')
+      await loadStudentPage(studentPage,search)
+    } catch(error) {setProfileMessage(error instanceof Error?error.message:'Unable to save student profile.')}
+    finally {setProfileSaving(false)}
   }
 
   async function loadStudentPage(page = 1, query = search) {
@@ -403,7 +429,7 @@ function App() {
                 </form>
               )}
               <div className="table-tools student-tools"><div className="search-box"><Search size={17} /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name or admission number..." /></div><select className="filter-select" value={studentClassFilter} onChange={e => setStudentClassFilter(e.target.value)}><option value="">All classes</option>{classes.map(item => <option key={item.id} value={item.id}>{item.name}{item.section ? ` — ${item.section}` : ""}</option>)}</select></div>
-              <StudentTable students={filteredStudents} classes={classes} />
+              <StudentTable students={filteredStudents} classes={classes} onSelect={id => void openStudentProfile(id)} />
               <div className="pagination-row"><span>Showing {students.length ? (studentPage - 1) * 25 + 1 : 0}–{Math.min(studentPage * 25, studentTotal)} of {studentTotal}</span><div><button className="secondary-button" disabled={studentPage <= 1} onClick={() => void loadStudentPage(studentPage - 1)}>Previous</button><button className="secondary-button" disabled={studentPage * 25 >= studentTotal} onClick={() => void loadStudentPage(studentPage + 1)}>Next</button></div></div>
             </section>
           )}
@@ -411,6 +437,31 @@ function App() {
 
 
           <StaffFinance token={token} active={active} />
+          {studentProfile && (
+            <div className="modal-backdrop" onClick={()=>setStudentProfile(null)}>
+              <section className="panel student-profile-modal" onClick={e=>e.stopPropagation()}>
+                <div className="panel-heading"><div><h2>Student profile</h2><p>{studentProfile.student.admission_number} · {studentProfile.student.status}</p></div><button className="secondary-button" type="button" onClick={()=>setStudentProfile(null)}>Close</button></div>
+                {profileMessage&&<div className="success-notice">{profileMessage}</div>}
+                <form className="student-form" onSubmit={saveStudentProfile}>
+                  <div className="student-form-grid">
+                    <label>First name<input required value={studentProfile.student.first_name||''} onChange={e=>setStudentProfile({...studentProfile,student:{...studentProfile.student,first_name:e.target.value}})}/></label>
+                    <label>Middle name<input value={studentProfile.student.middle_name||''} onChange={e=>setStudentProfile({...studentProfile,student:{...studentProfile.student,middle_name:e.target.value}})}/></label>
+                    <label>Last name<input required value={studentProfile.student.last_name||''} onChange={e=>setStudentProfile({...studentProfile,student:{...studentProfile.student,last_name:e.target.value}})}/></label>
+                    <label>Class<select value={studentProfile.student.class_id||''} onChange={e=>setStudentProfile({...studentProfile,student:{...studentProfile.student,class_id:e.target.value?Number(e.target.value):null}})}><option value="">Unassigned</option>{classes.map(c=><option key={c.id} value={c.id}>{c.name}{c.section?' — '+c.section:''}</option>)}</select></label>
+                    <label>Student phone<input value={studentProfile.student.phone||''} onChange={e=>setStudentProfile({...studentProfile,student:{...studentProfile.student,phone:e.target.value}})}/></label>
+                    <label>Home address<input value={studentProfile.student.address||''} onChange={e=>setStudentProfile({...studentProfile,student:{...studentProfile.student,address:e.target.value}})}/></label>
+                    <label>Parent / guardian<input value={studentProfile.student.guardian_name||''} onChange={e=>setStudentProfile({...studentProfile,student:{...studentProfile.student,guardian_name:e.target.value}})}/></label>
+                    <label>Guardian phone<input value={studentProfile.student.guardian_phone||''} onChange={e=>setStudentProfile({...studentProfile,student:{...studentProfile.student,guardian_phone:e.target.value}})}/></label>
+                    <label>Student status<select value={studentProfile.student.status||'active'} onChange={e=>setStudentProfile({...studentProfile,student:{...studentProfile.student,status:e.target.value}})}><option value="active">Active</option><option value="transferred">Transferred</option><option value="dismissed">Dismissed</option><option value="inactive">Inactive</option></select></label>
+                  </div>
+                  <div className="form-actions"><button className="primary-button" disabled={profileSaving}>{profileSaving?'Saving...':'Save student profile'}</button></div>
+                </form>
+                <div className="panel-heading"><div><h3>Fee history</h3><p>All historic charges and payments for this student</p></div></div>
+                <div className="stats-grid finance-stats"><div className="stat-card"><span>Total charged</span><strong className="stat-value">UGX {Number(studentProfile.total_charged||0).toLocaleString()}</strong></div><div className="stat-card"><span>Total paid</span><strong className="stat-value">UGX {Number(studentProfile.total_paid||0).toLocaleString()}</strong></div><div className="stat-card"><span>Balance</span><strong className="stat-value">UGX {Number(studentProfile.total_balance||0).toLocaleString()}</strong></div></div>
+                <div className="table-wrap"><table><thead><tr><th>Term</th><th>Year</th><th>Charged</th><th>Paid</th><th>Balance</th></tr></thead><tbody>{studentProfile.fees.map((fee:any)=><tr key={fee.charge_id}><td>{fee.term}</td><td>{fee.year}</td><td>{Number(fee.amount).toLocaleString()}</td><td>{Number(fee.paid).toLocaleString()}</td><td>{Number(fee.balance).toLocaleString()}</td></tr>)}</tbody></table></div>
+              </section>
+            </div>
+          )}
           {active === 'Examinations' && <ComingSoon title="Examinations and results" description="Exam setup, marks entry and student results will be managed here." />}
           {active === 'Settings' && settingsSection === 'home' && (
             <section className="settings-hub">
@@ -477,11 +528,11 @@ function StatCard({ title, value, icon, note }: { title: string; value: string |
   return <div className="stat-card"><div className="stat-top"><span>{title}</span><span className="stat-icon">{icon}</span></div><strong className="stat-value">{value}</strong><small><TrendingUp size={14} /> {note}</small></div>
 }
 
-function StudentTable({ students, classes = [] }: { students: RecordItem[]; classes?: RecordItem[] }) {
+function StudentTable({ students, classes = [], onSelect }: { students: RecordItem[]; classes?: RecordItem[]; onSelect:(id:number)=>void }) {
   if (!students.length) return <EmptyState text="No student records to display yet." />
   return (
     <div className="table-wrap"><table><thead><tr><th>Student</th><th>Admission no.</th><th>Gender</th><th>Class</th></tr></thead><tbody>
-      {students.map(student => <tr key={student.id}><td><div className="student-cell"><div className="student-avatar">{(student.first_name || '?').slice(0, 1).toUpperCase()}</div><strong>{student.first_name} {student.last_name}</strong></div></td><td>{student.admission_number}</td><td>{student.gender || '—'}</td><td>{classes.find(item => item.id === student.class_id)?.name || '—'}</td></tr>)}
+      {students.map(student => <tr key={student.id} className="clickable-row" onClick={()=>onSelect(student.id)}><td><div className="student-cell"><div className="student-avatar">{(student.first_name || '?').slice(0, 1).toUpperCase()}</div><strong>{student.first_name} {student.last_name}</strong></div></td><td>{student.admission_number}</td><td>{student.gender || '—'}</td><td>{classes.find(item => item.id === student.class_id)?.name || '—'}</td></tr>)}
     </tbody></table></div>
   )
 }
