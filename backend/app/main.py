@@ -689,16 +689,23 @@ def finance_summary(db: Session = Depends(get_db)):
 
 
 @app.get("/api/finance/charges", tags=["Finance"])
-def list_fee_charges(search: str = "", db: Session = Depends(get_db)):
+def list_fee_charges(search: str = "", class_id: int | None = None, stream: str | None = None, outstanding_only: bool = False, db: Session = Depends(get_db)):
     query = db.query(models.FeeCharge, models.Student).join(models.Student, models.Student.id == models.FeeCharge.student_id)
+    if class_id is not None:
+        query = query.filter(models.Student.class_id == class_id)
+    if stream:
+        query = query.join(models.SchoolClass, models.SchoolClass.id == models.Student.class_id).filter(models.SchoolClass.section == stream)
     if search.strip():
         term = "%" + search.strip() + "%"
         query = query.filter(or_(models.Student.admission_number.ilike(term), models.Student.first_name.ilike(term), models.Student.last_name.ilike(term)))
     results = []
     for charge, student in query.order_by(models.FeeCharge.year.desc(), models.FeeCharge.term, models.Student.last_name).limit(500).all():
         paid = db.query(func.coalesce(func.sum(models.FeePayment.amount), 0)).filter(models.FeePayment.charge_id == charge.id).scalar() or 0
+        balance = charge.amount - paid
+        if outstanding_only and balance <= 0:
+            continue
         school_class = db.get(models.SchoolClass, student.class_id) if student.class_id else None
-        results.append({"id": charge.id, "student_id": student.id, "student_name": student.first_name + " " + student.last_name, "admission_number": student.admission_number, "class_name": school_class.name if school_class else "", "stream": school_class.section if school_class else "", "term": charge.term, "year": charge.year, "amount": charge.amount, "paid": float(paid), "balance": float(charge.amount - paid)})
+        results.append({"id": charge.id, "student_id": student.id, "student_name": student.first_name + " " + student.last_name, "admission_number": student.admission_number, "class_id": student.class_id, "class_name": school_class.name if school_class else "", "stream": school_class.section if school_class else "", "term": charge.term, "year": charge.year, "amount": charge.amount, "paid": float(paid), "balance": float(balance)})
     return results
 
 
