@@ -815,3 +815,101 @@ select option:checked { background: #edf2ff; color: #244cc2; }
     font-size: 14px;
   }
 }
+
+
+/* Subject-first marks register */
+.subject-marks-workspace { display:grid; gap:18px; }
+.subject-marks-toolbar { display:flex; align-items:flex-end; gap:14px; flex-wrap:wrap; padding:16px; border:1px solid #e5eaf3; border-radius:12px; background:#f8faff; }
+.subject-marks-toolbar .academic-exam-select { flex:1 1 280px; max-width:460px; }
+.subject-marks-count { display:grid; gap:3px; min-width:115px; padding:7px 12px; color:#6d7b91; font-size:12px; }
+.subject-marks-count strong { color:#253956; font-size:21px; }
+.subject-marks-empty { display:grid; justify-items:center; gap:8px; padding:42px 16px; border:1px dashed #cbd5e5; border-radius:12px; color:#7b879b; text-align:center; }
+.subject-marks-empty strong { color:#34445e; }
+.subject-marks-empty span { font-size:13px; }
+.student-score-list { overflow:hidden; border:1px solid #e3e9f2; border-radius:12px; }
+.student-score-list-heading,.student-score-row { display:grid; grid-template-columns:minmax(220px,1.5fr) minmax(145px,1fr) minmax(140px,.8fr) minmax(110px,.7fr); align-items:center; gap:14px; padding:12px 16px; }
+.student-score-list-heading { background:#f5f7fb; color:#8995a8; font-size:10px; font-weight:800; letter-spacing:.65px; }
+.student-score-row { min-height:65px; border-top:1px solid #edf0f5; color:#526078; font-size:13px; }
+.student-score-name { display:flex; align-items:center; gap:11px; min-width:0; }
+.student-score-name strong { color:#293a55; font-size:13px; }
+.student-score-number { display:grid; place-items:center; flex:0 0 28px; height:28px; border-radius:8px; background:#edf2ff; color:#315ee8; font-size:11px; font-weight:800; }
+.student-score-admission { color:#78869b; font-size:12px; }
+.student-score-input { width:100%; max-width:150px; min-height:40px; padding:8px 11px; border:1px solid #d8e0ec; border-radius:8px; color:#293a55; background:#fff; font:600 14px inherit; }
+.student-score-input:focus { outline:3px solid #315ee81c; border-color:#5578e8; }
+.student-score-input:disabled { background:#f1f4f8; color:#78869b; }
+.student-score-status { font-size:11px; font-weight:700; }
+.student-score-status.verified { color:#16805a; }
+.student-score-status.recorded { color:#315ee8; }
+.student-score-status.pending { color:#9a6b25; }
+.student-score-footer { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; padding:15px 16px; border-top:1px solid #e7ebf2; background:#fafbfe; color:#7b879b; font-size:12px; }
+.recorded-marks-details { border:1px solid #e5eaf2; border-radius:10px; padding:12px 14px; }
+.recorded-marks-details summary { color:#36528a; font-size:13px; font-weight:750; cursor:pointer; }
+.recorded-marks-details .table-wrap { margin-top:12px; }
+@media(max-width:720px) {
+ .student-score-list-heading { display:none; }
+ .student-score-row { grid-template-columns:minmax(0,1fr) minmax(110px,.65fr); gap:8px 12px; padding:13px; }
+ .student-score-name { grid-column:1/-1; }
+ .student-score-admission { font-size:11px; }
+ .student-score-input { max-width:none; }
+ .student-score-status { grid-column:1/-1; }
+ .subject-marks-toolbar .primary-button { width:100%; }
+}
+
+/* Formal printable student report card */
+.report-student-picker { display:block; max-width:420px; margin-bottom:18px; }
+.report-card-sheet { max-width:1000px; margin:18px auto; padding:30px; border:1px solid #dce3ed; border-radius:12px; background:#fff; color:#26364f; box-shadow:0 8px 28px rgba(27,45,75,.07); }
+.report-card-header { display:grid; grid-template-columns:70px minmax(0,1fr) 120px; align-items:center; gap:18px; padding-bottom:22px; border-bottom:3px solid #263e70; }
+.report-school-emblem { display:grid; place-items:center; width:66px; height:66px; border:2px solid #315ee8; border-radius:50%; color:#315ee8; font-size:22px; font-weight:900; }
+.report-school-title { text-align:center; }
+.report-school-title > span,.report-card-term span { color:#8190a7; font-size:9px; font-weight:800; letter-spacing:1px; }
+.report-school-title h2 { margin:5px 0; color:#20365e; font-size:23px; font-weight:900; text-transform:uppercase; }
+.report-school-title p { margin:0 0 8px; color:#7b879b; font-size:11px; }
+.report-school-title em { display:block; margin-bottom:7px; color:#687895; font-size:11px; }
+.report-school-title > strong { display:inline-block; padding:7px 13px; border-radius:4px; background:#edf2ff; color:#274aab; font-size:11px; letter-spacing:.8px; }
+.report-card-term { display:grid; gap:5px; text-align:right; }
+.report-card-term strong { margin-bottom:5px; color:#243b66; font-size:15px; }
+.report-student-details { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0; margin:20px 0; border:1px solid #e2e8f1; border-radius:8px; overflow:hidden; }
+.report-student-details > div { display:grid; gap:5px; min-height:60px; padding:11px 14px; border-bottom:1px solid #e9edf4; }
+.report-student-details > div:nth-child(odd) { border-right:1px solid #e9edf4; }
+.report-student-details small,.report-summary-grid small { color:#8995a8; font-size:9px; font-weight:800; letter-spacing:.6px; }
+.report-student-details strong { color:#293a55; font-size:13px; }
+.report-section-heading { display:flex; align-items:center; gap:10px; margin:22px 0 11px; padding-bottom:8px; border-bottom:1px solid #e5eaf2; }
+.report-section-heading > span { display:grid; place-items:center; width:26px; height:26px; border-radius:7px; background:#edf2ff; color:#315ee8; font-size:10px; font-weight:900; }
+.report-section-heading h3 { margin:0; color:#263b62; font-size:14px; font-weight:850; }
+.report-results-table table { white-space:normal; }
+.report-results-table th { background:#f3f6fb; color:#65758e; font-size:9px; letter-spacing:.45px; }
+.report-results-table td { padding:11px 10px; color:#465671; font-size:11px; }
+.report-summary-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-top:14px; }
+.report-summary-grid > div { display:grid; gap:6px; padding:13px; border:1px solid #e4eaf3; border-radius:8px; background:#f8faff; }
+.report-summary-grid strong { color:#263e70; font-size:20px; }
+.report-remarks-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.report-remarks-grid label { display:grid; gap:7px; color:#465671; font-size:11px; font-weight:800; }
+.report-remarks-grid textarea { box-sizing:border-box; width:100%; min-height:88px; resize:vertical; padding:10px 11px; border:1px solid #dce4ef; border-radius:7px; color:#293a55; font:400 12px/1.5 inherit; }
+.report-remarks-grid textarea:focus { outline:3px solid #315ee81c; border-color:#5578e8; }
+.report-signatures { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px 24px; margin-top:24px; padding-top:18px; border-top:1px solid #e5eaf2; }
+.report-signatures > div { display:grid; gap:10px; color:#596982; font-size:10px; }
+.report-signatures strong { color:#293e65; font-size:11px; }
+.report-card-footer { margin-top:24px; padding-top:10px; border-top:1px solid #e5eaf2; color:#8995a8; font-size:9px; text-align:center; }
+@media(max-width:640px) {
+ .report-card-sheet { padding:16px; }
+ .report-card-header { grid-template-columns:44px minmax(0,1fr); gap:10px; }
+ .report-school-emblem { width:42px; height:42px; font-size:15px; }
+ .report-school-title h2 { font-size:16px; }
+ .report-school-title > span { font-size:8px; }
+ .report-card-term { grid-column:1/-1; display:flex; align-items:center; justify-content:center; gap:8px; text-align:center; }
+ .report-card-term strong { margin:0 8px 0 0; }
+ .report-student-details,.report-remarks-grid,.report-signatures { grid-template-columns:1fr; }
+ .report-student-details > div:nth-child(odd) { border-right:0; }
+ .report-summary-grid { grid-template-columns:1fr; }
+}
+@media print {
+ @page { size:A4 portrait; margin:12mm; }
+ body[data-schoolbridge-print="report"] .academic-report-print { padding:0 !important; }
+ body[data-schoolbridge-print="report"] .report-screen-controls,
+ body[data-schoolbridge-print="report"] .report-student-picker { display:none !important; }
+ body[data-schoolbridge-print="report"] .report-card-sheet { max-width:none; margin:0; padding:0; border:0; border-radius:0; box-shadow:none; }
+ body[data-schoolbridge-print="report"] .report-remarks-grid textarea { min-height:64px; border:1px solid #aab4c3; color:#26364f; }
+ body[data-schoolbridge-print="report"] .report-card-sheet * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+ body[data-schoolbridge-print="report"] .report-section-heading { break-after:avoid; }
+ body[data-schoolbridge-print="report"] .report-signatures { break-inside:avoid; }
+}
