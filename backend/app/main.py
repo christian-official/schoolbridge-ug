@@ -630,6 +630,8 @@ def upgrade_existing_database():
             if "salary_frequency" not in staff_columns: connection.execute(text("ALTER TABLE staff_members ADD COLUMN salary_frequency VARCHAR(20) NOT NULL DEFAULT 'Monthly'"))
         if "fee_payments" in inspector.get_table_names() and "receipt_number" not in payment_columns:
             connection.execute(text("ALTER TABLE fee_payments ADD COLUMN receipt_number VARCHAR(50)"))
+        if "fee_payments" in inspector.get_table_names():
+            connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_fee_payments_receipt_number ON fee_payments (receipt_number)"))
         if "school_settings" in inspector.get_table_names():
             if "academic_year" not in settings_columns:
                 connection.execute(text("ALTER TABLE school_settings ADD COLUMN academic_year INTEGER"))
@@ -878,7 +880,7 @@ def student_profile(student_id: int, db: Session = Depends(get_db)):
             "amount": charge.amount, "paid": paid, "balance": charge.amount-paid,
             "payments": [{
                 "id": p.id, "amount": p.amount, "date": p.payment_date,
-                "method": p.method, "reference": p.reference
+                "method": p.method, "reference": p.reference, "receipt_number": p.receipt_number
             } for p in payments]
         })
     return {
