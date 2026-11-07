@@ -771,6 +771,24 @@ def search_students(page: int = 1, page_size: int = 25, search: str = "", class_
     return {"items": rows, "total": total, "page": page, "page_size": page_size, "pages": (total + page_size - 1) // page_size}
 
 
+@app.get("/api/dashboard/summary", tags=["Dashboard"])
+def dashboard_summary(db: Session = Depends(get_db)):
+    settings = get_or_create_school_settings(db)
+    academic_year = settings.academic_year or date.today().year
+    year_start = date(academic_year, 1, 1)
+    year_end = date(academic_year, 12, 31)
+    return {
+        "active_students": db.query(models.Student).filter(models.Student.status == "active").count(),
+        "new_admissions_this_year": db.query(models.Student).filter(
+            models.Student.admission_date >= year_start,
+            models.Student.admission_date <= year_end,
+        ).count(),
+        "active_staff": db.query(models.StaffMember).filter(models.StaffMember.status == "active").count(),
+        "total_classes": db.query(models.SchoolClass).count(),
+        "academic_year": academic_year,
+    }
+
+
 @app.post("/api/staff", tags=["Staff"])
 def create_staff(data: StaffCreate, db: Session = Depends(get_db)):
     item = models.StaffMember(staff_number="STF-" + str(date.today().year) + "-" + uuid4().hex[:6].upper(), **data.model_dump())
