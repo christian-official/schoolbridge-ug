@@ -83,6 +83,7 @@ export default function StaffFinance({token,active,classes=[],refreshKey=0}:{tok
     setSavingFee(true);setMessage('')
     try{
       await request('classes/'+feeSetup.class_id+'/fees',token,{method:'PUT',body:JSON.stringify({term:feeSetup.term,year:Number(feeSetup.year),amount:Number(feeSetup.amount)})})
+      setShowFeeForm(false)
       setMessage('Class fee structure saved.')
       await refreshFinance()
     }catch(e){setMessage(e instanceof Error?e.message:'Unable to save class fee.')}
@@ -102,13 +103,13 @@ export default function StaffFinance({token,active,classes=[],refreshKey=0}:{tok
   }
   async function saveOtherExpense(e:FormEvent){
     e.preventDefault();setMessage('');setSavingExpense(true)
-    try {await request('finance/other-expenses',token,{method:'POST',body:JSON.stringify({...expenseForm,amount:Number(expenseForm.amount),reference:expenseForm.reference||null})});setExpenseForm({description:'',category:'General',amount:'',reference:''});setMessage('Expense recorded.');await refreshFinance()}
+    try {await request('finance/other-expenses',token,{method:'POST',body:JSON.stringify({...expenseForm,amount:Number(expenseForm.amount),reference:expenseForm.reference||null})});setExpenseForm({description:'',category:'General',amount:'',reference:''});setShowExpenseForm(false);setMessage('Expense recorded.');await refreshFinance()}
     catch(e){setMessage(e instanceof Error?e.message:'Unable to record expense.')}
     finally{setSavingExpense(false)}
   }
   async function saveSalaryPayment(e:FormEvent){
     e.preventDefault();setMessage('');setSavingSalary(true)
-    try {await request('finance/salary-payments',token,{method:'POST',body:JSON.stringify({...salaryForm,staff_id:Number(salaryForm.staff_id),amount:Number(salaryForm.amount),reference:salaryForm.reference||null})});setSalaryForm({staff_id:'',amount:'',period:'',reference:''});setMessage('Salary payment recorded.');await refreshFinance()}
+    try {await request('finance/salary-payments',token,{method:'POST',body:JSON.stringify({...salaryForm,staff_id:Number(salaryForm.staff_id),amount:Number(salaryForm.amount),reference:salaryForm.reference||null})});setSalaryForm({staff_id:'',amount:'',period:'',reference:''});setShowSalaryForm(false);setMessage('Salary payment recorded.');await refreshFinance()}
     catch(e){setMessage(e instanceof Error?e.message:'Unable to record salary payment.')}
     finally{setSavingSalary(false)}
   }
@@ -134,7 +135,7 @@ export default function StaffFinance({token,active,classes=[],refreshKey=0}:{tok
   }
   async function pay(e:FormEvent){
     e.preventDefault();setMessage('');setSavingPayment(true)
-    try { const saved=await request<{receipt_number:string;amount:number;payment_date:string}>('finance/payments',token,{method:'POST',body:JSON.stringify({charge_id:Number(payment.charge_id),amount:Number(payment.amount),method:payment.method,reference:payment.reference||null})});const charge=charges.find(c=>c.id===Number(payment.charge_id));if(charge)setReceipt({receipt_number:saved.receipt_number,charge,amount:saved.amount,method:payment.method,date:saved.payment_date});setPayment({charge_id:'',amount:'',method:'Cash',reference:''});setMessage('Payment recorded. Receipt generated.');await refreshFinance() }
+    try { const saved=await request<{receipt_number:string;amount:number;payment_date:string}>('finance/payments',token,{method:'POST',body:JSON.stringify({charge_id:Number(payment.charge_id),amount:Number(payment.amount),method:payment.method,reference:payment.reference||null})});const charge=charges.find(c=>c.id===Number(payment.charge_id));if(charge)setReceipt({receipt_number:saved.receipt_number,charge,amount:saved.amount,method:payment.method,date:saved.payment_date});setPayment({charge_id:'',amount:'',method:'Cash',reference:''});setShowPaymentForm(false);setSelectedPaymentStudent(null);setMessage('Payment recorded. Receipt generated.');await refreshFinance() }
     catch(e){setMessage(e instanceof Error?e.message:'Unable to record payment.')}
     finally{setSavingPayment(false)}
   }
