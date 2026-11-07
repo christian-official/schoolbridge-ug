@@ -597,6 +597,8 @@ class StaffCreate(BaseModel):
     department: str | None = None
     phone: str | None = None
     email: str | None = None
+    salary_amount: int | None = Field(default=None, ge=0)
+    salary_frequency: str = Field(default="Monthly", pattern="^(Monthly|Termly|Weekly|Daily)$")
 
 class FeePaymentCreate(BaseModel):
     charge_id: int
@@ -676,7 +678,14 @@ def list_staff(search: str = "", category: str | None = None, page: int = 1, pag
 def finance_summary(db: Session = Depends(get_db)):
     charged = db.query(func.coalesce(func.sum(models.FeeCharge.amount), 0)).scalar() or 0
     paid = db.query(func.coalesce(func.sum(models.FeePayment.amount), 0)).scalar() or 0
-    return {"fees_expected": float(charged), "fees_collected": float(paid), "outstanding": float(charged - paid)}
+    salary_expenses = db.query(func.coalesce(func.sum(models.SalaryPayment.amount), 0)).scalar() or 0
+    other_expenses = db.query(func.coalesce(func.sum(models.OtherExpense.amount), 0)).scalar() or 0
+    return {"fees_expected": float(charged), "fees_collected": float(paid),
+            "outstanding": float(charged - paid),
+            "salary_expenses": int(salary_expenses),
+            "other_expenses": int(other_expenses),
+            "total_expenses": int(salary_expenses + other_expenses),
+            "net_cash_position": int(paid - salary_expenses - other_expenses)}
 
 
 @app.get("/api/finance/charges", tags=["Finance"])
