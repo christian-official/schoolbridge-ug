@@ -181,6 +181,24 @@ function App() {
     }
   }
 
+  const [deletingClassId, setDeletingClassId] = useState<number | null>(null)
+
+  async function deleteClass(item: RecordItem) {
+    if (!window.confirm(`Remove class "${item.name}${item.section ? ' — ' + item.section : ''}"? This is allowed only when no students, fee records or teacher assignments are linked to it.`)) return
+    setDeletingClassId(item.id)
+    setClassError('')
+    setClassSuccess('')
+    try {
+      await api(`classes/${item.id}`, token, { method: 'DELETE' })
+      setClassSuccess('Class removed successfully.')
+      await loadSchoolData(token)
+    } catch (error) {
+      setClassError(error instanceof Error ? error.message : 'Unable to remove class.')
+    } finally {
+      setDeletingClassId(null)
+    }
+  }
+
   async function registerStudent(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setSavingStudent(true)
@@ -631,7 +649,7 @@ function App() {
               </form></details>
             </section>
               )}
-              {settingsSection === 'school' && <SchoolProfileSettings token={token} onSaved={() => setSettingsSection('home')} />}
+              {settingsSection === 'school' && <SchoolProfileSettings token={token} onSaved={() => { api<any>('settings/school-profile',token).then(setSchoolConfig).catch(()=>{}); setSettingsSection('home') }} />}
               {settingsSection === 'academic' && <><AcademicSettings token={token} onSaved={() => setSettingsSection('home')} /><SubjectSettings token={token} onSaved={() => setSettingsSection('home')} /></>}
               {settingsSection === 'curriculum' && <AcademicCurriculumSettings token={token} onSaved={() => setSettingsSection('home')} />}
               {settingsSection === 'users' && <TeacherUsersSettings token={token} classes={classes} onSaved={() => setSettingsSection('home')} />}
@@ -645,7 +663,7 @@ function App() {
               {classSuccess && <div className="success-notice">{classSuccess}</div>}
               {classError && <div className="form-error">{classError}</div>}
               {showClassForm && <form className="student-form class-form" onSubmit={registerClass}><div className="form-heading"><div><h3>Create a school class</h3><p>Choose a class for the school type saved in School Profile. A stream is optional.</p></div></div><div className="student-form-grid class-form-grid"><label>Class name *<select required value={classForm.name} onChange={e => setClassForm({ ...classForm, name: e.target.value })}><option value="">Choose a class</option>{((schoolConfig.school_type || 'Primary') === 'Primary' ? Array.from({length:7},(_,i)=>'Primary '+(i+1)) : Array.from({length:6},(_,i)=>'Senior '+(i+1))).map(name => <option key={name} value={name}>{name}</option>)}</select></label><label>Stream (optional)<input value={classForm.section} onChange={e => setClassForm({ ...classForm, section: e.target.value })} placeholder="e.g. East, A, Arts or Sciences" /></label></div><div className="form-actions"><button type="button" className="secondary-button" onClick={() => setShowClassForm(false)}>Cancel</button><button className="primary-button" disabled={savingClass || !classForm.name.trim()}>{savingClass ? 'Saving...' : 'Save class'}</button></div></form>}
-              <div className="class-grid">{classes.map(item => <div className="class-card" key={item.id}><BookOpen size={22} /><strong>{item.name}</strong><span>{item.section || 'No stream'}</span></div>)}</div>
+              <div className="class-grid">{classes.map(item => <div className="class-card" key={item.id}><BookOpen size={22} /><strong>{item.name}</strong><span>{item.section || 'No stream'}</span><button type="button" className="secondary-button" disabled={deletingClassId===item.id} onClick={() => void deleteClass(item)}>{deletingClassId===item.id ? 'Removing...' : 'Remove class'}</button></div>)}</div>
               {classes.length === 0 && <EmptyState text="No classes have been added yet." />}
             </section>
           )}
