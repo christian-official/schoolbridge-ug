@@ -2257,6 +2257,8 @@ class SchoolProfileUpdate(BaseModel):
     a_level_combinations: str | None = None
     o_level_optional_subjects: str | None = None
     a_level_subsidiary_subjects: str | None = None
+    report_logo: str | None = Field(default=None, max_length=2_000_000)
+    report_template: str | None = Field(default=None, max_length=100_000)
 
 
 @app.get("/api/settings/school-profile", tags=["School Settings"])
@@ -2276,10 +2278,10 @@ def save_school_profile(data: SchoolProfileUpdate, db: Session = Depends(get_db)
     if profile is None:
         profile = models.SchoolProfile(id=1)
         db.add(profile)
-    for key, value in data.model_dump().items():
+    for key, value in data.model_dump(exclude_unset=True).items():
         setattr(profile, key, value)
     db.flush()
-    write_audit(db, admin, "school_profile_updated", "school_profile", profile.id, profile.name)
+    write_audit(db, admin, "school_profile_updated", "school_profile", profile.id, "School profile and report branding updated.")
     db.commit()
     db.refresh(profile)
     return {"message": "School profile saved.", "profile": profile}
