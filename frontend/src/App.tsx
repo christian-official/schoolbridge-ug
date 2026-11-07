@@ -982,13 +982,51 @@ function SubjectSettings({token,onSaved}:{token:string;onSaved:()=>void}) {
   const [subjects,setSubjects]=useState<any[]>([])
   const [name,setName]=useState('')
   const [code,setCode]=useState('')
+  const [error,setError]=useState('')
   const [message,setMessage]=useState('')
-  async function load(){try{setSubjects(await api<any[]>('subjects',token))}catch(e){setMessage(e instanceof Error?e.message:'Unable to load subjects.')}}
-  useEffect(()=>{void load()},[token])
-  async function add(e:React.FormEvent){e.preventDefault();setMessage('');try{await api('subjects',token,{method:'POST',body:JSON.stringify({name:name.trim(),code:code.trim()||null})});setName('');setCode('');setMessage('Subject added.');await load();onSaved()}catch(e){setMessage(e instanceof Error?e.message:'Unable to add subject.')}}
-  return <section className="panel settings-panel"><div className="panel-heading"><div><h2>School subjects</h2><p>Manage subjects used for examinations and teacher assignments.</p></div></div>{message&&<div className="success-notice">{message}</div>}<details className="form-disclosure"><summary>Add a school subject</summary><form className="student-form" onSubmit={add}><div className="student-form-grid"><label>Subject name *<input required value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Mathematics"/></label><label>Subject code<input value={code} onChange={e=>setCode(e.target.value)} placeholder="Optional code"/></label></div><div className="form-actions"><button className="primary-button">Add subject</button></div></form></details><div className="table-wrap"><table><thead><tr><th>Subject</th><th>Code</th></tr></thead><tbody>{subjects.map(subject=><tr key={subject.id}><td>{subject.name}</td><td>{subject.code||'—'}</td></tr>)}</tbody></table></div></section>
-}
+  const [loading,setLoading]=useState(true)
+  const [busy,setBusy]=useState(false)
 
+  async function load() {
+    setLoading(true);setError('')
+    try { setSubjects(await api<any[]>('subjects',token)) }
+    catch(e) { setError(e instanceof Error?e.message:'Unable to load subjects.') }
+    finally { setLoading(false) }
+  }
+  useEffect(()=>{void load()},[token])
+
+  async function add(e:React.FormEvent) {
+    e.preventDefault()
+    const subjectName=name.trim()
+    if(!subjectName){setError('Enter a subject name before saving.');return}
+    setBusy(true);setError('');setMessage('')
+    try {
+      await api('subjects',token,{method:'POST',body:JSON.stringify({name:subjectName,code:code.trim()||null})})
+      setName('');setCode('')
+      setMessage('Subject added successfully.')
+      await load()
+      onSaved()
+    } catch(e) {setError(e instanceof Error?e.message:'Unable to add subject.')}
+    finally {setBusy(false)}
+  }
+
+  return <section className="panel settings-panel">
+    <div className="panel-heading"><div><h2>School subjects</h2><p>Manage subjects used for examinations and teacher assignments.</p></div><button type="button" className="secondary-button" onClick={()=>void load()} disabled={loading||busy}>{loading?'Loading...':'Refresh subjects'}</button></div>
+    {error&&<div className="form-error" role="alert">{error}</div>}
+    {message&&<div className="success-notice" role="status">{message}</div>}
+    <details className="form-disclosure"><summary>Add a school subject</summary><form className="student-form" onSubmit={add}>
+      <div className="student-form-grid">
+        <label>Subject name *<input required maxLength={100} value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Mathematics"/></label>
+        <label>Subject code<input maxLength={30} value={code} onChange={e=>setCode(e.target.value)} placeholder="Optional code"/></label>
+      </div>
+      <div className="form-actions"><button className="primary-button" disabled={busy||loading}>{busy?'Saving...':'Add subject'}</button></div>
+    </form></details>
+    {loading?<p className="form-hint">Loading subjects...</p>:<div className="table-wrap"><table><thead><tr><th>Subject</th><th>Code</th></tr></thead><tbody>
+      {subjects.map(subject=><tr key={subject.id}><td>{subject.name}</td><td>{subject.code||'—'}</td></tr>)}
+      {!subjects.length&&<tr><td colSpan={2}>No subjects have been added yet.</td></tr>}
+    </tbody></table></div>}
+  </section>
+}
 
 type PrefectRow = {
   id: number; student_id: number; student_name: string; admission_number: string;
