@@ -433,9 +433,13 @@ def list_students(db: Session = Depends(get_db)):
 
 
 @app.post("/api/attendance", response_model=AttendanceOut, tags=["Attendance"])
-def record_attendance(data: AttendanceCreate, db: Session = Depends(get_db)):
-    if not db.get(models.Student, data.student_id):
+def record_attendance(data: AttendanceCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    student = db.get(models.Student, data.student_id)
+    if not student:
         raise HTTPException(404, "Student not found.")
+    if user.role != "admin":
+        if user.role != "teacher" or not db.query(models.TeacherAssignment).filter_by(teacher_id=user.id, class_id=student.class_id).first():
+            raise HTTPException(403, "You are not assigned to this student's class.")
     item = models.Attendance(**data.model_dump())
     db.add(item)
     try:
@@ -445,6 +449,7 @@ def record_attendance(data: AttendanceCreate, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(409, "Attendance has already been recorded for this student on that date.")
     return item
+
 
 
 @app.get("/api/attendance", response_model=list[AttendanceOut], tags=["Attendance"])
