@@ -791,6 +791,8 @@ def save_attendance_register(
                 status=entry.status,
             ))
         saved += 1
+    write_audit(db, user, "attendance_register_saved", "class", data.class_id,
+                f"{saved} student records; {data.attendance_date}")
     db.commit()
     return {
         "message": "Class attendance register saved.",
@@ -822,8 +824,10 @@ def staff_attendance_summary(
 ):
     selected_date = attendance_date or date.today()
     active_staff = db.query(models.StaffMember).filter(models.StaffMember.status == "active").all()
+    active_ids = [person.id for person in active_staff]
     rows = db.query(models.StaffAttendance).filter(
-        models.StaffAttendance.attendance_date == selected_date
+        models.StaffAttendance.attendance_date == selected_date,
+        models.StaffAttendance.staff_id.in_(active_ids or [-1]),
     ).all()
     counts = {status: sum(1 for row in rows if row.status == status)
               for status in ("Present", "Absent", "Late", "Excused")}
@@ -868,6 +872,8 @@ def save_staff_attendance_register(
                 status=entry.status,
                 notes=entry.notes,
             ))
+    write_audit(db, admin, "staff_attendance_register_saved", "staff_attendance", 0,
+                f"{len(staff_ids)} staff records; {data.attendance_date}")
     db.commit()
     return {"message": "Staff attendance register saved.", "attendance_date": data.attendance_date, "saved": len(staff_ids)}
 
@@ -932,6 +938,9 @@ def create_timetable_entry(
     item = models.TimetableEntry(**data.model_dump())
     db.add(item)
     try:
+        db.flush()
+        write_audit(db, admin, "timetable_entry_created", "timetable_entry", item.id,
+                    f"Class {data.class_id}; day {data.day_of_week}; {data.start_time}-{data.end_time}")
         db.commit()
         db.refresh(item)
     except IntegrityError:
@@ -949,6 +958,8 @@ def delete_timetable_entry(
     item = db.get(models.TimetableEntry, entry_id)
     if not item:
         raise HTTPException(404, "Timetable entry not found.")
+    write_audit(db, admin, "timetable_entry_removed", "timetable_entry", item.id,
+                f"Class {item.class_id}; day {item.day_of_week}; {item.start_time}-{item.end_time}")
     db.delete(item)
     db.commit()
     return {"message": "Timetable entry removed."}
