@@ -12,7 +12,7 @@ class SchoolClass(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(80), index=True)
-    section: Mapped[str] = mapped_column(String(40), default="General")
+    section: Mapped[str] = mapped_column(String(40), default="")
 
 
 class Subject(Base):
