@@ -36,6 +36,9 @@ export default function AcademicManagement({ token, classes }: { token: string; 
   const [marks, setMarks] = useState<Mark[]>([])
   const [gradingBands, setGradingBands] = useState<GradeBand[]>([])
   const [draftBands, setDraftBands] = useState<GradeBand[]>([])
+  const [historyStudentId, setHistoryStudentId] = useState('')
+  const [historyMarks, setHistoryMarks] = useState<Mark[]>([])
+  const [historyError, setHistoryError] = useState('')
   const [selectedExamId, setSelectedExamId] = useState('')
   const [examForm, setExamForm] = useState({ name: '', class_id: '', term: 'Term 1', year: String(new Date().getFullYear()) })
   const [markForm, setMarkForm] = useState({ student_id: '', subject_id: '', score: '' })
@@ -95,6 +98,22 @@ export default function AcademicManagement({ token, classes }: { token: string; 
     })
     return () => { cancelled = true }
   }, [selectedExamId, token, selectedExam?.class_id])
+
+  useEffect(() => {
+    if (!historyStudentId) {
+      setHistoryMarks([])
+      setHistoryError('')
+      return
+    }
+    let cancelled = false
+    setHistoryError('')
+    request<Mark[]>(`marks?student_id=${historyStudentId}`, token).then(rows => {
+      if (!cancelled) setHistoryMarks(rows)
+    }).catch(e => {
+      if (!cancelled) setHistoryError(e instanceof Error ? e.message : 'Unable to load student academic history.')
+    })
+    return () => { cancelled = true }
+  }, [historyStudentId, token])
 
   const studentById = useMemo(() => new Map(students.map(student => [student.id, student])), [students])
   const subjectById = useMemo(() => new Map(subjects.map(subject => [subject.id, subject])), [subjects])
@@ -204,6 +223,14 @@ export default function AcademicManagement({ token, classes }: { token: string; 
   }
 
   const selectedClass = classes.find(item => item.id === selectedExam?.class_id)
+  const historyStudent = students.find(student => String(student.id) === historyStudentId)
+  const historyRows = historyMarks.map(mark => ({
+    ...mark,
+    exam: exams.find(exam => exam.id === mark.exam_id),
+    subject: subjects.find(subject => subject.id === mark.subject_id),
+    grade: gradingBands.find(band => mark.score >= band.min_score && (mark.score < band.max_score || band.max_score === 100))?.grade || '—',
+  })).sort((a, b) => (b.exam?.year || 0) - (a.exam?.year || 0) || (a.exam?.term || '').localeCompare(b.exam?.term || ''))
+  const historyAverage = historyMarks.length ? historyMarks.reduce((sum, mark) => sum + mark.score, 0) / historyMarks.length : 0
 
   return <div className="academic-workspace">
     <section className="panel">
@@ -296,6 +323,28 @@ export default function AcademicManagement({ token, classes }: { token: string; 
             <button className="primary-button" disabled={saving || !draftBands.length}>{saving ? 'Saving...' : 'Save grading scale'}</button>
           </div>
         </form>
+      </section>
+      <section className="panel">
+        <div className="panel-heading"><div><h2>Student report card and academic history</h2><p>Review this student's results across examinations and print the report card. Use the browser print option to save as PDF.</p></div><button type="button" className="secondary-button" disabled={!historyStudentId||!historyRows.length} onClick={() => window.print()}><Printer size={15}/> Print report card</button></div>
+        <label className="academic-exam-select">Student
+          <select value={historyStudentId} onChange={e => setHistoryStudentId(e.target.value)}>
+            <option value="">Choose a student</option>
+            {students.map(student => <option key={student.id} value={student.id}>{studentName(student)} · {student.admission_number}</option>)}
+          </select>
+        </label>
+        {historyError && <div className="form-error" role="alert">{historyError}</div>}
+        {historyStudent && <>
+          <div className="panel-heading"><div><h3>{studentName(historyStudent)}</h3><p>Admission number: {historyStudent.admission_number}</p></div></div>
+          <div className="stats-grid finance-stats">
+            <div className="stat-card"><span>Assessments recorded</span><strong className="stat-value">{historyMarks.length}</strong></div>
+            <div className="stat-card"><span>Overall average</span><strong className="stat-value">{historyAverage.toFixed(2)}%</strong></div>
+            <div className="stat-card"><span>Overall grade</span><strong className="stat-value">{gradingBands.find(band => historyAverage >= band.min_score && (historyAverage < band.max_score || band.max_score === 100))?.grade || '—'}</strong></div>
+          </div>
+          <div className="table-wrap"><table><thead><tr><th>Examination</th><th>Term / year</th><th>Subject</th><th>Score</th><th>Grade</th><th>Remark</th></tr></thead><tbody>
+            {historyRows.map(mark => <tr key={mark.id}><td>{mark.exam?.name || 'Archived examination'}</td><td>{mark.exam ? mark.exam.term + ' ' + mark.exam.year : '—'}</td><td>{mark.subject?.name || 'Unknown subject'}</td><td>{mark.score.toFixed(2)}</td><td>{mark.grade}</td><td>{gradingBands.find(band => band.grade === mark.grade)?.remark || '—'}</td></tr>)}
+            {!historyRows.length && <tr><td colSpan={6}>No academic history has been recorded for this student yet.</td></tr>}
+          </tbody></table></div>
+        </>}
       </section>
     </>}
     {!selectedExam && !loading && <section className="panel empty-state"><BookOpen size={32}/><h3>No examination selected</h3><p>Create an examination for a class to begin recording results.</p></section>}
