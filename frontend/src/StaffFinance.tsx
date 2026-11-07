@@ -31,6 +31,7 @@ export default function StaffFinance({token,active,classes=[]}:{token:string;act
   const [outstandingOnly,setOutstandingOnly]=useState(false)
   const [payment,setPayment]=useState({charge_id:'',amount:'',method:'Cash',reference:''})
   const [receipt,setReceipt]=useState<{receipt_number:string;charge:Charge;amount:number;method:string;date:string}|null>(null)
+  const [schoolProfile,setSchoolProfile]=useState<{name:string;phone?:string;email?:string;address?:string}>({name:'SchoolBridge'})
 
   useEffect(()=>{
     if(active!=='Staff' && active!=='Fees & Finance') return
@@ -43,7 +44,7 @@ export default function StaffFinance({token,active,classes=[]}:{token:string;act
     const [s,c]=await Promise.all([request<Summary>('finance/summary',token),request<Charge[]>('finance/charges?search='+encodeURIComponent(feeSearch)+'&class_id='+encodeURIComponent(feeClass)+'&outstanding_only='+String(outstandingOnly),token)])
     setSummary(s);setCharges(c)
   }
-  useEffect(()=>{if(active==='Fees & Finance') refreshFinance().catch(e=>setMessage(e.message))},[active,feeSearch,feeClass,outstandingOnly,token])
+  useEffect(()=>{if(active==='Fees & Finance'){refreshFinance().catch(e=>setMessage(e.message));request<any>('settings/school-profile',token).then(setSchoolProfile).catch(()=>{})}},[active,feeSearch,feeClass,outstandingOnly,token])
 
   async function addStaff(e:FormEvent){
     e.preventDefault();setMessage('')
@@ -115,7 +116,7 @@ export default function StaffFinance({token,active,classes=[]}:{token:string;act
       <label>Payment method<select value={payment.method} onChange={e=>setPayment({...payment,method:e.target.value})}><option>Cash</option><option>Bank</option><option>Mobile Money</option><option>Cheque</option></select></label>
       <label>Reference / receipt number<input value={payment.reference} onChange={e=>setPayment({...payment,reference:e.target.value})}/></label>
     </div><div className="form-actions"><button className="primary-button" disabled={!charges.some(c=>c.balance>0)}>Record payment</button></div></form>
-    {receipt&&<section className="panel receipt-print"><div className="panel-heading"><div><h2>Payment receipt</h2><p>SchoolBridge fee payment confirmation</p></div><button className="secondary-button" type="button" onClick={()=>window.print()}>Print receipt</button></div><div className="receipt-details"><strong>Receipt: {receipt.receipt_number}</strong><p>Student: {receipt.charge.student_name}</p><p>Admission number: {receipt.charge.admission_number}</p><p>Class: {receipt.charge.class_name||'—'} {receipt.charge.stream||''}</p><p>Fee: {receipt.charge.term} {receipt.charge.year}</p><p>Amount received: UGX {receipt.amount.toLocaleString()}</p><p>Payment method: {receipt.method}</p><p>Date: {receipt.date}</p></div></section>}
+    {receipt&&<section className="panel receipt-print"><div className="panel-heading"><div><h2>{schoolProfile.name||'SchoolBridge'}</h2><p>Official fee payment receipt · {schoolProfile.phone||''} {schoolProfile.email||''}</p></div><button className="secondary-button" type="button" onClick={()=>window.print()}>Print receipt</button></div><div className="receipt-details"><strong>Receipt: {receipt.receipt_number}</strong><p>Student: {receipt.charge.student_name}</p><p>Admission number: {receipt.charge.admission_number}</p><p>Class: {receipt.charge.class_name||'—'} {receipt.charge.stream||''}</p><p>Fee: {receipt.charge.term} {receipt.charge.year}</p><p>Amount received: UGX {receipt.amount.toLocaleString()}</p><p>Payment method: {receipt.method}</p><p>Date: {receipt.date}</p></div></section>}
     <div className="panel-heading"><div><h2>Record staff salary payment</h2><p>Recorded salary payments contribute to school expenses.</p></div></div>
     <form className="student-form" onSubmit={saveSalaryPayment}><div className="student-form-grid"><label>Staff member<select required value={salaryForm.staff_id} onChange={e=>setSalaryForm({...salaryForm,staff_id:e.target.value})}><option value="">Select staff member</option>{staff.filter(x=>x.status!=='archived').map(x=><option key={x.id} value={x.id}>{x.first_name} {x.last_name} · {x.staff_number}</option>)}</select></label><label>Amount (UGX)<input required type="number" min="1" value={salaryForm.amount} onChange={e=>setSalaryForm({...salaryForm,amount:e.target.value})}/></label><label>Salary period<input required placeholder="e.g. November 2026" value={salaryForm.period} onChange={e=>setSalaryForm({...salaryForm,period:e.target.value})}/></label><label>Reference<input value={salaryForm.reference} onChange={e=>setSalaryForm({...salaryForm,reference:e.target.value})}/></label></div><div className="form-actions"><button className="primary-button">Record salary payment</button></div></form>
     <div className="panel-heading"><div><h2>Record other school expense</h2></div></div>
