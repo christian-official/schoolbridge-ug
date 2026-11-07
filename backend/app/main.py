@@ -618,9 +618,16 @@ def upgrade_existing_database():
         "status": "VARCHAR(20) NOT NULL DEFAULT 'active'",
     }
     settings_columns = {c["name"] for c in inspector.get_columns("school_settings")} if "school_settings" in inspector.get_table_names() else set()
+    staff_columns = {c["name"] for c in inspector.get_columns("staff_members")} if "staff_members" in inspector.get_table_names() else set()
+    payment_columns = {c["name"] for c in inspector.get_columns("fee_payments")} if "fee_payments" in inspector.get_table_names() else set()
     with engine.begin() as connection:
         for name, sql_type in additions.items():
             if name not in existing: connection.execute(text("ALTER TABLE students ADD COLUMN " + name + " " + sql_type))
+        if "staff_members" in inspector.get_table_names():
+            if "salary_amount" not in staff_columns: connection.execute(text("ALTER TABLE staff_members ADD COLUMN salary_amount INTEGER"))
+            if "salary_frequency" not in staff_columns: connection.execute(text("ALTER TABLE staff_members ADD COLUMN salary_frequency VARCHAR(20) NOT NULL DEFAULT 'Monthly'"))
+        if "fee_payments" in inspector.get_table_names() and "receipt_number" not in payment_columns:
+            connection.execute(text("ALTER TABLE fee_payments ADD COLUMN receipt_number VARCHAR(50)"))
         if "school_settings" in inspector.get_table_names():
             if "academic_year" not in settings_columns:
                 connection.execute(text("ALTER TABLE school_settings ADD COLUMN academic_year INTEGER"))
@@ -693,11 +700,11 @@ def record_fee_payment(data: FeePaymentCreate, db: Session = Depends(get_db)):
     paid = db.query(func.coalesce(func.sum(models.FeePayment.amount), 0)).filter(models.FeePayment.charge_id == charge.id).scalar() or 0
     if data.amount > charge.amount - paid:
         raise HTTPException(400, "Payment exceeds the outstanding balance.")
-    item = models.FeePayment(**data.model_dump())
+    item = models.FeePayment(**data.model_dump(), receipt_number="RCPT-" + str(date.today().year) + "-" + uuid4().hex[:8].upper())
     db.add(item)
     db.commit()
     db.refresh(item)
-    return {"id": item.id, "charge_id": item.charge_id, "amount": item.amount, "payment_date": item.payment_date, "method": item.method, "reference": item.reference}
+    return {"id": item.id, "charge_id": item.charge_id, "amount": item.amount, "payment_date": item.payment_date, "method": item.method, "reference": item.reference, "receipt_number": item.receipt_number}
 
 
 class ClassFeeUpdate(BaseModel):
@@ -836,3 +843,82 @@ def change_student_status(student_id: int, status: str, db: Session = Depends(ge
     student.status = status
     db.commit()
     return {"message": "Student status updated. Historical academic and financial records were retained.", "status": status}
+
+
+class StaffUpdate(BaseModel):
+    first_name: str | None = None
+    last_name: str | None = None
+    category: str | None = Field(default=None, pattern="^(Teaching|Non-teaching)$")
+    position: str | None = None
+    department: str | None = None
+    phone: str | None = None
+    email: str | None = None
+    salary_amount: int | None = Field(default=None, ge=0)
+    salary_frequency: str | None = Field(default=None, pattern="^(Monthly|Termly|Weekly|Daily)$")
+    status: str | None = Field(default=None, pattern="^(active|archived|inactive)$")
+
+
+class SalaryPaymentCreate(BaseModel):
+    staff_id: int
+    amount: int = Field(gt=0)
+    payment_date: date = Field(default_factory=date.today)
+    period: str = Field(min_length=2, max_length=40)
+    reference: str | None = Field(default=None, max_length=80)
+
+
+class OtherExpenseCreate(BaseModel):
+    description: str = Field(min_length=2, max_length=160)
+    category: str = Field(default="General", max_length=60)
+    amount: int = Field(gt=0)
+    expense_date: date = Field(default_factory=date.today)
+    reference: str | None = Field(default=None, max_length=80)
+
+
+@app.patch("/api/staff/{staff_id}", tags=["Staff"])
+def update_staff(staff_id: int, data: StaffUpdate, db: Session = Depends(get_db)):
+    staff = db.get(models.StaffMember, staff_id)
+    if not staff:
+        raise HTTPException(404, "Staff member not found.")
+    for key, value in data.model_dump(exclude_unset=True).items():
+        setattr(staff, key, value)
+    db.commit()
+    db.refresh(staff)
+    return {"message": "Staff profile updated.", "staff": staff}
+
+
+@app.post("/api/staff/{staff_id}/archive", tags=["Staff"])
+def archive_staff(staff_id: int, db: Session = Depends(get_db)):
+    staff = db.get(models.StaffMember, staff_id)
+    if not staff:
+        raise HTTPException(404, "Staff member not found.")
+    staff.status = "archived"
+    db.commit()
+    return {"message": "Staff member archived. Historical salary records were retained."}
+
+
+@app.post("/api/finance/salary-payments", tags=["Finance"])
+def record_salary_payment(data: SalaryPaymentCreate, db: Session = Depends(get_db)):
+    staff = db.get(models.StaffMember, data.staff_id)
+    if not staff:
+        raise HTTPException(404, "Staff member not found.")
+    payment = models.SalaryPayment(**data.model_dump())
+    db.add(payment)
+    db.commit()
+    db.refresh(payment)
+    return {"id": payment.id, "staff_id": payment.staff_id, "amount": payment.amount, "payment_date": payment.payment_date, "period": payment.period}
+
+
+@app.post("/api/finance/other-expenses", tags=["Finance"])
+def record_other_expense(data: OtherExpenseCreate, db: Session = Depends(get_db)):
+    expense = models.OtherExpense(**data.model_dump())
+    db.add(expense)
+    db.commit()
+    db.refresh(expense)
+    return expense
+
+
+@app.get("/api/finance/expenses", tags=["Finance"])
+def finance_expenses(db: Session = Depends(get_db)):
+    salary_total = db.query(func.coalesce(func.sum(models.SalaryPayment.amount), 0)).scalar() or 0
+    other_total = db.query(func.coalesce(func.sum(models.OtherExpense.amount), 0)).scalar() or 0
+    return {"salary_expenses": int(salary_total), "other_expenses": int(other_total), "total_expenses": int(salary_total + other_total)}
