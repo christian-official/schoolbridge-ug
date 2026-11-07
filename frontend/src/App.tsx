@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Users, GraduationCap, BookOpen,
   FileText, Settings, LogOut,
   Search, Bell, Plus, Menu, X, ArrowUpRight, UserPlus,
-  CalendarDays, TrendingUp, ShieldCheck, LoaderCircle, Wallet,
+  CalendarDays, TrendingUp, ShieldCheck, LoaderCircle, Wallet, RefreshCw,
 } from 'lucide-react'
 import StaffFinance from './StaffFinance'
 import './App.css'
@@ -74,6 +74,7 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [active, setActive] = useState('Overview')
   const [refreshKey, setRefreshKey] = useState(0)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const [settingsSection, setSettingsSection] = useState('home')
   const [students, setStudents] = useState<RecordItem[]>([])
   const [studentTotal, setStudentTotal] = useState(0)
@@ -129,6 +130,19 @@ function App() {
       setStaffTotal(staffData.total)
     } catch {
       setDataError('Some school records could not be loaded. Check your connection and permissions.')
+    }
+  }
+
+  async function refreshWorkspace() {
+    if (isRefreshing) return
+    setIsRefreshing(true)
+    setDataError('')
+    setRefreshKey(value => value + 1)
+    try {
+      await loadSchoolData(token)
+      if (active === 'Students') await loadStudentPage(1, search)
+    } finally {
+      setIsRefreshing(false)
     }
   }
 
@@ -393,7 +407,10 @@ function App() {
           <button className="mobile-menu-button" onClick={() => setMobileMenu(true)}><Menu /></button>
           <div className="breadcrumb">School workspace <span>/</span> <strong>{active}</strong></div>
           <div className="top-actions">
-            <button className="secondary-button refresh-button" type="button" onClick={() => { void loadSchoolData(token); if (active === 'Students') void loadStudentPage(1, search); setRefreshKey(value => value + 1) }}>Refresh</button>
+            <button className="secondary-button refresh-button" type="button" onClick={() => void refreshWorkspace()} disabled={isRefreshing} aria-live="polite">
+              {isRefreshing ? <LoaderCircle className="spin" size={15} /> : <RefreshCw size={15} />}
+              {isRefreshing ? 'Refreshing...' : 'Refresh'}
+            </button>
             <span className="online-status"><i /> System online</span>
             <button className="icon-button" title="Notifications"><Bell size={19} /></button>
             <div className="top-avatar">{user.username.slice(0, 1).toUpperCase()}</div>
