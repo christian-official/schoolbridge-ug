@@ -775,7 +775,7 @@ function AcademicSettings({token,onSaved}:{token:string;onSaved:()=>void}) {
 type TeacherAssignment = {assignment_id:number;class_id:number;class:string;subject_id:number;subject:string}
 type TeacherStudent = {id:number;first_name:string;last_name:string;admission_number:string;class_id:number}
 type TeacherExam = {id:number;name:string;term:string;year:number;class_id:number|null}
-type TeacherMark = {id:number;student_id:number;subject_id:number;exam_id:number;score:number;student_name:string;admission_number:string;class_id:number|null}
+type TeacherMark = {id:number;student_id:number;subject_id:number;exam_id:number;score:number;verified:boolean;student_name:string;admission_number:string;class_id:number|null}
 
 function TeacherWorkspace({token,active}:{token:string;active:string}) {
   const [assignments,setAssignments]=useState<TeacherAssignment[]>([])
@@ -859,8 +859,8 @@ function TeacherWorkspace({token,active}:{token:string;active:string}) {
           </div>
           <div className="form-actions"><button className="primary-button" disabled={resultSaving||!assignedSubjects.length||!resultStudents.length}>{resultSaving?'Saving...':'Save mark'}</button></div>
         </form>
-        <div className="table-wrap"><table><thead><tr><th>Student</th><th>Admission number</th><th>Subject</th><th>Score</th><th>Action</th></tr></thead><tbody>
-          {resultMarks.filter(mark=>assignedSubjects.some(row=>row.subject_id===mark.subject_id)).map(mark=><tr key={mark.id}><td>{mark.student_name}</td><td>{mark.admission_number}</td><td>{assignedSubjects.find(row=>row.subject_id===mark.subject_id)?.subject}</td><td>{mark.score.toFixed(2)}</td><td><button type="button" className="secondary-button" onClick={()=>setResultForm({student_id:String(mark.student_id),subject_id:String(mark.subject_id),score:String(mark.score)})}>Edit</button></td></tr>)}
+        <div className="table-wrap"><table><thead><tr><th>Student</th><th>Admission number</th><th>Subject</th><th>Score</th><th>Verification</th><th>Action</th></tr></thead><tbody>
+          {resultMarks.filter(mark=>assignedSubjects.some(row=>row.subject_id===mark.subject_id)).map(mark=><tr key={mark.id}><td>{mark.student_name}</td><td>{mark.admission_number}</td><td>{assignedSubjects.find(row=>row.subject_id===mark.subject_id)?.subject}</td><td>{mark.score.toFixed(2)}</td><td>{mark.verified?'Verified':'Pending administrator review'}</td><td><button type="button" className="secondary-button" disabled={mark.verified} onClick={()=>setResultForm({student_id:String(mark.student_id),subject_id:String(mark.subject_id),score:String(mark.score)})}>{mark.verified?'Locked':'Edit'}</button></td></tr>)}
           {!resultMarks.length&&<tr><td colSpan={5}>No marks have been entered for this examination yet.</td></tr>}
         </tbody></table></div>
       </>}
