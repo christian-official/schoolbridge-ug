@@ -129,7 +129,7 @@ export default function StaffFinance({token,active,classes=[],refreshKey=0}:{tok
   }
 
   if(active==='Staff') return <section className="panel">
-    <div className="panel-heading"><div><h2>Staff directory</h2><p>{staffTotal} staff members · teaching and non-teaching</p></div><button className="primary-button add-student-button" onClick={()=>{setEditingStaff(null);setShowForm(v=>!v)}}><Plus size={16}/>{showForm?'Close form':'Add staff member'}</button></div>
+    <div className="panel-heading"><div><h2>Staff directory</h2><p>{staffTotal} staff members · teaching and non-teaching</p></div><button className="primary-button add-student-button" onClick={()=>{if(showForm){setShowForm(false);setEditingStaff(null)}else{setEditingStaff(null);setForm({first_name:'',last_name:'',category:'Teaching',position:'',department:'',phone:'',email:'',salary_amount:'',salary_frequency:'Monthly'});setMessage('');setShowForm(true)}}}><Plus size={16}/>{showForm?'Close form':'Add staff member'}</button></div>
     {message&&<div className="success-notice">{message}</div>}
     {showForm&&<form className="student-form registration-form" onSubmit={addStaff}>
       <div className="form-heading"><div><h3>{editingStaff?'Update staff profile':'Register a staff member'}</h3><p>Enter the employee's details. Fields marked * are compulsory.</p></div><span className="required-note">* Required</span></div>
