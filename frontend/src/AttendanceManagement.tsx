@@ -65,7 +65,7 @@ export default function AttendanceManagement({ token }: { token: string }) {
       setStatuses(() => {
         const next: Record<number, string> = {}
         students.filter(student => String(student.class_id) === selectedClass).forEach(student => {
-          next[student.id] = byStudent[student.id] || 'Present'
+          next[student.id] = byStudent[student.id] || ''
         })
         return next
       })
@@ -81,6 +81,7 @@ export default function AttendanceManagement({ token }: { token: string }) {
 
   async function saveRegister() {
     if (!classId || !classStudents.length) return
+    if (classStudents.some(student => !statuses[student.id])) { setError('Select an attendance status for every student before saving the register.'); return }
     setSaving(true); setError(''); setMessage('')
     try {
       const result = await request<{ saved: number; message: string }>('attendance/register', token, {
@@ -88,7 +89,7 @@ export default function AttendanceManagement({ token }: { token: string }) {
         body: JSON.stringify({
           class_id: Number(classId),
           attendance_date: attendanceDate,
-          records: classStudents.map(student => ({ student_id: student.id, status: statuses[student.id] || 'Present' })),
+          records: classStudents.map(student => ({ student_id: student.id, status: statuses[student.id] })),
         }),
       })
       setMessage(`${result.saved} student attendance records saved for ${attendanceDate}.`)
@@ -144,7 +145,7 @@ export default function AttendanceManagement({ token }: { token: string }) {
               <td>{student.first_name} {student.last_name}</td>
               <td>{student.admission_number}</td>
               <td><div className="attendance-choice-group" role="group" aria-label={`Attendance for ${student.first_name} ${student.last_name}`}>
-                {(['Present', 'Absent', 'Late', 'Excused'] as const).map(status => <button key={status} type="button" className={`attendance-choice attendance-${status.toLowerCase()} ${((statuses[student.id] || 'Present') === status) ? 'selected' : ''}`} aria-pressed={(statuses[student.id] || 'Present') === status} onClick={() => setStatuses(current => ({ ...current, [student.id]: status }))}>{status}</button>)}
+                {(['Present', 'Absent', 'Late', 'Excused'] as const).map(status => <button key={status} type="button" className={`attendance-choice attendance-${status.toLowerCase()} ${(statuses[student.id] === status) ? 'selected' : ''}`} aria-pressed={(statuses[student.id] || 'Present') === status} onClick={() => setStatuses(current => ({ ...current, [student.id]: status }))}>{status}</button>)}
               </div></td>
             </tr>)}</tbody>
           </table>
