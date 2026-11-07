@@ -155,7 +155,7 @@ export default function AcademicManagement({ token, classes }: { token: string; 
       .map((result, index, rows) => ({
         ...result,
         position: index + 1 - rows.slice(0, index).filter(previous =>
-          Number(previous.average.toFixed(2)) === Number(Math.round(result.average))
+          Math.round(previous.average) === Math.round(result.average)
         ).length,
       }))
   }, [marks, gradingBands])
