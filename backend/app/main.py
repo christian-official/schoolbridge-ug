@@ -867,55 +867,47 @@ def get_class_fees(class_id: int, year: int | None = None, db: Session = Depends
 
 @app.put("/api/classes/{class_id}/fees", tags=["Classes"])
 def save_class_fee(class_id: int, data: ClassFeeUpdate, db: Session = Depends(get_db), admin=Depends(require_admin)):
-    if not db.get(models.SchoolClass, class_id):
+    selected_class = db.get(models.SchoolClass, class_id)
+    if not selected_class:
         raise HTTPException(404, "Class not found.")
-    row = db.query(models.ClassFee).filter_by(
-        class_id=class_id, term=data.term, year=data.year
-    ).first()
-    if row is None:
-        row = models.ClassFee(class_id=class_id, **data.model_dump())
-        db.add(row)
-    else:
-        row.amount = data.amount
-    settings = get_or_create_school_settings(db)
+    # Streams under the same grade share one standard term fee.
+    grade_classes = db.query(models.SchoolClass).filter(
+        models.SchoolClass.name == selected_class.name
+    ).all()
     created = 0
-    if settings.active_term == data.term and (settings.academic_year or date.today().year) == data.year:
-        active_students = db.query(models.Student).filter_by(class_id=class_id, status="active").all()
-        for student in active_students:
-            existing = db.query(models.FeeCharge).filter_by(
-                student_id=student.id, term=data.term, year=data.year
-            ).first()
-            if existing is None and data.amount > 0:
-                db.add(models.FeeCharge(student_id=student.id, term=data.term, year=data.year, amount=data.amount))
-                created += 1
+    for grade_class in grade_classes:
+        row = db.query(models.ClassFee).filter_by(
+            class_id=grade_class.id, term=data.term, year=data.year
+        ).first()
+        if row is None:
+            row = models.ClassFee(class_id=grade_class.id, **data.model_dump())
+            db.add(row)
+            db.flush()
+        else:
+            row.amount = data.amount
+        settings = get_or_create_school_settings(db)
+        if settings.active_term == data.term and (settings.academic_year or date.today().year) == data.year:
+            active_students = db.query(models.Student).filter_by(
+                class_id=grade_class.id, status="active"
+            ).all()
+            for student in active_students:
+                existing = db.query(models.FeeCharge).filter_by(
+                    student_id=student.id, term=data.term, year=data.year
+                ).first()
+                if existing is None and data.amount > 0:
+                    db.add(models.FeeCharge(
+                        student_id=student.id, term=data.term,
+                        year=data.year, amount=data.amount
+                    ))
+                    created += 1
     db.flush()
-    write_audit(db, admin, "class_fee_updated", "class_fee", row.id,
-                f"Class {class_id}; {data.term} {data.year}; UGX {data.amount}")
+    write_audit(db, admin, "class_fee_updated", "class_fee", class_id,
+                f"Grade {selected_class.name}; {data.term} {data.year}; UGX {data.amount}")
     db.commit()
-    db.refresh(row)
-    return {"message": "Class fee saved. Existing charges were not changed.",
-            "class_id": class_id, "term": row.term, "year": row.year,
-            "amount": row.amount, "charges_created": created}
-
-
-class StudentUpdate(BaseModel):
-    first_name: str | None = None
-    middle_name: str | None = None
-    last_name: str | None = None
-    gender: str | None = None
-    date_of_birth: date | None = None
-    religion: str | None = None
-    nationality: str | None = None
-    phone: str | None = None
-    address: str | None = None
-    guardian_name: str | None = None
-    guardian_relationship: str | None = None
-    guardian_phone: str | None = None
-    previous_school: str | None = None
-    admission_date: date | None = None
-    class_id: int | None = None
-    status: str | None = Field(default=None, pattern="^(active|transferred|dismissed|inactive)$")
-
+    return {"message": "Class fee saved for all streams. Existing charges were not changed.",
+            "class_id": class_id, "term": data.term, "year": data.year,
+            "amount": data.amount, "streams_updated": len(grade_classes),
+            "charges_created": created}
 
 @app.get("/api/students/{student_id}/profile", tags=["Students"])
 def student_profile(student_id: int, db: Session = Depends(get_db)):
