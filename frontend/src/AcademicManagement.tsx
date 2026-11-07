@@ -134,7 +134,6 @@ export default function AcademicManagement({ token, classes }: { token: string; 
   }, [historyStudentId, token])
 
   const studentById = useMemo(() => new Map(students.map(student => [student.id, student])), [students])
-  const subjectById = useMemo(() => new Map(subjects.map(subject => [subject.id, subject])), [subjects])
   const results = useMemo(() => {
     const totals = new Map<number, { total: number; count: number }>()
     for (const mark of marks) {
