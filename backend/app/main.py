@@ -444,6 +444,24 @@ def list_students(db: Session = Depends(get_db)):
     return db.query(models.Student).order_by(models.Student.last_name).all()
 
 
+def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
+):
+    try:
+        payload = jwt.decode(
+            token, JWT_SECRET, algorithms=[JWT_ALGORITHM]
+        )
+        user_id = int(payload["sub"])
+    except (InvalidTokenError, ValueError, KeyError):
+        raise HTTPException(401, "Invalid or expired login token.")
+
+    user = db.get(models.User, user_id)
+    if not user or not user.is_active:
+        raise HTTPException(401, "Account is unavailable.")
+    return user
+
+
 @app.post("/api/attendance", response_model=AttendanceOut, tags=["Attendance"])
 def record_attendance(data: AttendanceCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
     student = db.get(models.Student, data.student_id)
@@ -738,24 +756,6 @@ def create_access_token(user):
         "exp": expires,
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
-
-
-def get_current_user(
-    token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db),
-):
-    try:
-        payload = jwt.decode(
-            token, JWT_SECRET, algorithms=[JWT_ALGORITHM]
-        )
-        user_id = int(payload["sub"])
-    except (InvalidTokenError, ValueError, KeyError):
-        raise HTTPException(401, "Invalid or expired login token.")
-
-    user = db.get(models.User, user_id)
-    if not user or not user.is_active:
-        raise HTTPException(401, "Account is unavailable.")
-    return user
 
 
 def require_admin(user=Depends(get_current_user)):
