@@ -697,7 +697,8 @@ def list_fee_charges(search: str = "", db: Session = Depends(get_db)):
     results = []
     for charge, student in query.order_by(models.FeeCharge.year.desc(), models.FeeCharge.term, models.Student.last_name).limit(500).all():
         paid = db.query(func.coalesce(func.sum(models.FeePayment.amount), 0)).filter(models.FeePayment.charge_id == charge.id).scalar() or 0
-        results.append({"id": charge.id, "student_id": student.id, "student_name": student.first_name + " " + student.last_name, "admission_number": student.admission_number, "term": charge.term, "year": charge.year, "amount": charge.amount, "paid": float(paid), "balance": float(charge.amount - paid)})
+        school_class = db.get(models.SchoolClass, student.class_id) if student.class_id else None
+        results.append({"id": charge.id, "student_id": student.id, "student_name": student.first_name + " " + student.last_name, "admission_number": student.admission_number, "class_name": school_class.name if school_class else "", "stream": school_class.section if school_class else "", "term": charge.term, "year": charge.year, "amount": charge.amount, "paid": float(paid), "balance": float(charge.amount - paid)})
     return results
 
 
