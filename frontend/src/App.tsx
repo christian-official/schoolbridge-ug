@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Users, GraduationCap, BookOpen,
   FileText, Settings, LogOut,
   Search, Plus, Menu, X, ArrowUpRight, UserPlus,
-  CalendarDays, TrendingUp, ShieldCheck, LoaderCircle, Wallet, RefreshCw,
+  CalendarDays, TrendingUp, ShieldCheck, LoaderCircle, Wallet, RefreshCw, Bell,
 } from 'lucide-react'
 import StaffFinance from './StaffFinance'
 import './App.css'
