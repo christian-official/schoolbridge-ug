@@ -167,6 +167,103 @@ def seed_demo_data_if_empty():
                 models.StaffMember(staff_number="DEMO-ST-002", first_name="Sarah", last_name="Instructor", category="Teaching", position="Subject Teacher", department="Sciences", status="active"),
                 models.StaffMember(staff_number="DEMO-ST-003", first_name="David", last_name="Accounts", category="Non-Teaching", position="Accounts Assistant", department="Finance", status="active"),
             ])
+        db.flush()
+
+        demo_students = db.query(models.Student).filter(
+            models.Student.admission_number.like("DEMO-%")
+        ).all()
+        demo_classes = db.query(models.SchoolClass).all()
+        current_year = date.today().year
+        active_term = "Term 1"
+
+        # Demo class fees and student charges (UGX), without touching real records.
+        for school_class in demo_classes:
+            class_fee = db.query(models.ClassFee).filter_by(
+                class_id=school_class.id, term=active_term, year=current_year
+            ).first()
+            if class_fee is None:
+                class_fee = models.ClassFee(
+                    class_id=school_class.id, term=active_term,
+                    year=current_year, amount=650000
+                )
+                db.add(class_fee)
+        db.flush()
+
+        for index, student in enumerate(demo_students, start=1):
+            charge = db.query(models.FeeCharge).filter_by(
+                student_id=student.id, term=active_term, year=current_year
+            ).first()
+            if charge is None:
+                charge = models.FeeCharge(
+                    student_id=student.id, term=active_term,
+                    year=current_year, amount=650000,
+                    description="DEMO tuition fees"
+                )
+                db.add(charge)
+                db.flush()
+            if index % 2 == 1 and not db.query(models.FeePayment).filter_by(charge_id=charge.id).first():
+                db.add(models.FeePayment(
+                    charge_id=charge.id,
+                    amount=250000,
+                    payment_date=date.today(),
+                    method="Cash",
+                    reference=f"DEMO-PAY-{index:03d}",
+                    received_by="Demo Accounts",
+                    receipt_number=f"DEMO-RCPT-{current_year}-{index:03d}",
+                ))
+
+        # Demo attendance for today, one record per sample learner.
+        for index, student in enumerate(demo_students):
+            if not db.query(models.Attendance).filter_by(
+                student_id=student.id, attendance_date=date.today()
+            ).first():
+                db.add(models.Attendance(
+                    student_id=student.id,
+                    attendance_date=date.today(),
+                    status="Absent" if index % 7 == 6 else ("Late" if index % 5 == 4 else "Present"),
+                ))
+
+        # Demo exams, marks and a usable grading scale.
+        demo_subjects = db.query(models.Subject).filter(
+            models.Subject.school_type == school_type
+        ).order_by(models.Subject.id).all()
+        for school_class in demo_classes:
+            exam = db.query(models.Exam).filter_by(
+                name="DEMO End of Term Assessment",
+                term=active_term, year=current_year,
+                class_id=school_class.id
+            ).first()
+            if exam is None:
+                exam = models.Exam(
+                    name="DEMO End of Term Assessment",
+                    term=active_term, year=current_year,
+                    class_id=school_class.id
+                )
+                db.add(exam)
+                db.flush()
+            class_students = [s for s in demo_students if s.class_id == school_class.id]
+            for student in class_students:
+                for subject_index, subject in enumerate(demo_subjects[:4]):
+                    if db.query(models.Mark).filter_by(
+                        student_id=student.id, subject_id=subject.id, exam_id=exam.id
+                    ).first():
+                        continue
+                    db.add(models.Mark(
+                        student_id=student.id,
+                        subject_id=subject.id,
+                        exam_id=exam.id,
+                        score=float(55 + ((student.id * 7 + subject_index * 9) % 41)),
+                        verified=True,
+                    ))
+
+        if db.query(models.GradeBand).count() == 0:
+            db.add_all([
+                models.GradeBand(grade="A", min_score=80, max_score=100, remark="Excellent"),
+                models.GradeBand(grade="B", min_score=70, max_score=79.99, remark="Very good"),
+                models.GradeBand(grade="C", min_score=60, max_score=69.99, remark="Good"),
+                models.GradeBand(grade="D", min_score=50, max_score=59.99, remark="Fair"),
+                models.GradeBand(grade="E", min_score=0, max_score=49.99, remark="Needs improvement"),
+            ])
         db.commit()
     except Exception:
         db.rollback()
