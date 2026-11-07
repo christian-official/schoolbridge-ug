@@ -61,7 +61,7 @@ app.add_middleware(
 
 class ClassCreate(BaseModel):
     name: str = Field(min_length=1, max_length=80)
-    section: str = Field(min_length=1, max_length=40)
+    section: str = Field(default="", max_length=40)
 
 
 class SubjectCreate(BaseModel):
@@ -235,9 +235,9 @@ def health_check():
 
 @app.post("/api/classes", response_model=ClassOut, tags=["Classes"])
 def create_class(data: ClassCreate, db: Session = Depends(get_db)):
-    if not data.name.strip() or not data.section.strip():
-        raise HTTPException(422, "Enter both a class name and a stream name. A General stream is not created automatically.")
-    item = models.SchoolClass(name=data.name.strip(), section=data.section.strip())
+    if not data.name.strip():
+        raise HTTPException(422, "Enter a class name.")
+    item = models.SchoolClass(name=data.name.strip(), section=(data.section or "").strip())
     db.add(item)
     try:
         db.commit()
@@ -276,10 +276,10 @@ def create_student(data: StudentCreate, db: Session = Depends(get_db)):
     if not data.first_name.strip() or not data.last_name.strip():
         raise HTTPException(422, "Enter the student's full name before registering.")
     if data.class_id is None:
-        raise HTTPException(422, "Select a class and stream before registering the student.")
+        raise HTTPException(422, "Select a class before registering the student.")
     selected_class = db.get(models.SchoolClass, data.class_id)
     if not selected_class:
-        raise HTTPException(404, "Choose a valid class and stream.")
+        raise HTTPException(404, "Choose a valid class.")
     profile = db.get(models.SchoolProfile, 1)
     school_type = profile.school_type if profile else "Secondary"
     class_label = re.sub(r"[\s._-]+", "", selected_class.name.lower())
