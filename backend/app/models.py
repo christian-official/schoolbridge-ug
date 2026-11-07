@@ -8,10 +8,11 @@ from .database import Base
 
 class SchoolClass(Base):
     __tablename__ = "classes"
+    __table_args__ = (UniqueConstraint("name", "section", name="uq_classes_name_section"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(80), unique=True, index=True)
-    section: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    name: Mapped[str] = mapped_column(String(80), index=True)
+    section: Mapped[str] = mapped_column(String(40), default="General")
 
 
 class Subject(Base):
