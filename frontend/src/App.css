@@ -168,3 +168,17 @@ td strong { color: #34445e; font-size: 11px; }
 .pagination-row > div { display:flex; gap:8px; }
 .finance-stats { grid-template-columns:repeat(3,minmax(0,1fr)); margin:0 0 22px; }
 @media(max-width:700px) { .pagination-row { align-items:flex-start; flex-direction:column; } .student-tools .search-box { max-width:none; width:100%; } .finance-stats { grid-template-columns:1fr; } }
+
+
+.settings-hub { background:#fff; border:1px solid var(--line); border-radius:12px; padding:24px; }
+.settings-category-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
+.settings-category { min-height:142px; display:grid; grid-template-columns:38px 1fr 18px; grid-template-rows:auto auto; align-items:center; column-gap:12px; row-gap:6px; text-align:left; padding:18px; border:1px solid var(--line); border-radius:11px; background:#fff; color:#34445e; cursor:pointer; }
+.settings-category:hover { border-color:#b9c8fa; background:#f8faff; }
+.settings-category-icon { grid-row:1 / span 2; width:38px; height:38px; display:grid; place-items:center; border-radius:10px; color:var(--blue); background:#edf2ff; }
+.settings-category strong { font-size:12px; align-self:end; }
+.settings-category small { color:#8d9aaf; font-size:10px; line-height:1.5; align-self:start; }
+.settings-category > svg { grid-column:3; grid-row:1 / span 2; width:16px; color:#9aa5b6; }
+.settings-detail { display:grid; gap:14px; }
+.settings-back { justify-self:start; border:0; background:transparent; color:var(--blue); font-size:12px; font-weight:700; padding:7px 0; cursor:pointer; }
+@media(max-width:900px) { .settings-category-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:520px) { .settings-category-grid { grid-template-columns:1fr; } .settings-hub { padding:16px; } }
