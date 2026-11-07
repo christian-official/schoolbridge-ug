@@ -460,3 +460,86 @@ def test_phase_one_staff_and_finance_workflow_end_to_end():
 
         archived = client.post(f"/api/staff/{staff_id}/archive", headers=headers)
         assert archived.status_code == 200, archived.text
+
+
+def test_class_scoped_exams_and_mark_correction():
+    reset_database()
+    admin = create_admin()
+    token = create_access_token(admin)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    db = SessionLocal()
+    try:
+        class_one = models.SchoolClass(name="Senior 3", section="East")
+        class_two = models.SchoolClass(name="Senior 3", section="West")
+        subject = models.Subject(name="Mathematics", code="MATH")
+        db.add_all([class_one, class_two, subject])
+        db.flush()
+        student_one = models.Student(
+            admission_number="SB-EXAM-001", first_name="Sarah",
+            last_name="Student", class_id=class_one.id,
+        )
+        student_two = models.Student(
+            admission_number="SB-EXAM-002", first_name="David",
+            last_name="Student", class_id=class_two.id,
+        )
+        db.add_all([student_one, student_two])
+        db.commit()
+        class_one_id, class_two_id = class_one.id, class_two.id
+        subject_id = subject.id
+        student_one_id, student_two_id = student_one.id, student_two.id
+    finally:
+        db.close()
+
+    with TestClient(app) as client:
+        payload = {
+            "name": "Mid-Term Assessment", "term": "Term 1",
+            "year": 2026, "class_id": class_one_id,
+        }
+        created = client.post("/api/exams", headers=headers, json=payload)
+        assert created.status_code == 200, created.text
+        exam_id = created.json()["id"]
+
+        duplicate = client.post("/api/exams", headers=headers, json=payload)
+        assert duplicate.status_code == 409
+
+        wrong_class_mark = client.post(
+            "/api/marks", headers=headers,
+            json={"student_id": student_two_id, "subject_id": subject_id, "exam_id": exam_id, "score": 75},
+        )
+        assert wrong_class_mark.status_code == 422
+
+        saved = client.post(
+            "/api/marks", headers=headers,
+            json={"student_id": student_one_id, "subject_id": subject_id, "exam_id": exam_id, "score": 68},
+        )
+        assert saved.status_code == 200, saved.text
+        mark_id = saved.json()["id"]
+
+        duplicate_mark = client.post(
+            "/api/marks", headers=headers,
+            json={"student_id": student_one_id, "subject_id": subject_id, "exam_id": exam_id, "score": 70},
+        )
+        assert duplicate_mark.status_code == 409
+
+        corrected = client.patch(
+            f"/api/marks/{mark_id}", headers=headers, json={"score": 91.5},
+        )
+        assert corrected.status_code == 200, corrected.text
+        assert corrected.json()["score"] == 91.5
+
+        exam_marks = client.get(f"/api/marks?exam_id={exam_id}", headers=headers)
+        assert exam_marks.status_code == 200
+        assert len(exam_marks.json()) == 1
+        assert exam_marks.json()[0]["score"] == 91.5
+
+        class_exams = client.get(
+            f"/api/exams?class_id={class_one_id}&year=2026", headers=headers,
+        )
+        assert class_exams.status_code == 200
+        assert [row["id"] for row in class_exams.json()] == [exam_id]
+        other_class_exams = client.get(
+            f"/api/exams?class_id={class_two_id}", headers=headers,
+        )
+        assert other_class_exams.status_code == 200
+        assert other_class_exams.json() == []
