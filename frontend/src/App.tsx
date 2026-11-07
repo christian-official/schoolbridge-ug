@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   LayoutDashboard, Users, GraduationCap, BookOpen,
-  ClipboardCheck, FileText, Settings, LogOut,
+  FileText, Settings, LogOut,
   Search, Bell, Plus, Menu, X, ArrowUpRight, UserPlus,
   CalendarDays, TrendingUp, ShieldCheck, LoaderCircle,
 } from 'lucide-react'
@@ -416,7 +416,6 @@ function App() {
 
 
           <StaffFinance token={token} active={active} />
-          {active === 'Attendance' && <ComingSoon title="Attendance management" description="Daily attendance records and summaries will appear here." />}
           {active === 'Examinations' && <ComingSoon title="Examinations and results" description="Exam setup, marks entry and student results will be managed here." />}
           {active === 'Settings' && settingsSection === 'home' && (
             <section className="settings-hub">
