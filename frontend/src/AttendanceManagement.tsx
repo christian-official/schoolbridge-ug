@@ -34,12 +34,18 @@ export default function AttendanceManagement({ token }: { token: string }) {
   async function load() {
     setLoading(true); setError('')
     try {
-      const [classRows, studentRows] = await Promise.all([
+      const [classRows, firstPage] = await Promise.all([
         request<SchoolClass[]>('classes', token),
-        request<{ items: Student[] }>('students/search?page=1&page_size=100', token),
+        request<{ items: Student[]; pages: number }>('students/search?page=1&page_size=100', token),
       ])
+      const remainingPages = await Promise.all(
+        Array.from({ length: Math.max(0, firstPage.pages - 1) }, (_, index) =>
+          request<{ items: Student[] }>(`students/search?page=${index + 2}&page_size=100`, token)
+        )
+      )
       setClasses(classRows)
-      setStudents(studentRows.items.filter(student => student.status === 'active' && student.class_id !== null))
+      setStudents([...firstPage.items, ...remainingPages.flatMap(page => page.items)]
+        .filter(student => student.status === 'active' && student.class_id !== null))
       if (!classId && classRows.length) setClassId(String(classRows[0].id))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to load class registers.')
