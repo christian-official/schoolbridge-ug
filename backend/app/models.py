@@ -111,6 +111,8 @@ class SchoolSettings(Base):
     admission_separator: Mapped[str] = mapped_column(String(5), default="-")
     admission_padding: Mapped[int] = mapped_column(Integer, default=4)
     next_admission_number: Mapped[int] = mapped_column(Integer, default=1)
+    academic_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    active_term: Mapped[str] = mapped_column(String(20), default="Term 1")
 
 class StaffMember(Base):
     __tablename__ = "staff_members"
