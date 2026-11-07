@@ -120,6 +120,8 @@ function App() {
   const [settingsSuccess, setSettingsSuccess] = useState('')
   const [savingSettings, setSavingSettings] = useState(false)
 
+  const [schoolConfig, setSchoolConfig] = useState<any>({ school_type: 'Primary', a_level_combinations: '', o_level_optional_subjects: '', a_level_subsidiary_subjects: '' })
+
   useEffect(()=>{if(token)api<any>('settings/school-profile',token).then(setSchoolConfig).catch(()=>{})},[token,active])
 
   async function loadSchoolData(authToken: string) {
