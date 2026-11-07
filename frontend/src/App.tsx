@@ -207,7 +207,7 @@ function App() {
           class_id: Number(studentForm.class_id),
           fee_amount: studentForm.fee_amount === '' ? null : Number(studentForm.fee_amount),
           academic_level: schoolConfig.school_type==='Secondary' ? selectedAcademicLevel || null : null,
-          combination: selectedAcademicLevel==='A-Level' ? studentForm.combination || null : null,
+          combination: selectedAcademicLevel==='A-Level' && studentForm.a_level_stream && studentForm.combination ? `${studentForm.a_level_stream} — ${studentForm.combination}` : null,
           optional_subjects: selectedAcademicLevel==='O-Level' ? studentForm.optional_subjects || null : null,
           subsidiary_subjects: selectedAcademicLevel==='A-Level' ? studentForm.subsidiary_subjects || null : null,
         }),
@@ -362,7 +362,7 @@ function App() {
   const filteredStudents = students
 
   const selectedClass = classes.find(item => String(item.id) === studentForm.class_id)
-  const className = (selectedClass?.name || '').toLowerCase().replace(/\s+/g, ' ').trim()
+  const className = (selectedClass?.name || '').toLowerCase().replace(/[.\s_-]/g, '')
   const selectedAcademicLevel = /^(s|senior\s*)[56]$/.test(className) || /senior\s*[56]/.test(className) ? 'A-Level' : /^(s|senior\s*)[1-4]$/.test(className) || /senior\s*[1-4]/.test(className) ? 'O-Level' : ''
   const [artsCombinations, sciencesCombinations] = (schoolConfig.a_level_combinations || '').split(/\r?\n/).reduce((groups: string[][], line: string) => { const match = line.match(/^(ARTS|SCIENCES)::(.*)$/i); if (match && match[2].trim()) groups[match[1].toUpperCase() === 'ARTS' ? 0 : 1].push(match[2].trim()); return groups }, [[], []])
 
