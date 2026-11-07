@@ -69,6 +69,7 @@ class Exam(Base):
     name: Mapped[str] = mapped_column(String(100))
     term: Mapped[str] = mapped_column(String(40))
     year: Mapped[int] = mapped_column(Integer)
+    class_id: Mapped[int | None] = mapped_column(ForeignKey("classes.id"), nullable=True, index=True)
 
 
 class Mark(Base):
