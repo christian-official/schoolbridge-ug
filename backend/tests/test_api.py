@@ -144,7 +144,7 @@ def test_admin_can_download_valid_sqlite_backup():
         )
 
     assert response.status_code == 200
-    assert response.content.startswith(b"SQLite format 3\\x00")
+    assert response.content.startswith(b"SQLite format 3\x00")
     assert "attachment" in response.headers.get("content-disposition", "")
 
 
