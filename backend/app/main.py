@@ -1214,9 +1214,10 @@ async def restore_database_backup(file: UploadFile = File(...), admin=Depends(re
         candidate = sqlite3.connect(uploaded_path)
         try:
             integrity = candidate.execute("PRAGMA integrity_check").fetchone()
+            foreign_key_errors = candidate.execute("PRAGMA foreign_key_check").fetchall()
             tables = {row[0] for row in candidate.execute("SELECT name FROM sqlite_master WHERE type='table'")}
             required = {"users", "students", "classes", "school_settings"}
-            if not integrity or integrity[0] != "ok" or not required.issubset(tables):
+            if not integrity or integrity[0] != "ok" or foreign_key_errors or not required.issubset(tables):
                 raise HTTPException(400, "This file is not a valid SchoolBridge database backup.")
         finally:
             candidate.close()
