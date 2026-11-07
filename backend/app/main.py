@@ -758,3 +758,81 @@ def save_class_fee(class_id: int, data: ClassFeeUpdate, db: Session = Depends(ge
     db.refresh(row)
     return {"message": "Class fee saved.", "class_id": class_id,
             "term": row.term, "year": row.year, "amount": row.amount}
+
+
+class StudentUpdate(BaseModel):
+    first_name: str | None = None
+    middle_name: str | None = None
+    last_name: str | None = None
+    gender: str | None = None
+    date_of_birth: date | None = None
+    religion: str | None = None
+    nationality: str | None = None
+    phone: str | None = None
+    address: str | None = None
+    guardian_name: str | None = None
+    guardian_relationship: str | None = None
+    guardian_phone: str | None = None
+    previous_school: str | None = None
+    admission_date: date | None = None
+    class_id: int | None = None
+    status: str | None = Field(default=None, pattern="^(active|transferred|dismissed|inactive)$")
+
+
+@app.get("/api/students/{student_id}/profile", tags=["Students"])
+def student_profile(student_id: int, db: Session = Depends(get_db)):
+    student = db.get(models.Student, student_id)
+    if not student:
+        raise HTTPException(404, "Student not found.")
+    charges = db.query(models.FeeCharge).filter_by(student_id=student_id).order_by(
+        models.FeeCharge.year.desc(), models.FeeCharge.term
+    ).all()
+    fee_history = []
+    for charge in charges:
+        payments = db.query(models.FeePayment).filter_by(charge_id=charge.id).order_by(
+            models.FeePayment.payment_date.desc(), models.FeePayment.id.desc()
+        ).all()
+        paid = sum(p.amount for p in payments)
+        fee_history.append({
+            "charge_id": charge.id, "term": charge.term, "year": charge.year,
+            "amount": charge.amount, "paid": paid, "balance": charge.amount-paid,
+            "payments": [{
+                "id": p.id, "amount": p.amount, "date": p.payment_date,
+                "method": p.method, "reference": p.reference
+            } for p in payments]
+        })
+    return {
+        "student": student,
+        "class": db.get(models.SchoolClass, student.class_id).name if student.class_id and db.get(models.SchoolClass, student.class_id) else None,
+        "fees": fee_history,
+        "total_charged": sum(x["amount"] for x in fee_history),
+        "total_paid": sum(x["paid"] for x in fee_history),
+        "total_balance": sum(x["balance"] for x in fee_history),
+    }
+
+
+@app.patch("/api/students/{student_id}", tags=["Students"])
+def update_student(student_id: int, data: StudentUpdate, db: Session = Depends(get_db)):
+    student = db.get(models.Student, student_id)
+    if not student:
+        raise HTTPException(404, "Student not found.")
+    changes = data.model_dump(exclude_unset=True)
+    if "class_id" in changes and changes["class_id"] is not None and not db.get(models.SchoolClass, changes["class_id"]):
+        raise HTTPException(404, "Class not found.")
+    for key, value in changes.items():
+        setattr(student, key, value)
+    db.commit()
+    db.refresh(student)
+    return {"message": "Student profile updated.", "student": student}
+
+
+@app.patch("/api/students/{student_id}/status", tags=["Students"])
+def change_student_status(student_id: int, status: str, db: Session = Depends(get_db)):
+    if status not in {"active", "transferred", "dismissed", "inactive"}:
+        raise HTTPException(422, "Status must be active, transferred, dismissed or inactive.")
+    student = db.get(models.Student, student_id)
+    if not student:
+        raise HTTPException(404, "Student not found.")
+    student.status = status
+    db.commit()
+    return {"message": "Student status updated. Historical academic and financial records were retained.", "status": status}
