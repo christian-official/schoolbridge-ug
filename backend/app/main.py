@@ -506,6 +506,11 @@ def verify_mark(mark_id: int, verified: bool, db: Session = Depends(get_db), adm
     if not item:
         raise HTTPException(404, "Mark record not found.")
     item.verified = verified
+    write_audit(
+        db, admin, "mark_verified" if verified else "mark_unlocked",
+        "mark", item.id,
+        f"exam={item.exam_id}; student={item.student_id}; subject={item.subject_id}",
+    )
     db.commit()
     db.refresh(item)
     return item
