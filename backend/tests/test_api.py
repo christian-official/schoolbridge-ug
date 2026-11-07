@@ -31,7 +31,7 @@ def create_admin():
         db.add(admin)
         db.commit()
         db.refresh(admin)
-        return SimpleNamespace(id=admin.id, role=admin.role)
+        return SimpleNamespace(id=admin.id, role=admin.role, username=admin.username)
     finally:
         db.close()
 
@@ -259,3 +259,80 @@ def test_admin_cannot_use_teacher_only_workspace():
         )
 
     assert response.status_code == 403
+
+
+
+def test_fee_payments_cannot_exceed_charge_and_balance_updates():
+    reset_database()
+    admin = create_admin()
+    token = create_access_token(admin)
+    db = SessionLocal()
+    try:
+        student = models.Student(
+            admission_number="SB-TEST-001",
+            first_name="Test",
+            last_name="Learner",
+        )
+        db.add(student)
+        db.commit()
+        db.refresh(student)
+        charge = models.FeeCharge(
+            student_id=student.id,
+            term="Term 1",
+            year=2026,
+            amount=100000,
+        )
+        db.add(charge)
+        db.commit()
+        db.refresh(charge)
+        charge_id = charge.id
+    finally:
+        db.close()
+
+    headers = {"Authorization": f"Bearer {token}"}
+    with TestClient(app) as client:
+        first = client.post(
+            "/api/finance/payments",
+            headers=headers,
+            json={"charge_id": charge_id, "amount": 75000},
+        )
+        overpayment = client.post(
+            "/api/finance/payments",
+            headers=headers,
+            json={"charge_id": charge_id, "amount": 30000},
+        )
+        final_payment = client.post(
+            "/api/finance/payments",
+            headers=headers,
+            json={"charge_id": charge_id, "amount": 25000},
+        )
+        payment_after_settlement = client.post(
+            "/api/finance/payments",
+            headers=headers,
+            json={"charge_id": charge_id, "amount": 1},
+        )
+        summary = client.get("/api/finance/summary", headers=headers)
+
+    assert first.status_code == 200
+    assert first.json()["receipt_number"].startswith("RCPT-")
+    assert overpayment.status_code == 400
+    assert final_payment.status_code == 200
+    assert payment_after_settlement.status_code == 400
+    assert summary.status_code == 200
+    assert summary.json()["fees_collected"] == 100000.0
+    assert summary.json()["outstanding"] == 0.0
+
+
+def test_fee_payment_amount_must_be_positive():
+    reset_database()
+    admin = create_admin()
+    token = create_access_token(admin)
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/finance/payments",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"charge_id": 1, "amount": 0},
+        )
+
+    assert response.status_code == 422
