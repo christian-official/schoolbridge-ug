@@ -6,8 +6,10 @@ type Page<T> = { items:T[]; total:number; page:number; pages:number }
 type Summary = { fees_expected:number; fees_collected:number; outstanding:number; salary_expenses?:number; other_expenses?:number; total_expenses?:number; net_cash_position?:number }
 type Charge = { id:number; student_id:number; student_name:string; admission_number:string; class_id?:number|null; class_name?:string; stream?:string; term:string; year:number; amount:number; paid:number; balance:number }
 
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
+
 async function request<T>(path:string, token:string, options:RequestInit={}):Promise<T> {
-  const response = await fetch('/api/'+path, { ...options, headers:{ Authorization:'Bearer '+token, ...(options.body?{'Content-Type':'application/json'}:{}), ...options.headers } })
+  const response = await fetch(`${API_BASE_URL}/api/${path}`, { ...options, headers:{ Authorization:'Bearer '+token, ...(options.body?{'Content-Type':'application/json'}:{}), ...options.headers } })
   const data = await response.json().catch(()=>({}))
   if(!response.ok) throw new Error(data.detail || 'Request failed')
   return data as T
