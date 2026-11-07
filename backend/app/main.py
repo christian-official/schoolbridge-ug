@@ -835,8 +835,17 @@ def save_staff_attendance_register(
 def list_timetable(
     class_id: int | None = None,
     db: Session = Depends(get_db),
+    user=Depends(get_current_user),
 ):
     query = db.query(models.TimetableEntry)
+    if user.role == "teacher":
+        assigned_class_ids = [
+            row.class_id for row in db.query(models.TeacherAssignment.class_id)
+            .filter_by(teacher_id=user.id).distinct().all()
+        ]
+        query = query.filter(models.TimetableEntry.class_id.in_(assigned_class_ids or [-1]))
+    elif user.role != "admin":
+        raise HTTPException(403, "Administrator or teacher permission required.")
     if class_id:
         query = query.filter(models.TimetableEntry.class_id == class_id)
     return query.order_by(
