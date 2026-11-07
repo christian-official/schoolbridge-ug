@@ -813,8 +813,30 @@ def update_academic_settings(data: AcademicSettingsUpdate, db: Session = Depends
     settings = get_or_create_school_settings(db)
     settings.academic_year = data.academic_year
     settings.active_term = data.active_term
+    db.flush()
+    created = 0
+    active_students = db.query(models.Student).filter(
+        models.Student.status == "active",
+        models.Student.class_id.is_not(None)
+    ).all()
+    for student in active_students:
+        class_fee = db.query(models.ClassFee).filter_by(
+            class_id=student.class_id, term=data.active_term, year=data.academic_year
+        ).first()
+        if not class_fee or class_fee.amount <= 0:
+            continue
+        existing = db.query(models.FeeCharge).filter_by(
+            student_id=student.id, term=data.active_term, year=data.academic_year
+        ).first()
+        if existing is None:
+            db.add(models.FeeCharge(
+                student_id=student.id, term=data.active_term,
+                year=data.academic_year, amount=class_fee.amount
+            ))
+            created += 1
     db.commit()
-    return {"message": "Academic settings saved.", **data.model_dump()}
+    return {"message": "Academic settings saved and class fees assigned to active students.",
+            **data.model_dump(), "charges_created": created}
 
 
 @app.get("/api/classes/{class_id}/fees", tags=["Classes"])
