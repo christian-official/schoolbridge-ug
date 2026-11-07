@@ -383,7 +383,7 @@ export default function AcademicManagement({ token, classes }: { token: string; 
           </div>
           <div className="table-wrap"><table><thead><tr><th>Examination</th><th>Term / year</th><th>Subject</th><th>Score</th><th>Grade</th><th>Remark</th></tr></thead><tbody>
             {historyRows.map(mark => <tr key={mark.id}><td>{mark.exam?.name || 'Archived examination'}</td><td>{mark.exam ? mark.exam.term + ' ' + mark.exam.year : '—'}</td><td>{mark.subject?.name || 'Unknown subject'}</td><td>{mark.score.toFixed(2)}</td><td>{mark.grade}</td><td>{gradingBands.find(band => band.grade === mark.grade)?.remark || '—'}</td></tr>)}
-            {!historyRows.length && <tr><td colSpan={6}>No academic history has been recorded for this student yet.</td></tr>}
+            {!historyRows.length && <tr><td colSpan={6}>{historyMarks.length ? 'No verified marks yet. Pending marks are excluded until an administrator verifies them.' : 'No academic history has been recorded for this student yet.'}</td></tr>}
           </tbody></table></div>
         </>}
       </section>
