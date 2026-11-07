@@ -76,6 +76,7 @@ function App() {
   const [settingsSection, setSettingsSection] = useState('home')
   const [students, setStudents] = useState<RecordItem[]>([])
   const [studentTotal, setStudentTotal] = useState(0)
+  const [staffTotal, setStaffTotal] = useState(0)
   const [financeSummary, setFinanceSummary] = useState<FinanceSummary>({ fees_expected: 0, fees_collected: 0, outstanding: 0 })
   const [studentPage, setStudentPage] = useState(1)
   const [studentClassFilter, setStudentClassFilter] = useState('')
@@ -111,11 +112,12 @@ function App() {
   async function loadSchoolData(authToken: string) {
     setDataError('')
     try {
-      const [studentData, classData, admissionData, financeData] = await Promise.all([
+      const [studentData, classData, admissionData, financeData, staffData] = await Promise.all([
         api<StudentPage>('students/search?page=1&page_size=25', authToken),
         api<RecordItem[]>('classes', authToken),
         api<AdmissionSettings>('settings/admission-number', authToken),
         api<FinanceSummary>('finance/summary', authToken),
+        api<{total:number}>('staff?search=&page=1&page_size=1', authToken),
       ])
       setStudents(studentData.items)
       setStudentTotal(studentData.total)
@@ -123,6 +125,7 @@ function App() {
       setClasses(classData)
       setAdmissionSettings(admissionData)
       setFinanceSummary(financeData)
+      setStaffTotal(staffData.total)
     } catch {
       setDataError('Some school records could not be loaded. Check your connection and permissions.')
     }
@@ -383,6 +386,7 @@ function App() {
             <>
               <section className="stats-grid">
                 <StatCard title="Total students" value={studentTotal} icon={<GraduationCap />} note="Registered students" />
+                <StatCard title="Total staff" value={staffTotal} icon={<Users />} note="Teaching and non-teaching" />
                 <StatCard title="Classes" value={classes.length} icon={<BookOpen />} note="School classes" />
                 <StatCard title="Fees expected" value={`UGX ${financeSummary.fees_expected.toLocaleString()}`} icon={<FileText />} note="Recorded term charges" />
                 <StatCard title="Fees collected" value={`UGX ${financeSummary.fees_collected.toLocaleString()}`} icon={<TrendingUp />} note="Payments received" />
@@ -390,6 +394,7 @@ function App() {
                 <StatCard title="Salary expenses" value={`UGX ${(financeSummary.salary_expenses||0).toLocaleString()}`} icon={<Users />} note="Recorded salary payments" />
                 <StatCard title="Other expenses" value={`UGX ${(financeSummary.other_expenses||0).toLocaleString()}`} icon={<FileText />} note="Recorded school expenses" />
                 <StatCard title="Total expenses" value={`UGX ${(financeSummary.total_expenses||0).toLocaleString()}`} icon={<TrendingUp />} note="Salary and other expenses" />
+                <StatCard title="Net cash position" value={`UGX ${(financeSummary.net_cash_position||0).toLocaleString()}`} icon={<Wallet />} note="Fees collected less expenses" />
                 <StatCard title="Account status" value="Active" icon={<ShieldCheck />} note="Administrator access" />
               </section>
               <section className="dashboard-grid">
