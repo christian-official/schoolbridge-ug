@@ -18,6 +18,14 @@ type User = {
 
 type StudentPage = { items: RecordItem[]; total: number; page: number; pages: number }
 
+type DashboardSummary = {
+  active_students: number
+  new_admissions_this_year: number
+  active_staff: number
+  total_classes: number
+  academic_year: number
+}
+
 type AdmissionSettings = {
   admission_prefix: string
   include_year: boolean
@@ -78,6 +86,7 @@ function App() {
   const [students, setStudents] = useState<RecordItem[]>([])
   const [studentTotal, setStudentTotal] = useState(0)
   const [staffTotal, setStaffTotal] = useState(0)
+  const [dashboardSummary, setDashboardSummary] = useState<DashboardSummary>({ active_students: 0, new_admissions_this_year: 0, active_staff: 0, total_classes: 0, academic_year: new Date().getFullYear() })
   const [studentPage, setStudentPage] = useState(1)
   const [studentClassFilter, setStudentClassFilter] = useState('')
   const [classes, setClasses] = useState<RecordItem[]>([])
@@ -112,11 +121,12 @@ function App() {
   async function loadSchoolData(authToken: string) {
     setDataError('')
     try {
-      const [studentData, classData, admissionData, staffData] = await Promise.all([
+      const [studentData, classData, admissionData, staffData, summaryData] = await Promise.all([
         api<StudentPage>('students/search?page=1&page_size=25', authToken),
         api<RecordItem[]>('classes', authToken),
         api<AdmissionSettings>('settings/admission-number', authToken),
         api<{total:number}>('staff?search=&page=1&page_size=1', authToken),
+        api<DashboardSummary>('dashboard/summary', authToken),
       ])
       setStudents(studentData.items)
       setStudentTotal(studentData.total)
@@ -124,6 +134,7 @@ function App() {
       setClasses(classData)
       setAdmissionSettings(admissionData)
       setStaffTotal(staffData.total)
+      setDashboardSummary(summaryData)
     } catch {
       setDataError('Some school records could not be loaded. Check your connection and permissions.')
     }
@@ -429,10 +440,10 @@ function App() {
           {active === 'Overview' && (
             <>
               <section className="stats-grid">
-                <StatCard title="Total students" value={studentTotal} icon={<GraduationCap />} note="Registered students" />
-                <StatCard title="Total staff" value={staffTotal} icon={<Users />} note="Teaching and non-teaching" />
-                <StatCard title="Classes" value={classes.length} icon={<BookOpen />} note="School classes" />
-                <StatCard title="Account status" value="Active" icon={<ShieldCheck />} note="Administrator access" />
+                <StatCard title="Active students" value={dashboardSummary.active_students} icon={<GraduationCap />} note="Currently enrolled" />
+                <StatCard title="New admissions" value={dashboardSummary.new_admissions_this_year} icon={<UserPlus />} note={`Admitted in ${dashboardSummary.academic_year}`} />
+                <StatCard title="Active staff" value={dashboardSummary.active_staff} icon={<Users />} note="Teaching and non-teaching" />
+                <StatCard title="Total classes" value={dashboardSummary.total_classes} icon={<BookOpen />} note="Classes and streams" />
               </section>
               <section className="dashboard-grid">
                 <div className="panel recent-panel">
