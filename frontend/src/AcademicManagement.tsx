@@ -5,7 +5,7 @@ type SchoolClass = { id: number; name?: string; section?: string }
 type Subject = { id: number; name: string }
 type Student = { id: number; first_name: string; middle_name?: string | null; last_name: string; admission_number: string; class_id?: number | null }
 type Exam = { id: number; name: string; term: string; year: number; class_id: number | null }
-type Mark = { id: number; student_id: number; subject_id: number; exam_id: number; score: number }
+type Mark = { id: number; student_id: number; subject_id: number; exam_id: number; score: number; verified: boolean }
 type GradeBand = { id?: number; grade: string; min_score: number; max_score: number; remark: string }
 type Page<T> = { items: T[]; total: number; pages?: number }
 
@@ -192,6 +192,7 @@ export default function AcademicManagement({ token, classes }: { token: string; 
     try {
       const existing = editingMarkId ? marks.find(mark => mark.id === editingMarkId) : marks.find(mark => mark.student_id === Number(markForm.student_id) && mark.subject_id === Number(markForm.subject_id))
       if (existing) {
+        if (existing.verified) throw new Error('This mark is verified. Unlock it before making corrections.')
         await request<Mark>(`marks/${existing.id}`, token, { method: 'PATCH', body: JSON.stringify({ score }) })
       } else {
         await request<Mark>('marks', token, { method: 'POST', body: JSON.stringify({ exam_id: selectedExam.id, student_id: Number(markForm.student_id), subject_id: Number(markForm.subject_id), score }) })
@@ -208,7 +209,20 @@ export default function AcademicManagement({ token, classes }: { token: string; 
     }
   }
 
+  async function setMarkVerification(mark: Mark, verified: boolean) {
+    setSaving(true); setError(''); setMessage('')
+    try {
+      await request<Mark>(`marks/${mark.id}/verification?verified=${verified}`, token, { method: 'PATCH' })
+      const next = await request<Mark[]>(`marks?exam_id=${selectedExam?.id}`, token)
+      setMarks(next)
+      setMessage(verified ? 'Mark verified and locked against further edits.' : 'Mark unlocked for correction.')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to update mark verification.')
+    } finally { setSaving(false) }
+  }
+
   function editMark(mark: Mark) {
+    if (mark.verified) { setError('Unlock this verified mark before editing it.'); return }
     setEditingMarkId(mark.id)
     setMarkForm({ student_id: String(mark.student_id), subject_id: String(mark.subject_id), score: String(mark.score) })
     setError('')
@@ -300,9 +314,9 @@ export default function AcademicManagement({ token, classes }: { token: string; 
         </form>
         {!students.length && <p className="form-hint">No students are registered in this class yet.</p>}
         {!subjects.length && <p className="form-hint">Add school subjects under Settings before entering marks.</p>}
-        <div className="table-wrap"><table><thead><tr><th>Student</th><th>Admission no.</th><th>Subject</th><th>Score</th><th>Action</th></tr></thead><tbody>
-          {marks.map(mark => <tr key={mark.id}><td>{studentName(studentById.get(mark.student_id))}</td><td>{studentById.get(mark.student_id)?.admission_number || '—'}</td><td>{subjectById.get(mark.subject_id)?.name || 'Unknown subject'}</td><td><strong>{mark.score.toFixed(2)}</strong></td><td><button type="button" className="secondary-button" onClick={() => editMark(mark)}>Edit</button></td></tr>)}
-          {!marks.length && <tr><td colSpan={5}>No marks have been entered for this examination.</td></tr>}
+        <div className="table-wrap"><table><thead><tr><th>Student</th><th>Admission no.</th><th>Subject</th><th>Score</th><th>Verification</th><th>Action</th></tr></thead><tbody>
+          {marks.map(mark => <tr key={mark.id}><td>{studentName(studentById.get(mark.student_id))}</td><td>{studentById.get(mark.student_id)?.admission_number || '—'}</td><td>{subjectById.get(mark.subject_id)?.name || 'Unknown subject'}</td><td><strong>{mark.score.toFixed(2)}</strong></td><td>{mark.verified ? 'Verified' : 'Pending'}</td><td><button type="button" className="secondary-button" onClick={() => void setMarkVerification(mark, !mark.verified)} disabled={saving}>{mark.verified ? 'Unlock' : 'Verify'}</button> <button type="button" className="secondary-button" onClick={() => editMark(mark)} disabled={mark.verified}>Edit</button></td></tr>)}
+          {!marks.length && <tr><td colSpan={6}>No marks have been entered for this examination.</td></tr>}
         </tbody></table></div>
       </section>
 
