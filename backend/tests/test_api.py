@@ -612,3 +612,45 @@ def test_teacher_exam_access_is_limited_to_assigned_class_and_subject():
         )
         assert other_class_exams.status_code == 200
         assert other_class_exams.json() == []
+
+
+def test_grading_scale_requires_complete_non_overlapping_bands():
+    reset_database()
+    admin = create_admin()
+    headers = {"Authorization": f"Bearer {create_access_token(admin)}"}
+
+    with TestClient(app) as client:
+        gap = client.put(
+            "/api/grading-scale", headers=headers,
+            json={"bands": [
+                {"grade": "U", "min_score": 0, "max_score": 39, "remark": "Ungraded"},
+                {"grade": "C", "min_score": 40, "max_score": 69, "remark": "Credit"},
+                {"grade": "A", "min_score": 70, "max_score": 100, "remark": "Excellent"},
+            ]},
+        )
+        assert gap.status_code == 422
+
+        overlap = client.put(
+            "/api/grading-scale", headers=headers,
+            json={"bands": [
+                {"grade": "U", "min_score": 0, "max_score": 50, "remark": "Ungraded"},
+                {"grade": "C", "min_score": 49, "max_score": 70, "remark": "Credit"},
+                {"grade": "A", "min_score": 70, "max_score": 100, "remark": "Excellent"},
+            ]},
+        )
+        assert overlap.status_code == 422
+
+        saved = client.put(
+            "/api/grading-scale", headers=headers,
+            json={"bands": [
+                {"grade": "U", "min_score": 0, "max_score": 40, "remark": "Ungraded"},
+                {"grade": "C", "min_score": 40, "max_score": 70, "remark": "Credit"},
+                {"grade": "A", "min_score": 70, "max_score": 100, "remark": "Excellent"},
+            ]},
+        )
+        assert saved.status_code == 200, saved.text
+        assert [row["grade"] for row in saved.json()] == ["U", "C", "A"]
+
+        fetched = client.get("/api/grading-scale", headers=headers)
+        assert fetched.status_code == 200
+        assert fetched.json() == saved.json()
