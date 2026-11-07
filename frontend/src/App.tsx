@@ -97,6 +97,7 @@ function App() {
   const [showStudentForm, setShowStudentForm] = useState(false)
   const [showClassForm, setShowClassForm] = useState(false)
   const [classForm, setClassForm] = useState({ name: '', section: '' })
+  const [classSchoolType, setClassSchoolType] = useState('Primary')
   const [classError, setClassError] = useState('')
   const [classSuccess, setClassSuccess] = useState('')
   const [savingClass, setSavingClass] = useState(false)
@@ -172,8 +173,7 @@ function App() {
       })
       setClassForm({ name: '', section: '' })
       setShowClassForm(false)
-      setClassSuccess('Class created successfully.')
-      setSettingsSection('home')
+      setClassSuccess('Class created successfully. The class list has been refreshed.')
       await loadSchoolData(token)
     } catch (error) {
       setClassError(error instanceof Error ? error.message : 'Unable to create class.')
@@ -620,7 +620,7 @@ function App() {
               {settingsError && <div className="form-error">{settingsError}</div>}
               <details className="form-disclosure"><summary>Edit admission number settings</summary><form className="student-form" onSubmit={saveAdmissionSettings}>
                 <div className="student-form-grid">
-                  <label>School prefix<input maxLength={20} value={admissionSettings.admission_prefix} onChange={e => setAdmissionSettings({ ...admissionSettings, admission_prefix: e.target.value })} placeholder="e.g. KIS" /></label>
+                  <label>School prefix *<input required maxLength={20} value={admissionSettings.admission_prefix} onChange={e => setAdmissionSettings({ ...admissionSettings, admission_prefix: e.target.value })} placeholder="e.g. KIS" /></label>
                   <label>Separator<select value={admissionSettings.admission_separator} onChange={e => setAdmissionSettings({ ...admissionSettings, admission_separator: e.target.value })}><option value="-">Hyphen (-)</option><option value="/">Slash (/)</option><option value="">None</option></select></label>
                   <label>Number of digits<select value={admissionSettings.admission_padding} onChange={e => setAdmissionSettings({ ...admissionSettings, admission_padding: Number(e.target.value) })}>{[3,4,5,6,7,8].map(n => <option key={n} value={n}>{n} digits</option>)}</select></label>
                   <label>Next sequence number<input type="number" min="1" value={admissionSettings.next_admission_number} onChange={e => setAdmissionSettings({ ...admissionSettings, next_admission_number: Math.max(1, Number(e.target.value)) })} required /></label>
@@ -642,10 +642,10 @@ function App() {
           )}
           {active === 'Settings' && settingsSection === 'classes' && (
             <section className="panel">
-              <div className="panel-heading"><div><h2>School classes</h2><p>Classes registered in the system</p></div><button className="primary-button add-student-button" onClick={() => { setShowClassForm(v => !v); setClassError(''); setClassSuccess('') }}><Plus size={16} /> {showClassForm ? 'Close form' : 'Add class'}</button></div>
+              <div className="panel-heading"><div><h2>School classes</h2><p>Classes registered in the system</p></div><button className="primary-button add-student-button" onClick={() => { setShowClassForm(v => !v); setClassError(''); setClassSuccess(''); if (!showClassForm) { setClassSchoolType(schoolConfig.school_type || 'Primary'); setClassForm({ name: '', section: '' }) } }}><Plus size={16} /> {showClassForm ? 'Close form' : 'Add class'}</button></div>
               {classSuccess && <div className="success-notice">{classSuccess}</div>}
               {classError && <div className="form-error">{classError}</div>}
-              {showClassForm && <form className="student-form class-form" onSubmit={registerClass}><div className="form-heading"><div><h3>Create a school class</h3><p>Examples: Primary 1, Senior 1, Senior 2.</p></div></div><div className="student-form-grid class-form-grid"><label>Class name *<input value={classForm.name} onChange={e => setClassForm({ ...classForm, name: e.target.value })} placeholder="e.g. Primary 1" required /></label><label>Stream (optional)<input value={classForm.section} onChange={e => setClassForm({ ...classForm, section: e.target.value })} placeholder="e.g. East, A, Arts or Sciences" /></label></div><div className="form-actions"><button type="button" className="secondary-button" onClick={() => setShowClassForm(false)}>Cancel</button><button className="primary-button" disabled={savingClass}>{savingClass ? 'Saving...' : 'Save class'}</button></div></form>}
+              {showClassForm && <form className="student-form class-form" onSubmit={registerClass}><div className="form-heading"><div><h3>Create a school class</h3><p>Choose the school section to display its available classes. A stream is optional.</p></div></div><div className="student-form-grid class-form-grid"><label>School section *<select required value={classSchoolType} onChange={e => { setClassSchoolType(e.target.value); setClassForm({ ...classForm, name: '' }) }}><option value="Primary">Primary</option><option value="Secondary">Secondary</option></select></label><label>Class name *<select required value={classForm.name} onChange={e => setClassForm({ ...classForm, name: e.target.value })}><option value="">Choose a class</option>{(classSchoolType === 'Primary' ? Array.from({length:7},(_,i)=>'Primary '+(i+1)) : Array.from({length:6},(_,i)=>'Senior '+(i+1))).map(name => <option key={name} value={name}>{name}</option>)}</select></label><label>Stream (optional)<input value={classForm.section} onChange={e => setClassForm({ ...classForm, section: e.target.value })} placeholder="e.g. East, A, Arts or Sciences" /></label></div><div className="form-actions"><button type="button" className="secondary-button" onClick={() => setShowClassForm(false)}>Cancel</button><button className="primary-button" disabled={savingClass || !classForm.name.trim()}>{savingClass ? 'Saving...' : 'Save class'}</button></div></form>}
               <div className="class-grid">{classes.map(item => <div className="class-card" key={item.id}><BookOpen size={22} /><strong>{item.name}</strong><span>{item.section || 'No stream'}</span></div>)}</div>
               {classes.length === 0 && <EmptyState text="No classes have been added yet." />}
             </section>
