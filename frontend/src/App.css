@@ -634,3 +634,25 @@ button:disabled { cursor: not-allowed; opacity: .58; }
   .form-actions .primary-button, .form-actions .secondary-button { width: 100%; }
   .login-card { padding: 28px 22px; }
 }
+
+
+/* Guided student registration */
+.registration-form { display: grid; gap: 22px; }
+.form-section { padding: 20px; border: 1px solid #e8edf5; border-radius: 13px; background: linear-gradient(180deg,#fff 0%,#fbfcff 100%); }
+.form-section-heading { display: flex; align-items: flex-start; gap: 13px; margin-bottom: 18px; }
+.form-section-number { flex: 0 0 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; background: #edf2ff; color: #315ee8; font-size: 12px; font-weight: 800; }
+.form-section-heading h4 { margin: 1px 0 5px; color: #243550; font-size: 15px; font-weight: 800; }
+.form-section-heading p { margin: 0; color: #8491a6; font-size: 12px; line-height: 1.5; }
+.field-hint { display: block; margin-top: 5px; color: #8290a5; font-size: 11px; font-weight: 400; line-height: 1.45; }
+.field-span-full { grid-column: 1 / -1; }
+.generated-admission { display: grid; gap: 5px; align-content: center; min-height: 82px; padding: 13px 15px; border: 1px dashed #b9c9f5; border-radius: 10px; background: #f5f8ff; }
+.generated-admission strong { color: #34445e; font-size: 12px; }
+.generated-admission span { color: #8290a5; font-size: 11px; }
+.generated-admission b { color: #315ee8; font-size: 18px; letter-spacing: .4px; }
+.registration-actions { position: sticky; bottom: 0; z-index: 2; padding: 14px 0 2px; background: linear-gradient(180deg,#ffffff00,#fff 28%); }
+@media (max-width: 640px) {
+  .form-section { padding: 15px; }
+  .form-section-heading { gap: 10px; }
+  .generated-admission { grid-column: 1 / -1; }
+  .registration-actions { position: static; }
+}
