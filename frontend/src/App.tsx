@@ -475,30 +475,55 @@ function App() {
               {studentSuccess && <div className="success-notice">{studentSuccess}</div>}
               {studentError && <div className="form-error">{studentError}</div>}
               {showStudentForm && (
-                <form className="student-form" onSubmit={registerStudent}>
-                  <div className="form-heading"><div><h3>New student registration</h3><p>Enter the student's details below.</p></div><span className="required-note">* Required fields</span></div>
-                  <div className="student-form-grid">
-                    <div className="generated-admission"><strong>Admission number</strong></div>
-                    <label>First name *<input value={studentForm.first_name} onChange={e => setStudentForm({ ...studentForm, first_name: e.target.value })} placeholder="First name" required /></label>
-                    <label>Middle name<input value={studentForm.middle_name} onChange={e => setStudentForm({ ...studentForm, middle_name: e.target.value })} /></label>
-                    <label>Last name *<input value={studentForm.last_name} onChange={e => setStudentForm({ ...studentForm, last_name: e.target.value })} placeholder="Last name" required /></label>
-                    <label>Class *<select value={studentForm.class_id} onChange={e => setStudentForm({ ...studentForm, class_id: e.target.value })} required><option value="">Select class</option>{classes.map(item => <option key={item.id} value={item.id}>{item.name}{item.section ? ` — ${item.section}` : ''}</option>)}</select></label>
-                    <label>Term fee (UGX)<input type="number" min="0" value={studentForm.fee_amount} onChange={e => setStudentForm({ ...studentForm, fee_amount: e.target.value })} placeholder="Enter fee amount" /></label>
-                    <label>Gender<select value={studentForm.gender} onChange={e => setStudentForm({ ...studentForm, gender: e.target.value })}><option value="">Select gender</option><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select></label>
-                    <label>Date of birth<input type="date" value={studentForm.date_of_birth} onChange={e => setStudentForm({ ...studentForm, date_of_birth: e.target.value })} /></label>
-                    <label>Religion<input value={studentForm.religion} onChange={e => setStudentForm({ ...studentForm, religion: e.target.value })} /></label>
-                    <label>Nationality<input value={studentForm.nationality} onChange={e => setStudentForm({ ...studentForm, nationality: e.target.value })} /></label>
-                    <label>Student phone<input value={studentForm.phone} onChange={e => setStudentForm({ ...studentForm, phone: e.target.value })} /></label>
-                    <label>Home address<input value={studentForm.address} onChange={e => setStudentForm({ ...studentForm, address: e.target.value })} /></label>
-                    <label>Parent / guardian name<input value={studentForm.guardian_name} onChange={e => setStudentForm({ ...studentForm, guardian_name: e.target.value })} /></label>
-                    <label>Guardian relationship<select value={studentForm.guardian_relationship} onChange={e => setStudentForm({ ...studentForm, guardian_relationship: e.target.value })}><option value="">Select relationship</option><option>Parent</option><option>Guardian</option><option>Other relative</option></select></label>
-                    <label>Guardian phone<input value={studentForm.guardian_phone} onChange={e => setStudentForm({ ...studentForm, guardian_phone: e.target.value })} /></label>
-                    <label>Previous school<input value={studentForm.previous_school} onChange={e => setStudentForm({ ...studentForm, previous_school: e.target.value })} /></label>
-                    <label>Admission date<input type="date" value={studentForm.admission_date} onChange={e => setStudentForm({ ...studentForm, admission_date: e.target.value })} /></label>
-
+                <form className="student-form registration-form" onSubmit={registerStudent}>
+                  <div className="form-heading">
+                    <div><h3>Register a new student</h3><p>Complete the sections below. Only the fields marked with * are compulsory.</p></div>
+                    <span className="required-note">* Required</span>
                   </div>
-                  {classes.length === 0 && <p className="form-hint">Add a school class first before registering students.</p>}
-                  <div className="form-actions"><button type="button" className="secondary-button" onClick={() => setShowStudentForm(false)}>Cancel</button><button className="primary-button" disabled={savingStudent || classes.length === 0}>{savingStudent ? <><LoaderCircle className="spin" size={16} /> Saving...</> : 'Save student'}</button></div>
+
+                  <section className="form-section">
+                    <div className="form-section-heading"><span className="form-section-number">01</span><div><h4>Admission details</h4><p>Choose the class and confirm when the student is joining.</p></div></div>
+                    <div className="student-form-grid">
+                      <div className="generated-admission"><strong>Admission number</strong><span>Generated automatically when you save</span><b>{[admissionSettings.admission_prefix.trim(), ...(admissionSettings.include_year ? [String(new Date().getFullYear())] : []), String(admissionSettings.next_admission_number).padStart(admissionSettings.admission_padding, '0')].filter(Boolean).join(admissionSettings.admission_separator)}</b></div>
+                      <label>Class / stream *<select value={studentForm.class_id} onChange={e => setStudentForm({ ...studentForm, class_id: e.target.value })} required><option value="">Choose the student's class</option>{classes.map(item => <option key={item.id} value={item.id}>{item.name}{item.section ? ` — ${item.section}` : ''}</option>)}</select></label>
+                      <label>Admission date<input type="date" value={studentForm.admission_date} onChange={e => setStudentForm({ ...studentForm, admission_date: e.target.value })} /><small className="field-hint">Date the student officially joins the school.</small></label>
+                      <label>Term fee (UGX)<input type="number" min="0" step="1" value={studentForm.fee_amount} onChange={e => setStudentForm({ ...studentForm, fee_amount: e.target.value })} placeholder="Automatically uses the class fee" /><small className="field-hint">Prefilled from the selected class and active term. You can adjust it if authorised.</small></label>
+                    </div>
+                  </section>
+
+                  <section className="form-section">
+                    <div className="form-section-heading"><span className="form-section-number">02</span><div><h4>Student information</h4><p>Enter the student's official names and personal details.</p></div></div>
+                    <div className="student-form-grid">
+                      <label>First name *<input autoComplete="given-name" value={studentForm.first_name} onChange={e => setStudentForm({ ...studentForm, first_name: e.target.value })} placeholder="e.g. Amina" required /></label>
+                      <label>Middle name<input autoComplete="additional-name" value={studentForm.middle_name} onChange={e => setStudentForm({ ...studentForm, middle_name: e.target.value })} placeholder="Optional" /></label>
+                      <label>Last name *<input autoComplete="family-name" value={studentForm.last_name} onChange={e => setStudentForm({ ...studentForm, last_name: e.target.value })} placeholder="e.g. Nakato" required /></label>
+                      <label>Gender<select value={studentForm.gender} onChange={e => setStudentForm({ ...studentForm, gender: e.target.value })}><option value="">Select gender</option><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select></label>
+                      <label>Date of birth<input type="date" value={studentForm.date_of_birth} onChange={e => setStudentForm({ ...studentForm, date_of_birth: e.target.value })} /></label>
+                      <label>Nationality<input autoComplete="country-name" value={studentForm.nationality} onChange={e => setStudentForm({ ...studentForm, nationality: e.target.value })} placeholder="e.g. Ugandan" /></label>
+                      <label>Religion<input value={studentForm.religion} onChange={e => setStudentForm({ ...studentForm, religion: e.target.value })} placeholder="Optional" /></label>
+                      <label>Student phone<input type="tel" autoComplete="tel" value={studentForm.phone} onChange={e => setStudentForm({ ...studentForm, phone: e.target.value })} placeholder="e.g. 07XX XXX XXX" /></label>
+                      <label className="field-span-full">Home address<input autoComplete="street-address" value={studentForm.address} onChange={e => setStudentForm({ ...studentForm, address: e.target.value })} placeholder="Village, parish, town or area" /></label>
+                    </div>
+                  </section>
+
+                  <section className="form-section">
+                    <div className="form-section-heading"><span className="form-section-number">03</span><div><h4>Parent or guardian</h4><p>Provide a contact the school can reach when necessary.</p></div></div>
+                    <div className="student-form-grid">
+                      <label>Parent / guardian name<input autoComplete="name" value={studentForm.guardian_name} onChange={e => setStudentForm({ ...studentForm, guardian_name: e.target.value })} placeholder="Full name" /></label>
+                      <label>Relationship<select value={studentForm.guardian_relationship} onChange={e => setStudentForm({ ...studentForm, guardian_relationship: e.target.value })}><option value="">Select relationship</option><option>Parent</option><option>Guardian</option><option>Other relative</option></select></label>
+                      <label>Guardian phone<input type="tel" autoComplete="tel" value={studentForm.guardian_phone} onChange={e => setStudentForm({ ...studentForm, guardian_phone: e.target.value })} placeholder="e.g. 07XX XXX XXX" /></label>
+                    </div>
+                  </section>
+
+                  <section className="form-section">
+                    <div className="form-section-heading"><span className="form-section-number">04</span><div><h4>Previous education</h4><p>If the student is joining from another school, record it here.</p></div></div>
+                    <div className="student-form-grid">
+                      <label>Previous school<input value={studentForm.previous_school} onChange={e => setStudentForm({ ...studentForm, previous_school: e.target.value })} placeholder="Name of previous school (optional)" /></label>
+                    </div>
+                  </section>
+
+                  {classes.length === 0 && <p className="form-hint">No classes are available yet. Add a class under Settings → Classes & Streams before registering students.</p>}
+                  <div className="form-actions registration-actions"><button type="button" className="secondary-button" onClick={() => setShowStudentForm(false)}>Cancel</button><button className="primary-button" disabled={savingStudent || classes.length === 0}>{savingStudent ? <><LoaderCircle className="spin" size={16} /> Saving student...</> : 'Register student'}</button></div>
                 </form>
               )}
               <div className="table-tools student-tools"><div className="search-box"><Search size={17} /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name or admission number..." /></div><select className="filter-select" value={studentClassFilter} onChange={e => setStudentClassFilter(e.target.value)}><option value="">All classes</option>{classes.map(item => <option key={item.id} value={item.id}>{item.name}{item.section ? ` — ${item.section}` : ""}</option>)}</select></div>
