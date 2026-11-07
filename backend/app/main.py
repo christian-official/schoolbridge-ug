@@ -809,6 +809,31 @@ def list_staff_attendance(
     return query.order_by(models.StaffAttendance.attendance_date.desc(), models.StaffAttendance.id.desc()).all()
 
 
+@app.get("/api/staff-attendance/summary", tags=["Attendance"])
+def staff_attendance_summary(
+    attendance_date: date | None = None,
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+):
+    selected_date = attendance_date or date.today()
+    active_staff = db.query(models.StaffMember).filter(models.StaffMember.status == "active").all()
+    rows = db.query(models.StaffAttendance).filter(
+        models.StaffAttendance.attendance_date == selected_date
+    ).all()
+    counts = {status: sum(1 for row in rows if row.status == status)
+              for status in ("Present", "Absent", "Late", "Excused")}
+    return {
+        "attendance_date": selected_date,
+        "total_staff": len(active_staff),
+        "marked": len(rows),
+        "unmarked": max(0, len(active_staff) - len(rows)),
+        "present": counts["Present"],
+        "absent": counts["Absent"],
+        "late": counts["Late"],
+        "excused": counts["Excused"],
+    }
+
+
 @app.put("/api/staff-attendance/register", tags=["Attendance"])
 def save_staff_attendance_register(
     data: StaffAttendanceRegisterUpdate,
@@ -890,6 +915,15 @@ def create_timetable_entry(
     ).first()
     if overlaps:
         raise HTTPException(409, "This lesson overlaps another lesson for the selected class.")
+    if data.staff_id is not None:
+        staff_overlap = db.query(models.TimetableEntry).filter(
+            models.TimetableEntry.staff_id == data.staff_id,
+            models.TimetableEntry.day_of_week == data.day_of_week,
+            models.TimetableEntry.start_time < data.end_time,
+            models.TimetableEntry.end_time > data.start_time,
+        ).first()
+        if staff_overlap:
+            raise HTTPException(409, "This staff member already has a lesson scheduled at that time.")
     item = models.TimetableEntry(**data.model_dump())
     db.add(item)
     try:
