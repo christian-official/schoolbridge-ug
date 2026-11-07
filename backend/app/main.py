@@ -282,7 +282,7 @@ def create_student(data: StudentCreate, db: Session = Depends(get_db)):
         raise HTTPException(404, "Choose a valid class and stream.")
     profile = db.get(models.SchoolProfile, 1)
     school_type = profile.school_type if profile else "Secondary"
-    class_label = re.sub(r"[\\s._-]+", "", selected_class.name.lower())
+    class_label = re.sub(r"[\s._-]+", "", selected_class.name.lower())
     level_match = re.search(r"(?:senior|s)?([1-6])$", class_label)
     if school_type == "Secondary" and level_match:
         grade = int(level_match.group(1))
