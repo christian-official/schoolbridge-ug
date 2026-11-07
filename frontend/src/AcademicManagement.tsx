@@ -343,11 +343,29 @@ export default function AcademicManagement({ token, classes }: { token: string; 
           })}
           <div className="student-score-footer"><span>Blank scores are skipped. Scores must be between 0 and 100.</span><button type="button" className="primary-button" onClick={() => void saveClassMarks()} disabled={saving}><Save size={15}/>{saving ? 'Saving…' : 'Save scores'}</button></div>
         </div>}
-        <details className="recorded-marks-details"><summary>View all recorded marks and verification</summary>
-          <div className="table-wrap"><table><thead><tr><th>Student</th><th>Subject</th><th>Score</th><th>Verification</th><th>Action</th></tr></thead><tbody>
-            {marks.map(mark => <tr key={mark.id}><td>{studentName(studentById.get(mark.student_id))}</td><td>{subjectById.get(mark.subject_id)?.name || 'Unknown subject'}</td><td><strong>{mark.score.toFixed(2)}</strong></td><td>{mark.verified ? 'Verified' : 'Pending'}</td><td><button type="button" className="secondary-button" onClick={() => void setMarkVerification(mark, !mark.verified)} disabled={saving}>{mark.verified ? 'Unlock' : 'Verify'}</button></td></tr>)}
-            {!marks.length && <tr><td colSpan={5}>No marks have been recorded for this examination yet.</td></tr>}
-          </tbody></table></div>
+        <details className="recorded-marks-details"><summary>Recorded scores · by subject and verification status</summary>
+          <div className="recorded-subject-groups">
+            {subjects.filter(subject => marks.some(mark => mark.subject_id === subject.id)).map(subject => {
+              const subjectMarks = marks.filter(mark => mark.subject_id === subject.id).sort((a, b) => studentName(studentById.get(a.student_id)).localeCompare(studentName(studentById.get(b.student_id))));
+              const verifiedMarks = subjectMarks.filter(mark => mark.verified);
+              const unverifiedMarks = subjectMarks.filter(mark => !mark.verified);
+              const renderMarkRows = (rows: Mark[]) => rows.map(mark => <tr key={mark.id}><td>{studentName(studentById.get(mark.student_id))}</td><td><strong>{mark.score.toFixed(2)}</strong></td><td><button type="button" className="secondary-button" onClick={() => void setMarkVerification(mark, !mark.verified)} disabled={saving}>{mark.verified ? 'Unlock' : 'Verify'}</button></td></tr>);
+              return <section className="recorded-subject-card" key={subject.id}>
+                <div className="recorded-subject-heading"><h3>{subject.name}</h3><span>{subjectMarks.length} recorded</span></div>
+                <div className="recorded-status-columns">
+                  <div className="recorded-status-group">
+                    <div className="recorded-status-heading"><strong>Verified scores</strong><span className="recorded-count verified-count">{verifiedMarks.length}</span></div>
+                    <div className="table-wrap"><table><thead><tr><th>Student</th><th>Score</th><th>Action</th></tr></thead><tbody>{renderMarkRows(verifiedMarks)}{!verifiedMarks.length && <tr><td colSpan={3}>No verified scores.</td></tr>}</tbody></table></div>
+                  </div>
+                  <div className="recorded-status-group">
+                    <div className="recorded-status-heading"><strong>Unverified scores</strong><span className="recorded-count pending-count">{unverifiedMarks.length}</span></div>
+                    <div className="table-wrap"><table><thead><tr><th>Student</th><th>Score</th><th>Action</th></tr></thead><tbody>{renderMarkRows(unverifiedMarks)}{!unverifiedMarks.length && <tr><td colSpan={3}>No unverified scores.</td></tr>}</tbody></table></div>
+                  </div>
+                </div>
+              </section>;
+            })}
+            {!marks.length && <p className="form-hint">No marks have been recorded for this examination yet.</p>}
+          </div>
         </details>
       </section>
       )}
