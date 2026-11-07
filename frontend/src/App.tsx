@@ -306,10 +306,11 @@ function App() {
       setUser(profile)
       if(profile.role==='teacher') setActive('My Classes')
       else await loadSchoolData(authToken)
-    } catch {
+    } catch (error) {
       sessionStorage.removeItem('sb_token')
       setToken('')
       setUser(null)
+      setLoginError(error instanceof Error ? `Sign-in succeeded, but account verification failed: ${error.message}` : 'Sign-in succeeded, but account verification failed.')
     }
   }
 
