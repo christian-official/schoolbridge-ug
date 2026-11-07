@@ -866,7 +866,7 @@ def get_class_fees(class_id: int, year: int | None = None, db: Session = Depends
 
 
 @app.put("/api/classes/{class_id}/fees", tags=["Classes"])
-def save_class_fee(class_id: int, data: ClassFeeUpdate, db: Session = Depends(get_db)):
+def save_class_fee(class_id: int, data: ClassFeeUpdate, db: Session = Depends(get_db), admin=Depends(require_admin)):
     if not db.get(models.SchoolClass, class_id):
         raise HTTPException(404, "Class not found.")
     row = db.query(models.ClassFee).filter_by(
@@ -877,10 +877,25 @@ def save_class_fee(class_id: int, data: ClassFeeUpdate, db: Session = Depends(ge
         db.add(row)
     else:
         row.amount = data.amount
+    settings = get_or_create_school_settings(db)
+    created = 0
+    if settings.active_term == data.term and (settings.academic_year or date.today().year) == data.year:
+        active_students = db.query(models.Student).filter_by(class_id=class_id, status="active").all()
+        for student in active_students:
+            existing = db.query(models.FeeCharge).filter_by(
+                student_id=student.id, term=data.term, year=data.year
+            ).first()
+            if existing is None and data.amount > 0:
+                db.add(models.FeeCharge(student_id=student.id, term=data.term, year=data.year, amount=data.amount))
+                created += 1
+    db.flush()
+    write_audit(db, admin, "class_fee_updated", "class_fee", row.id,
+                f"Class {class_id}; {data.term} {data.year}; UGX {data.amount}")
     db.commit()
     db.refresh(row)
-    return {"message": "Class fee saved.", "class_id": class_id,
-            "term": row.term, "year": row.year, "amount": row.amount}
+    return {"message": "Class fee saved. Existing charges were not changed.",
+            "class_id": class_id, "term": row.term, "year": row.year,
+            "amount": row.amount, "charges_created": created}
 
 
 class StudentUpdate(BaseModel):
