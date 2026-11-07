@@ -11,7 +11,7 @@ async function request<T>(path: string, token: string, options: RequestInit = {}
   if (!response.ok) throw new Error(result.detail || `Request failed: ${response.status}`)
   return result as T
 }
-const today = () => new Date().toISOString().slice(0, 10)
+const today = () => { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}` }
 
 type Staff = { id: number; first_name: string; last_name: string; staff_number: string; category: string; status: string }
 type StaffAttendance = { id: number; staff_id: number; attendance_date: string; status: string; notes?: string }
