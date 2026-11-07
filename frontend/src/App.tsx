@@ -58,6 +58,7 @@ const menu = [
 const teacherMenu = [
   { label: 'My Classes', icon: BookOpen },
   { label: 'Attendance', icon: CalendarDays },
+  { label: 'My Results', icon: FileText },
 ]
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
@@ -503,7 +504,7 @@ function App() {
 
           {dataError && <div className="notice">{dataError} <button onClick={() => void loadSchoolData(token)}>Retry</button></div>}
 
-          {(active === 'My Classes' || active === 'Attendance') && user.role === 'teacher' && <TeacherWorkspace token={token} active={active} />}
+          {(active === 'My Classes' || active === 'Attendance' || active === 'My Results') && user.role === 'teacher' && <TeacherWorkspace token={token} active={active} />}
 
           {active === 'Overview' && (
             <>
@@ -771,8 +772,11 @@ function AcademicSettings({token,onSaved}:{token:string;onSaved:()=>void}) {
   return <section className="panel settings-panel"><div className="panel-heading"><div><h2>Academic year and active term</h2><p>These settings determine which class fee is assigned to new students.</p></div></div>{message&&<div className="success-notice">{message}</div>}<details className="form-disclosure"><summary>Edit academic year and active term</summary><form className="student-form" onSubmit={save}><div className="student-form-grid"><label>Academic year *<input required type="number" min="2000" max="2100" value={year} onChange={e=>setYear(Number(e.target.value))}/></label><label>Active term *<select required value={term} onChange={e=>setTerm(e.target.value)}><option>Term 1</option><option>Term 2</option><option>Term 3</option></select></label></div><div className="form-actions"><button className="primary-button" disabled={busy}>{busy?'Saving...':'Save academic settings'}</button></div></form></details></section>
 }
 
-type TeacherAssignment = {assignment_id:number;class_id:number;class:string;subject:string}
+type TeacherAssignment = {assignment_id:number;class_id:number;class:string;subject_id:number;subject:string}
 type TeacherStudent = {id:number;first_name:string;last_name:string;admission_number:string;class_id:number}
+type TeacherExam = {id:number;name:string;term:string;year:number;class_id:number|null}
+type TeacherMark = {id:number;student_id:number;subject_id:number;exam_id:number;score:number;student_name:string;admission_number:string;class_id:number|null}
+
 function TeacherWorkspace({token,active}:{token:string;active:string}) {
   const [assignments,setAssignments]=useState<TeacherAssignment[]>([])
   const [students,setStudents]=useState<TeacherStudent[]>([])
@@ -781,10 +785,87 @@ function TeacherWorkspace({token,active}:{token:string;active:string}) {
   const [attendanceDate,setAttendanceDate]=useState(new Date().toISOString().slice(0,10))
   const [message,setMessage]=useState('')
   const [busy,setBusy]=useState<number|null>(null)
+  const [teacherExams,setTeacherExams]=useState<TeacherExam[]>([])
+  const [examId,setExamId]=useState('')
+  const [resultStudents,setResultStudents]=useState<TeacherStudent[]>([])
+  const [resultMarks,setResultMarks]=useState<TeacherMark[]>([])
+  const [resultForm,setResultForm]=useState({student_id:'',subject_id:'',score:''})
+  const [resultMessage,setResultMessage]=useState('')
+  const [resultError,setResultError]=useState('')
+  const [resultSaving,setResultSaving]=useState(false)
+
   useEffect(()=>{api<TeacherAssignment[]>('teacher/my-assignments',token).then(rows=>{setAssignments(rows);if(rows.length)setClassId(String(rows[0].class_id))}).catch(e=>setMessage(e.message))},[token])
   useEffect(()=>{if(active!=='Attendance'||!classId)return;api<TeacherStudent[]>('teacher/students?class_id='+classId,token).then(setStudents).catch(e=>setMessage(e.message))},[active,classId,token])
+  useEffect(()=>{
+    if(active!=='My Results')return
+    api<TeacherExam[]>('teacher/exams',token).then(rows=>{
+      setTeacherExams(rows)
+      if(rows.length)setExamId(String(rows[0].id))
+      else setExamId('')
+    }).catch(e=>setResultError(e.message))
+  },[active,token])
+  const selectedTeacherExam=teacherExams.find(exam=>String(exam.id)===examId)||null
+  const assignedSubjects=assignments.filter(row=>row.class_id===selectedTeacherExam?.class_id)
+  useEffect(()=>{
+    if(active!=='My Results'||!selectedTeacherExam){setResultStudents([]);setResultMarks([]);return}
+    let cancelled=false
+    setResultError('')
+    Promise.all([
+      api<TeacherStudent[]>('teacher/students?class_id='+selectedTeacherExam.class_id,token),
+      api<TeacherMark[]>('teacher/marks?exam_id='+selectedTeacherExam.id,token),
+    ]).then(([studentRows,markRows])=>{
+      if(cancelled)return
+      setResultStudents(studentRows)
+      setResultMarks(markRows)
+    }).catch(e=>{if(!cancelled)setResultError(e.message)})
+    return ()=>{cancelled=true}
+  },[active,examId,selectedTeacherExam?.class_id,token])
   async function record(student:TeacherStudent) {setBusy(student.id);setMessage('');try{await api('teacher/attendance',token,{method:'POST',body:JSON.stringify({student_id:student.id,attendance_date:attendanceDate,status:statuses[student.id]||'Present'})});setMessage('Attendance saved for '+student.first_name+' '+student.last_name+'.')}catch(e){setMessage(e instanceof Error?e.message:'Unable to save attendance.')}finally{setBusy(null)}}
+  async function saveTeacherMark(e:React.FormEvent){
+    e.preventDefault()
+    if(!selectedTeacherExam||!resultForm.student_id||!resultForm.subject_id||resultForm.score===''){setResultError('Choose the student and assigned subject, then enter a score.');return}
+    const score=Number(resultForm.score)
+    if(!Number.isFinite(score)||score<0||score>100){setResultError('Scores must be between 0 and 100.');return}
+    setResultSaving(true);setResultError('');setResultMessage('')
+    try{
+      await api('teacher/marks',token,{method:'PUT',body:JSON.stringify({exam_id:selectedTeacherExam.id,student_id:Number(resultForm.student_id),subject_id:Number(resultForm.subject_id),score})})
+      const rows=await api<TeacherMark[]>('teacher/marks?exam_id='+selectedTeacherExam.id,token)
+      setResultMarks(rows)
+      setResultForm({student_id:'',subject_id:'',score:''})
+      setResultMessage('Mark saved successfully.')
+    }catch(e){setResultError(e instanceof Error?e.message:'Unable to save mark.')}
+    finally{setResultSaving(false)}
+  }
   if(active==='My Classes') return <section className="panel"><div className="panel-heading"><div><h2>My assigned classes</h2><p>Only classes and subjects assigned to your teacher account appear here.</p></div></div>{message&&<div className="notice">{message}</div>}<div className="class-grid">{assignments.map(a=><div className="class-card" key={a.assignment_id}><BookOpen size={22}/><strong>{a.class}</strong><span>{a.subject}</span></div>)}</div>{!assignments.length&&<div className="empty-state"><GraduationCap size={30}/><p>No classes have been assigned to your account yet.</p></div>}</section>
+  if(active==='My Results') return <div className="academic-workspace">
+    <section className="panel">
+      <div className="panel-heading"><div><h2>My examination results</h2><p>Enter or correct marks only for your assigned subjects and classes.</p></div></div>
+      {resultError&&<div className="form-error" role="alert">{resultError}</div>}
+      {resultMessage&&<div className="success-notice" role="status">{resultMessage}</div>}
+      <label className="academic-exam-select">Examination
+        <select value={examId} onChange={e=>{setExamId(e.target.value);setResultForm({student_id:'',subject_id:'',score:''})}}>
+          <option value="">Choose an assigned examination</option>
+          {teacherExams.map(exam=><option key={exam.id} value={exam.id}>{exam.name} · {exam.term} {exam.year}</option>)}
+        </select>
+      </label>
+      {!teacherExams.length&&<p className="form-hint">No examinations have been created for your assigned classes yet.</p>}
+      {selectedTeacherExam&&<>
+        <p className="form-hint">Assigned subjects: {assignedSubjects.map(row=>row.subject).join(', ')||'None'}</p>
+        <form className="student-form" onSubmit={saveTeacherMark}>
+          <div className="student-form-grid">
+            <label>Student *<select required value={resultForm.student_id} onChange={e=>setResultForm({...resultForm,student_id:e.target.value})}><option value="">Select student</option>{resultStudents.map(student=><option key={student.id} value={student.id}>{student.first_name} {student.last_name} · {student.admission_number}</option>)}</select></label>
+            <label>Assigned subject *<select required value={resultForm.subject_id} onChange={e=>setResultForm({...resultForm,subject_id:e.target.value})}><option value="">Select subject</option>{assignedSubjects.map(row=><option key={row.subject_id} value={row.subject_id}>{row.subject}</option>)}</select></label>
+            <label>Score (0–100) *<input required type="number" min="0" max="100" step="0.01" value={resultForm.score} onChange={e=>setResultForm({...resultForm,score:e.target.value})}/></label>
+          </div>
+          <div className="form-actions"><button className="primary-button" disabled={resultSaving||!assignedSubjects.length||!resultStudents.length}>{resultSaving?'Saving...':'Save mark'}</button></div>
+        </form>
+        <div className="table-wrap"><table><thead><tr><th>Student</th><th>Admission number</th><th>Subject</th><th>Score</th><th>Action</th></tr></thead><tbody>
+          {resultMarks.filter(mark=>assignedSubjects.some(row=>row.subject_id===mark.subject_id)).map(mark=><tr key={mark.id}><td>{mark.student_name}</td><td>{mark.admission_number}</td><td>{assignedSubjects.find(row=>row.subject_id===mark.subject_id)?.subject}</td><td>{mark.score.toFixed(2)}</td><td><button type="button" className="secondary-button" onClick={()=>setResultForm({student_id:String(mark.student_id),subject_id:String(mark.subject_id),score:String(mark.score)})}>Edit</button></td></tr>)}
+          {!resultMarks.length&&<tr><td colSpan={5}>No marks have been entered for this examination yet.</td></tr>}
+        </tbody></table></div>
+      </>}
+    </section>
+  </div>
   return <section className="panel"><div className="panel-heading"><div><h2>Class attendance</h2><p>Record attendance for students in your assigned classes.</p></div></div>{message&&<div className="notice">{message}</div>}<div className="student-form-grid"><label>Assigned class<select value={classId} onChange={e=>setClassId(e.target.value)}><option value="">Choose class</option>{assignments.map(a=><option key={a.assignment_id} value={a.class_id}>{a.class} — {a.subject}</option>)}</select></label><label>Attendance date<input type="date" value={attendanceDate} onChange={e=>setAttendanceDate(e.target.value)}/></label></div><div className="table-wrap"><table><thead><tr><th>Student</th><th>Admission number</th><th>Status</th><th>Action</th></tr></thead><tbody>{students.map(student=><tr key={student.id}><td>{student.first_name} {student.last_name}</td><td>{student.admission_number}</td><td><select value={statuses[student.id]||'Present'} onChange={e=>setStatuses(old=>({...old,[student.id]:e.target.value}))}><option>Present</option><option>Absent</option><option>Late</option><option>Excused</option></select></td><td><button className="primary-button" disabled={busy===student.id} onClick={()=>void record(student)}>{busy===student.id?'Saving...':'Save'}</button></td></tr>)}</tbody></table></div>{!students.length&&<div className="empty-state"><Users size={30}/><p>Select one of your assigned classes to load its active students.</p></div>}</section>
 }
 function SchoolProfileSettings({token,onSaved}:{token:string;onSaved:()=>void}) {
