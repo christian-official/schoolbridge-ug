@@ -436,7 +436,7 @@ function App() {
 
 
 
-          <StaffFinance token={token} active={active} />
+          <StaffFinance token={token} active={active} classes={classes} />
           {studentProfile && (
             <div className="modal-backdrop" onClick={()=>setStudentProfile(null)}>
               <section className="panel student-profile-modal" onClick={e=>e.stopPropagation()}>
