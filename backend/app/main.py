@@ -177,7 +177,10 @@ def seed_demo_data_if_empty():
         active_term = "Term 1"
 
         # Demo class fees and student charges (UGX), without touching real records.
+        demo_class_ids = {student.class_id for student in demo_students if student.class_id is not None}
         for school_class in demo_classes:
+            if school_class.id not in demo_class_ids:
+                continue
             class_fee = db.query(models.ClassFee).filter_by(
                 class_id=school_class.id, term=active_term, year=current_year
             ).first()
