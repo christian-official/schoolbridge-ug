@@ -107,7 +107,7 @@ function App() {
   const [studentError, setStudentError] = useState('')
   const [studentSuccess, setStudentSuccess] = useState('')
   const [studentForm, setStudentForm] = useState({
-    first_name: '', middle_name: '', last_name: '', gender: '', date_of_birth: '', class_id: '',
+    first_name: '', middle_name: '', last_name: '', full_name: '', a_level_stream: '', gender: '', date_of_birth: '', class_id: '',
     religion: '', nationality: '', phone: '', address: '', guardian_name: '', guardian_relationship: '', guardian_phone: '', previous_school: '',
     admission_date: new Date().toISOString().slice(0, 10), fee_amount: '', academic_level: '', combination: '', optional_subjects: '', subsidiary_subjects: '',
   })
@@ -167,7 +167,7 @@ function App() {
         method: 'POST',
         body: JSON.stringify({
           name: classForm.name.trim(),
-          section: classForm.section.trim() || null,
+          section: classForm.section.trim(),
         }),
       })
       setClassForm({ name: '', section: '' })
@@ -190,9 +190,9 @@ function App() {
       const createdStudent = await api<RecordItem>('students', token, {
         method: 'POST',
         body: JSON.stringify({
-          first_name: studentForm.first_name.trim(),
+          first_name: studentForm.full_name.trim().split(/\s+/)[0] || '',
           middle_name: null,
-          last_name: studentForm.last_name.trim(),
+          last_name: studentForm.full_name.trim().split(/\s+/).slice(1).join(' '),
           religion: studentForm.religion || null,
           nationality: studentForm.nationality.trim() || null,
           phone: studentForm.phone.trim() || null,
@@ -206,13 +206,13 @@ function App() {
           date_of_birth: studentForm.date_of_birth || null,
           class_id: Number(studentForm.class_id),
           fee_amount: studentForm.fee_amount === '' ? null : Number(studentForm.fee_amount),
-          academic_level: schoolConfig.school_type==='Secondary' ? studentForm.academic_level || null : null,
-          combination: schoolConfig.school_type==='Secondary' && studentForm.academic_level==='A-Level' ? studentForm.combination || null : null,
-          optional_subjects: schoolConfig.school_type==='Secondary' && studentForm.academic_level==='O-Level' ? studentForm.optional_subjects || null : null,
-          subsidiary_subjects: schoolConfig.school_type==='Secondary' && studentForm.academic_level==='A-Level' ? studentForm.subsidiary_subjects || null : null,
+          academic_level: schoolConfig.school_type==='Secondary' ? selectedAcademicLevel || null : null,
+          combination: selectedAcademicLevel==='A-Level' ? studentForm.combination || null : null,
+          optional_subjects: selectedAcademicLevel==='O-Level' ? studentForm.optional_subjects || null : null,
+          subsidiary_subjects: selectedAcademicLevel==='A-Level' ? studentForm.subsidiary_subjects || null : null,
         }),
       })
-      setStudentForm({ first_name: '', middle_name: '', last_name: '', gender: '', date_of_birth: '', class_id: '', religion: '', nationality: '', phone: '', address: '', guardian_name: '', guardian_relationship: '', guardian_phone: '', previous_school: '', admission_date: new Date().toISOString().slice(0, 10), fee_amount: '', academic_level: '', combination: '', optional_subjects: '', subsidiary_subjects: '' })
+      setStudentForm({ first_name: '', middle_name: '', last_name: '', full_name: '', a_level_stream: '', gender: '', date_of_birth: '', class_id: '', religion: '', nationality: '', phone: '', address: '', guardian_name: '', guardian_relationship: '', guardian_phone: '', previous_school: '', admission_date: new Date().toISOString().slice(0, 10), fee_amount: '', academic_level: '', combination: '', optional_subjects: '', subsidiary_subjects: '' })
       setShowStudentForm(false)
       setStudentSuccess(`Student registered successfully. Admission number: ${createdStudent.admission_number}`)
       await loadSchoolData(token)
@@ -361,6 +361,11 @@ function App() {
 
   const filteredStudents = students
 
+  const selectedClass = classes.find(item => String(item.id) === studentForm.class_id)
+  const className = (selectedClass?.name || '').toLowerCase().replace(/\s+/g, ' ').trim()
+  const selectedAcademicLevel = /^(s|senior\s*)[56]$/.test(className) || /senior\s*[56]/.test(className) ? 'A-Level' : /^(s|senior\s*)[1-4]$/.test(className) || /senior\s*[1-4]/.test(className) ? 'O-Level' : ''
+  const [artsCombinations, sciencesCombinations] = (schoolConfig.a_level_combinations || '').split(/\r?\n/).reduce((groups: string[][], line: string) => { const match = line.match(/^(ARTS|SCIENCES)::(.*)$/i); if (match && match[2].trim()) groups[match[1].toUpperCase() === 'ARTS' ? 0 : 1].push(match[2].trim()); return groups }, [[], []])
+
   if (!token || !user) {
     return (
       <main className="login-page">
@@ -505,7 +510,7 @@ function App() {
                   <section className="form-section">
                     <div className="form-section-heading"><span className="form-section-number">02</span><div><h4>Biodata</h4><p>Enter the student's official names and personal details.</p></div></div>
                     <div className="student-form-grid">
-                      <label className="field-span-full">Student full name *<input autoComplete="name" value={[studentForm.first_name,studentForm.last_name].filter(Boolean).join(' ')} onChange={e=>{const parts=e.target.value.trim().split(/\s+/);setStudentForm({...studentForm,first_name:parts.shift()||'',last_name:parts.join(' ')})}} placeholder="Enter student's full name" required /></label>
+                      <label className="field-span-full">Student full name *<input autoComplete="name" value={studentForm.full_name} onChange={e=>setStudentForm({...studentForm,full_name:e.target.value})} placeholder="Enter student's full name" required /></label>
                       <label>Gender<select value={studentForm.gender} onChange={e => setStudentForm({ ...studentForm, gender: e.target.value })}><option value="">Select gender</option><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select></label>
                       <label>Date of birth<input type="date" value={studentForm.date_of_birth} onChange={e => setStudentForm({ ...studentForm, date_of_birth: e.target.value })} /></label>
                       <label>Nationality<input autoComplete="country-name" value={studentForm.nationality} onChange={e => setStudentForm({ ...studentForm, nationality: e.target.value })} placeholder="e.g. Ugandan" /></label>
@@ -531,7 +536,7 @@ function App() {
                     </div>
                   </section>
 
-                  {schoolConfig.school_type==='Secondary'&&<section className="form-section"><div className="form-section-heading"><span className="form-section-number">05</span><div><h4>Academic level and subject choices</h4><p>These options follow the school type and curriculum configured in Settings.</p></div></div><div className="student-form-grid"><label>Level<select value={studentForm.academic_level} onChange={e=>setStudentForm({...studentForm,academic_level:e.target.value,combination:'',optional_subjects:'',subsidiary_subjects:''})}><option value="">Select level</option><option value="O-Level">O-Level</option><option value="A-Level">A-Level</option></select></label>{studentForm.academic_level==='A-Level'&&<label>A-Level combination<select value={studentForm.combination} onChange={e=>setStudentForm({...studentForm,combination:e.target.value})}><option value="">Select combination</option>{(schoolConfig.a_level_combinations||'').split(/\r?\n/).map((x:string)=>x.trim()).filter(Boolean).map((x:string)=><option key={x}>{x}</option>)}</select></label>}{studentForm.academic_level==='A-Level'&&<label className="field-span-full">Subsidiary subjects<select multiple value={studentForm.subsidiary_subjects?studentForm.subsidiary_subjects.split(',').filter(Boolean):[]} onChange={e=>setStudentForm({...studentForm,subsidiary_subjects:Array.from(e.target.selectedOptions).map(o=>o.value).join(',')})}>{(schoolConfig.a_level_subsidiary_subjects||'').split(/\r?\n/).map((x:string)=>x.trim()).filter(Boolean).map((x:string)=><option key={x}>{x}</option>)}</select><small className="field-hint">Select subsidiary subjects configured by the administrator.</small></label>}{studentForm.academic_level==='O-Level'&&<label className="field-span-full">Optional subjects<select multiple value={studentForm.optional_subjects?studentForm.optional_subjects.split(',').filter(Boolean):[]} onChange={e=>setStudentForm({...studentForm,optional_subjects:Array.from(e.target.selectedOptions).map(o=>o.value).join(',')})}>{(schoolConfig.o_level_optional_subjects||'').split(/\r?\n/).map((x:string)=>x.trim()).filter(Boolean).map((x:string)=><option key={x}>{x}</option>)}</select><small className="field-hint">Hold Ctrl (or Command) to select more than one optional subject.</small></label>}</div></section>}
+                  {schoolConfig.school_type==='Secondary'&&selectedAcademicLevel==='A-Level'&&<section className="form-section"><div className="form-section-heading"><span className="form-section-number">05</span><div><h4>A-Level subject choices</h4><p>The selected class determines A-Level automatically. Choose Arts or Sciences, then its combinations.</p></div></div><div className="student-form-grid"><label>A-Level stream *<select required value={studentForm.a_level_stream} onChange={e=>setStudentForm({...studentForm,a_level_stream:e.target.value,combination:''})}><option value="">Choose Arts or Sciences</option><option value="Arts">Arts</option><option value="Sciences">Sciences</option></select></label>{studentForm.a_level_stream&&<label>Combination *<select required value={studentForm.combination} onChange={e=>setStudentForm({...studentForm,combination:e.target.value})}><option value="">Select combination</option>{(studentForm.a_level_stream==='Arts'?artsCombinations:sciencesCombinations).map((x:string)=><option key={x}>{x}</option>)}</select></label>}<label className="field-span-full">Subsidiary subjects<select multiple size={5} value={studentForm.subsidiary_subjects?studentForm.subsidiary_subjects.split(',').filter(Boolean):[]} onChange={e=>setStudentForm({...studentForm,subsidiary_subjects:Array.from(e.target.selectedOptions).map(o=>o.value).join(',')})}>{(schoolConfig.a_level_subsidiary_subjects||'').split(/\r?\n/).map((x:string)=>x.trim()).filter(Boolean).map((x:string)=><option key={x}>{x}</option>)}</select><small className="field-hint">Select more than one subsidiary subject using Ctrl/Command-click.</small></label></div></section>}{schoolConfig.school_type==='Secondary'&&selectedAcademicLevel==='O-Level'&&<section className="form-section"><div className="form-section-heading"><span className="form-section-number">05</span><div><h4>O-Level optional subjects</h4><p>The selected class determines O-Level automatically.</p></div></div><div className="student-form-grid"><label className="field-span-full">Optional subjects<select multiple size={5} value={studentForm.optional_subjects?studentForm.optional_subjects.split(',').filter(Boolean):[]} onChange={e=>setStudentForm({...studentForm,optional_subjects:Array.from(e.target.selectedOptions).map(o=>o.value).join(',')})}>{(schoolConfig.o_level_optional_subjects||'').split(/\r?\n/).map((x:string)=>x.trim()).filter(Boolean).map((x:string)=><option key={x}>{x}</option>)}</select><small className="field-hint">Select more than one optional subject using Ctrl/Command-click.</small></label></div></section>}
                   {classes.length === 0 && <p className="form-hint">No classes are available yet. Add a class under Settings → Classes & Streams before registering students.</p>}
                   <div className="form-actions registration-actions"><button type="button" className="secondary-button" onClick={() => setShowStudentForm(false)}>Cancel</button><button className="primary-button" disabled={savingStudent || classes.length === 0}>{savingStudent ? <><LoaderCircle className="spin" size={16} /> Saving student...</> : 'Register student'}</button></div>
                 </form>
@@ -638,7 +643,7 @@ function App() {
               <div className="panel-heading"><div><h2>School classes</h2><p>Classes registered in the system</p></div><button className="primary-button add-student-button" onClick={() => { setShowClassForm(v => !v); setClassError(''); setClassSuccess('') }}><Plus size={16} /> {showClassForm ? 'Close form' : 'Add class'}</button></div>
               {classSuccess && <div className="success-notice">{classSuccess}</div>}
               {classError && <div className="form-error">{classError}</div>}
-              {showClassForm && <form className="student-form class-form" onSubmit={registerClass}><div className="form-heading"><div><h3>Create a school class</h3><p>Examples: Primary 1, Senior 1, Senior 2.</p></div></div><div className="student-form-grid class-form-grid"><label>Class name *<input value={classForm.name} onChange={e => setClassForm({ ...classForm, name: e.target.value })} placeholder="e.g. Primary 1" required /></label><label>Section (optional)<input value={classForm.section} onChange={e => setClassForm({ ...classForm, section: e.target.value })} placeholder="e.g. East or A" /></label></div><div className="form-actions"><button type="button" className="secondary-button" onClick={() => setShowClassForm(false)}>Cancel</button><button className="primary-button" disabled={savingClass}>{savingClass ? 'Saving...' : 'Save class'}</button></div></form>}
+              {showClassForm && <form className="student-form class-form" onSubmit={registerClass}><div className="form-heading"><div><h3>Create a school class</h3><p>Examples: Primary 1, Senior 1, Senior 2.</p></div></div><div className="student-form-grid class-form-grid"><label>Class name *<input value={classForm.name} onChange={e => setClassForm({ ...classForm, name: e.target.value })} placeholder="e.g. Primary 1" required /></label><label>Stream *<input value={classForm.section} onChange={e => setClassForm({ ...classForm, section: e.target.value })} placeholder="e.g. East, A, Arts or Sciences" required /></label></div><div className="form-actions"><button type="button" className="secondary-button" onClick={() => setShowClassForm(false)}>Cancel</button><button className="primary-button" disabled={savingClass}>{savingClass ? 'Saving...' : 'Save class'}</button></div></form>}
               <div className="class-grid">{classes.map(item => <div className="class-card" key={item.id}><BookOpen size={22} /><strong>{item.name}</strong><span>{item.section || 'General section'}</span></div>)}</div>
               {classes.length === 0 && <EmptyState text="No classes have been added yet." />}
             </section>
@@ -712,12 +717,12 @@ function SchoolProfileSettings({token}:{token:string}) {
 
 function AcademicCurriculumSettings({token}:{token:string}) {
   const [profile,setProfile]=useState<any>({name:'My School',school_type:'Secondary'})
-  const [form,setForm]=useState({a_level_combinations:'',o_level_optional_subjects:'',a_level_subsidiary_subjects:''})
+  const [form,setForm]=useState({arts_combinations:'',sciences_combinations:'',o_level_optional_subjects:'',a_level_subsidiary_subjects:''})
   const [message,setMessage]=useState('')
   const [busy,setBusy]=useState(false)
-  useEffect(()=>{api<any>('settings/school-profile',token).then(p=>{setProfile(p);setForm({a_level_combinations:p.a_level_combinations||'',o_level_optional_subjects:p.o_level_optional_subjects||'',a_level_subsidiary_subjects:p.a_level_subsidiary_subjects||''})}).catch(e=>setMessage(e.message))},[token])
-  async function save(e:React.FormEvent){e.preventDefault();setBusy(true);setMessage('');try{await api('settings/school-profile',token,{method:'PUT',body:JSON.stringify({...profile,...form})});setMessage('Academic curriculum options saved.')}catch(e){setMessage(e instanceof Error?e.message:'Unable to save curriculum settings.')}finally{setBusy(false)}}
-  return <section className="panel settings-panel"><div className="panel-heading"><div><h2>Academic & curriculum settings</h2><p>Enter one option per line. These choices will appear during student registration.</p></div></div>{message&&<div className="success-notice">{message}</div>}<form className="student-form" onSubmit={save}><div className="student-form-grid"><label className="field-span-full">A-Level combinations<textarea rows={6} value={form.a_level_combinations} onChange={e=>setForm({...form,a_level_combinations:e.target.value})} placeholder={'e.g. PCM\nBCM\nHEG'}/><small className="field-hint">Combinations offered by this school.</small></label><label className="field-span-full">O-Level optional subjects<textarea rows={6} value={form.o_level_optional_subjects} onChange={e=>setForm({...form,o_level_optional_subjects:e.target.value})} placeholder={'e.g. Agriculture\nComputer Studies\nFine Art'}/></label><label className="field-span-full">A-Level subsidiary subjects<textarea rows={4} value={form.a_level_subsidiary_subjects} onChange={e=>setForm({...form,a_level_subsidiary_subjects:e.target.value})} placeholder={'e.g. General Paper\nSub Mathematics'}/></label></div><div className="form-actions"><button className="primary-button" disabled={busy}>{busy?'Saving...':'Save academic options'}</button></div></form></section>
+  useEffect(()=>{api<any>('settings/school-profile',token).then(p=>{setProfile(p);setForm({arts_combinations:(p.a_level_combinations||'').split(/\r?\n/).filter((x:string)=>x.startsWith('ARTS::')).map((x:string)=>x.slice(6)).join('\n'),sciences_combinations:(p.a_level_combinations||'').split(/\r?\n/).filter((x:string)=>x.startsWith('SCIENCES::')).map((x:string)=>x.slice(10)).join('\n'),o_level_optional_subjects:p.o_level_optional_subjects||'',a_level_subsidiary_subjects:p.a_level_subsidiary_subjects||''})}).catch(e=>setMessage(e.message))},[token])
+  async function save(e:React.FormEvent){e.preventDefault();setBusy(true);setMessage('');try{await api('settings/school-profile',token,{method:'PUT',body:JSON.stringify({...profile,a_level_combinations:[...form.arts_combinations.split(/\r?\n/).map((x:string)=>x.trim()).filter(Boolean).map((x:string)=>'ARTS::'+x),...form.sciences_combinations.split(/\r?\n/).map((x:string)=>x.trim()).filter(Boolean).map((x:string)=>'SCIENCES::'+x)].join('\n'),o_level_optional_subjects:form.o_level_optional_subjects,a_level_subsidiary_subjects:form.a_level_subsidiary_subjects})});setMessage('Academic curriculum options saved.')}catch(e){setMessage(e instanceof Error?e.message:'Unable to save curriculum settings.')}finally{setBusy(false)}}
+  return <section className="panel settings-panel"><div className="panel-heading"><div><h2>Academic & curriculum settings</h2><p>Enter one option per line. These choices will appear during student registration.</p></div></div>{message&&<div className="success-notice">{message}</div>}<form className="student-form" onSubmit={save}><div className="student-form-grid"><label>A-Level Arts combinations<textarea rows={6} value={form.arts_combinations} onChange={e=>setForm({...form,arts_combinations:e.target.value})} placeholder={'e.g. HEG\nLEG\nHED'}/><small className="field-hint">Enter Arts combinations, one per line.</small></label><label>A-Level Sciences combinations<textarea rows={6} value={form.sciences_combinations} onChange={e=>setForm({...form,sciences_combinations:e.target.value})} placeholder={'e.g. PCM\nBCM\nPCB'}/><small className="field-hint">Enter Sciences combinations, one per line.</small></label><label className="field-span-full">O-Level optional subjects<textarea rows={6} value={form.o_level_optional_subjects} onChange={e=>setForm({...form,o_level_optional_subjects:e.target.value})} placeholder={'e.g. Agriculture\nComputer Studies\nFine Art'}/></label><label className="field-span-full">A-Level subsidiary subjects<textarea rows={4} value={form.a_level_subsidiary_subjects} onChange={e=>setForm({...form,a_level_subsidiary_subjects:e.target.value})} placeholder={'e.g. General Paper\nSub Mathematics'}/></label></div><div className="form-actions"><button className="primary-button" disabled={busy}>{busy?'Saving...':'Save academic options'}</button></div></form></section>
 }
 
 function TeacherUsersSettings({token,classes}:{token:string;classes:RecordItem[]}) {
