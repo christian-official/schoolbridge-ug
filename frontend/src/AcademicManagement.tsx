@@ -319,7 +319,7 @@ export default function AcademicManagement({ token, classes }: { token: string; 
           {marks.map(mark => <tr key={mark.id}><td>{studentName(studentById.get(mark.student_id))}</td><td>{studentById.get(mark.student_id)?.admission_number || '—'}</td><td>{subjectById.get(mark.subject_id)?.name || 'Unknown subject'}</td><td><strong>{mark.score.toFixed(2)}</strong></td><td>{mark.verified ? 'Verified' : 'Pending'}</td><td><button type="button" className="secondary-button" onClick={() => void setMarkVerification(mark, !mark.verified)} disabled={saving}>{mark.verified ? 'Unlock' : 'Verify'}</button></td></tr>)}
           {!marks.length && <tr><td colSpan={6}>No marks have been recorded for this examination yet.</td></tr>}
         </tbody></table></div>
-      </section>>
+      </section>
 
       <section className="panel academic-results-print">
         <div className="panel-heading"><div><h2>Class performance</h2><p>{selectedExam.name} · {selectedClass?.name || 'Class'}{selectedClass?.section ? ' — ' + selectedClass.section : ''} · {selectedExam.term} {selectedExam.year}</p><p>Provisional ranking uses average scores. Complete and verify all subject marks before issuing final results.</p></div></div>
