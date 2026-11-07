@@ -176,20 +176,20 @@ def health_check():
 
 @app.post("/api/classes", response_model=ClassOut, tags=["Classes"])
 def create_class(data: ClassCreate, db: Session = Depends(get_db)):
-    item = models.SchoolClass(**data.model_dump())
+    item = models.SchoolClass(name=data.name.strip(), section=(data.section or "General").strip())
     db.add(item)
     try:
         db.commit()
         db.refresh(item)
     except IntegrityError:
         db.rollback()
-        raise HTTPException(409, "A class with that name already exists.")
+        raise HTTPException(409, "That class and stream combination already exists.")
     return item
 
 
 @app.get("/api/classes", response_model=list[ClassOut], tags=["Classes"])
 def list_classes(db: Session = Depends(get_db)):
-    return db.query(models.SchoolClass).order_by(models.SchoolClass.name).all()
+    return db.query(models.SchoolClass).order_by(models.SchoolClass.name, models.SchoolClass.section).all()
 
 
 @app.post("/api/subjects", response_model=SubjectOut, tags=["Subjects"])
@@ -637,6 +637,62 @@ def upgrade_existing_database():
                 connection.execute(text("ALTER TABLE school_settings ADD COLUMN active_term VARCHAR(20) NOT NULL DEFAULT 'Term 1'"))
 
 upgrade_existing_database()
+
+def upgrade_class_stream_uniqueness():
+    """Allow multiple streams per grade while preserving existing class IDs and foreign keys."""
+    from sqlalchemy import inspect, text
+    import os, shutil, sqlite3
+    inspector = inspect(engine)
+    if "classes" not in inspector.get_table_names():
+        return
+    uniques = inspector.get_unique_constraints("classes")
+    name_only = any(u.get("column_names") == ["name"] for u in uniques)
+    if not name_only:
+        return
+    if engine.dialect.name == "sqlite":
+        db_path = engine.url.database
+        if not db_path or db_path == ":memory:":
+            raise RuntimeError("Cannot safely migrate an in-memory classes database.")
+        absolute_path = os.path.abspath(db_path)
+        backup_path = absolute_path + ".pre_stream_migration.bak"
+        if not os.path.exists(backup_path):
+            shutil.copy2(absolute_path, backup_path)
+        raw = sqlite3.connect(absolute_path)
+        try:
+            raw.execute("PRAGMA foreign_keys=OFF")
+            raw.execute("BEGIN")
+            raw.execute("""CREATE TABLE classes_new (
+                id INTEGER NOT NULL PRIMARY KEY,
+                name VARCHAR(80) NOT NULL,
+                section VARCHAR(40) NOT NULL DEFAULT 'General',
+                CONSTRAINT uq_classes_name_section UNIQUE (name, section)
+            )""")
+            raw.execute("INSERT INTO classes_new (id,name,section) SELECT id,name,COALESCE(section,'General') FROM classes")
+            raw.execute("DROP TABLE classes")
+            raw.execute("ALTER TABLE classes_new RENAME TO classes")
+            raw.execute("CREATE INDEX ix_classes_name ON classes (name)")
+            raw.commit()
+            raw.execute("PRAGMA foreign_keys=ON")
+            violations = raw.execute("PRAGMA foreign_key_check").fetchall()
+            if violations:
+                raise RuntimeError("Class stream migration found foreign-key violations; restore the automatic backup.")
+        except Exception:
+            raw.rollback()
+            raise
+        finally:
+            raw.close()
+    elif engine.dialect.name == "postgresql":
+        with engine.begin() as connection:
+            connection.execute(text("UPDATE classes SET section='General' WHERE section IS NULL"))
+            for unique in uniques:
+                if unique.get("column_names") == ["name"] and unique.get("name"):
+                    connection.execute(text('ALTER TABLE classes DROP CONSTRAINT "' + unique["name"] + '"'))
+            connection.execute(text("ALTER TABLE classes ALTER COLUMN section SET DEFAULT 'General'"))
+            connection.execute(text("ALTER TABLE classes ALTER COLUMN section SET NOT NULL"))
+            connection.execute(text("ALTER TABLE classes ADD CONSTRAINT uq_classes_name_section UNIQUE (name, section)"))
+
+upgrade_class_stream_uniqueness()
+
 @app.get("/api/students/search", tags=["Students"])
 def search_students(page: int = 1, page_size: int = 25, search: str = "", class_id: int | None = None, db: Session = Depends(get_db)):
     page_size = min(max(page_size, 1), 100)
