@@ -73,6 +73,7 @@ function App() {
   const [loginError, setLoginError] = useState('')
   const [loading, setLoading] = useState(false)
   const [active, setActive] = useState('Overview')
+  const [refreshKey, setRefreshKey] = useState(0)
   const [settingsSection, setSettingsSection] = useState('home')
   const [students, setStudents] = useState<RecordItem[]>([])
   const [studentTotal, setStudentTotal] = useState(0)
@@ -392,7 +393,7 @@ function App() {
           <button className="mobile-menu-button" onClick={() => setMobileMenu(true)}><Menu /></button>
           <div className="breadcrumb">School workspace <span>/</span> <strong>{active}</strong></div>
           <div className="top-actions">
-            <button className="secondary-button refresh-button" type="button" onClick={() => { void loadSchoolData(token); if (active === 'Students') void loadStudentPage(1, search) }}>Refresh</button>
+            <button className="secondary-button refresh-button" type="button" onClick={() => { void loadSchoolData(token); if (active === 'Students') void loadStudentPage(1, search); setRefreshKey(value => value + 1) }}>Refresh</button>
             <span className="online-status"><i /> System online</span>
             <button className="icon-button" title="Notifications"><Bell size={19} /></button>
             <div className="top-avatar">{user.username.slice(0, 1).toUpperCase()}</div>
@@ -454,7 +455,7 @@ function App() {
                 <form className="student-form" onSubmit={registerStudent}>
                   <div className="form-heading"><div><h3>New student registration</h3><p>Enter the student's details below.</p></div><span className="required-note">* Required fields</span></div>
                   <div className="student-form-grid">
-                    <div className="generated-admission"><strong>Admission number</strong><span>Generated automatically when you save</span></div>
+                    <div className="generated-admission"><strong>Admission number</strong></div>
                     <label>First name *<input value={studentForm.first_name} onChange={e => setStudentForm({ ...studentForm, first_name: e.target.value })} placeholder="First name" required /></label>
                     <label>Middle name<input value={studentForm.middle_name} onChange={e => setStudentForm({ ...studentForm, middle_name: e.target.value })} /></label>
                     <label>Last name *<input value={studentForm.last_name} onChange={e => setStudentForm({ ...studentForm, last_name: e.target.value })} placeholder="Last name" required /></label>
@@ -471,7 +472,7 @@ function App() {
                     <label>Guardian phone<input value={studentForm.guardian_phone} onChange={e => setStudentForm({ ...studentForm, guardian_phone: e.target.value })} /></label>
                     <label>Previous school<input value={studentForm.previous_school} onChange={e => setStudentForm({ ...studentForm, previous_school: e.target.value })} /></label>
                     <label>Admission date<input type="date" value={studentForm.admission_date} onChange={e => setStudentForm({ ...studentForm, admission_date: e.target.value })} /></label>
-                    <div className="generated-admission"><strong>Class fees are assigned automatically</strong><span>The current term fee comes from the selected class fee structure.</span></div>
+
                   </div>
                   {classes.length === 0 && <p className="form-hint">Add a school class first before registering students.</p>}
                   <div className="form-actions"><button type="button" className="secondary-button" onClick={() => setShowStudentForm(false)}>Cancel</button><button className="primary-button" disabled={savingStudent || classes.length === 0}>{savingStudent ? <><LoaderCircle className="spin" size={16} /> Saving...</> : 'Save student'}</button></div>
@@ -485,7 +486,7 @@ function App() {
 
 
 
-          <StaffFinance token={token} active={active} classes={classes} />
+          <StaffFinance token={token} active={active} classes={classes} refreshKey={refreshKey} />
           {studentProfile && (
             <div className="modal-backdrop" onClick={()=>setStudentProfile(null)}>
               <section className="panel student-profile-modal" onClick={e=>e.stopPropagation()}>
