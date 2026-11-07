@@ -16,6 +16,7 @@ def test_fresh_database_is_created_and_versioned(tmp_path):
     assert "students" in tables
     assert "fee_payments" in tables
     assert "teacher_duties" in tables
+    assert "verified" in {column["name"] for column in inspector.get_columns("marks")}
 
 
 def test_baseline_adds_missing_tables_without_losing_existing_records(tmp_path):
