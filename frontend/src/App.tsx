@@ -64,6 +64,7 @@ const menu = [
 const teacherMenu = [
   { label: 'My Classes', icon: BookOpen },
   { label: 'Attendance', icon: CalendarDays },
+  { label: 'My Attendance', icon: Users },
   { label: 'My Results', icon: FileText },
 ]
 
@@ -510,7 +511,7 @@ function App() {
 
           {dataError && <div className="notice">{dataError} <button onClick={() => void loadSchoolData(token)}>Retry</button></div>}
 
-          {(active === 'My Classes' || active === 'Attendance' || active === 'My Results') && user.role === 'teacher' && <TeacherWorkspace token={token} active={active} />}
+          {(active === 'My Classes' || active === 'Attendance' || active === 'My Attendance' || active === 'My Results') && user.role === 'teacher' && <TeacherWorkspace token={token} active={active} />}
 
           {active === 'Overview' && (
             <>
@@ -784,6 +785,7 @@ type TeacherAssignment = {assignment_id:number;class_id:number;class:string;subj
 type TeacherStudent = {id:number;first_name:string;last_name:string;admission_number:string;class_id:number}
 type TeacherExam = {id:number;name:string;term:string;year:number;class_id:number|null}
 type TeacherMark = {id:number;student_id:number;subject_id:number;exam_id:number;score:number;verified:boolean;student_name:string;admission_number:string;class_id:number|null}
+type TeacherOwnAttendance = {staff_name:string;staff_number:string;records:{id:number;attendance_date:string;status:string;notes?:string|null}[]}
 
 function TeacherWorkspace({token,active}:{token:string;active:string}) {
   const [assignments,setAssignments]=useState<TeacherAssignment[]>([])
@@ -801,6 +803,9 @@ function TeacherWorkspace({token,active}:{token:string;active:string}) {
   const [resultMessage,setResultMessage]=useState('')
   const [resultError,setResultError]=useState('')
   const [resultSaving,setResultSaving]=useState(false)
+  const [ownAttendance,setOwnAttendance]=useState<TeacherOwnAttendance|null>(null)
+  const [ownAttendanceError,setOwnAttendanceError]=useState('')
+  const [ownAttendanceLoading,setOwnAttendanceLoading]=useState(false)
 
   useEffect(()=>{api<TeacherAssignment[]>('teacher/my-assignments',token).then(rows=>{setAssignments(rows);if(rows.length)setClassId(String(rows[0].class_id))}).catch(e=>setMessage(e.message))},[token])
   useEffect(()=>{if(active!=='Attendance'||!classId)return;api<TeacherStudent[]>('teacher/students?class_id='+classId,token).then(setStudents).catch(e=>setMessage(e.message))},[active,classId,token])
@@ -812,7 +817,19 @@ function TeacherWorkspace({token,active}:{token:string;active:string}) {
       else setExamId('')
     }).catch(e=>setResultError(e.message))
   },[active,token])
-  const selectedTeacherExam=teacherExams.find(exam=>String(exam.id)===examId)||null
+  useEffect(()=>{
+    if(active!=='My Attendance')return
+    let cancelled=false
+    setOwnAttendanceLoading(true)
+    setOwnAttendanceError('')
+    api<TeacherOwnAttendance>('teacher/my-staff-attendance',token).then(data=>{
+      if(!cancelled)setOwnAttendance(data)
+    }).catch(error=>{
+      if(!cancelled){setOwnAttendance(null);setOwnAttendanceError(error instanceof Error?error.message:'Unable to load your attendance records.')}
+    }).finally(()=>{if(!cancelled)setOwnAttendanceLoading(false)})
+    return ()=>{cancelled=true}
+  },[active,token])
+    const selectedTeacherExam=teacherExams.find(exam=>String(exam.id)===examId)||null
   const assignedSubjects=assignments.filter(row=>row.class_id===selectedTeacherExam?.class_id)
   useEffect(()=>{
     if(active!=='My Results'||!selectedTeacherExam){setResultStudents([]);setResultMarks([]);return}
@@ -845,7 +862,22 @@ function TeacherWorkspace({token,active}:{token:string;active:string}) {
     finally{setResultSaving(false)}
   }
   if(active==='My Classes') return <section className="panel"><div className="panel-heading"><div><h2>My assigned classes</h2><p>Only classes and subjects assigned to your teacher account appear here.</p></div></div>{message&&<div className="notice">{message}</div>}<div className="class-grid">{assignments.map(a=><div className="class-card" key={a.assignment_id}><BookOpen size={22}/><strong>{a.class}</strong><span>{a.subject}</span></div>)}</div>{!assignments.length&&<div className="empty-state"><GraduationCap size={30}/><p>No classes have been assigned to your account yet.</p></div>}</section>
-  if(active==='My Results') return <div className="academic-workspace">
+  if(active==='My Attendance') return <div className="academic-workspace">
+    <section className="panel">
+      <div className="panel-heading"><div><h2>My attendance record</h2><p>Review the daily attendance status recorded against your staff profile.</p></div></div>
+      {ownAttendanceLoading&&<p className="form-hint">Loading your attendance...</p>}
+      {ownAttendanceError&&<div className="form-error" role="alert">{ownAttendanceError}</div>}
+      {ownAttendance&&<>
+        <div className="teacher-attendance-identity"><strong>{ownAttendance.staff_name}</strong><span>{ownAttendance.staff_number}</span></div>
+        <p className="attendance-help">Check the date and recorded status. If anything is incorrect, contact the school administrator to request a correction.</p>
+        <div className="table-wrap"><table><thead><tr><th>Date</th><th>Your status</th><th>Notes</th></tr></thead><tbody>
+          {ownAttendance.records.map(record=><tr key={record.id}><td>{new Date(record.attendance_date+'T00:00:00').toLocaleDateString('en-UG',{day:'numeric',month:'short',year:'numeric'})}</td><td><span className={'attendance-status-pill status-'+record.status.toLowerCase()}>{record.status}</span></td><td>{record.notes||'—'}</td></tr>)}
+          {!ownAttendance.records.length&&<tr><td colSpan={3}>No attendance records have been saved against your staff profile yet.</td></tr>}
+        </tbody></table></div>
+      </>}
+    </section>
+  </div>
+    if(active==='My Results') return <div className="academic-workspace">
     <section className="panel">
       <div className="panel-heading"><div><h2>My examination results</h2><p>Enter or correct marks only for your assigned subjects and classes.</p></div></div>
       {resultError&&<div className="form-error" role="alert">{resultError}</div>}
