@@ -387,7 +387,7 @@ export default function AcademicManagement({ token, classes }: { token: string; 
       )}
       {activeAcademicTab === 'history' && (
       <section className="panel academic-report-print">
-        <div className="panel-heading report-screen-controls"><div><h2>Student report cards</h2><p>Prepare a formal academic report with subject results and remarks from responsible staff and the parent or guardian.</p></div><button type="button" className="secondary-button" disabled={!historyStudentId||!historyRows.length} onClick={() => printAcademicSection('report')}><Printer size={15}/> Print report card</button></div>
+        <div className="panel-heading report-screen-controls"><div><h2>Student report cards</h2><p>Prepare a formal academic report with subject results and remarks from the class teacher and headteacher.</p></div><button type="button" className="secondary-button" disabled={!historyStudentId||!historyRows.length} onClick={() => printAcademicSection('report')}><Printer size={15}/> Print report card</button></div>
         <label className="academic-exam-select report-student-picker">Select student
           <select value={historyStudentId} onChange={e => setHistoryStudentId(e.target.value)}>
             <option value="">Choose a student</option>
