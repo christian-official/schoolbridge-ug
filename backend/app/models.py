@@ -85,6 +85,17 @@ class Mark(Base):
     score: Mapped[float]
 
 
+class GradeBand(Base):
+    __tablename__ = "grade_bands"
+    __table_args__ = (UniqueConstraint("grade"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    grade: Mapped[str] = mapped_column(String(20), unique=True)
+    min_score: Mapped[float]
+    max_score: Mapped[float]
+    remark: Mapped[str] = mapped_column(String(100), default="")
+
+
 class User(Base):
     __tablename__ = "users"
 
