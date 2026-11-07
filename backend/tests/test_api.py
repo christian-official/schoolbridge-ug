@@ -543,3 +543,72 @@ def test_class_scoped_exams_and_mark_correction():
         )
         assert other_class_exams.status_code == 200
         assert other_class_exams.json() == []
+
+
+def test_teacher_exam_access_is_limited_to_assigned_class_and_subject():
+    reset_database()
+    admin = create_admin()
+    admin_headers = {"Authorization": f"Bearer {create_access_token(admin)}"}
+    teacher = create_teacher()
+    teacher_headers = {"Authorization": f"Bearer " + create_access_token(teacher)}
+
+    db = SessionLocal()
+    try:
+        assigned_class = models.SchoolClass(name="Senior 4", section="North")
+        other_class = models.SchoolClass(name="Senior 4", section="South")
+        math = models.Subject(name="Mathematics")
+        biology = models.Subject(name="Biology")
+        db.add_all([assigned_class, other_class, math, biology])
+        db.flush()
+        student = models.Student(
+            admission_number="SB-TEACH-001", first_name="Joan",
+            last_name="Learner", class_id=assigned_class.id,
+        )
+        db.add(student)
+        db.flush()
+        exam = models.Exam(
+            name="End of Term", term="Term 2", year=2026,
+            class_id=assigned_class.id,
+        )
+        db.add(exam)
+        assignment = models.TeacherAssignment(
+            teacher_id=teacher.id, class_id=assigned_class.id, subject_id=math.id,
+        )
+        db.add(assignment)
+        db.commit()
+        exam_id, student_id = exam.id, student.id
+        math_id, biology_id = math.id, biology.id
+        other_class_id = other_class.id
+    finally:
+        db.close()
+
+    with TestClient(app) as client:
+        teacher_exams = client.get("/api/teacher/exams", headers=teacher_headers)
+        assert teacher_exams.status_code == 200
+        assert [row["id"] for row in teacher_exams.json()] == [exam_id]
+
+        allowed = client.put(
+            "/api/teacher/marks", headers=teacher_headers,
+            json={"student_id": student_id, "subject_id": math_id, "exam_id": exam_id, "score": 84},
+        )
+        assert allowed.status_code == 200, allowed.text
+        assert allowed.json()["score"] == 84
+
+        forbidden_subject = client.put(
+            "/api/teacher/marks", headers=teacher_headers,
+            json={"student_id": student_id, "subject_id": biology_id, "exam_id": exam_id, "score": 72},
+        )
+        assert forbidden_subject.status_code == 403
+
+        teacher_rows = client.get(
+            f"/api/teacher/marks?exam_id={exam_id}", headers=teacher_headers,
+        )
+        assert teacher_rows.status_code == 200
+        assert len(teacher_rows.json()) == 1
+        assert teacher_rows.json()[0]["subject_id"] == math_id
+
+        other_class_exams = client.get(
+            f"/api/exams?class_id={other_class_id}", headers=admin_headers,
+        )
+        assert other_class_exams.status_code == 200
+        assert other_class_exams.json() == []
