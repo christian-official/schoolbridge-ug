@@ -787,14 +787,73 @@ function TeacherWorkspace({token,active}:{token:string;active:string}) {
   return <section className="panel"><div className="panel-heading"><div><h2>Class attendance</h2><p>Record attendance for students in your assigned classes.</p></div></div>{message&&<div className="notice">{message}</div>}<div className="student-form-grid"><label>Assigned class<select value={classId} onChange={e=>setClassId(e.target.value)}><option value="">Choose class</option>{assignments.map(a=><option key={a.assignment_id} value={a.class_id}>{a.class} — {a.subject}</option>)}</select></label><label>Attendance date<input type="date" value={attendanceDate} onChange={e=>setAttendanceDate(e.target.value)}/></label></div><div className="table-wrap"><table><thead><tr><th>Student</th><th>Admission number</th><th>Status</th><th>Action</th></tr></thead><tbody>{students.map(student=><tr key={student.id}><td>{student.first_name} {student.last_name}</td><td>{student.admission_number}</td><td><select value={statuses[student.id]||'Present'} onChange={e=>setStatuses(old=>({...old,[student.id]:e.target.value}))}><option>Present</option><option>Absent</option><option>Late</option><option>Excused</option></select></td><td><button className="primary-button" disabled={busy===student.id} onClick={()=>void record(student)}>{busy===student.id?'Saving...':'Save'}</button></td></tr>)}</tbody></table></div>{!students.length&&<div className="empty-state"><Users size={30}/><p>Select one of your assigned classes to load its active students.</p></div>}</section>
 }
 function SchoolProfileSettings({token,onSaved}:{token:string;onSaved:()=>void}) {
-  const [form,setForm]=useState({name:'My School',address:'',phone:'',email:'',motto:'',school_type:'Secondary',a_level_combinations:'',o_level_optional_subjects:'',a_level_subsidiary_subjects:''})
+  const [form,setForm]=useState({name:'',address:'',phone:'',email:'',motto:'',school_type:'Secondary',a_level_combinations:'',o_level_optional_subjects:'',a_level_subsidiary_subjects:''})
   const [message,setMessage]=useState('')
+  const [error,setError]=useState('')
   const [busy,setBusy]=useState(false)
-  useEffect(()=>{api<any>('settings/school-profile',token).then(p=>setForm({name:p.name||'My School',address:p.address||'',phone:p.phone||'',email:p.email||'',motto:p.motto||'',school_type:p.school_type||'Secondary',a_level_combinations:p.a_level_combinations||'',o_level_optional_subjects:p.o_level_optional_subjects||'',a_level_subsidiary_subjects:p.a_level_subsidiary_subjects||''})).catch(e=>setMessage(e.message))},[token])
-  async function save(e:React.FormEvent){e.preventDefault();setBusy(true);setMessage('');try{await api('settings/school-profile',token,{method:'PUT',body:JSON.stringify({...form,address:form.address||null,phone:form.phone||null,email:form.email||null,motto:form.motto||null})});setMessage('School profile saved. Student registration will now follow this school type.');onSaved()}catch(e){setMessage(e instanceof Error?e.message:'Unable to save school profile.')}finally{setBusy(false)}}
-  return <section className="panel settings-panel"><div className="panel-heading"><div><h2>School profile</h2><p>Set the identity, contact information and school category used throughout SchoolBridge.</p></div></div>{message&&<div className="success-notice">{message}</div>}<form className="student-form" onSubmit={save}><div className="student-form-grid"><label>School name *<input required value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/></label><label>School type *<select required value={form.school_type} onChange={e=>setForm({...form,school_type:e.target.value})}><option>Primary</option><option>Secondary</option></select><small className="field-hint">Primary schools will not be shown secondary-level academic options during registration.</small></label><label>Phone number<input value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})}/></label><label>Email address<input type="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})}/></label><label>Address<input value={form.address} onChange={e=>setForm({...form,address:e.target.value})}/></label><label>School motto<input value={form.motto} onChange={e=>setForm({...form,motto:e.target.value})}/></label></div><div className="form-actions"><button className="primary-button" disabled={busy}>{busy?'Saving...':'Save school profile'}</button></div></form></section>
-}
+  const [loaded,setLoaded]=useState(false)
 
+  useEffect(()=>{
+    let cancelled=false
+    api<any>('settings/school-profile',token).then(p=>{
+      if(cancelled)return
+      setForm({
+        name:p.name||'',address:p.address||'',phone:p.phone||'',email:p.email||'',
+        motto:p.motto||'',school_type:p.school_type||'Secondary',
+        a_level_combinations:p.a_level_combinations||'',
+        o_level_optional_subjects:p.o_level_optional_subjects||'',
+        a_level_subsidiary_subjects:p.a_level_subsidiary_subjects||''
+      })
+      setLoaded(true)
+    }).catch(e=>{if(!cancelled)setError(e instanceof Error?e.message:'Unable to load school profile.')})
+    return ()=>{cancelled=true}
+  },[token])
+
+  async function save(e:React.FormEvent<HTMLFormElement>){
+    e.preventDefault()
+    const name=form.name.trim()
+    const email=form.email.trim()
+    if(!name){setError('Enter the official school name before saving.');return}
+    if(email && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)){setError('Enter a valid school email address.');return}
+    setBusy(true);setError('');setMessage('')
+    try{
+      await api('settings/school-profile',token,{method:'PUT',body:JSON.stringify({
+        ...form,name,address:form.address.trim()||null,phone:form.phone.trim()||null,
+        email:email||null,motto:form.motto.trim()||null
+      })})
+      setMessage('School profile saved successfully.')
+      onSaved()
+    }catch(e){setError(e instanceof Error?e.message:'Unable to save school profile.')}
+    finally{setBusy(false)}
+  }
+
+  return <section className="panel settings-panel">
+    <div className="panel-heading"><div><h2>School profile</h2><p>Maintain the official identity and contact details used throughout SchoolBridge.</p></div></div>
+    {error&&<div className="form-error" role="alert">{error}</div>}
+    {message&&<div className="success-notice" role="status">{message}</div>}
+    {!loaded&&!error&&<p className="form-hint">Loading saved school details...</p>}
+    <form className="student-form" onSubmit={save}>
+      <div className="form-section">
+        <div className="form-section-heading"><span className="form-section-number">01</span><div><h4>School identity</h4><p>These details identify your institution in the school workspace.</p></div></div>
+        <div className="student-form-grid">
+          <label className="field-span-full">Official school name *<input required maxLength={120} autoComplete="organization" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} placeholder="Enter the registered school name"/></label>
+          <label>School type *<select required value={form.school_type} onChange={e=>setForm({...form,school_type:e.target.value})}><option value="Primary">Primary</option><option value="Secondary">Secondary</option></select><small className="field-hint">This controls the class options and academic levels used during student registration. Existing classes will not be changed.</small></label>
+          <label>School motto<input maxLength={180} value={form.motto} onChange={e=>setForm({...form,motto:e.target.value})} placeholder="Enter the school motto (optional)"/></label>
+        </div>
+      </div>
+      <div className="form-section">
+        <div className="form-section-heading"><span className="form-section-number">02</span><div><h4>Contact information</h4><p>Optional details that parents and authorised users can use to contact the school.</p></div></div>
+        <div className="student-form-grid">
+          <label>Phone number<input type="tel" autoComplete="tel" maxLength={30} value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})} placeholder="e.g. 0700 000 000"/></label>
+          <label>Email address<input type="email" autoComplete="email" maxLength={254} value={form.email} onChange={e=>setForm({...form,email:e.target.value})} placeholder="e.g. info@school.ug"/></label>
+          <label className="field-span-full">Physical address<input autoComplete="street-address" maxLength={240} value={form.address} onChange={e=>setForm({...form,address:e.target.value})} placeholder="Village, town, district or P.O. Box (optional)"/></label>
+        </div>
+      </div>
+      <div className="form-actions"><button type="button" className="secondary-button" onClick={onSaved}>Cancel</button><button className="primary-button" disabled={busy||!loaded}>{busy?'Saving school profile...':'Save school profile'}</button></div>
+      <p className="form-hint">Only the school name and school type are compulsory. Optional contact fields can be left blank.</p>
+    </form>
+  </section>
+}
 function AcademicCurriculumSettings({token,onSaved}:{token:string;onSaved:()=>void}) {
   const [profile,setProfile]=useState<any>({name:'My School',school_type:'Secondary'})
   const [form,setForm]=useState({arts_combinations:'',sciences_combinations:'',o_level_optional_subjects:'',a_level_subsidiary_subjects:''})
