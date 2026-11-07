@@ -46,6 +46,10 @@ const menu = [
   { label: 'Fees & Finance', icon: FileText },
   { label: 'Examinations', icon: FileText },
 ]
+const teacherMenu = [
+  { label: 'My Classes', icon: BookOpen },
+  { label: 'Attendance', icon: CalendarDays },
+]
 
 async function api<T>(path: string, token: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`/api/${path}`, {
@@ -243,7 +247,8 @@ function App() {
     try {
       const profile = await api<User>('auth/me', authToken)
       setUser(profile)
-      await loadSchoolData(authToken)
+      if(profile.role==='teacher') setActive('My Classes')
+      else await loadSchoolData(authToken)
     } catch {
       sessionStorage.removeItem('sb_token')
       setToken('')
@@ -325,7 +330,7 @@ function App() {
         </div>
         <div className="school-label">SCHOOL MANAGEMENT</div>
         <nav>
-          {menu.map(item => {
+          {(user.role === 'teacher' ? teacherMenu : menu).map(item => {
             const Icon = item.icon
             return (
               <button key={item.label} className={`nav-item ${active === item.label ? 'active' : ''}`} onClick={() => { setActive(item.label); setMobileMenu(false) }}>
@@ -336,7 +341,7 @@ function App() {
           })}
         </nav>
         <div className="sidebar-bottom">
-          <button className="nav-item" onClick={() => setActive('Settings')}><Settings size={19} /> Settings</button>
+          {user.role === 'admin' && <button className="nav-item" onClick={() => setActive('Settings')}><Settings size={19} /> Settings</button>}
           <div className="profile-card">
             <div className="avatar">{user.username.slice(0, 1).toUpperCase()}</div>
             <div className="profile-info"><strong>{user.username}</strong><small>{user.role}</small></div>
@@ -369,6 +374,8 @@ function App() {
           </div>
 
           {dataError && <div className="notice">{dataError} <button onClick={() => void loadSchoolData(token)}>Retry</button></div>}
+
+          {(active === 'My Classes' || active === 'Attendance') && user.role === 'teacher' && <TeacherWorkspace token={token} active={active} />}
 
           {active === 'Overview' && (
             <>
@@ -582,4 +589,21 @@ function AcademicSettings({token}:{token:string}) {
   useEffect(()=>{api<{academic_year:number;active_term:string}>('settings/academic',token).then(x=>{setYear(x.academic_year);setTerm(x.active_term)}).catch(e=>setMessage(e.message))},[token])
   async function save(e:React.FormEvent) {e.preventDefault();setBusy(true);setMessage('');try{await api('settings/academic',token,{method:'PUT',body:JSON.stringify({academic_year:year,active_term:term})});setMessage('Active academic year and term saved. New registrations will use this term.')}catch(e){setMessage(e instanceof Error?e.message:'Unable to save academic settings.')}finally{setBusy(false)}}
   return <section className="panel settings-panel"><div className="panel-heading"><div><h2>Academic year and active term</h2><p>These settings determine which class fee is assigned to new students.</p></div></div>{message&&<div className="success-notice">{message}</div>}<form className="student-form" onSubmit={save}><div className="student-form-grid"><label>Academic year<input type="number" min="2000" max="2100" value={year} onChange={e=>setYear(Number(e.target.value))}/></label><label>Active term<select value={term} onChange={e=>setTerm(e.target.value)}><option>Term 1</option><option>Term 2</option><option>Term 3</option></select></label></div><div className="form-actions"><button className="primary-button" disabled={busy}>{busy?'Saving...':'Save academic settings'}</button></div></form></section>
+}
+
+type TeacherAssignment = {assignment_id:number;class_id:number;class:string;subject:string}
+type TeacherStudent = {id:number;first_name:string;last_name:string;admission_number:string;class_id:number}
+function TeacherWorkspace({token,active}:{token:string;active:string}) {
+  const [assignments,setAssignments]=useState<TeacherAssignment[]>([])
+  const [students,setStudents]=useState<TeacherStudent[]>([])
+  const [classId,setClassId]=useState('')
+  const [statuses,setStatuses]=useState<Record<number,string>>({})
+  const [attendanceDate,setAttendanceDate]=useState(new Date().toISOString().slice(0,10))
+  const [message,setMessage]=useState('')
+  const [busy,setBusy]=useState<number|null>(null)
+  useEffect(()=>{api<TeacherAssignment[]>('teacher/my-assignments',token).then(rows=>{setAssignments(rows);if(rows.length)setClassId(String(rows[0].class_id))}).catch(e=>setMessage(e.message))},[token])
+  useEffect(()=>{if(active!=='Attendance'||!classId)return;api<TeacherStudent[]>('teacher/students?class_id='+classId,token).then(setStudents).catch(e=>setMessage(e.message))},[active,classId,token])
+  async function record(student:TeacherStudent) {setBusy(student.id);setMessage('');try{await api('teacher/attendance',token,{method:'POST',body:JSON.stringify({student_id:student.id,attendance_date:attendanceDate,status:statuses[student.id]||'Present'})});setMessage('Attendance saved for '+student.first_name+' '+student.last_name+'.')}catch(e){setMessage(e instanceof Error?e.message:'Unable to save attendance.')}finally{setBusy(null)}}
+  if(active==='My Classes') return <section className="panel"><div className="panel-heading"><div><h2>My assigned classes</h2><p>Only classes and subjects assigned to your teacher account appear here.</p></div></div>{message&&<div className="notice">{message}</div>}<div className="class-grid">{assignments.map(a=><div className="class-card" key={a.assignment_id}><BookOpen size={22}/><strong>{a.class}</strong><span>{a.subject}</span></div>)}</div>{!assignments.length&&<div className="empty-state"><GraduationCap size={30}/><p>No classes have been assigned to your account yet.</p></div>}</section>
+  return <section className="panel"><div className="panel-heading"><div><h2>Class attendance</h2><p>Record attendance for students in your assigned classes.</p></div></div>{message&&<div className="notice">{message}</div>}<div className="student-form-grid"><label>Assigned class<select value={classId} onChange={e=>setClassId(e.target.value)}><option value="">Choose class</option>{assignments.map(a=><option key={a.assignment_id} value={a.class_id}>{a.class} — {a.subject}</option>)}</select></label><label>Attendance date<input type="date" value={attendanceDate} onChange={e=>setAttendanceDate(e.target.value)}/></label></div><div className="table-wrap"><table><thead><tr><th>Student</th><th>Admission number</th><th>Status</th><th>Action</th></tr></thead><tbody>{students.map(student=><tr key={student.id}><td>{student.first_name} {student.last_name}</td><td>{student.admission_number}</td><td><select value={statuses[student.id]||'Present'} onChange={e=>setStatuses(old=>({...old,[student.id]:e.target.value}))}><option>Present</option><option>Absent</option><option>Late</option><option>Excused</option></select></td><td><button className="primary-button" disabled={busy===student.id} onClick={()=>void record(student)}>{busy===student.id?'Saving...':'Save'}</button></td></tr>)}</tbody></table></div>{!students.length&&<div className="empty-state"><Users size={30}/><p>Select one of your assigned classes to load its active students.</p></div>}</section>
 }
