@@ -192,3 +192,13 @@ class AuditLog(Base):
     entity_id: Mapped[int]
     details: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class SchoolProfile(Base):
+    __tablename__ = "school_profile"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(160), default="My School")
+    address: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    motto: Mapped[str | None] = mapped_column(String(200), nullable=True)
