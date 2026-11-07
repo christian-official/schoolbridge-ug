@@ -48,7 +48,7 @@ export default function AcademicManagement({ token, classes }: { token: string; 
   const [marks, setMarks] = useState<Mark[]>([])
   const [markDrafts, setMarkDrafts] = useState<Record<string, string>>({})
   const [selectedSubjectId, setSelectedSubjectId] = useState('')
-  const [reportRemarks, setReportRemarks] = useState({ classTeacher: '', headOfDepartment: '', headteacher: '', parent: '' })
+  const [reportRemarks, setReportRemarks] = useState({ classTeacher: '', headteacher: '' })
   const [gradingBands, setGradingBands] = useState<GradeBand[]>([])
   const [schoolProfile, setSchoolProfile] = useState<SchoolProfile>({})
   const [draftBands, setDraftBands] = useState<GradeBand[]>([])
@@ -354,7 +354,7 @@ export default function AcademicManagement({ token, classes }: { token: string; 
 
       {activeAcademicTab === 'results' && (
       <section className="panel academic-results-print">
-        <div className="panel-heading"><div><h2>Class performance</h2><p>{selectedExam.name} · {selectedClass?.name || 'Class'}{selectedClass?.section ? ' — ' + selectedClass.section : ''} · {selectedExam.term} {selectedExam.year}</p><p>Provisional ranking uses average scores. Complete and verify all subject marks before issuing final results.</p></div></div>
+        <div className="panel-heading report-screen-controls"><div><h2>Class performance</h2><p>{selectedExam.name} · {selectedClass?.name || 'Class'}{selectedClass?.section ? ' — ' + selectedClass.section : ''} · {selectedExam.term} {selectedExam.year}</p><p>Provisional ranking uses average scores. Complete and verify all subject marks before issuing final results.</p></div><button type="button" className="secondary-button" onClick={() => printAcademicSection('results')}><Printer size={15}/> Print class performance</button></div>
         <div className="table-wrap"><table><thead><tr><th>Position</th><th>Student</th><th>Admission no.</th><th>Subjects entered</th><th>Total</th><th>Average</th><th>Grade</th></tr></thead><tbody>
           {results.map(result => <tr key={result.studentId}><td>{result.position}</td><td>{studentName(studentById.get(result.studentId))}</td><td>{studentById.get(result.studentId)?.admission_number || '—'}</td><td>{result.count}</td><td>{result.total.toFixed(2)}</td><td>{result.average.toFixed(2)}%</td><td>{result.grade}</td></tr>)}
           {!results.length && <tr><td colSpan={7}>Performance positions will appear after marks are entered.</td></tr>}
@@ -417,11 +417,9 @@ export default function AcademicManagement({ token, classes }: { token: string; 
             <div className="report-section-heading"><span>02</span><h3>Progress remarks and recommendations</h3></div>
             <div className="report-remarks-grid">
               <label>Class teacher's remarks<textarea value={reportRemarks.classTeacher} onChange={e => setReportRemarks(v => ({ ...v, classTeacher: e.target.value }))} placeholder="Comment on attendance, conduct, participation and general progress."/></label>
-              <label>Head of department's remarks<textarea value={reportRemarks.headOfDepartment} onChange={e => setReportRemarks(v => ({ ...v, headOfDepartment: e.target.value }))} placeholder="Comment on academic progress and subject performance."/></label>
               <label>Headteacher's remarks<textarea value={reportRemarks.headteacher} onChange={e => setReportRemarks(v => ({ ...v, headteacher: e.target.value }))} placeholder="School leadership comments and recommendations."/></label>
-              <label>Parent / guardian's remarks<textarea value={reportRemarks.parent} onChange={e => setReportRemarks(v => ({ ...v, parent: e.target.value }))} placeholder="Parent or guardian feedback and follow-up."/></label>
             </div>
-            <div className="report-signatures"><div><strong>Class teacher</strong><span>Signature: __________________</span><span>Date: __________________</span></div><div><strong>Head of department</strong><span>Signature: __________________</span><span>Date: __________________</span></div><div><strong>Headteacher</strong><span>Signature: __________________</span><span>Date: __________________</span></div><div><strong>Parent / guardian</strong><span>Signature: __________________</span><span>Date: __________________</span></div></div>
+            <div className="report-signatures"><div><strong>Class teacher</strong><span>Signature: __________________</span><span>Date: __________________</span></div><div><strong>Headteacher</strong><span>Signature: __________________</span><span>Date: __________________</span></div></div>
             <footer className="report-card-footer">SchoolBridge · Official student progress report · Keep this report for your records</footer>
           </div>
         </>}
