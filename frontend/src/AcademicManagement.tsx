@@ -165,6 +165,26 @@ export default function AcademicManagement({ token, classes }: { token: string; 
     return { subject, count: rows.length, average: rows.length ? rows.reduce((sum, mark) => sum + mark.score, 0) / rows.length : 0 }
   }).filter(row => row.count), [subjects, marks])
 
+  const verifiedMarks = useMemo(() => marks.filter(mark => mark.verified), [marks])
+  const verifiedSubjectAnalysis = useMemo(() => subjects.map(subject => {
+    const rows = verifiedMarks.filter(mark => mark.subject_id === subject.id)
+    return { subject, count: rows.length, average: rows.length ? rows.reduce((sum, mark) => sum + mark.score, 0) / rows.length : 0 }
+  }).filter(row => row.count), [subjects, verifiedMarks])
+  const verifiedResults = useMemo(() => {
+    const totals = new Map<number, { total: number; count: number }>()
+    for (const mark of verifiedMarks) {
+      const current = totals.get(mark.student_id) || { total: 0, count: 0 }
+      current.total += mark.score
+      current.count += 1
+      totals.set(mark.student_id, current)
+    }
+    return [...totals.entries()].map(([studentId, value]) => ({
+      studentId, total: value.total, count: value.count, average: value.total / value.count,
+      grade: gradingBands.find(band => value.total / value.count >= band.min_score && (value.total / value.count < band.max_score || band.max_score === 100))?.grade || '—',
+    })).sort((a, b) => b.average - a.average || b.total - a.total || a.studentId - b.studentId)
+      .map((result, index, rows) => ({ ...result, position: index + 1 - rows.slice(0, index).filter(previous => Math.round(previous.average) === Math.round(result.average)).length }))
+  }, [verifiedMarks, gradingBands])
+
   async function createExam(event: FormEvent) {
     event.preventDefault()
     if (!examForm.name.trim() || !examForm.class_id || !examForm.year.trim()) {
@@ -416,13 +436,13 @@ export default function AcademicManagement({ token, classes }: { token: string; 
         <div className="class-results-print-sheet">
           <header className="class-results-print-header"><div><span>OFFICIAL ACADEMIC RESULTS</span><h1>{schoolProfile.name || 'SCHOOL NAME'}</h1><p>{[schoolProfile.address, schoolProfile.phone, schoolProfile.email].filter(Boolean).join(' · ')}</p></div><strong>CLASS RESULTS</strong></header>
           <div className="class-results-print-meta"><span><b>CLASS</b>{selectedClass?.name || '—'} {selectedClass?.section || ''}</span><span><b>EXAMINATION</b>{selectedExam.name}</span><span><b>TERM / YEAR</b>{selectedExam.term} {selectedExam.year}</span><span><b>ENROLMENT</b>{students.length} students</span></div>
-          <div className="class-results-print-stats"><div><small>RESULTS RECORDED</small><strong>{results.length}</strong></div><div><small>SUBJECTS ASSESSED</small><strong>{subjectAnalysis.length}</strong></div><div><small>VERIFIED SCORES</small><strong>{marks.filter(mark => mark.verified).length} / {marks.length}</strong></div><div><small>CLASS AVERAGE</small><strong>{Math.round(results.length ? results.reduce((sum, row) => sum + row.average, 0) / results.length : 0)}%</strong></div></div>
+          <div className="class-results-print-stats"><div><small>RESULTS RECORDED</small><strong>{verifiedResults.length}</strong></div><div><small>SUBJECTS ASSESSED</small><strong>{verifiedSubjectAnalysis.length}</strong></div><div><small>VERIFIED SCORES</small><strong>{marks.filter(mark => mark.verified).length} / {marks.length}</strong></div><div><small>CLASS AVERAGE</small><strong>{Math.round(verifiedResults.length ? verifiedResults.reduce((sum, row) => sum + row.average, 0) / verifiedResults.length : 0)}%</strong></div></div>
           <h2>Class performance register</h2>
-          <div className="table-wrap"><table><thead><tr><th>POS.</th><th>STUDENT NAME</th><th>ADMISSION NO.</th>{subjectAnalysis.map(row => <th key={row.subject.id}>{row.subject.name}</th>)}<th>TOTAL</th><th>AVERAGE</th><th>GRADE</th></tr></thead><tbody>
-            {results.map(result => <tr key={result.studentId}><td>{result.position}</td><td>{studentName(studentById.get(result.studentId))}</td><td>{studentById.get(result.studentId)?.admission_number || '—'}</td>{subjectAnalysis.map(row => <td key={row.subject.id}>{Math.round(marks.find(mark => mark.student_id === result.studentId && mark.subject_id === row.subject.id)?.score ?? 0)}</td>)}<td>{Math.round(result.total)}</td><td>{Math.round(result.average)}%</td><td>{result.grade}</td></tr>)}
-            {!results.length && <tr><td colSpan={subjectAnalysis.length + 6}>No results recorded.</td></tr>}
+          <div className="table-wrap"><table><thead><tr><th>POS.</th><th>STUDENT NAME</th><th>ADMISSION NO.</th>{verifiedSubjectAnalysis.map(row => <th key={row.subject.id}>{row.subject.name}</th>)}<th>TOTAL</th><th>AVERAGE</th><th>GRADE</th></tr></thead><tbody>
+            {verifiedResults.map(result => <tr key={result.studentId}><td>{result.position}</td><td>{studentName(studentById.get(result.studentId))}</td><td>{studentById.get(result.studentId)?.admission_number || '—'}</td>{verifiedSubjectAnalysis.map(row => { const mark = verifiedMarks.find(item => item.student_id === result.studentId && item.subject_id === row.subject.id); return <td key={row.subject.id}>{mark ? Math.round(mark.score) : '—'}</td> })}<td>{Math.round(result.total)}</td><td>{Math.round(result.average)}%</td><td>{result.grade}</td></tr>)}
+            {!verifiedResults.length && <tr><td colSpan={verifiedSubjectAnalysis.length + 6}>No verified results recorded yet.</td></tr>}
           </tbody></table></div>
-          <h2>Subject performance summary</h2><div className="table-wrap"><table><thead><tr><th>SUBJECT</th><th>STUDENTS ASSESSED</th><th>CLASS AVERAGE</th></tr></thead><tbody>{subjectAnalysis.map(row => <tr key={row.subject.id}><td>{row.subject.name}</td><td>{row.count}</td><td>{Math.round(row.average)}%</td></tr>)}</tbody></table></div>
+          <h2>Subject performance summary</h2><div className="table-wrap"><table><thead><tr><th>SUBJECT</th><th>STUDENTS ASSESSED</th><th>CLASS AVERAGE</th></tr></thead><tbody>{verifiedSubjectAnalysis.map(row => <tr key={row.subject.id}><td>{row.subject.name}</td><td>{row.count}</td><td>{Math.round(row.average)}%</td></tr>)}</tbody></table></div>
           <footer>Prepared by SchoolBridge · Verified results only should be treated as official · Headteacher signature: ____________________</footer>
         </div>
         <div className="table-wrap"><table><thead><tr><th>Position</th><th>Student</th><th>Admission no.</th><th>Subjects entered</th><th>Total</th><th>Average</th><th>Grade</th></tr></thead><tbody>
