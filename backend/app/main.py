@@ -201,6 +201,7 @@ class ExamOut(BaseModel):
 
 class MarkOut(MarkCreate):
     id: int
+    verified: bool = False
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -493,6 +494,18 @@ def update_mark(mark_id: int, data: MarkUpdate, db: Session = Depends(get_db)):
     if exam and exam.class_id is not None and student and student.class_id != exam.class_id:
         raise HTTPException(409, "This mark no longer matches the examination class.")
     item.score = data.score
+    item.verified = False
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@app.patch("/api/marks/{mark_id}/verification", tags=["Marks"])
+def verify_mark(mark_id: int, verified: bool, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    item = db.get(models.Mark, mark_id)
+    if not item:
+        raise HTTPException(404, "Mark record not found.")
+    item.verified = verified
     db.commit()
     db.refresh(item)
     return item
@@ -912,6 +925,8 @@ def save_teacher_mark(data: MarkCreate, db: Session = Depends(get_db),
     item = db.query(models.Mark).filter_by(
         student_id=student.id, subject_id=subject.id, exam_id=exam.id
     ).first()
+    if item is not None and item.verified:
+        raise HTTPException(409, "This mark has been verified by the administrator. Contact the administrator to unlock it before editing.")
     if item is None:
         item = models.Mark(**data.model_dump())
         db.add(item)
@@ -965,9 +980,12 @@ def upgrade_existing_database():
     settings_columns = {c["name"] for c in inspector.get_columns("school_settings")} if "school_settings" in inspector.get_table_names() else set()
     staff_columns = {c["name"] for c in inspector.get_columns("staff_members")} if "staff_members" in inspector.get_table_names() else set()
     payment_columns = {c["name"] for c in inspector.get_columns("fee_payments")} if "fee_payments" in inspector.get_table_names() else set()
+    mark_columns = {c["name"] for c in inspector.get_columns("marks")} if "marks" in inspector.get_table_names() else set()
     with engine.begin() as connection:
         for name, sql_type in additions.items():
             if name not in existing: connection.execute(text("ALTER TABLE students ADD COLUMN " + name + " " + sql_type))
+        if "marks" in inspector.get_table_names() and "verified" not in mark_columns:
+            connection.execute(text("ALTER TABLE marks ADD COLUMN verified BOOLEAN NOT NULL DEFAULT FALSE"))
         if "staff_members" in inspector.get_table_names():
             if "subjects" not in staff_columns: connection.execute(text("ALTER TABLE staff_members ADD COLUMN subjects TEXT"))
             if "salary_amount" not in staff_columns: connection.execute(text("ALTER TABLE staff_members ADD COLUMN salary_amount INTEGER"))
