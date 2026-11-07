@@ -17,7 +17,7 @@ type User = {
 }
 
 type StudentPage = { items: RecordItem[]; total: number; page: number; pages: number }
-type FinanceSummary = { fees_expected: number; fees_collected: number; outstanding: number }
+type FinanceSummary = { fees_expected: number; fees_collected: number; outstanding: number; salary_expenses?:number; other_expenses?:number; total_expenses?:number; net_cash_position?:number }
 
 type AdmissionSettings = {
   admission_prefix: string
@@ -378,6 +378,9 @@ function App() {
                 <StatCard title="Fees expected" value={`UGX ${financeSummary.fees_expected.toLocaleString()}`} icon={<FileText />} note="Recorded term charges" />
                 <StatCard title="Fees collected" value={`UGX ${financeSummary.fees_collected.toLocaleString()}`} icon={<TrendingUp />} note="Payments received" />
                 <StatCard title="Outstanding fees" value={`UGX ${financeSummary.outstanding.toLocaleString()}`} icon={<Bell />} note="Remaining balances" />
+                <StatCard title="Salary expenses" value={`UGX ${(financeSummary.salary_expenses||0).toLocaleString()}`} icon={<Users />} note="Recorded salary payments" />
+                <StatCard title="Other expenses" value={`UGX ${(financeSummary.other_expenses||0).toLocaleString()}`} icon={<FileText />} note="Recorded school expenses" />
+                <StatCard title="Total expenses" value={`UGX ${(financeSummary.total_expenses||0).toLocaleString()}`} icon={<TrendingUp />} note="Salary and other expenses" />
                 <StatCard title="Account status" value="Active" icon={<ShieldCheck />} note="Administrator access" />
               </section>
               <section className="dashboard-grid">
