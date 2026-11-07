@@ -141,15 +141,20 @@ class AttendanceCreate(BaseModel):
 
 
 class ExamCreate(BaseModel):
-    name: str
-    term: str
-    year: int
+    name: str = Field(min_length=2, max_length=100)
+    term: str = Field(pattern="^(Term 1|Term 2|Term 3)$")
+    year: int = Field(ge=2000, le=2100)
+    class_id: int
 
 
 class MarkCreate(BaseModel):
     student_id: int
     subject_id: int
     exam_id: int
+    score: float = Field(ge=0, le=100)
+
+
+class MarkUpdate(BaseModel):
     score: float = Field(ge=0, le=100)
 
 
@@ -173,8 +178,12 @@ class AttendanceOut(AttendanceCreate):
     model_config = ConfigDict(from_attributes=True)
 
 
-class ExamOut(ExamCreate):
+class ExamOut(BaseModel):
     id: int
+    name: str
+    term: str
+    year: int
+    class_id: int | None = None
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -404,7 +413,14 @@ def list_attendance(db: Session = Depends(get_db)):
 
 @app.post("/api/exams", response_model=ExamOut, tags=["Exams"])
 def create_exam(data: ExamCreate, db: Session = Depends(get_db)):
-    item = models.Exam(**data.model_dump())
+    if not db.get(models.SchoolClass, data.class_id):
+        raise HTTPException(404, "Select a valid class for this examination.")
+    duplicate = db.query(models.Exam).filter_by(
+        name=data.name.strip(), term=data.term, year=data.year, class_id=data.class_id
+    ).first()
+    if duplicate:
+        raise HTTPException(409, "This examination already exists for the selected class, term and year.")
+    item = models.Exam(**{**data.model_dump(), "name": data.name.strip()})
     db.add(item)
     db.commit()
     db.refresh(item)
@@ -412,19 +428,28 @@ def create_exam(data: ExamCreate, db: Session = Depends(get_db)):
 
 
 @app.get("/api/exams", response_model=list[ExamOut], tags=["Exams"])
-def list_exams(db: Session = Depends(get_db)):
-    return db.query(models.Exam).order_by(models.Exam.year.desc()).all()
+def list_exams(class_id: int | None = None, year: int | None = None, db: Session = Depends(get_db)):
+    query = db.query(models.Exam)
+    if class_id is not None:
+        query = query.filter(models.Exam.class_id == class_id)
+    if year is not None:
+        query = query.filter(models.Exam.year == year)
+    return query.order_by(models.Exam.year.desc(), models.Exam.term, models.Exam.name).all()
 
 
 @app.post("/api/marks", response_model=MarkOut, tags=["Marks"])
 def record_mark(data: MarkCreate, db: Session = Depends(get_db)):
-    for model, record_id, label in [
-        (models.Student, data.student_id, "Student"),
-        (models.Subject, data.subject_id, "Subject"),
-        (models.Exam, data.exam_id, "Exam"),
-    ]:
-        if not db.get(model, record_id):
-            raise HTTPException(404, f"{label} not found.")
+    student = db.get(models.Student, data.student_id)
+    subject = db.get(models.Subject, data.subject_id)
+    exam = db.get(models.Exam, data.exam_id)
+    if not student:
+        raise HTTPException(404, "Student not found.")
+    if not subject:
+        raise HTTPException(404, "Subject not found.")
+    if not exam:
+        raise HTTPException(404, "Exam not found.")
+    if exam.class_id is not None and student.class_id != exam.class_id:
+        raise HTTPException(422, "The selected student does not belong to this examination's class.")
     item = models.Mark(**data.model_dump())
     db.add(item)
     try:
@@ -437,8 +462,28 @@ def record_mark(data: MarkCreate, db: Session = Depends(get_db)):
 
 
 @app.get("/api/marks", response_model=list[MarkOut], tags=["Marks"])
-def list_marks(db: Session = Depends(get_db)):
-    return db.query(models.Mark).all()
+def list_marks(exam_id: int | None = None, student_id: int | None = None, db: Session = Depends(get_db)):
+    query = db.query(models.Mark)
+    if exam_id is not None:
+        query = query.filter(models.Mark.exam_id == exam_id)
+    if student_id is not None:
+        query = query.filter(models.Mark.student_id == student_id)
+    return query.order_by(models.Mark.student_id, models.Mark.subject_id).all()
+
+
+@app.patch("/api/marks/{mark_id}", response_model=MarkOut, tags=["Marks"])
+def update_mark(mark_id: int, data: MarkUpdate, db: Session = Depends(get_db)):
+    item = db.get(models.Mark, mark_id)
+    if not item:
+        raise HTTPException(404, "Mark record not found.")
+    exam = db.get(models.Exam, item.exam_id)
+    student = db.get(models.Student, item.student_id)
+    if exam and exam.class_id is not None and student and student.class_id != exam.class_id:
+        raise HTTPException(409, "This mark no longer matches the examination class.")
+    item.score = data.score
+    db.commit()
+    db.refresh(item)
+    return item
 
 
 # ========== AUTHENTICATION AND USER MANAGEMENT ==========
