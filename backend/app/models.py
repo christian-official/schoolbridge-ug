@@ -245,3 +245,27 @@ class TeacherDuty(Base):
     staff_id: Mapped[int] = mapped_column(ForeignKey("staff_members.id"), index=True)
     duty_date: Mapped[date] = mapped_column(Date, index=True)
     notes: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+class StaffAttendance(Base):
+    __tablename__ = "staff_attendance"
+    __table_args__ = (UniqueConstraint("staff_id", "attendance_date"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    staff_id: Mapped[int] = mapped_column(ForeignKey("staff_members.id"), index=True)
+    attendance_date: Mapped[date] = mapped_column(Date, default=date.today, index=True)
+    status: Mapped[str] = mapped_column(String(20))
+    notes: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+
+class TimetableEntry(Base):
+    __tablename__ = "timetable_entries"
+    __table_args__ = (UniqueConstraint("class_id", "day_of_week", "start_time"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    class_id: Mapped[int] = mapped_column(ForeignKey("classes.id"), index=True)
+    subject_id: Mapped[int | None] = mapped_column(ForeignKey("subjects.id"), nullable=True)
+    staff_id: Mapped[int | None] = mapped_column(ForeignKey("staff_members.id"), nullable=True)
+    day_of_week: Mapped[int] = mapped_column(Integer)
+    start_time: Mapped[str] = mapped_column(String(5))
+    end_time: Mapped[str] = mapped_column(String(5))
+    room: Mapped[str | None] = mapped_column(String(60), nullable=True)
