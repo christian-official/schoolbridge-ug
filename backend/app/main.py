@@ -180,6 +180,9 @@ def seed_demo_data_if_empty():
         current_year = date.today().year
         active_term = "Term 1"
 
+
+        # Demo class fees and student charges (UGX), without touching real records.
+        demo_class_ids = {student.class_id for student in demo_students if student.class_id is not None}
         # A realistic Monday-Friday demo timetable for classes containing demo learners.
         demo_teachers = db.query(models.StaffMember).filter(
             models.StaffMember.category == "Teaching",
@@ -217,9 +220,6 @@ def seed_demo_data_if_empty():
                         room="Room " + str(((school_class.id + period) % 6) + 1),
                     ))
         db.flush()
-
-        # Demo class fees and student charges (UGX), without touching real records.
-        demo_class_ids = {student.class_id for student in demo_students if student.class_id is not None}
         for school_class in demo_classes:
             if school_class.id not in demo_class_ids:
                 continue
