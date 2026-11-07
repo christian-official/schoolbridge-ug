@@ -120,7 +120,7 @@ function App() {
   const [settingsSuccess, setSettingsSuccess] = useState('')
   const [savingSettings, setSavingSettings] = useState(false)
 
-  useEffect(()=>{if(token)api<any>('settings/school-profile',token).then(setSchoolConfig).catch(()=>{})},[token])
+  useEffect(()=>{if(token)api<any>('settings/school-profile',token).then(setSchoolConfig).catch(()=>{})},[token,active])
 
   async function loadSchoolData(authToken: string) {
     setDataError('')
