@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Users, GraduationCap, BookOpen,
   FileText, Settings, LogOut,
   Search, Plus, Menu, X, ArrowUpRight, UserPlus,
-  CalendarDays, TrendingUp, ShieldCheck, LoaderCircle, Wallet, RefreshCw, Bell,
+  CalendarDays, TrendingUp, ShieldCheck, LoaderCircle, RefreshCw,
 } from 'lucide-react'
 import StaffFinance from './StaffFinance'
 import './App.css'
@@ -17,7 +17,6 @@ type User = {
 }
 
 type StudentPage = { items: RecordItem[]; total: number; page: number; pages: number }
-type FinanceSummary = { fees_expected: number; fees_collected: number; outstanding: number; salary_expenses?:number; other_expenses?:number; total_expenses?:number; net_cash_position?:number }
 
 type AdmissionSettings = {
   admission_prefix: string
@@ -79,7 +78,6 @@ function App() {
   const [students, setStudents] = useState<RecordItem[]>([])
   const [studentTotal, setStudentTotal] = useState(0)
   const [staffTotal, setStaffTotal] = useState(0)
-  const [financeSummary, setFinanceSummary] = useState<FinanceSummary>({ fees_expected: 0, fees_collected: 0, outstanding: 0 })
   const [studentPage, setStudentPage] = useState(1)
   const [studentClassFilter, setStudentClassFilter] = useState('')
   const [classes, setClasses] = useState<RecordItem[]>([])
@@ -118,7 +116,6 @@ function App() {
         api<StudentPage>('students/search?page=1&page_size=25', authToken),
         api<RecordItem[]>('classes', authToken),
         api<AdmissionSettings>('settings/admission-number', authToken),
-        api<FinanceSummary>('finance/summary', authToken),
         api<{total:number}>('staff?search=&page=1&page_size=1', authToken),
       ])
       setStudents(studentData.items)
@@ -126,7 +123,6 @@ function App() {
       setStudentPage(1)
       setClasses(classData)
       setAdmissionSettings(admissionData)
-      setFinanceSummary(financeData)
       setStaffTotal(staffData.total)
     } catch {
       setDataError('Some school records could not be loaded. Check your connection and permissions.')
@@ -436,13 +432,6 @@ function App() {
                 <StatCard title="Total students" value={studentTotal} icon={<GraduationCap />} note="Registered students" />
                 <StatCard title="Total staff" value={staffTotal} icon={<Users />} note="Teaching and non-teaching" />
                 <StatCard title="Classes" value={classes.length} icon={<BookOpen />} note="School classes" />
-                <StatCard title="Fees expected" value={`UGX ${financeSummary.fees_expected.toLocaleString()}`} icon={<FileText />} note="Recorded term charges" />
-                <StatCard title="Fees collected" value={`UGX ${financeSummary.fees_collected.toLocaleString()}`} icon={<TrendingUp />} note="Payments received" />
-                <StatCard title="Outstanding fees" value={`UGX ${financeSummary.outstanding.toLocaleString()}`} icon={<Bell />} note="Remaining balances" />
-                <StatCard title="Salary expenses" value={`UGX ${(financeSummary.salary_expenses||0).toLocaleString()}`} icon={<Users />} note="Recorded salary payments" />
-                <StatCard title="Other expenses" value={`UGX ${(financeSummary.other_expenses||0).toLocaleString()}`} icon={<FileText />} note="Recorded school expenses" />
-                <StatCard title="Total expenses" value={`UGX ${(financeSummary.total_expenses||0).toLocaleString()}`} icon={<TrendingUp />} note="Salary and other expenses" />
-                <StatCard title="Net cash position" value={`UGX ${(financeSummary.net_cash_position||0).toLocaleString()}`} icon={<Wallet />} note="Fees collected less expenses" />
                 <StatCard title="Account status" value="Active" icon={<ShieldCheck />} note="Administrator access" />
               </section>
               <section className="dashboard-grid">
@@ -450,7 +439,6 @@ function App() {
                   <div className="panel-heading"><div><h2>School records</h2><p>Keep large registers inside their own modules</p></div></div>
                   <button className="quick-action" onClick={() => setActive('Students')}><span className="quick-icon blue"><GraduationCap /></span><span><strong>Student register</strong><small>{studentTotal.toLocaleString()} student records · searchable</small></span><ArrowUpRight size={17} /></button>
                   <button className="quick-action" onClick={() => setActive('Staff')}><span className="quick-icon purple"><Users /></span><span><strong>Staff directory</strong><small>Teaching and non-teaching staff</small></span><ArrowUpRight size={17} /></button>
-                  <button className="quick-action" onClick={() => setActive('Fees & Finance')}><span className="quick-icon green"><FileText /></span><span><strong>Fees and finance</strong><small>Charges, payments and balances</small></span><ArrowUpRight size={17} /></button>
                 </div>
                 <div className="panel quick-panel">
                   <div className="panel-heading"><div><h2>Quick actions</h2><p>Common school operations</p></div></div>
