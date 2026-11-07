@@ -1405,6 +1405,42 @@ def assign_teacher(
     return {"message": "Teacher assigned successfully.", "id": assignment.id}
 
 
+@app.get("/api/teacher/my-staff-attendance", tags=["Teacher Workspace"])
+def teacher_my_staff_attendance(
+    db: Session = Depends(get_db),
+    teacher=Depends(get_current_user),
+):
+    if teacher.role != "teacher":
+        raise HTTPException(403, "Teacher account required.")
+    staff_member = db.query(models.StaffMember).filter(
+        func.lower(models.StaffMember.email) == teacher.email.lower()
+    ).first()
+    if not staff_member:
+        raise HTTPException(
+            404,
+            "Your login email is not linked to a staff profile. Ask the administrator to use the same email on your staff record."
+        )
+    records = db.query(models.StaffAttendance).filter(
+        models.StaffAttendance.staff_id == staff_member.id
+    ).order_by(
+        models.StaffAttendance.attendance_date.desc(),
+        models.StaffAttendance.id.desc(),
+    ).limit(60).all()
+    return {
+        "staff_name": f"{staff_member.first_name} {staff_member.last_name}",
+        "staff_number": staff_member.staff_number,
+        "records": [
+            {
+                "id": row.id,
+                "attendance_date": row.attendance_date,
+                "status": row.status,
+                "notes": row.notes,
+            }
+            for row in records
+        ],
+    }
+
+
 @app.get("/api/teacher/my-assignments", tags=["Teacher Management"])
 def my_assignments(
     db: Session = Depends(get_db),
