@@ -144,7 +144,13 @@ export default function AcademicManagement({ token, classes }: { token: string; 
     })).map(result => ({
       ...result,
       grade: gradingBands.find(band => result.average >= band.min_score && (result.average < band.max_score || band.max_score === 100))?.grade || '—',
-    })).sort((a, b) => b.total - a.total || a.studentId - b.studentId)
+    })).sort((a, b) => b.average - a.average || b.total - a.total || a.studentId - b.studentId)
+      .map((result, index, rows) => ({
+        ...result,
+        position: index > 0 && Number(rows[index - 1].average.toFixed(2)) === Number(result.average.toFixed(2))
+          ? rows[index - 1].position
+          : index + 1,
+      }))
   }, [marks, gradingBands])
 
   const subjectAnalysis = useMemo(() => subjects.map(subject => {
@@ -296,6 +302,7 @@ export default function AcademicManagement({ token, classes }: { token: string; 
           <div className="stat-card"><span>Marks recorded</span><strong className="stat-value">{marks.length}</strong></div>
           <div className="stat-card"><span>Subjects assessed</span><strong className="stat-value">{subjectAnalysis.length}</strong></div>
           <div className="stat-card"><span>Students with results</span><strong className="stat-value">{results.length}</strong></div>
+          <div className="stat-card"><span>Verified marks</span><strong className="stat-value">{marks.filter(mark => mark.verified).length} / {marks.length}</strong></div>
         </div>
       </section>
 
@@ -323,7 +330,7 @@ export default function AcademicManagement({ token, classes }: { token: string; 
       <section className="panel">
         <div className="panel-heading"><div><h2>Class performance</h2><p>Provisional ranking is based on total marks entered so far. Complete all subject marks before confirming positions.</p></div></div>
         <div className="table-wrap"><table><thead><tr><th>Position</th><th>Student</th><th>Admission no.</th><th>Subjects entered</th><th>Total</th><th>Average</th><th>Grade</th></tr></thead><tbody>
-          {results.map((result, index) => <tr key={result.studentId}><td>{index + 1}</td><td>{studentName(studentById.get(result.studentId))}</td><td>{studentById.get(result.studentId)?.admission_number || '—'}</td><td>{result.count}</td><td>{result.total.toFixed(2)}</td><td>{result.average.toFixed(2)}%</td><td>{result.grade}</td></tr>)}
+          {results.map((result, index) => <tr key={result.studentId}><td>{result.position}</td><td>{studentName(studentById.get(result.studentId))}</td><td>{studentById.get(result.studentId)?.admission_number || '—'}</td><td>{result.count}</td><td>{result.total.toFixed(2)}</td><td>{result.average.toFixed(2)}%</td><td>{result.grade}</td></tr>)}
           {!results.length && <tr><td colSpan={7}>Performance positions will appear after marks are entered.</td></tr>}
         </tbody></table></div>
         <div className="panel-heading"><div><h3>Subject analysis</h3><p>Average score for each subject with recorded marks.</p></div></div>
