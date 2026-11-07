@@ -601,6 +601,14 @@ class StaffCreate(BaseModel):
     salary_amount: int | None = Field(default=None, ge=0)
     salary_frequency: str = Field(default="Monthly", pattern="^(Monthly|Termly|Weekly|Daily)$")
 
+def write_audit(db: Session, actor, action: str, entity_type: str, entity_id: int, details: str = ""):
+    db.add(models.AuditLog(
+        actor_id=actor.id if actor else None,
+        actor_username=actor.username if actor else "system",
+        action=action, entity_type=entity_type, entity_id=entity_id, details=details
+    ))
+
+
 class FeePaymentCreate(BaseModel):
     charge_id: int
     amount: int = Field(gt=0)
@@ -774,7 +782,7 @@ def list_fee_charges(search: str = "", class_id: int | None = None, stream: str 
 
 
 @app.post("/api/finance/payments", tags=["Finance"])
-def record_fee_payment(data: FeePaymentCreate, db: Session = Depends(get_db)):
+def record_fee_payment(data: FeePaymentCreate, db: Session = Depends(get_db), admin=Depends(require_admin)):
     charge = db.get(models.FeeCharge, data.charge_id)
     if not charge:
         raise HTTPException(404, "Fee charge not found.")
@@ -783,6 +791,9 @@ def record_fee_payment(data: FeePaymentCreate, db: Session = Depends(get_db)):
         raise HTTPException(400, "Payment exceeds the outstanding balance.")
     item = models.FeePayment(**data.model_dump(), receipt_number="RCPT-" + str(date.today().year) + "-" + uuid4().hex[:8].upper())
     db.add(item)
+    db.flush()
+    write_audit(db, admin, "payment_received", "fee_payment", item.id,
+                f"Receipt {item.receipt_number}; amount {item.amount}; charge {item.charge_id}")
     db.commit()
     db.refresh(item)
     return {"id": item.id, "charge_id": item.charge_id, "amount": item.amount, "payment_date": item.payment_date, "method": item.method, "reference": item.reference, "receipt_number": item.receipt_number}
@@ -922,7 +933,7 @@ def student_profile(student_id: int, db: Session = Depends(get_db)):
 
 
 @app.patch("/api/students/{student_id}", tags=["Students"])
-def update_student(student_id: int, data: StudentUpdate, db: Session = Depends(get_db)):
+def update_student(student_id: int, data: StudentUpdate, db: Session = Depends(get_db), admin=Depends(require_admin)):
     student = db.get(models.Student, student_id)
     if not student:
         raise HTTPException(404, "Student not found.")
@@ -931,19 +942,21 @@ def update_student(student_id: int, data: StudentUpdate, db: Session = Depends(g
         raise HTTPException(404, "Class not found.")
     for key, value in changes.items():
         setattr(student, key, value)
+    write_audit(db, admin, "student_updated", "student", student.id, ", ".join(changes.keys()))
     db.commit()
     db.refresh(student)
     return {"message": "Student profile updated.", "student": student}
 
 
 @app.patch("/api/students/{student_id}/status", tags=["Students"])
-def change_student_status(student_id: int, status: str, db: Session = Depends(get_db)):
+def change_student_status(student_id: int, status: str, db: Session = Depends(get_db), admin=Depends(require_admin)):
     if status not in {"active", "transferred", "dismissed", "inactive"}:
         raise HTTPException(422, "Status must be active, transferred, dismissed or inactive.")
     student = db.get(models.Student, student_id)
     if not student:
         raise HTTPException(404, "Student not found.")
     student.status = status
+    write_audit(db, admin, "student_status_changed", "student", student.id, status)
     db.commit()
     return {"message": "Student status updated. Historical academic and financial records were retained.", "status": status}
 
@@ -978,43 +991,52 @@ class OtherExpenseCreate(BaseModel):
 
 
 @app.patch("/api/staff/{staff_id}", tags=["Staff"])
-def update_staff(staff_id: int, data: StaffUpdate, db: Session = Depends(get_db)):
+def update_staff(staff_id: int, data: StaffUpdate, db: Session = Depends(get_db), admin=Depends(require_admin)):
     staff = db.get(models.StaffMember, staff_id)
     if not staff:
         raise HTTPException(404, "Staff member not found.")
-    for key, value in data.model_dump(exclude_unset=True).items():
+    changes = data.model_dump(exclude_unset=True)
+    for key, value in changes.items():
         setattr(staff, key, value)
+    write_audit(db, admin, "staff_updated", "staff", staff.id, ", ".join(changes.keys()))
     db.commit()
     db.refresh(staff)
     return {"message": "Staff profile updated.", "staff": staff}
 
 
 @app.post("/api/staff/{staff_id}/archive", tags=["Staff"])
-def archive_staff(staff_id: int, db: Session = Depends(get_db)):
+def archive_staff(staff_id: int, db: Session = Depends(get_db), admin=Depends(require_admin)):
     staff = db.get(models.StaffMember, staff_id)
     if not staff:
         raise HTTPException(404, "Staff member not found.")
     staff.status = "archived"
+    write_audit(db, admin, "staff_archived", "staff", staff.id, "Staff archived; history retained.")
     db.commit()
     return {"message": "Staff member archived. Historical salary records were retained."}
 
 
 @app.post("/api/finance/salary-payments", tags=["Finance"])
-def record_salary_payment(data: SalaryPaymentCreate, db: Session = Depends(get_db)):
+def record_salary_payment(data: SalaryPaymentCreate, db: Session = Depends(get_db), admin=Depends(require_admin)):
     staff = db.get(models.StaffMember, data.staff_id)
     if not staff:
         raise HTTPException(404, "Staff member not found.")
     payment = models.SalaryPayment(**data.model_dump())
     db.add(payment)
+    db.flush()
+    write_audit(db, admin, "salary_paid", "salary_payment", payment.id,
+                f"Staff {staff.staff_number}; amount {payment.amount}; period {payment.period}")
     db.commit()
     db.refresh(payment)
     return {"id": payment.id, "staff_id": payment.staff_id, "amount": payment.amount, "payment_date": payment.payment_date, "period": payment.period}
 
 
 @app.post("/api/finance/other-expenses", tags=["Finance"])
-def record_other_expense(data: OtherExpenseCreate, db: Session = Depends(get_db)):
+def record_other_expense(data: OtherExpenseCreate, db: Session = Depends(get_db), admin=Depends(require_admin)):
     expense = models.OtherExpense(**data.model_dump())
     db.add(expense)
+    db.flush()
+    write_audit(db, admin, "expense_recorded", "other_expense", expense.id,
+                f"{expense.category}; amount {expense.amount}; {expense.description}")
     db.commit()
     db.refresh(expense)
     return expense
@@ -1062,3 +1084,12 @@ def teacher_record_attendance(data: AttendanceCreate, db: Session = Depends(get_
         db.rollback()
         raise HTTPException(409, "Attendance already recorded for this student on this date.")
     return item
+
+
+@app.get("/api/audit-logs", tags=["System Audit"])
+def list_audit_logs(page: int = 1, page_size: int = 50, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    page_size = min(max(page_size, 1), 100)
+    query = db.query(models.AuditLog)
+    total = query.count()
+    rows = query.order_by(models.AuditLog.created_at.desc(), models.AuditLog.id.desc()).offset((page-1)*page_size).limit(page_size).all()
+    return {"items": rows, "total": total, "page": page, "page_size": page_size}
