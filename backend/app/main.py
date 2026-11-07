@@ -1,4 +1,5 @@
 import os
+import re
 from datetime import date, datetime
 from uuid import uuid4
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
@@ -59,8 +60,8 @@ app.add_middleware(
 
 
 class ClassCreate(BaseModel):
-    name: str
-    section: str | None = None
+    name: str = Field(min_length=1, max_length=80)
+    section: str = Field(min_length=1, max_length=40)
 
 
 class SubjectCreate(BaseModel):
@@ -84,7 +85,7 @@ class StudentCreate(BaseModel):
     guardian_phone: str | None = None
     previous_school: str | None = None
     admission_date: date | None = None
-    class_id: int | None = None
+    class_id: int = Field(gt=0)
     fee_amount: int | None = Field(default=None, ge=0)
     academic_level: str | None = Field(default=None, pattern="^(O-Level|A-Level)$")
     combination: str | None = None
@@ -234,7 +235,9 @@ def health_check():
 
 @app.post("/api/classes", response_model=ClassOut, tags=["Classes"])
 def create_class(data: ClassCreate, db: Session = Depends(get_db)):
-    item = models.SchoolClass(name=data.name.strip(), section=(data.section or "General").strip())
+    if not data.name.strip() or not data.section.strip():
+        raise HTTPException(422, "Enter both a class name and a stream name. A General stream is not created automatically.")
+    item = models.SchoolClass(name=data.name.strip(), section=data.section.strip())
     db.add(item)
     try:
         db.commit()
@@ -270,10 +273,36 @@ def list_subjects(db: Session = Depends(get_db)):
 
 @app.post("/api/students", response_model=StudentOut, tags=["Students"])
 def create_student(data: StudentCreate, db: Session = Depends(get_db)):
-    if data.class_id is not None and not db.get(models.SchoolClass, data.class_id):
-        raise HTTPException(404, "Class not found.")
+    if not data.first_name.strip() or not data.last_name.strip():
+        raise HTTPException(422, "Enter the student's full name before registering.")
+    selected_class = db.get(models.SchoolClass, data.class_id)
+    if not selected_class:
+        raise HTTPException(404, "Choose a valid class and stream.")
+    profile = db.get(models.SchoolProfile, 1)
+    school_type = profile.school_type if profile else "Secondary"
+    class_label = selected_class.name.lower().replace(" ", "")
+    level_match = re.search(r"(?:senior|s)?([1-6])$", class_label)
+    if school_type == "Secondary" and level_match:
+        grade = int(level_match.group(1))
+        derived_level = "A-Level" if grade in (5, 6) else "O-Level"
+        if data.academic_level and data.academic_level != derived_level:
+            raise HTTPException(422, f"{selected_class.name} is {derived_level}; the level is determined by the selected class.")
+        if derived_level == "A-Level":
+            if not data.combination or not data.combination.strip():
+                raise HTTPException(422, "Choose an Arts or Sciences combination for this A-Level class.")
+            if not (data.combination.startswith("Arts — ") or data.combination.startswith("Sciences — ")):
+                raise HTTPException(422, "Choose the A-Level stream and a combination.")
+        student_academic_level = derived_level
+    else:
+        student_academic_level = None
     student_data = data.model_dump()
     student_data.pop("fee_amount", None)
+    student_data["academic_level"] = student_academic_level
+    if student_academic_level != "A-Level":
+        student_data["combination"] = None
+        student_data["subsidiary_subjects"] = None
+    if student_academic_level != "O-Level":
+        student_data["optional_subjects"] = None
     supplied_number = (student_data.pop("admission_number") or "").strip()
     settings = get_or_create_school_settings(db)
     item = models.Student(
@@ -284,8 +313,6 @@ def create_student(data: StudentCreate, db: Session = Depends(get_db)):
     try:
         db.flush()
         if not supplied_number:
-            # Atomic counter increment prevents two concurrent registrations
-            # from receiving the same sequence number.
             next_value = db.execute(
                 update(models.SchoolSettings)
                 .where(models.SchoolSettings.id == 1)
@@ -319,7 +346,6 @@ def create_student(data: StudentCreate, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(409, "That admission number is already registered. Check the school's numbering sequence.")
     return item
-
 
 @app.get("/api/students", response_model=list[StudentOut], tags=["Students"])
 def list_students(db: Session = Depends(get_db)):
