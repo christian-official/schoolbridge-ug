@@ -4,7 +4,7 @@ import { Users, Plus, Search, Wallet, ReceiptText } from 'lucide-react'
 type Staff = { id:number; staff_number:string; first_name:string; last_name:string; category:string; position?:string; department?:string; phone?:string; email?:string; salary_amount?:number|null; salary_frequency?:string; status?:string }
 type Page<T> = { items:T[]; total:number; page:number; pages:number }
 type Summary = { fees_expected:number; fees_collected:number; outstanding:number; salary_expenses?:number; other_expenses?:number; total_expenses?:number; net_cash_position?:number }
-type Charge = { id:number; student_name:string; admission_number:string; term:string; year:number; amount:number; paid:number; balance:number }
+type Charge = { id:number; student_id:number; student_name:string; admission_number:string; class_name?:string; stream?:string; term:string; year:number; amount:number; paid:number; balance:number }
 
 async function request<T>(path:string, token:string, options:RequestInit={}):Promise<T> {
   const response = await fetch('/api/'+path, { ...options, headers:{ Authorization:'Bearer '+token, ...(options.body?{'Content-Type':'application/json'}:{}), ...options.headers } })
@@ -80,7 +80,7 @@ export default function StaffFinance({token,active}:{token:string;active:string}
     </div>
     <div className="panel-heading"><div><h2>Record a payment</h2><p>Partial payments are supported; overpayments are blocked.</p></div></div>
     <form className="student-form" onSubmit={pay}><div className="student-form-grid">
-      <label>Student term charge *<select required value={payment.charge_id} onChange={e=>setPayment({...payment,charge_id:e.target.value})}><option value="">Select outstanding charge</option>{charges.filter(c=>c.balance>0).map(c=><option key={c.id} value={c.id}>{c.student_name} · {c.admission_number} · {c.term} {c.year} · UGX {c.balance.toLocaleString()}</option>)}</select></label>
+      <label>Student term charge *<select required value={payment.charge_id} onChange={e=>setPayment({...payment,charge_id:e.target.value})}><option value="">Select outstanding charge</option>{charges.filter(c=>c.balance>0).map(c=><option key={c.id} value={c.id}>{c.student_name} · {c.admission_number} · {c.class_name||'No class'} {c.stream?'— '+c.stream:''} · {c.term} {c.year} · UGX {c.balance.toLocaleString()}</option>)}</select></label>
       <label>Amount received (UGX) *<input type="number" min="1" required value={payment.amount} onChange={e=>setPayment({...payment,amount:e.target.value})}/></label>
       <label>Payment method<select value={payment.method} onChange={e=>setPayment({...payment,method:e.target.value})}><option>Cash</option><option>Bank</option><option>Mobile Money</option><option>Cheque</option></select></label>
       <label>Reference / receipt number<input value={payment.reference} onChange={e=>setPayment({...payment,reference:e.target.value})}/></label>
