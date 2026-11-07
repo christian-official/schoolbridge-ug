@@ -607,27 +607,6 @@ function ComingSoon({ title, description }: { title: string; description: string
 export default App
 
 
-function FeeStructure({token, classes}:{token:string;classes:RecordItem[]}) {
-  const [classId,setClassId]=useState('')
-  const [year,setYear]=useState(new Date().getFullYear())
-  const [fees,setFees]=useState([0,0,0])
-  const [message,setMessage]=useState('')
-  const [busy,setBusy]=useState(false)
-  async function load(id=classId, selectedYear=year) {
-    if(!id) return
-    try { const response=await api<{fees:{term:string;amount:number}[]}>('classes/'+id+'/fees?year='+selectedYear,token); setFees([response.fees.find(x=>x.term==='Term 1')?.amount||0,response.fees.find(x=>x.term==='Term 2')?.amount||0,response.fees.find(x=>x.term==='Term 3')?.amount||0]); setMessage('') }
-    catch(e) {setMessage(e instanceof Error?e.message:'Could not load class fees.')}
-  }
-  useEffect(()=>{void load()},[classId,year])
-  async function save(e:React.FormEvent) {
-    e.preventDefault(); if(!classId)return; setBusy(true);setMessage('')
-    try { for(let i=0;i<3;i++) await api('classes/'+classId+'/fees',token,{method:'PUT',body:JSON.stringify({term:'Term '+(i+1),year,amount:fees[i]})}); setMessage('Class fee structure saved. Existing student charges remain unchanged.') }
-    catch(e) {setMessage(e instanceof Error?e.message:'Unable to save fees.')}
-    finally {setBusy(false)}
-  }
-  return <section className="panel settings-panel"><div className="panel-heading"><div><h2>Class fee structure</h2><p>Set one standard fee per class for each term. New registrations use the active term amount.</p></div></div>{message&&<div className="success-notice">{message}</div>}<form className="student-form" onSubmit={save}><div className="student-form-grid"><label>Class<select required value={classId} onChange={e=>setClassId(e.target.value)}><option value="">Choose class</option>{classes.map(c=><option key={c.id} value={c.id}>{c.name}{c.section?' — '+c.section:''}</option>)}</select></label><label>Academic year<input type="number" min="2000" max="2100" value={year} onChange={e=>setYear(Number(e.target.value))}/></label>{[0,1,2].map(i=><label key={i}>Term {i+1} fee (UGX)<input type="number" min="0" value={fees[i]} onChange={e=>setFees(old=>old.map((v,index)=>index===i?Number(e.target.value):v))}/></label>)}</div><p className="form-hint">Changing a class fee will not rewrite charges already issued to students.</p><div className="form-actions"><button className="primary-button" disabled={!classId||busy}>{busy?'Saving...':'Save class fees'}</button></div></form></section>
-}
-
 function AcademicSettings({token}:{token:string}) {
   const [year,setYear]=useState(new Date().getFullYear())
   const [term,setTerm]=useState('Term 1')
