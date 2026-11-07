@@ -649,7 +649,9 @@ def upgrade_class_stream_uniqueness():
     if "classes" not in inspector.get_table_names():
         return
     uniques = inspector.get_unique_constraints("classes")
-    name_only = any(u.get("column_names") == ["name"] for u in uniques)
+    unique_indexes = [i for i in inspector.get_indexes("classes") if i.get("unique")]
+    name_only = (any(u.get("column_names") == ["name"] for u in uniques)
+                 or any(i.get("column_names") == ["name"] for i in unique_indexes))
     if not name_only:
         return
     if engine.dialect.name == "sqlite":
@@ -690,6 +692,9 @@ def upgrade_class_stream_uniqueness():
             for unique in uniques:
                 if unique.get("column_names") == ["name"] and unique.get("name"):
                     connection.execute(text('ALTER TABLE classes DROP CONSTRAINT "' + unique["name"] + '"'))
+            for index in unique_indexes:
+                if index.get("column_names") == ["name"] and index.get("name"):
+                    connection.execute(text('DROP INDEX IF EXISTS "' + index["name"] + '"'))
             connection.execute(text("ALTER TABLE classes ALTER COLUMN section SET DEFAULT 'General'"))
             connection.execute(text("ALTER TABLE classes ALTER COLUMN section SET NOT NULL"))
             connection.execute(text("ALTER TABLE classes ADD CONSTRAINT uq_classes_name_section UNIQUE (name, section)"))
