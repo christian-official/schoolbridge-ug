@@ -7,7 +7,7 @@ type Student = { id: number; first_name: string; middle_name?: string | null; la
 type Exam = { id: number; name: string; term: string; year: number; class_id: number | null }
 type Mark = { id: number; student_id: number; subject_id: number; exam_id: number; score: number }
 type GradeBand = { id?: number; grade: string; min_score: number; max_score: number; remark: string }
-type Page<T> = { items: T[]; total: number }
+type Page<T> = { items: T[]; total: number; pages?: number }
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 
@@ -27,6 +27,17 @@ async function request<T>(path: string, token: string, options: RequestInit = {}
 
 function studentName(student?: Student) {
   return student ? [student.first_name, student.middle_name, student.last_name].filter(Boolean).join(' ') : 'Unknown student'
+}
+
+async function fetchClassStudents(token: string, classId: number | null): Promise<Student[]> {
+  const query = classId === null ? '' : `&class_id=${classId}`
+  const first = await request<Page<Student>>(`students/search?page=1&page_size=100${query}`, token)
+  const remaining = await Promise.all(
+    Array.from({ length: Math.max(0, (first.pages || 1) - 1) }, (_, index) =>
+      request<Page<Student>>(`students/search?page=${index + 2}&page_size=100${query}`, token)
+    )
+  )
+  return [first, ...remaining].flatMap(page => page.items)
 }
 
 export default function AcademicManagement({ token, classes }: { token: string; classes: SchoolClass[] }) {
@@ -87,11 +98,11 @@ export default function AcademicManagement({ token, classes }: { token: string; 
     let cancelled = false
     setError('')
     Promise.all([
-      request<Page<Student>>(`students/search?page=1&page_size=100&class_id=${selectedExam.class_id ?? ''}`, token),
+      fetchClassStudents(token, selectedExam.class_id),
       request<Mark[]>(`marks?exam_id=${selectedExam.id}`, token),
-    ]).then(([studentPage, markRows]) => {
+    ]).then(([studentRows, markRows]) => {
       if (cancelled) return
-      setStudents(studentPage.items)
+      setStudents(studentRows)
       setMarks(markRows)
     }).catch(e => {
       if (!cancelled) setError(e instanceof Error ? e.message : 'Unable to load this examination.')
