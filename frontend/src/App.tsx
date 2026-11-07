@@ -947,7 +947,7 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
     </details>
     <h3>School user accounts</h3>
     {loading?<p className="form-hint">Loading school accounts...</p>:<div className="table-wrap"><table><thead><tr><th>Username</th><th>Email</th><th>Role</th><th>Status</th></tr></thead><tbody>
-      {users.map(u=><tr key={u.id}><td>{u.username}</td><td>{u.email}</td><td>{u.role}</td><td><span className={u.active?'status-active':'status-inactive'}>{u.active?'Active':'Disabled'}</span></td></tr>)}
+      {users.map(u=><tr key={u.id}><td>{u.username}</td><td>{u.email}</td><td>{u.role}</td><td><span className={u.active?'':'form-hint'}>{u.active?'Active':'Disabled'}</span></td></tr>)}
       {!users.length&&<tr><td colSpan={4}>No user accounts found.</td></tr>}
     </tbody></table></div>}
   </section>
