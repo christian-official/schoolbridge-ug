@@ -93,13 +93,13 @@ export default function OperationsManagement({ token, active }: { token: string;
       await request<TimetableEntry>('timetable', token, {
         method: 'POST',
         body: JSON.stringify({
-          ...draft, class_id: Number(draft.class_id), subject_id: draft.subject_id ? Number(draft.subject_id) : null,
+          ...draft, class_id: Number(draft.class_id || classId), subject_id: draft.subject_id ? Number(draft.subject_id) : null,
           staff_id: draft.staff_id ? Number(draft.staff_id) : null, day_of_week: Number(draft.day_of_week), room: draft.room.trim() || null,
         }),
       })
       setMessage('Lesson added to the class timetable.')
       setDraft(old => ({ ...old, subject_id: '', staff_id: '', room: '' }))
-      await loadTimetable(draft.class_id)
+      await loadTimetable(draft.class_id || classId)
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to add timetable entry.') }
     finally { setSaving(false) }
   }
