@@ -193,3 +193,10 @@ td strong { color: #34445e; font-size: 11px; }
   .modal-backdrop { padding: 8px; align-items: flex-start; }
   .student-profile-modal { max-height: 96vh; }
 }
+
+@media print {
+  body * { visibility: hidden !important; }
+  .receipt-print, .receipt-print * { visibility: visible !important; }
+  .receipt-print { position: absolute !important; inset: 0 auto auto 0 !important; width: 100% !important; max-width: none !important; box-shadow: none !important; border: 0 !important; }
+  .receipt-print button { display: none !important; }
+}
