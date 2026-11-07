@@ -459,6 +459,13 @@ function App() {
                   <button className="quick-action" onClick={() => setActive('Leadership & Duty')}><span className="quick-icon purple"><ShieldCheck /></span><span><strong>Prefectorial body & duty roster</strong><small>Appoint student leaders and assign teachers on duty</small></span><ArrowUpRight size={17} /></button>
                 </div>
               </section>
+              <section className="panel overview-leadership">
+                <div className="panel-heading"><div><h2>Student leadership & staff duty</h2><p>Keep student leadership appointments and teacher duty schedules organised.</p></div><button className="secondary-button" onClick={() => setActive('Leadership & Duty')}>Open management <ArrowUpRight size={15}/></button></div>
+                <div className="overview-leadership-grid">
+                  <button className="leadership-shortcut" onClick={() => setActive('Leadership & Duty')}><span className="quick-icon purple"><ShieldCheck /></span><span><strong>Prefectorial body</strong><small>Appoint head prefects, deputies and other student leaders; track their terms.</small></span><ArrowUpRight size={17}/></button>
+                  <button className="leadership-shortcut" onClick={() => setActive('Leadership & Duty')}><span className="quick-icon blue"><CalendarDays /></span><span><strong>Teachers on duty</strong><small>Assign teaching staff to dates and keep a searchable duty history.</small></span><ArrowUpRight size={17}/></button>
+                </div>
+              </section>
             </>
           )}
 
