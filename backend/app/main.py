@@ -54,9 +54,6 @@ class StudentCreate(BaseModel):
     previous_school: str | None = None
     admission_date: date | None = None
     class_id: int | None = None
-    term1_fee: int = Field(default=0, ge=0)
-    term2_fee: int = Field(default=0, ge=0)
-    term3_fee: int = Field(default=0, ge=0)
 
 
 
@@ -137,6 +134,8 @@ def read_admission_settings(db: Session = Depends(get_db)):
         "admission_separator": settings.admission_separator,
         "admission_padding": settings.admission_padding,
         "next_admission_number": settings.next_admission_number,
+        "academic_year": settings.academic_year,
+        "active_term": settings.active_term,
     }
 
 
@@ -160,6 +159,8 @@ def update_admission_settings(
         "admission_separator": settings.admission_separator,
         "admission_padding": settings.admission_padding,
         "next_admission_number": settings.next_admission_number,
+        "academic_year": settings.academic_year,
+        "active_term": settings.active_term,
     }
 
 
@@ -213,8 +214,7 @@ def list_subjects(db: Session = Depends(get_db)):
 def create_student(data: StudentCreate, db: Session = Depends(get_db)):
     if data.class_id is not None and not db.get(models.SchoolClass, data.class_id):
         raise HTTPException(404, "Class not found.")
-    student_data = data.model_dump(exclude={"term1_fee", "term2_fee", "term3_fee"})
-    term_fees = {"Term 1": data.term1_fee, "Term 2": data.term2_fee, "Term 3": data.term3_fee}
+    student_data = data.model_dump()
     supplied_number = (student_data.pop("admission_number") or "").strip()
     settings = get_or_create_school_settings(db)
     item = models.Student(
@@ -241,9 +241,18 @@ def create_student(data: StudentCreate, db: Session = Depends(get_db)):
             parts.append(str(next_value).zfill(settings.admission_padding))
             item.admission_number = settings.admission_separator.join(parts)
         db.flush()
-        for term, amount in term_fees.items():
-            if amount > 0:
-                db.add(models.FeeCharge(student_id=item.id, term=term, year=date.today().year, amount=amount))
+        if item.class_id is not None:
+            school_settings = get_or_create_school_settings(db)
+            active_term = school_settings.active_term
+            active_year = school_settings.academic_year or date.today().year
+            class_fee = db.query(models.ClassFee).filter_by(
+                class_id=item.class_id, term=active_term, year=active_year
+            ).first()
+            if class_fee and class_fee.amount > 0:
+                db.add(models.FeeCharge(
+                    student_id=item.id, term=active_term,
+                    year=active_year, amount=class_fee.amount
+                ))
         db.commit()
         db.refresh(item)
     except IntegrityError:
@@ -608,9 +617,15 @@ def upgrade_existing_database():
         "previous_school": "VARCHAR(160)", "admission_date": "DATE",
         "status": "VARCHAR(20) NOT NULL DEFAULT 'active'",
     }
+    settings_columns = {c["name"] for c in inspector.get_columns("school_settings")} if "school_settings" in inspector.get_table_names() else set()
     with engine.begin() as connection:
         for name, sql_type in additions.items():
             if name not in existing: connection.execute(text("ALTER TABLE students ADD COLUMN " + name + " " + sql_type))
+        if "school_settings" in inspector.get_table_names():
+            if "academic_year" not in settings_columns:
+                connection.execute(text("ALTER TABLE school_settings ADD COLUMN academic_year INTEGER"))
+            if "active_term" not in settings_columns:
+                connection.execute(text("ALTER TABLE school_settings ADD COLUMN active_term VARCHAR(20) NOT NULL DEFAULT 'Term 1'"))
 
 upgrade_existing_database()
 @app.get("/api/students/search", tags=["Students"])
@@ -683,3 +698,63 @@ def record_fee_payment(data: FeePaymentCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(item)
     return {"id": item.id, "charge_id": item.charge_id, "amount": item.amount, "payment_date": item.payment_date, "method": item.method, "reference": item.reference}
+
+
+class ClassFeeUpdate(BaseModel):
+    term: str = Field(pattern="^(Term 1|Term 2|Term 3)$")
+    year: int = Field(ge=2000, le=2100)
+    amount: int = Field(ge=0)
+
+
+class AcademicSettingsUpdate(BaseModel):
+    academic_year: int = Field(ge=2000, le=2100)
+    active_term: str = Field(pattern="^(Term 1|Term 2|Term 3)$")
+
+
+@app.get("/api/settings/academic", tags=["School Settings"])
+def read_academic_settings(db: Session = Depends(get_db)):
+    settings = get_or_create_school_settings(db)
+    if settings.academic_year is None:
+        settings.academic_year = date.today().year
+        db.commit()
+    return {"academic_year": settings.academic_year, "active_term": settings.active_term}
+
+
+@app.put("/api/settings/academic", tags=["School Settings"])
+def update_academic_settings(data: AcademicSettingsUpdate, db: Session = Depends(get_db)):
+    settings = get_or_create_school_settings(db)
+    settings.academic_year = data.academic_year
+    settings.active_term = data.active_term
+    db.commit()
+    return {"message": "Academic settings saved.", **data.model_dump()}
+
+
+@app.get("/api/classes/{class_id}/fees", tags=["Classes"])
+def get_class_fees(class_id: int, year: int | None = None, db: Session = Depends(get_db)):
+    if not db.get(models.SchoolClass, class_id):
+        raise HTTPException(404, "Class not found.")
+    settings = get_or_create_school_settings(db)
+    selected_year = year or settings.academic_year or date.today().year
+    rows = db.query(models.ClassFee).filter_by(class_id=class_id, year=selected_year).all()
+    by_term = {row.term: row.amount for row in rows}
+    return {"class_id": class_id, "year": selected_year,
+            "fees": [{"term": term, "amount": by_term.get(term, 0)}
+                     for term in ("Term 1", "Term 2", "Term 3")]}
+
+
+@app.put("/api/classes/{class_id}/fees", tags=["Classes"])
+def save_class_fee(class_id: int, data: ClassFeeUpdate, db: Session = Depends(get_db)):
+    if not db.get(models.SchoolClass, class_id):
+        raise HTTPException(404, "Class not found.")
+    row = db.query(models.ClassFee).filter_by(
+        class_id=class_id, term=data.term, year=data.year
+    ).first()
+    if row is None:
+        row = models.ClassFee(class_id=class_id, **data.model_dump())
+        db.add(row)
+    else:
+        row.amount = data.amount
+    db.commit()
+    db.refresh(row)
+    return {"message": "Class fee saved.", "class_id": class_id,
+            "term": row.term, "year": row.year, "amount": row.amount}
