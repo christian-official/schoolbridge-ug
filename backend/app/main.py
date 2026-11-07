@@ -1093,3 +1093,37 @@ def list_audit_logs(page: int = 1, page_size: int = 50, db: Session = Depends(ge
     total = query.count()
     rows = query.order_by(models.AuditLog.created_at.desc(), models.AuditLog.id.desc()).offset((page-1)*page_size).limit(page_size).all()
     return {"items": rows, "total": total, "page": page, "page_size": page_size}
+
+
+class SchoolProfileUpdate(BaseModel):
+    name: str = Field(min_length=2, max_length=160)
+    address: str | None = Field(default=None, max_length=255)
+    phone: str | None = Field(default=None, max_length=40)
+    email: str | None = Field(default=None, max_length=150)
+    motto: str | None = Field(default=None, max_length=200)
+
+
+@app.get("/api/settings/school-profile", tags=["School Settings"])
+def get_school_profile(db: Session = Depends(get_db)):
+    profile = db.get(models.SchoolProfile, 1)
+    if profile is None:
+        profile = models.SchoolProfile(id=1)
+        db.add(profile)
+        db.commit()
+        db.refresh(profile)
+    return profile
+
+
+@app.put("/api/settings/school-profile", tags=["School Settings"])
+def save_school_profile(data: SchoolProfileUpdate, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    profile = db.get(models.SchoolProfile, 1)
+    if profile is None:
+        profile = models.SchoolProfile(id=1)
+        db.add(profile)
+    for key, value in data.model_dump().items():
+        setattr(profile, key, value)
+    db.flush()
+    write_audit(db, admin, "school_profile_updated", "school_profile", profile.id, profile.name)
+    db.commit()
+    db.refresh(profile)
+    return {"message": "School profile saved.", "profile": profile}
