@@ -1408,6 +1408,8 @@ async def restore_database_backup(file: UploadFile = File(...), admin=Depends(re
         return {"message": "Backup validated and staged. Restart the SchoolBridge backend to apply it. The current database will be copied to a safety backup before replacement."}
     except HTTPException:
         raise
+    except sqlite3.DatabaseError as exc:
+        raise HTTPException(400, "The uploaded file is not a readable SQLite database backup.") from exc
     except Exception as exc:
         raise HTTPException(500, "Could not stage the database restore.") from exc
     finally:
