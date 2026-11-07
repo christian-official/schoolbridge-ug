@@ -6,15 +6,22 @@ on:
     branches: ['**']
 
 jobs:
-  backend-syntax:
+  backend-tests:
     runs-on: ubuntu-latest
+    env:
+      SCHOOLBRIDGE_DATABASE_URL: sqlite:///./schoolbridge_ci.db
+      SCHOOLBRIDGE_SECRET_KEY: ci-only-secret-key-not-for-production
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Install backend test dependencies
+        run: pip install -r backend/requirements-dev.txt
       - name: Compile backend
         run: python -m compileall -q backend/app
+      - name: Run backend API tests
+        run: pytest -q backend/tests
 
   frontend-build:
     runs-on: ubuntu-latest
