@@ -23,6 +23,8 @@ export default function StaffFinance({token,active,classes=[]}:{token:string;act
   const [form,setForm]=useState({first_name:'',last_name:'',category:'Teaching',position:'',department:'',phone:'',email:'',salary_amount:'',salary_frequency:'Monthly'})
   const [summary,setSummary]=useState<Summary>({fees_expected:0,fees_collected:0,outstanding:0})
   const [charges,setCharges]=useState<Charge[]>([])
+  const [expenseForm,setExpenseForm]=useState({description:'',category:'General',amount:'',reference:''})
+  const [salaryForm,setSalaryForm]=useState({staff_id:'',amount:'',period:'',reference:''})
   const [feeSearch,setFeeSearch]=useState('')
   const [feeClass,setFeeClass]=useState('')
   const [outstandingOnly,setOutstandingOnly]=useState(false)
@@ -30,7 +32,7 @@ export default function StaffFinance({token,active,classes=[]}:{token:string;act
   const [receipt,setReceipt]=useState<{receipt_number:string;charge:Charge;amount:number;method:string;date:string}|null>(null)
 
   useEffect(()=>{
-    if(active!=='Staff') return
+    if(active!=='Staff' && active!=='Fees & Finance') return
     const params=new URLSearchParams({search,page:'1',page_size:'100'})
     if(category) params.set('category',category)
     request<Page<Staff>>('staff?'+params.toString(),token).then(r=>{setStaff(r.items);setStaffTotal(r.total)}).catch(e=>setMessage(e.message))
@@ -46,6 +48,16 @@ export default function StaffFinance({token,active,classes=[]}:{token:string;act
     e.preventDefault();setMessage('')
     try { await request('staff',token,{method:'POST',body:JSON.stringify({...form,salary_amount:form.salary_amount===''?null:Number(form.salary_amount)})});setForm({first_name:'',last_name:'',category:'Teaching',position:'',department:'',phone:'',email:'',salary_amount:'',salary_frequency:'Monthly'});setShowForm(false);setMessage('Staff member registered.');const p=new URLSearchParams({search,page:'1',page_size:'100'});if(category)p.set('category',category);const r=await request<Page<Staff>>('staff?'+p.toString(),token);setStaff(r.items);setStaffTotal(r.total) }
     catch(e){setMessage(e instanceof Error?e.message:'Unable to save staff member.')}
+  }
+  async function saveOtherExpense(e:FormEvent){
+    e.preventDefault();setMessage('')
+    try {await request('finance/other-expenses',token,{method:'POST',body:JSON.stringify({...expenseForm,amount:Number(expenseForm.amount),reference:expenseForm.reference||null})});setExpenseForm({description:'',category:'General',amount:'',reference:''});setMessage('Expense recorded.');await refreshFinance()}
+    catch(e){setMessage(e instanceof Error?e.message:'Unable to record expense.')}
+  }
+  async function saveSalaryPayment(e:FormEvent){
+    e.preventDefault();setMessage('')
+    try {await request('finance/salary-payments',token,{method:'POST',body:JSON.stringify({...salaryForm,staff_id:Number(salaryForm.staff_id),amount:Number(salaryForm.amount),reference:salaryForm.reference||null})});setSalaryForm({staff_id:'',amount:'',period:'',reference:''});setMessage('Salary payment recorded.');await refreshFinance()}
+    catch(e){setMessage(e instanceof Error?e.message:'Unable to record salary payment.')}
   }
   async function pay(e:FormEvent){
     e.preventDefault();setMessage('')
@@ -89,6 +101,10 @@ export default function StaffFinance({token,active,classes=[]}:{token:string;act
       <label>Reference / receipt number<input value={payment.reference} onChange={e=>setPayment({...payment,reference:e.target.value})}/></label>
     </div><div className="form-actions"><button className="primary-button" disabled={!charges.some(c=>c.balance>0)}>Record payment</button></div></form>
     {receipt&&<section className="panel receipt-print"><div className="panel-heading"><div><h2>Payment receipt</h2><p>SchoolBridge fee payment confirmation</p></div><button className="secondary-button" type="button" onClick={()=>window.print()}>Print receipt</button></div><div className="receipt-details"><strong>Receipt: {receipt.receipt_number}</strong><p>Student: {receipt.charge.student_name}</p><p>Admission number: {receipt.charge.admission_number}</p><p>Class: {receipt.charge.class_name||'—'} {receipt.charge.stream||''}</p><p>Fee: {receipt.charge.term} {receipt.charge.year}</p><p>Amount received: UGX {receipt.amount.toLocaleString()}</p><p>Payment method: {receipt.method}</p><p>Date: {receipt.date}</p></div></section>}
+    <div className="panel-heading"><div><h2>Record staff salary payment</h2><p>Recorded salary payments contribute to school expenses.</p></div></div>
+    <form className="student-form" onSubmit={saveSalaryPayment}><div className="student-form-grid"><label>Staff member<select required value={salaryForm.staff_id} onChange={e=>setSalaryForm({...salaryForm,staff_id:e.target.value})}><option value="">Select staff member</option>{staff.filter(x=>x.status!=='archived').map(x=><option key={x.id} value={x.id}>{x.first_name} {x.last_name} · {x.staff_number}</option>)}</select></label><label>Amount (UGX)<input required type="number" min="1" value={salaryForm.amount} onChange={e=>setSalaryForm({...salaryForm,amount:e.target.value})}/></label><label>Salary period<input required placeholder="e.g. November 2026" value={salaryForm.period} onChange={e=>setSalaryForm({...salaryForm,period:e.target.value})}/></label><label>Reference<input value={salaryForm.reference} onChange={e=>setSalaryForm({...salaryForm,reference:e.target.value})}/></label></div><div className="form-actions"><button className="primary-button">Record salary payment</button></div></form>
+    <div className="panel-heading"><div><h2>Record other school expense</h2></div></div>
+    <form className="student-form" onSubmit={saveOtherExpense}><div className="student-form-grid"><label>Description<input required value={expenseForm.description} onChange={e=>setExpenseForm({...expenseForm,description:e.target.value})}/></label><label>Category<select value={expenseForm.category} onChange={e=>setExpenseForm({...expenseForm,category:e.target.value})}><option>General</option><option>Utilities</option><option>Supplies</option><option>Maintenance</option><option>Transport</option><option>Other</option></select></label><label>Amount (UGX)<input required type="number" min="1" value={expenseForm.amount} onChange={e=>setExpenseForm({...expenseForm,amount:e.target.value})}/></label><label>Reference<input value={expenseForm.reference} onChange={e=>setExpenseForm({...expenseForm,reference:e.target.value})}/></label></div><div className="form-actions"><button className="primary-button">Record expense</button></div></form>
     <div className="panel-heading"><div><h2>Student fee balances</h2><p>Search by student name or admission number</p></div></div>
     <div className="table-tools"><div className="search-box"><Search size={17}/><input placeholder="Search by name or admission number..." value={feeSearch} onChange={e=>setFeeSearch(e.target.value)}/></div><select className="filter-select" value={feeClass} onChange={e=>setFeeClass(e.target.value)}><option value="">All classes and streams</option>{classes.map(c=><option key={c.id} value={c.id}>{c.name}{c.section?' — '+c.section:''}</option>)}</select><label className="settings-checkbox"><input type="checkbox" checked={outstandingOnly} onChange={e=>setOutstandingOnly(e.target.checked)}/> Outstanding only</label><button className="secondary-button" type="button" onClick={()=>window.print()}>Print reminders</button></div>
     <div className="table-wrap"><table><thead><tr><th>Student</th><th>Admission no.</th><th>Term</th><th>Year</th><th>Charged (UGX)</th><th>Paid (UGX)</th><th>Balance (UGX)</th></tr></thead><tbody>{charges.map(c=><tr key={c.id}><td>{c.student_name}</td><td>{c.admission_number}</td><td>{c.term}</td><td>{c.year}</td><td>{c.amount.toLocaleString()}</td><td>{c.paid.toLocaleString()}</td><td><strong>{c.balance.toLocaleString()}</strong></td></tr>)}</tbody></table></div>
