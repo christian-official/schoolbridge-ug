@@ -59,7 +59,7 @@ export default function OperationsManagement({ token, active }: { token: string;
       ])
       setStaffRows(rows); setStaffSummary(totals)
       const values: Record<number, string> = {}
-      staff.forEach(person => { values[person.id] = rows.find(row => row.staff_id === person.id)?.status || 'Present' })
+      staff.forEach(person => { values[person.id] = rows.find(row => row.staff_id === person.id)?.status || '' })
       setStaffStatuses(values)
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to load staff attendance.') }
   }
@@ -75,11 +75,12 @@ export default function OperationsManagement({ token, active }: { token: string;
   useEffect(() => { if (active === 'Timetable') void loadTimetable() }, [active, classId])
 
   async function saveStaffRegister() {
+    if (staff.some(person => !staffStatuses[person.id])) { setError('Select an attendance status for every staff member before saving the register.'); return }
     setSaving(true); setError(''); setMessage('')
     try {
       const result = await request<{ saved: number }>('staff-attendance/register', token, {
         method: 'PUT',
-        body: JSON.stringify({ attendance_date: staffDate, records: staff.map(person => ({ staff_id: person.id, status: staffStatuses[person.id] || 'Present' })) }),
+        body: JSON.stringify({ attendance_date: staffDate, records: staff.map(person => ({ staff_id: person.id, status: staffStatuses[person.id] })) }),
       })
       setMessage(`${result.saved} staff attendance records saved for ${staffDate}.`)
       await loadStaffAttendance()
@@ -130,7 +131,7 @@ export default function OperationsManagement({ token, active }: { token: string;
           <div className="stat-card"><span>Not marked</span><strong className="stat-value">{staffSummary.unmarked}</strong></div>
         </div>}
         {loading ? <p className="form-hint">Loading staff...</p> : <div className="table-wrap"><table><thead><tr><th>Staff member</th><th>Staff number</th><th>Category</th><th>Status</th></tr></thead><tbody>
-          {staff.map(person => <tr key={person.id}><td>{person.first_name} {person.last_name}</td><td>{person.staff_number}</td><td>{person.category}</td><td><select value={staffStatuses[person.id] || 'Present'} onChange={event => setStaffStatuses(current => ({ ...current, [person.id]: event.target.value }))}><option>Present</option><option>Absent</option><option>Late</option><option>Excused</option></select></td></tr>)}
+          {staff.map(person => <tr key={person.id}><td>{person.first_name} {person.last_name}</td><td>{person.staff_number}</td><td>{person.category}</td><td><div className="attendance-choice-group" role="group" aria-label={`Attendance for ${person.first_name} ${person.last_name}`}>{(['Present', 'Absent', 'Late', 'Excused'] as const).map(status => <button key={status} type="button" className={`attendance-choice attendance-${status.toLowerCase()} ${staffStatuses[person.id] === status ? 'selected' : ''}`} aria-pressed={staffStatuses[person.id] === status} onClick={() => setStaffStatuses(current => ({ ...current, [person.id]: status }))}>{status}</button>)}</div></td></tr>)}
           {!staff.length && <tr><td colSpan={4}>No active staff records found.</td></tr>}
         </tbody></table></div>}
         <div className="form-actions"><button className="primary-button" type="button" disabled={saving || !staff.length} onClick={() => void saveStaffRegister()}><Save size={15}/>{saving ? 'Saving...' : 'Save staff attendance'}</button></div>
