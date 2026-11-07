@@ -113,53 +113,57 @@ def seed_demo_data_if_empty():
             if name.lower() not in existing_subjects:
                 db.add(models.Subject(name=name, school_type=school_type))
 
-        if db.query(models.Student).count() == 0:
-            class_by_name = {item.name.upper(): item for item in classes}
-            sample_students = [
-                ("Amina", "Demo", "Female", "S1"),
-                ("Brian", "Sample", "Male", "S1"),
-                ("Carol", "Test", "Female", "S2"),
-                ("Daniel", "Preview", "Male", "S2"),
-                ("Esther", "Demo", "Female", "S3"),
-                ("Farid", "Sample", "Male", "S3"),
-                ("Grace", "Test", "Female", "S4"),
-                ("Henry", "Preview", "Male", "S4"),
-                ("Irene", "Demo", "Female", "S5"),
-                ("James", "Sample", "Male", "S5"),
-                ("Kevin", "Test", "Male", "S6"),
-                ("Lydia", "Preview", "Female", "S6"),
-            ] if school_type == "Secondary" else [
-                ("Amina", "Demo", "Female", "P1"), ("Brian", "Sample", "Male", "P1"),
-                ("Carol", "Test", "Female", "P2"), ("Daniel", "Preview", "Male", "P2"),
-                ("Esther", "Demo", "Female", "P3"), ("Farid", "Sample", "Male", "P3"),
-                ("Grace", "Test", "Female", "P4"), ("Henry", "Preview", "Male", "P4"),
-                ("Irene", "Demo", "Female", "P5"), ("James", "Sample", "Male", "P5"),
-                ("Kevin", "Test", "Male", "P6"), ("Lydia", "Preview", "Female", "P7"),
-            ]
-            for index, (first, last, gender, class_name) in enumerate(sample_students, start=1):
-                selected = class_by_name.get(class_name)
-                if not selected:
-                    continue
-                level = None
-                combination = None
-                if school_type == "Secondary":
-                    level = "A-Level" if class_name in {"S5", "S6"} else "O-Level"
-                    if level == "A-Level":
-                        combination = "Sciences — PCB"
-                db.add(models.Student(
-                    admission_number=f"DEMO-{date.today().year}-{index:03d}",
-                    first_name=first,
-                    last_name=last,
-                    gender=gender,
-                    guardian_name=f"{first} Demo Guardian",
-                    guardian_relationship="Parent",
-                    guardian_phone="0000000000",
-                    previous_school="Demo Primary School",
-                    admission_date=date.today(),
-                    class_id=selected.id,
-                    academic_level=level,
-                    combination=combination,
-                ))
+        class_by_name = {item.name.upper(): item for item in classes}
+        existing_demo_admissions = {
+            row.admission_number for row in db.query(models.Student.admission_number).filter(
+                models.Student.admission_number.like(f"DEMO-{date.today().year}-%")
+            ).all()
+        }
+        first_names = [
+            "Amina", "Brian", "Carol", "Daniel", "Esther", "Farid", "Grace", "Henry",
+            "Irene", "James", "Kevin", "Lydia", "Moses", "Nadia", "Oscar", "Patricia",
+            " क्वincy", "Ruth", "Samuel", "Tina", "Umar", "Vanessa", "William", "Xavier",
+            "Yasmin", "Zach", "Andrew", "Bella", "Charles", "Diana"
+        ]
+        last_names = [
+            "Demo", "Sample", "Test", "Preview", "Nabirye", "Okello", "Namutebi", "Kato",
+            "Akena", "Atim", "Mugisha", "Nansubuga", "Ssemanda", "Auma", "Tumusiime"
+        ]
+        class_names = (
+            [f"S{i}" for i in range(1, 7)] if school_type == "Secondary"
+            else [f"P{i}" for i in range(1, 8)]
+        )
+        for index in range(1, 31):
+            admission_number = f"DEMO-{date.today().year}-{index:03d}"
+            if admission_number in existing_demo_admissions:
+                continue
+            class_name = class_names[(index - 1) % len(class_names)]
+            selected = class_by_name.get(class_name.upper())
+            if not selected:
+                continue
+            level = None
+            combination = None
+            if school_type == "Secondary":
+                level = "A-Level" if class_name in {"S5", "S6"} else "O-Level"
+                if level == "A-Level":
+                    combination = "Sciences — PCB"
+            first = first_names[index - 1]
+            last = last_names[(index - 1) % len(last_names)]
+            gender = "Female" if index % 2 else "Male"
+            db.add(models.Student(
+                admission_number=admission_number,
+                first_name=first,
+                last_name=last,
+                gender=gender,
+                guardian_name=f"{first} Demo Guardian",
+                guardian_relationship="Parent",
+                guardian_phone="0000000000",
+                previous_school="Demo Primary School",
+                admission_date=date.today(),
+                class_id=selected.id,
+                academic_level=level,
+                combination=combination,
+            ))
 
         if db.query(models.StaffMember).count() == 0:
             db.add_all([
