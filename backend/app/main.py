@@ -789,24 +789,52 @@ def finance_summary(db: Session = Depends(get_db)):
 
 @app.get("/api/finance/charges", tags=["Finance"])
 def list_fee_charges(search: str = "", class_id: int | None = None, stream: str | None = None, outstanding_only: bool = False, db: Session = Depends(get_db)):
-    query = db.query(models.FeeCharge, models.Student).join(models.Student, models.Student.id == models.FeeCharge.student_id)
+    payment_totals = db.query(
+        models.FeePayment.charge_id.label("charge_id"),
+        func.sum(models.FeePayment.amount).label("paid")
+    ).group_by(models.FeePayment.charge_id).subquery()
+    query = db.query(
+        models.FeeCharge, models.Student, models.SchoolClass,
+        func.coalesce(payment_totals.c.paid, 0)
+    ).join(
+        models.Student, models.Student.id == models.FeeCharge.student_id
+    ).outerjoin(
+        models.SchoolClass, models.SchoolClass.id == models.Student.class_id
+    ).outerjoin(
+        payment_totals, payment_totals.c.charge_id == models.FeeCharge.id
+    )
     if class_id is not None:
         query = query.filter(models.Student.class_id == class_id)
     if stream:
-        query = query.join(models.SchoolClass, models.SchoolClass.id == models.Student.class_id).filter(models.SchoolClass.section == stream)
+        query = query.filter(models.SchoolClass.section == stream)
     if search.strip():
         term = "%" + search.strip() + "%"
-        query = query.filter(or_(models.Student.admission_number.ilike(term), models.Student.first_name.ilike(term), models.Student.last_name.ilike(term)))
+        query = query.filter(or_(
+            models.Student.admission_number.ilike(term),
+            models.Student.first_name.ilike(term),
+            models.Student.middle_name.ilike(term),
+            models.Student.last_name.ilike(term)
+        ))
     results = []
-    for charge, student in query.order_by(models.FeeCharge.year.desc(), models.FeeCharge.term, models.Student.last_name).limit(500).all():
-        paid = db.query(func.coalesce(func.sum(models.FeePayment.amount), 0)).filter(models.FeePayment.charge_id == charge.id).scalar() or 0
-        balance = charge.amount - paid
+    for charge, student, school_class, paid in query.order_by(
+        models.FeeCharge.year.desc(), models.FeeCharge.term,
+        models.Student.last_name, models.Student.first_name
+    ).all():
+        balance = charge.amount - int(paid or 0)
         if outstanding_only and balance <= 0:
             continue
-        school_class = db.get(models.SchoolClass, student.class_id) if student.class_id else None
-        results.append({"id": charge.id, "student_id": student.id, "student_name": student.first_name + " " + student.last_name, "admission_number": student.admission_number, "class_id": student.class_id, "class_name": school_class.name if school_class else "", "stream": school_class.section if school_class else "", "term": charge.term, "year": charge.year, "amount": charge.amount, "paid": float(paid), "balance": float(balance)})
+        results.append({
+            "id": charge.id, "student_id": student.id,
+            "student_name": " ".join(x for x in [student.first_name, student.middle_name, student.last_name] if x),
+            "admission_number": student.admission_number,
+            "class_id": student.class_id,
+            "class_name": school_class.name if school_class else "",
+            "stream": school_class.section if school_class else "",
+            "term": charge.term, "year": charge.year,
+            "amount": charge.amount, "paid": int(paid or 0),
+            "balance": balance
+        })
     return results
-
 
 @app.post("/api/finance/payments", tags=["Finance"])
 def record_fee_payment(data: FeePaymentCreate, db: Session = Depends(get_db), admin=Depends(require_admin)):
