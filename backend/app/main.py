@@ -875,6 +875,7 @@ def save_class_fee(class_id: int, data: ClassFeeUpdate, db: Session = Depends(ge
         models.SchoolClass.name == selected_class.name
     ).all()
     created = 0
+    settings = get_or_create_school_settings(db)
     for grade_class in grade_classes:
         row = db.query(models.ClassFee).filter_by(
             class_id=grade_class.id, term=data.term, year=data.year
@@ -885,7 +886,6 @@ def save_class_fee(class_id: int, data: ClassFeeUpdate, db: Session = Depends(ge
             db.flush()
         else:
             row.amount = data.amount
-        settings = get_or_create_school_settings(db)
         if settings.active_term == data.term and (settings.academic_year or date.today().year) == data.year:
             active_students = db.query(models.Student).filter_by(
                 class_id=grade_class.id, status="active"
