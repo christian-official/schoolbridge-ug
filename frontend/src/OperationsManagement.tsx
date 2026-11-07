@@ -17,7 +17,7 @@ type Staff = { id: number; first_name: string; last_name: string; staff_number: 
 type StaffAttendance = { id: number; staff_id: number; attendance_date: string; status: string; notes?: string }
 type StaffAttendanceSummary = { total_staff: number; marked: number; unmarked: number; present: number; absent: number; late: number; excused: number }
 type SchoolClass = { id: number; name: string; section?: string }
-type Subject = { id: number; name: string }
+type Subject = { id: number; name: string; code?: string | null }
 type TimetableEntry = { id: number; class_id: number; subject_id?: number | null; staff_id?: number | null; day_of_week: number; start_time: string; end_time: string }
 
 export default function OperationsManagement({ token, active }: { token: string; active: string }) {
@@ -155,11 +155,28 @@ export default function OperationsManagement({ token, active }: { token: string;
             <div className="form-actions"><button className="primary-button" disabled={saving || !classes.length}>{saving ? 'Saving...' : 'Add lesson'}</button></div>
           </form>
         </details>
-        <div className="panel-heading"><div><h3>Whole-school weekly timetable</h3><p>Monday to Friday · All classes appear together, with lessons ordered by time.</p></div><span className="timetable-count">{entries.length} lessons</span></div>
-        {dayNames.map((day, index) => <div key={day} className="timetable-day"><h3>{day}</h3><div className="table-wrap"><table><thead><tr><th>Time</th><th>Class</th><th>Subject</th><th>Teacher</th><th></th></tr></thead><tbody>
-          {entries.filter(entry => entry.day_of_week === index + 1).map(entry => { const lessonClass = classes.find(item => item.id === entry.class_id); const teacher = staff.find(person => person.id === entry.staff_id); return <tr key={entry.id}><td>{entry.start_time}–{entry.end_time}</td><td><strong>{lessonClass ? lessonClass.name + (lessonClass.section ? ' — ' + lessonClass.section : '') : 'Class'}</strong></td><td>{subjects.find(subject => subject.id === entry.subject_id)?.name || 'Lesson'}</td><td>{teacher ? teacher.first_name + ' ' + teacher.last_name : '—'}</td><td><button type="button" className="secondary-button" disabled={saving} onClick={() => void removeEntry(entry.id)}><Trash2 size={14}/> Remove</button></td></tr> })}
-          {!entries.some(entry => entry.day_of_week === index + 1) && <tr><td colSpan={5}>No lessons scheduled.</td></tr>}
-        </tbody></table></div></div>)}
+        <div className="panel-heading"><div><h3>Whole-school timetable by class</h3><p>Each class has one clear weekly table. Subject codes are shown where available; otherwise short abbreviations are generated from the subject name.</p></div><span className="timetable-count">{entries.length} lessons</span></div>
+        {classes.slice().sort((a,b) => a.name.localeCompare(b.name) || (a.section || '').localeCompare(b.section || '')).map(schoolClass => {
+          const classEntries = entries.filter(entry => entry.class_id === schoolClass.id).sort((a,b) => a.day_of_week - b.day_of_week || a.start_time.localeCompare(b.start_time));
+          const subjectAbbreviation = (subject?: Subject) => {
+            if (!subject) return '—';
+            if (subject.code?.trim()) return subject.code.trim().toUpperCase();
+            const words = subject.name.trim().split(/\\s+/);
+            return (words.length > 1 ? words.map(word => word[0]).join('') : subject.name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 3)).toUpperCase();
+          };
+          return <div key={schoolClass.id} className="timetable-class-block">
+            <div className="timetable-class-heading"><h3>{schoolClass.name}{schoolClass.section ? ' — ' + schoolClass.section : ''}</h3><span>{classEntries.length} lessons</span></div>
+            <div className="table-wrap"><table className="class-timetable-table"><thead><tr><th>Day</th><th>Time</th><th>Subject</th><th>Teacher</th><th>Action</th></tr></thead><tbody>
+              {classEntries.map(entry => {
+                const subject = subjects.find(item => item.id === entry.subject_id);
+                const teacher = staff.find(person => person.id === entry.staff_id);
+                return <tr key={entry.id}><td><strong>{dayNames[entry.day_of_week - 1]?.slice(0, 3).toUpperCase() || '—'}</strong></td><td>{entry.start_time}–{entry.end_time}</td><td><span className="subject-abbreviation" title={subject?.name || 'Lesson'}>{subjectAbbreviation(subject)}</span><span className="subject-full-name">{subject?.name || 'Lesson'}</span></td><td>{teacher ? teacher.first_name + ' ' + teacher.last_name : '—'}</td><td><button type="button" className="secondary-button" disabled={saving} onClick={() => void removeEntry(entry.id)}><Trash2 size={14}/> Remove</button></td></tr>
+              })}
+              {!classEntries.length && <tr><td colSpan={5}>No lessons scheduled for this class.</td></tr>}
+            </tbody></table></div>
+          </div>;
+        })}
+        {!classes.length && <p className="form-hint">Create classes before adding timetable lessons.</p>}
       </>}
     </section>
   </div>
