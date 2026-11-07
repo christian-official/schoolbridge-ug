@@ -870,14 +870,88 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
   const [teacher,setTeacher]=useState({username:'',email:'',password:''})
   const [assignment,setAssignment]=useState({teacher_id:'',class_id:'',subject_id:''})
   const [message,setMessage]=useState('')
+  const [error,setError]=useState('')
+  const [loading,setLoading]=useState(true)
   const [busy,setBusy]=useState(false)
-  async function load(){try{const [u,sub]=await Promise.all([api<any[]>('auth/users',token),api<any[]>('subjects',token)]);setUsers(u);setSubjects(sub)}catch(e){setMessage(e instanceof Error?e.message:'Unable to load user settings.')}}
-  useEffect(()=>{void load()},[token])
-  async function create(e:React.FormEvent){e.preventDefault();setBusy(true);setMessage('');try{await api('auth/teachers',token,{method:'POST',body:JSON.stringify(teacher)});setTeacher({username:'',email:'',password:''});setMessage('Teacher account created.');await load();onSaved()}catch(e){setMessage(e instanceof Error?e.message:'Unable to create account.')}finally{setBusy(false)}}
-  async function assign(e:React.FormEvent){e.preventDefault();setBusy(true);setMessage('');try{await api('teacher-assignments',token,{method:'POST',body:JSON.stringify({teacher_id:Number(assignment.teacher_id),class_id:Number(assignment.class_id),subject_id:Number(assignment.subject_id)})});setMessage('Teacher assignment saved.');setAssignment({teacher_id:'',class_id:'',subject_id:''});onSaved()}catch(e){setMessage(e instanceof Error?e.message:'Unable to assign teacher.')}finally{setBusy(false)}}
-  return <section className="panel settings-panel"><div className="panel-heading"><div><h2>Users and permissions</h2><p>Create teacher accounts and restrict their workspace to assigned classes and subjects.</p></div></div>{message&&<div className="success-notice">{message}</div>}<h3>Create teacher account</h3><details className="form-disclosure"><summary>Create teacher account</summary><form className="student-form" onSubmit={create}><div className="student-form-grid"><label>Username *<input required value={teacher.username} onChange={e=>setTeacher({...teacher,username:e.target.value})}/></label><label>Email *<input required type="email" value={teacher.email} onChange={e=>setTeacher({...teacher,email:e.target.value})}/></label><label>Temporary password *<input required type="password" minLength={12} value={teacher.password} onChange={e=>setTeacher({...teacher,password:e.target.value})}/></label></div><p className="form-hint">Use a strong password of at least 12 characters and share it securely with the teacher.</p><div className="form-actions"><button className="primary-button" disabled={busy}>Create teacher account</button></div></form></details><h3>Assign classes and subjects</h3><details className="form-disclosure"><summary>Assign teacher classes and subjects</summary><form className="student-form" onSubmit={assign}><div className="student-form-grid"><label>Teacher<select required value={assignment.teacher_id} onChange={e=>setAssignment({...assignment,teacher_id:e.target.value})}><option value="">Select teacher</option>{users.filter(u=>u.role==='teacher'&&u.active).map(u=><option key={u.id} value={u.id}>{u.username}</option>)}</select></label><label>Class<select required value={assignment.class_id} onChange={e=>setAssignment({...assignment,class_id:e.target.value})}><option value="">Select class</option>{classes.map(c=><option key={c.id} value={c.id}>{c.name}{c.section?' — '+c.section:''}</option>)}</select></label><label>Subject<select required value={assignment.subject_id} onChange={e=>setAssignment({...assignment,subject_id:e.target.value})}><option value="">Select subject</option>{subjects.map(sub=><option key={sub.id} value={sub.id}>{sub.name}</option>)}</select></label></div><div className="form-actions"><button className="primary-button" disabled={busy||!subjects.length||!classes.length}>Save teacher assignment</button></div></form></details><h3>School user accounts</h3><div className="table-wrap"><table><thead><tr><th>Username</th><th>Email</th><th>Role</th><th>Status</th></tr></thead><tbody>{users.map(u=><tr key={u.id}><td>{u.username}</td><td>{u.email}</td><td>{u.role}</td><td>{u.active?'Active':'Disabled'}</td></tr>)}</tbody></table></div></section>
-}
 
+  async function load() {
+    setLoading(true);setError('')
+    try {
+      const [u,sub]=await Promise.all([api<any[]>('auth/users',token),api<any[]>('subjects',token)])
+      setUsers(u);setSubjects(sub)
+    } catch(e) {
+      setError(e instanceof Error?e.message:'Unable to load teacher accounts and subjects.')
+    } finally {setLoading(false)}
+  }
+  useEffect(()=>{void load()},[token])
+
+  async function create(e:React.FormEvent) {
+    e.preventDefault()
+    const username=teacher.username.trim()
+    const email=teacher.email.trim()
+    if(!username||!email||teacher.password.length<12){setError('Enter a username, valid email and password of at least 12 characters.');return}
+    setBusy(true);setError('');setMessage('')
+    try {
+      await api('auth/teachers',token,{method:'POST',body:JSON.stringify({username,email,password:teacher.password})})
+      setTeacher({username:'',email:'',password:''})
+      setMessage('Teacher account created successfully.')
+      await load()
+      onSaved()
+    } catch(e) {
+      setError(e instanceof Error?e.message:'Unable to create teacher account.')
+    } finally {setBusy(false)}
+  }
+
+  async function assign(e:React.FormEvent) {
+    e.preventDefault()
+    if(!assignment.teacher_id||!assignment.class_id||!assignment.subject_id){setError('Select a teacher, class and subject before saving.');return}
+    setBusy(true);setError('');setMessage('')
+    try {
+      await api('teacher-assignments',token,{method:'POST',body:JSON.stringify({teacher_id:Number(assignment.teacher_id),class_id:Number(assignment.class_id),subject_id:Number(assignment.subject_id)})})
+      setAssignment({teacher_id:'',class_id:'',subject_id:''})
+      setMessage('Teacher assignment saved successfully.')
+      onSaved()
+    } catch(e) {
+      setError(e instanceof Error?e.message:'Unable to assign teacher.')
+    } finally {setBusy(false)}
+  }
+
+  const activeTeachers=users.filter(u=>u.role==='teacher'&&u.active)
+  return <section className="panel settings-panel">
+    <div className="panel-heading"><div><h2>Users and permissions</h2><p>Create teacher accounts and restrict their workspace to assigned classes and subjects.</p></div><button type="button" className="secondary-button" onClick={()=>void load()} disabled={loading||busy}>{loading?'Loading...':'Refresh accounts'}</button></div>
+    {error&&<div className="form-error" role="alert">{error}</div>}
+    {message&&<div className="success-notice" role="status">{message}</div>}
+    <h3>Create teacher account</h3>
+    <details className="form-disclosure"><summary>Create teacher account</summary>
+      <form className="student-form" onSubmit={create}>
+        <div className="student-form-grid">
+          <label>Username *<input required maxLength={60} autoComplete="username" value={teacher.username} onChange={e=>setTeacher({...teacher,username:e.target.value})} placeholder="Enter a username"/></label>
+          <label>Email address *<input required type="email" maxLength={254} autoComplete="email" value={teacher.email} onChange={e=>setTeacher({...teacher,email:e.target.value})} placeholder="teacher@example.com"/></label>
+          <label>Temporary password *<input required type="password" minLength={12} maxLength={128} autoComplete="new-password" value={teacher.password} onChange={e=>setTeacher({...teacher,password:e.target.value})} placeholder="At least 12 characters"/></label>
+        </div>
+        <p className="form-hint">Use a strong password of at least 12 characters and share it securely with the teacher.</p>
+        <div className="form-actions"><button className="primary-button" disabled={busy||loading}>{busy?'Saving...':'Create teacher account'}</button></div>
+      </form>
+    </details>
+    <h3>Assign classes and subjects</h3>
+    <details className="form-disclosure"><summary>Assign teacher classes and subjects</summary>
+      <form className="student-form" onSubmit={assign}>
+        <div className="student-form-grid">
+          <label>Teacher *<select required value={assignment.teacher_id} onChange={e=>setAssignment({...assignment,teacher_id:e.target.value})}><option value="">Select teacher</option>{activeTeachers.map(u=><option key={u.id} value={u.id}>{u.username}</option>)}</select></label>
+          <label>Class *<select required value={assignment.class_id} onChange={e=>setAssignment({...assignment,class_id:e.target.value})}><option value="">Select class</option>{classes.map(c=><option key={c.id} value={c.id}>{c.name}{c.section?' — '+c.section:''}</option>)}</select></label>
+          <label>Subject *<select required value={assignment.subject_id} onChange={e=>setAssignment({...assignment,subject_id:e.target.value})}><option value="">Select subject</option>{subjects.map(sub=><option key={sub.id} value={sub.id}>{sub.name}</option>)}</select></label>
+        </div>
+        {(!activeTeachers.length||!classes.length||!subjects.length)&&<p className="form-hint">To make an assignment, ensure there is at least one active teacher account, one class and one subject.</p>}
+        <div className="form-actions"><button className="primary-button" disabled={busy||loading||!activeTeachers.length||!subjects.length||!classes.length}>{busy?'Saving...':'Save teacher assignment'}</button></div>
+      </form>
+    </details>
+    <h3>School user accounts</h3>
+    {loading?<p className="form-hint">Loading school accounts...</p>:<div className="table-wrap"><table><thead><tr><th>Username</th><th>Email</th><th>Role</th><th>Status</th></tr></thead><tbody>
+      {users.map(u=><tr key={u.id}><td>{u.username}</td><td>{u.email}</td><td>{u.role}</td><td><span className={u.active?'status-active':'status-inactive'}>{u.active?'Active':'Disabled'}</span></td></tr>)}
+      {!users.length&&<tr><td colSpan={4}>No user accounts found.</td></tr>}
+    </tbody></table></div>}
+  </section>
+}
 function BackupSettings({token}:{token:string}) {
   const [file,setFile]=useState<File|null>(null)
   const [message,setMessage]=useState('')
