@@ -611,6 +611,37 @@ function App() {
               <section className="panel student-profile-modal" onClick={e=>e.stopPropagation()}>
                 <div className="panel-heading"><div><h2>Student profile</h2><p>{studentProfile.student.admission_number} · {studentProfile.student.status}</p></div><div className="profile-actions"><button className="secondary-button" type="button" onClick={()=>void dismissStudent(studentProfile.student.id)} disabled={studentProfile.student.status==='dismissed'}>Dismiss student</button><button className="secondary-button" type="button" onClick={()=>setStudentProfile(null)}>Close</button></div></div>
                 {profileMessage&&<div className="success-notice">{profileMessage}</div>}
+                <section className="student-profile-details">
+                  <div className="panel-heading"><div><h3>Admission details</h3><p>Essential information captured during registration</p></div></div>
+                  <div className="student-form-grid">
+                    <div><small>Admission number</small><strong>{studentProfile.student.admission_number||'—'}</strong></div>
+                    <div><small>Class / stream</small><strong>{classes.find(c=>c.id===studentProfile.student.class_id)?.name||'—'}{classes.find(c=>c.id===studentProfile.student.class_id)?.section?' — '+classes.find(c=>c.id===studentProfile.student.class_id)?.section:''}</strong></div>
+                    <div><small>Admission date</small><strong>{studentProfile.student.admission_date||'—'}</strong></div>
+                    <div><small>Student status</small><strong>{studentProfile.student.status||'Active'}</strong></div>
+                  </div>
+                  <div className="panel-heading"><div><h3>Student biodata</h3></div></div>
+                  <div className="student-form-grid">
+                    <div><small>Full name</small><strong>{[studentProfile.student.first_name,studentProfile.student.middle_name,studentProfile.student.last_name].filter(Boolean).join(' ')||'—'}</strong></div>
+                    <div><small>Gender</small><strong>{studentProfile.student.gender||'—'}</strong></div>
+                    <div><small>Date of birth</small><strong>{studentProfile.student.date_of_birth||'—'}</strong></div>
+                    <div><small>Nationality</small><strong>{studentProfile.student.nationality||'—'}</strong></div>
+                    <div><small>Religion</small><strong>{studentProfile.student.religion||'—'}</strong></div>
+                    <div><small>Student phone</small><strong>{studentProfile.student.phone||'—'}</strong></div>
+                    <div className="field-span-full"><small>Home address</small><strong>{studentProfile.student.address||'—'}</strong></div>
+                  </div>
+                  <div className="panel-heading"><div><h3>Parent / guardian</h3></div></div>
+                  <div className="student-form-grid">
+                    <div><small>Parent / guardian name</small><strong>{studentProfile.student.guardian_name||'—'}</strong></div>
+                    <div><small>Relationship</small><strong>{studentProfile.student.guardian_relationship||'—'}</strong></div>
+                    <div><small>Guardian phone</small><strong>{studentProfile.student.guardian_phone||'—'}</strong></div>
+                  </div>
+                  <div className="panel-heading"><div><h3>Previous education</h3></div></div>
+                  <div className="student-form-grid">
+                    <div><small>Previous school</small><strong>{studentProfile.student.previous_school||'—'}</strong></div>
+                    <div><small>Academic level</small><strong>{studentProfile.student.academic_level||'—'}</strong></div>
+                    <div><small>Combination / subjects</small><strong>{studentProfile.student.combination||studentProfile.student.optional_subjects||'—'}</strong></div>
+                  </div>
+                </section>
                 <details className="form-disclosure"><summary>Edit student details</summary><form className="student-form" onSubmit={saveStudentProfile}>
                   <div className="student-form-grid">
                     <label>First name<input required value={studentProfile.student.first_name||''} onChange={e=>setStudentProfile({...studentProfile,student:{...studentProfile.student,first_name:e.target.value}})}/></label>
