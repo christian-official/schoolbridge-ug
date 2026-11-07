@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import StaffFinance from './StaffFinance'
 import AcademicManagement from './AcademicManagement'
+import AttendanceManagement from './AttendanceManagement'
 import './App.css'
 
 type User = {
@@ -53,6 +54,7 @@ const menu = [
   { label: 'Staff', icon: Users },
   { label: 'Fees & Finance', icon: FileText },
   { label: 'Examinations', icon: FileText },
+  { label: 'Attendance', icon: CalendarDays },
   { label: 'Leadership & Duty', icon: ShieldCheck },
 ]
 const teacherMenu = [
@@ -678,6 +680,7 @@ function App() {
             </div>
           )}
           {active === 'Examinations' && user.role === 'admin' && <AcademicManagement token={token} classes={classes} />}
+          {active === 'Attendance' && user.role === 'admin' && <AttendanceManagement token={token} />}
           {active === 'Leadership & Duty' && user.role === 'admin' && <LeadershipDuty token={token} />}
           {active === 'Settings' && settingsSection === 'home' && (
             <section className="settings-hub">
