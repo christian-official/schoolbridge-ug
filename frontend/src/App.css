@@ -251,3 +251,27 @@ td,th,.stat-top,.stat-card small,.quick-action strong,.quick-action small { font
  .finance-tabs { grid-template-columns:1fr 1fr; }
  .finance-class-grid { grid-template-columns:1fr; }
 }
+
+
+/* Refined typography and responsive refresh feedback */
+:root { font-size: 14px; }
+body { font-size: 14px; }
+.nav-item { font-size: 13px; }
+.breadcrumb,.muted,.panel-heading p,.form-heading p,.required-note,.student-form-grid label,
+.secondary-button,.primary-button,.filter-select,.search-box input,.pagination-row,
+td,th,.stat-top,.stat-card small,.quick-action strong,.quick-action small { font-size: 12px; }
+.welcome-row h1 { font-size: 23px; }
+.panel-heading h2 { font-size: 16px; }
+.stat-value { font-size: 24px; }
+.student-form-grid input,.student-form-grid select,.filter-select,.search-box { font-size: 13px; }
+.finance-tab { font-size: 12px; padding: 10px 13px; }
+.finance-overview h3 { font-size: 17px; }
+.finance-overview p { font-size: 13px; }
+.finance-class-card strong { font-size: 14px; }
+.finance-class-card span { font-size: 12px; }
+.refresh-button { min-width: 104px; justify-content: center; }
+.refresh-button:disabled { opacity: .7; cursor: wait; }
+@media(max-width:700px) {
+  .welcome-row h1 { font-size: 20px; }
+  .stat-value { font-size: 21px; }
+}
