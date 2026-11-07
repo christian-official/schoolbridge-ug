@@ -6,6 +6,7 @@ import {
   CalendarDays, TrendingUp, ShieldCheck, LoaderCircle, RefreshCw,
 } from 'lucide-react'
 import StaffFinance from './StaffFinance'
+import AcademicManagement from './AcademicManagement'
 import './App.css'
 
 type User = {
@@ -675,7 +676,7 @@ function App() {
               </section>
             </div>
           )}
-          {active === 'Examinations' && <ComingSoon title="Examinations and results" description="Exam setup, marks entry and student results will be managed here." />}
+          {active === 'Examinations' && user.role === 'admin' && <AcademicManagement token={token} classes={classes} />}
           {active === 'Leadership & Duty' && user.role === 'admin' && <LeadershipDuty token={token} />}
           {active === 'Settings' && settingsSection === 'home' && (
             <section className="settings-hub">
