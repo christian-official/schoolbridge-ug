@@ -8,6 +8,7 @@ type Exam = { id: number; name: string; term: string; year: number; class_id: nu
 type Mark = { id: number; student_id: number; subject_id: number; exam_id: number; score: number; verified: boolean }
 type GradeBand = { id?: number; grade: string; min_score: number; max_score: number; remark: string }
 type SchoolProfile = { name?: string; address?: string | null; phone?: string | null; email?: string | null; motto?: string | null }
+type ReportTemplateConfig = { title?: string; footer?: string }
 type Page<T> = { items: T[]; total: number; pages?: number }
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
@@ -50,6 +51,12 @@ export default function AcademicManagement({ token, classes }: { token: string; 
   const [selectedSubjectId, setSelectedSubjectId] = useState('')
   const [reportRemarks, setReportRemarks] = useState({ classTeacher: '', headteacher: '' })
   const [reportTemplate, setReportTemplate] = useState<'classic' | 'modern' | 'detailed'>('modern')
+  const [recordedSubjectFilter, setRecordedSubjectFilter] = useState('all')
+  const [recordedStatusFilter, setRecordedStatusFilter] = useState<'all' | 'verified' | 'unverified'>('all')
+  const [reportLogo, setReportLogo] = useState(() => localStorage.getItem('schoolbridge-report-logo') || '')
+  const [reportTemplateConfig, setReportTemplateConfig] = useState<ReportTemplateConfig>(() => { try { return JSON.parse(localStorage.getItem('schoolbridge-report-template') || '{}') } catch { return {} } })
+  const [reportTitle, setReportTitle] = useState(() => { try { return JSON.parse(localStorage.getItem('schoolbridge-report-template') || '{}').title || 'STUDENT PROGRESS REPORT' } catch { return 'STUDENT PROGRESS REPORT' } })
+  const [reportFooter, setReportFooter] = useState(() => { try { return JSON.parse(localStorage.getItem('schoolbridge-report-template') || '{}').footer || 'SchoolBridge · Official student progress report · Keep this report for your records' } catch { return 'SchoolBridge · Official student progress report · Keep this report for your records' } })
   const [gradingBands, setGradingBands] = useState<GradeBand[]>([])
   const [schoolProfile, setSchoolProfile] = useState<SchoolProfile>({})
   const [draftBands, setDraftBands] = useState<GradeBand[]>([])
@@ -271,6 +278,30 @@ export default function AcademicManagement({ token, classes }: { token: string; 
     }
   }
 
+  function saveReportTemplateEdits() {
+    const next = { ...reportTemplateConfig, title: reportTitle.trim(), footer: reportFooter.trim() }
+    setReportTemplateConfig(next); localStorage.setItem('schoolbridge-report-template', JSON.stringify(next)); setMessage('Report layout text saved on this browser.')
+  }
+  async function uploadReportTemplate(file?: File) {
+    if (!file) return
+    if (file.size > 100 * 1024) { setError('Report template JSON must be 100 KB or smaller.'); return }
+    try {
+      const parsed = JSON.parse(await file.text())
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) || (parsed.title !== undefined && typeof parsed.title !== 'string') || (parsed.footer !== undefined && typeof parsed.footer !== 'string')) throw new Error('Use a JSON template with optional title and footer text fields.')
+      const next = { title: parsed.title || reportTitle, footer: parsed.footer || reportFooter }
+      setReportTemplateConfig(next); setReportTitle(next.title); setReportFooter(next.footer); localStorage.setItem('schoolbridge-report-template', JSON.stringify(next)); setMessage('Custom report template imported and saved on this browser.')
+    } catch (e) { setError(e instanceof Error ? e.message : 'Unable to read this report template.') }
+  }
+  async function uploadSchoolLogo(file?: File) {
+    if (!file) return
+    if (!file.type.startsWith('image/')) { setError('Choose an image file for the school badge.'); return }
+    if (file.size > 1500000) { setError('School badge image must be 1.5 MB or smaller.'); return }
+    const reader = new FileReader()
+    reader.onload = () => { const value = String(reader.result || ''); try { localStorage.setItem('schoolbridge-report-logo', value); setReportLogo(value); setMessage('School badge saved on this browser and added to report cards.') } catch { setError('The image could not be saved. Choose a smaller image.') } }
+    reader.onerror = () => setError('Unable to read the selected image.')
+    reader.readAsDataURL(file)
+  }
+
   function printAcademicSection(target: 'results' | 'report' | 'class-reports') {
     const cleanup = () => { delete document.body.dataset.schoolbridgePrint }
     document.body.dataset.schoolbridgePrint = target
@@ -294,8 +325,8 @@ export default function AcademicManagement({ token, classes }: { token: string; 
     const templateClass = 'report-card-sheet report-template-' + reportTemplate
     return <article className={templateClass} key={student.id}>
       <header className="report-card-header">
-        <div className="report-school-emblem">{schoolProfile.name?.slice(0, 2).toUpperCase() || 'SB'}</div>
-        <div className="report-school-title"><span>OFFICIAL ACADEMIC RECORD {index !== undefined ? '· CLASS COPY ' + (index + 1) : ''}</span><h2>{schoolProfile.name || 'SCHOOL NAME'}</h2><p>{[schoolProfile.address, schoolProfile.phone, schoolProfile.email].filter(Boolean).join(' · ') || 'School address · Telephone · Email'}</p>{schoolProfile.motto && <em>{schoolProfile.motto}</em>}<strong>{reportTemplate === 'classic' ? 'STUDENT REPORT CARD' : reportTemplate === 'detailed' ? 'COMPREHENSIVE ACADEMIC REPORT' : 'STUDENT PROGRESS REPORT'}</strong></div>
+        {reportLogo ? <img className="report-school-emblem report-school-logo" src={reportLogo} alt="School badge"/> : <div className="report-school-emblem">{schoolProfile.name?.slice(0, 2).toUpperCase() || 'SB'}</div>}
+        <div className="report-school-title"><span>OFFICIAL ACADEMIC RECORD {index !== undefined ? '· CLASS COPY ' + (index + 1) : ''}</span><h2>{schoolProfile.name || 'SCHOOL NAME'}</h2><p>{[schoolProfile.address, schoolProfile.phone, schoolProfile.email].filter(Boolean).join(' · ') || 'School address · Telephone · Email'}</p>{schoolProfile.motto && <em>{schoolProfile.motto}</em>}<strong>{reportTitle || (reportTemplate === 'classic' ? 'STUDENT REPORT CARD' : reportTemplate === 'detailed' ? 'COMPREHENSIVE ACADEMIC REPORT' : 'STUDENT PROGRESS REPORT')}</strong></div>
         <div className="report-card-term"><span>ACADEMIC YEAR</span><strong>{selectedExam?.year || new Date().getFullYear()}</strong><span>TERM</span><strong>{selectedExam?.term || '—'}</strong></div>
       </header>
       <div className="report-student-details">
@@ -312,7 +343,7 @@ export default function AcademicManagement({ token, classes }: { token: string; 
       <div className="report-section-heading"><span>{reportTemplate === 'detailed' ? '03' : '02'}</span><h3>Progress remarks and recommendations</h3></div>
       <div className="report-remarks-grid"><label>Class teacher's remarks<textarea value={reportRemarks.classTeacher} onChange={e => setReportRemarks(v => ({ ...v, classTeacher: e.target.value }))} placeholder="Comment on attendance, conduct, participation and general progress."/></label><label>Headteacher's remarks<textarea value={reportRemarks.headteacher} onChange={e => setReportRemarks(v => ({ ...v, headteacher: e.target.value }))} placeholder="School leadership comments and recommendations."/></label></div>
       <div className="report-signatures"><div><strong>Class teacher</strong><span>Signature: __________________</span><span>Date: __________________</span></div><div><strong>Headteacher</strong><span>Signature: __________________</span><span>Date: __________________</span></div></div>
-      <footer className="report-card-footer">SchoolBridge · Official student progress report · Keep this report for your records</footer>
+      <footer className="report-card-footer">{reportFooter}</footer>
     </article>
   }
 
@@ -404,12 +435,13 @@ export default function AcademicManagement({ token, classes }: { token: string; 
           <div className="student-score-footer"><span>Blank scores are skipped. Scores must be between 0 and 100.</span><button type="button" className="primary-button" onClick={() => void saveClassMarks()} disabled={saving}><Save size={15}/>{saving ? 'Saving…' : 'Save scores'}</button></div>
         </div>}
         <details className="recorded-marks-details"><summary>Recorded scores · by subject and verification status</summary>
+          <div className="recorded-marks-filters"><label>Subject<select value={recordedSubjectFilter} onChange={e => setRecordedSubjectFilter(e.target.value)}><option value="all">All subjects</option>{subjects.map(subject => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label><label>Verification status<select value={recordedStatusFilter} onChange={e => setRecordedStatusFilter(e.target.value as 'all' | 'verified' | 'unverified')}><option value="all">All statuses</option><option value="verified">Verified</option><option value="unverified">Unverified</option></select></label></div>
           <div className="recorded-subject-groups">
-            {subjects.filter(subject => marks.some(mark => mark.subject_id === subject.id)).map(subject => {
-              const subjectMarks = marks.filter(mark => mark.subject_id === subject.id).sort((a, b) => studentName(studentById.get(a.student_id)).localeCompare(studentName(studentById.get(b.student_id))));
+            {subjects.filter(subject => marks.some(mark => mark.subject_id === subject.id) && (recordedSubjectFilter === 'all' || String(subject.id) === recordedSubjectFilter)).map(subject => {
+              const subjectMarks = marks.filter(mark => mark.subject_id === subject.id && (recordedStatusFilter === 'all' || (recordedStatusFilter === 'verified' ? mark.verified : !mark.verified))).sort((a, b) => studentName(studentById.get(a.student_id)).localeCompare(studentName(studentById.get(b.student_id))));
               const verifiedMarks = subjectMarks.filter(mark => mark.verified);
               const unverifiedMarks = subjectMarks.filter(mark => !mark.verified);
-              const renderMarkRows = (rows: Mark[]) => rows.map(mark => <tr key={mark.id}><td>{studentName(studentById.get(mark.student_id))}</td><td><strong>{Math.round(mark.score)}</strong></td><td><button type="button" className="secondary-button" onClick={() => void setMarkVerification(mark, !mark.verified)} disabled={saving}>{mark.verified ? 'Unlock' : 'Verify'}</button></td></tr>);
+              const renderMarkRows = (rows: Mark[]) => rows.map(mark => <tr key={mark.id}><td>{studentName(studentById.get(mark.student_id))}</td><td><strong>{Math.round(mark.score)}</strong></td><td><select aria-label={'Verification status for ' + studentName(studentById.get(mark.student_id))} value={mark.verified ? 'verified' : 'unverified'} disabled={saving} onChange={e => void setMarkVerification(mark, e.target.value === 'verified')}><option value="unverified">Unverified</option><option value="verified">Verified</option></select></td></tr>);
               return <section className="recorded-subject-card" key={subject.id}>
                 <div className="recorded-subject-heading"><h3>{subject.name}</h3><span>{subjectMarks.length} recorded</span></div>
                 <div className="recorded-status-columns">
@@ -483,6 +515,7 @@ export default function AcademicManagement({ token, classes }: { token: string; 
           <label className="academic-exam-select report-student-picker">Preview student<select value={historyStudentId} onChange={e => setHistoryStudentId(e.target.value)}><option value="">Choose a student</option>{students.map(student => <option key={student.id} value={student.id}>{studentName(student)} · {student.admission_number}</option>)}</select></label>
           <button type="button" className="primary-button" disabled={!historyStudentId} onClick={() => printAcademicSection('report')}><Printer size={15}/> Print selected report</button>
         </div>
+        <div className="report-customisation-panel report-screen-controls"><div><strong>School badge / logo</strong><p>Upload the school's crest, badge or logo for every report.</p><input type="file" accept="image/*" onChange={e => void uploadSchoolLogo(e.target.files?.[0])}/>{reportLogo && <button type="button" className="secondary-button" onClick={() => { localStorage.removeItem('schoolbridge-report-logo'); setReportLogo('') }}>Remove badge</button>}</div><div><strong>Upload a report template</strong><p>Import a JSON template with editable report heading and footer fields.</p><input type="file" accept=".json,application/json" onChange={e => void uploadReportTemplate(e.target.files?.[0])}/></div><label>Editable report heading<input value={reportTitle} maxLength={100} onChange={e => setReportTitle(e.target.value)}/></label><label>Editable report footer<input value={reportFooter} maxLength={180} onChange={e => setReportFooter(e.target.value)}/></label><button type="button" className="primary-button" onClick={saveReportTemplateEdits}>Save report design</button></div>
         {historyError && <div className="form-error" role="alert">{historyError}</div>}
         {historyStudent && reportCardMarkup(historyStudent, selectedReportRows)}
         {!historyStudent && <div className="subject-marks-empty"><BookOpen size={25}/><strong>Choose a student to preview a report</strong><span>Use Print whole class to produce every student's report in one print job.</span></div>}
