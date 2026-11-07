@@ -186,6 +186,14 @@ def test_admin_can_stage_valid_restore_without_immediate_replacement(tmp_path):
         destination.close()
         source.close()
 
+    # Make the uploaded backup intentionally different from the live database.
+    with sqlite3.connect(str(backup_path)) as backup_db:
+        backup_db.execute(
+            "INSERT INTO users (username, email, hashed_password, role, is_active) "
+            "VALUES (?, ?, ?, ?, ?)",
+            ("backup-only-teacher", "backup-only@example.invalid", "test-hash", "teacher", 1),
+        )
+
     try:
         with TestClient(app) as client:
             response = client.post(
@@ -197,9 +205,18 @@ def test_admin_can_stage_valid_restore_without_immediate_replacement(tmp_path):
         assert response.status_code == 200
         assert "Restart the SchoolBridge backend" in response.json()["message"]
         assert os.path.exists(pending_path)
-        # The live database remains untouched until the controlled restart.
+        # The live database remains untouched; the distinct uploaded copy is staged.
         with sqlite3.connect(database_path) as live_db:
             assert live_db.execute("SELECT COUNT(*) FROM users").fetchone()[0] == 1
+            assert live_db.execute(
+                "SELECT username FROM users"
+            ).fetchone()[0] == "test-admin"
+        with sqlite3.connect(pending_path) as staged_db:
+            assert staged_db.execute("SELECT COUNT(*) FROM users").fetchone()[0] == 2
+            assert staged_db.execute(
+                "SELECT username FROM users WHERE username = ?",
+                ("backup-only-teacher",),
+            ).fetchone() is not None
     finally:
         if os.path.exists(pending_path):
             os.unlink(pending_path)
