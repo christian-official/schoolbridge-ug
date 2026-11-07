@@ -897,7 +897,7 @@ def teacher_marks(exam_id: int | None = None, db: Session = Depends(get_db),
         rows.append({
             "id": mark.id, "student_id": mark.student_id,
             "subject_id": mark.subject_id, "exam_id": mark.exam_id,
-            "score": mark.score, "student_name": " ".join(
+            "score": mark.score, "verified": mark.verified, "student_name": " ".join(
                 part for part in [student.first_name, student.middle_name, student.last_name] if part
             ), "admission_number": student.admission_number,
             "class_id": student.class_id,
