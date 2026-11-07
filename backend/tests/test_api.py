@@ -203,3 +203,42 @@ def test_admin_can_stage_valid_restore_without_immediate_replacement(tmp_path):
     finally:
         if os.path.exists(pending_path):
             os.unlink(pending_path)
+
+
+
+def test_teacher_cannot_access_admin_records_or_mutations():
+    reset_database()
+    teacher = create_teacher()
+    token = create_access_token(teacher)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    with TestClient(app) as client:
+        students = client.get("/api/students", headers=headers)
+        finance = client.get("/api/finance/summary", headers=headers)
+        create_class = client.post(
+            "/api/classes",
+            json={"name": "Primary 3", "section": "North"},
+            headers=headers,
+        )
+        teacher_workspace = client.get(
+            "/api/teacher/my-assignments", headers=headers
+        )
+
+    assert students.status_code == 403
+    assert finance.status_code == 403
+    assert create_class.status_code == 403
+    assert teacher_workspace.status_code == 200
+
+
+def test_admin_cannot_use_teacher_only_workspace():
+    reset_database()
+    admin = create_admin()
+    token = create_access_token(admin)
+
+    with TestClient(app) as client:
+        response = client.get(
+            "/api/teacher/my-assignments",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert response.status_code == 403
