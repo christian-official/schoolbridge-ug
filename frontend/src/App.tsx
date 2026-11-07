@@ -412,7 +412,6 @@ function App() {
               {isRefreshing ? 'Refreshing...' : 'Refresh'}
             </button>
             <span className="online-status"><i /> System online</span>
-            <button className="icon-button" title="Notifications"><Bell size={19} /></button>
             <div className="top-avatar">{user.username.slice(0, 1).toUpperCase()}</div>
           </div>
         </header>
