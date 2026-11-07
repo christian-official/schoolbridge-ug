@@ -327,7 +327,9 @@ def list_classes(db: Session = Depends(get_db)):
 
 @app.post("/api/subjects", response_model=SubjectOut, tags=["Subjects"])
 def create_subject(data: SubjectCreate, db: Session = Depends(get_db)):
-    item = models.Subject(**data.model_dump())
+    profile = db.get(models.SchoolProfile, 1)
+    school_type = profile.school_type if profile else "Secondary"
+    item = models.Subject(**data.model_dump(), school_type=school_type)
     db.add(item)
     try:
         db.commit()
@@ -340,7 +342,11 @@ def create_subject(data: SubjectCreate, db: Session = Depends(get_db)):
 
 @app.get("/api/subjects", response_model=list[SubjectOut], tags=["Subjects"])
 def list_subjects(db: Session = Depends(get_db)):
-    return db.query(models.Subject).order_by(models.Subject.name).all()
+    profile = db.get(models.SchoolProfile, 1)
+    school_type = profile.school_type if profile else "Secondary"
+    return db.query(models.Subject).filter(
+        models.Subject.school_type == school_type
+    ).order_by(models.Subject.name).all()
 
 
 @app.post("/api/students", response_model=StudentOut, tags=["Students"])
