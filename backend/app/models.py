@@ -83,6 +83,7 @@ class Mark(Base):
     subject_id: Mapped[int] = mapped_column(ForeignKey("subjects.id"))
     exam_id: Mapped[int] = mapped_column(ForeignKey("exams.id"))
     score: Mapped[float]
+    verified: Mapped[bool] = mapped_column(default=False, nullable=False)
 
 
 class GradeBand(Base):
