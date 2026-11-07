@@ -253,6 +253,13 @@ export default function AcademicManagement({ token, classes }: { token: string; 
     }
   }
 
+  function printAcademicSection(target: 'results' | 'report') {
+    const cleanup = () => { delete document.body.dataset.schoolbridgePrint }
+    document.body.dataset.schoolbridgePrint = target
+    window.addEventListener('afterprint', cleanup, { once: true })
+    window.print()
+  }
+
   const selectedClass = classes.find(item => item.id === selectedExam?.class_id)
   const historyStudent = students.find(student => String(student.id) === historyStudentId)
   const historyRows = historyMarks.map(mark => ({
@@ -296,7 +303,7 @@ export default function AcademicManagement({ token, classes }: { token: string; 
 
     {selectedExam && <>
       <section className="panel">
-        <div className="panel-heading"><div><h2>{selectedExam.name}</h2><p>{selectedClass?.name || 'Class'}{selectedClass?.section ? ' — ' + selectedClass.section : ''} · {selectedExam.term} {selectedExam.year}</p></div><button type="button" className="secondary-button" onClick={() => window.print()}><Printer size={15}/> Print results</button></div>
+        <div className="panel-heading"><div><h2>{selectedExam.name}</h2><p>{selectedClass?.name || 'Class'}{selectedClass?.section ? ' — ' + selectedClass.section : ''} · {selectedExam.term} {selectedExam.year}</p></div><button type="button" className="secondary-button" onClick={() => printAcademicSection('results')}><Printer size={15}/> Print results</button></div>
         <div className="stats-grid finance-stats">
           <div className="stat-card"><span>Students in class</span><strong className="stat-value">{students.length}</strong></div>
           <div className="stat-card"><span>Marks recorded</span><strong className="stat-value">{marks.length}</strong></div>
@@ -327,7 +334,7 @@ export default function AcademicManagement({ token, classes }: { token: string; 
         </tbody></table></div>
       </section>
 
-      <section className="panel">
+      <section className="panel academic-results-print">
         <div className="panel-heading"><div><h2>Class performance</h2><p>Provisional ranking is based on total marks entered so far. Complete all subject marks before confirming positions.</p></div></div>
         <div className="table-wrap"><table><thead><tr><th>Position</th><th>Student</th><th>Admission no.</th><th>Subjects entered</th><th>Total</th><th>Average</th><th>Grade</th></tr></thead><tbody>
           {results.map((result, index) => <tr key={result.studentId}><td>{result.position}</td><td>{studentName(studentById.get(result.studentId))}</td><td>{studentById.get(result.studentId)?.admission_number || '—'}</td><td>{result.count}</td><td>{result.total.toFixed(2)}</td><td>{result.average.toFixed(2)}%</td><td>{result.grade}</td></tr>)}
@@ -356,8 +363,8 @@ export default function AcademicManagement({ token, classes }: { token: string; 
           </div>
         </form>
       </section>
-      <section className="panel">
-        <div className="panel-heading"><div><h2>Student report card and academic history</h2><p>Review this student's results across examinations and print the report card. Use the browser print option to save as PDF.</p></div><button type="button" className="secondary-button" disabled={!historyStudentId||!historyRows.length} onClick={() => window.print()}><Printer size={15}/> Print report card</button></div>
+      <section className="panel academic-report-print">
+        <div className="panel-heading"><div><h2>Student report card and academic history</h2><p>Review this student's results across examinations and print the report card. Use the browser print option to save as PDF.</p></div><button type="button" className="secondary-button" disabled={!historyStudentId||!historyRows.length} onClick={() => printAcademicSection('report')}><Printer size={15}/> Print report card</button></div>
         <label className="academic-exam-select">Student
           <select value={historyStudentId} onChange={e => setHistoryStudentId(e.target.value)}>
             <option value="">Choose a student</option>
