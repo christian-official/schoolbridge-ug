@@ -248,6 +248,26 @@ def create_class(data: ClassCreate, db: Session = Depends(get_db)):
     return item
 
 
+@app.delete("/api/classes/{class_id}", tags=["Classes"])
+def delete_class(class_id: int, db: Session = Depends(get_db)):
+    item = db.get(models.SchoolClass, class_id)
+    if not item:
+        raise HTTPException(404, "Class not found.")
+
+    linked_students = db.query(models.Student).filter(models.Student.class_id == class_id).count()
+    linked_fees = db.query(models.ClassFee).filter(models.ClassFee.class_id == class_id).count()
+    linked_assignments = db.query(models.TeacherAssignment).filter(models.TeacherAssignment.class_id == class_id).count()
+    if linked_students or linked_fees or linked_assignments:
+        raise HTTPException(
+            409,
+            "This class cannot be removed because it has linked students, class fee records or teacher assignments. Remove or reassign those records first."
+        )
+
+    db.delete(item)
+    db.commit()
+    return {"message": "Class removed successfully."}
+
+
 @app.get("/api/classes", response_model=list[ClassOut], tags=["Classes"])
 def list_classes(db: Session = Depends(get_db)):
     return db.query(models.SchoolClass).order_by(models.SchoolClass.name, models.SchoolClass.section).all()
