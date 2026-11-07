@@ -180,6 +180,44 @@ def seed_demo_data_if_empty():
         current_year = date.today().year
         active_term = "Term 1"
 
+        # A realistic Monday-Friday demo timetable for classes containing demo learners.
+        demo_teachers = db.query(models.StaffMember).filter(
+            models.StaffMember.category == "Teaching",
+            models.StaffMember.status == "active"
+        ).order_by(models.StaffMember.id).all()
+        timetable_subjects = demo_subjects_for_school = db.query(models.Subject).filter(
+            models.Subject.school_type == school_type
+        ).order_by(models.Subject.id).all()
+        lesson_slots = [
+            ("08:00", "08:40"), ("08:40", "09:20"),
+            ("09:40", "10:20"), ("10:20", "11:00"),
+            ("11:40", "12:20"),
+        ]
+        for school_class in demo_classes:
+            if school_class.id not in demo_class_ids:
+                continue
+            for day in range(1, 6):
+                for period, (start_time, end_time) in enumerate(lesson_slots):
+                    exists = db.query(models.TimetableEntry).filter_by(
+                        class_id=school_class.id,
+                        day_of_week=day,
+                        start_time=start_time,
+                    ).first()
+                    if exists:
+                        continue
+                    subject = timetable_subjects[(day * 2 + period) % len(timetable_subjects)] if timetable_subjects else None
+                    teacher = demo_teachers[(day + period) % len(demo_teachers)] if demo_teachers else None
+                    db.add(models.TimetableEntry(
+                        class_id=school_class.id,
+                        subject_id=subject.id if subject else None,
+                        staff_id=teacher.id if teacher else None,
+                        day_of_week=day,
+                        start_time=start_time,
+                        end_time=end_time,
+                        room="Room " + str(((school_class.id + period) % 6) + 1),
+                    ))
+        db.flush()
+
         # Demo class fees and student charges (UGX), without touching real records.
         demo_class_ids = {student.class_id for student in demo_students if student.class_id is not None}
         for school_class in demo_classes:
