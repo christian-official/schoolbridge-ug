@@ -110,7 +110,7 @@ export default function AcademicManagement({ token, classes }: { token: string; 
       if (cancelled) return
       setStudents(studentRows)
       setMarks(markRows)
-      setMarkDrafts(Object.fromEntries(markRows.map(mark => [String(mark.student_id) + ':' + String(mark.subject_id), String(mark.score)])))
+      setMarkDrafts(Object.fromEntries(markRows.map(mark => [String(mark.student_id) + ':' + String(mark.subject_id), String(Math.round(mark.score))])))
     }).catch(e => {
       if (!cancelled) setError(e instanceof Error ? e.message : 'Unable to load this examination.')
     })
@@ -155,7 +155,7 @@ export default function AcademicManagement({ token, classes }: { token: string; 
       .map((result, index, rows) => ({
         ...result,
         position: index + 1 - rows.slice(0, index).filter(previous =>
-          Number(previous.average.toFixed(2)) === Number(result.average.toFixed(2))
+          Number(previous.average.toFixed(2)) === Number(Math.round(result.average))
         ).length,
       }))
   }, [marks, gradingBands])
@@ -205,7 +205,7 @@ export default function AcademicManagement({ token, classes }: { token: string; 
         const raw = markDrafts[key]
         if (raw === undefined || raw.trim() === '') continue
         const score = Number(raw)
-        if (!Number.isFinite(score) || score < 0 || score > 100) throw new Error('Enter a valid score from 0 to 100 for ' + studentName(student) + '.')
+        if (!Number.isFinite(score) || !Number.isInteger(score) || score < 0 || score > 100) throw new Error('Enter a valid score from 0 to 100 for ' + studentName(student) + '.')
         const existing = marks.find(mark => mark.student_id === student.id && String(mark.subject_id) === selectedSubjectId)
         if (existing && existing.verified) continue
         if (existing && Number(existing.score) === score) continue
@@ -215,7 +215,7 @@ export default function AcademicManagement({ token, classes }: { token: string; 
       }
       const next = await request<Mark[]>('marks?exam_id=' + selectedExam.id, token)
       setMarks(next)
-      setMarkDrafts(Object.fromEntries(next.map(mark => [String(mark.student_id) + ':' + String(mark.subject_id), String(mark.score)])))
+      setMarkDrafts(Object.fromEntries(next.map(mark => [String(mark.student_id) + ':' + String(mark.subject_id), String(Math.round(mark.score))])))
       setMessage(saved + ' ' + subject.name + ' score(s) saved.')
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to save subject marks.') }
     finally { setSaving(false) }
@@ -337,7 +337,7 @@ export default function AcademicManagement({ token, classes }: { token: string; 
             return <div className="student-score-row" key={student.id}>
               <div className="student-score-name"><span className="student-score-number">{index + 1}</span><strong>{studentName(student)}</strong></div>
               <span className="student-score-admission">{student.admission_number}</span>
-              <input className="student-score-input" aria-label={studentName(student) + ' score'} type="number" min="0" max="100" step="0.01" inputMode="decimal" placeholder="Enter score" value={markDrafts[key] ?? ''} disabled={!!mark?.verified || saving} onChange={event => setMarkDrafts(current => ({ ...current, [key]: event.target.value }))}/>
+              <input className="student-score-input" aria-label={studentName(student) + ' score'} type="number" min="0" max="100" step="1" inputMode="numeric" placeholder="Enter score" value={markDrafts[key] ?? ''} disabled={!!mark?.verified || saving} onChange={event => setMarkDrafts(current => ({ ...current, [key]: event.target.value }))}/>
               <span className={mark?.verified ? 'student-score-status verified' : mark ? 'student-score-status recorded' : 'student-score-status pending'}>{mark?.verified ? 'Verified' : mark ? 'Recorded' : 'Not entered'}</span>
             </div>
           })}
@@ -349,7 +349,7 @@ export default function AcademicManagement({ token, classes }: { token: string; 
               const subjectMarks = marks.filter(mark => mark.subject_id === subject.id).sort((a, b) => studentName(studentById.get(a.student_id)).localeCompare(studentName(studentById.get(b.student_id))));
               const verifiedMarks = subjectMarks.filter(mark => mark.verified);
               const unverifiedMarks = subjectMarks.filter(mark => !mark.verified);
-              const renderMarkRows = (rows: Mark[]) => rows.map(mark => <tr key={mark.id}><td>{studentName(studentById.get(mark.student_id))}</td><td><strong>{mark.score.toFixed(2)}</strong></td><td><button type="button" className="secondary-button" onClick={() => void setMarkVerification(mark, !mark.verified)} disabled={saving}>{mark.verified ? 'Unlock' : 'Verify'}</button></td></tr>);
+              const renderMarkRows = (rows: Mark[]) => rows.map(mark => <tr key={mark.id}><td>{studentName(studentById.get(mark.student_id))}</td><td><strong>{Math.round(mark.score)}</strong></td><td><button type="button" className="secondary-button" onClick={() => void setMarkVerification(mark, !mark.verified)} disabled={saving}>{mark.verified ? 'Unlock' : 'Verify'}</button></td></tr>);
               return <section className="recorded-subject-card" key={subject.id}>
                 <div className="recorded-subject-heading"><h3>{subject.name}</h3><span>{subjectMarks.length} recorded</span></div>
                 <div className="recorded-status-columns">
@@ -374,12 +374,12 @@ export default function AcademicManagement({ token, classes }: { token: string; 
       <section className="panel academic-results-print">
         <div className="panel-heading report-screen-controls"><div><h2>Class performance</h2><p>{selectedExam.name} · {selectedClass?.name || 'Class'}{selectedClass?.section ? ' — ' + selectedClass.section : ''} · {selectedExam.term} {selectedExam.year}</p><p>Provisional ranking uses average scores. Complete and verify all subject marks before issuing final results.</p></div><button type="button" className="secondary-button" onClick={() => printAcademicSection('results')}><Printer size={15}/> Print class performance</button></div>
         <div className="table-wrap"><table><thead><tr><th>Position</th><th>Student</th><th>Admission no.</th><th>Subjects entered</th><th>Total</th><th>Average</th><th>Grade</th></tr></thead><tbody>
-          {results.map(result => <tr key={result.studentId}><td>{result.position}</td><td>{studentName(studentById.get(result.studentId))}</td><td>{studentById.get(result.studentId)?.admission_number || '—'}</td><td>{result.count}</td><td>{result.total.toFixed(2)}</td><td>{result.average.toFixed(2)}%</td><td>{result.grade}</td></tr>)}
+          {results.map(result => <tr key={result.studentId}><td>{result.position}</td><td>{studentName(studentById.get(result.studentId))}</td><td>{studentById.get(result.studentId)?.admission_number || '—'}</td><td>{result.count}</td><td>{Math.round(result.total)}</td><td>{Math.round(result.average)}%</td><td>{result.grade}</td></tr>)}
           {!results.length && <tr><td colSpan={7}>Performance positions will appear after marks are entered.</td></tr>}
         </tbody></table></div>
         <div className="panel-heading"><div><h3>Subject analysis</h3><p>Average score for each subject with recorded marks.</p></div></div>
         <div className="table-wrap"><table><thead><tr><th>Subject</th><th>Students assessed</th><th>Average score</th></tr></thead><tbody>
-          {subjectAnalysis.map(row => <tr key={row.subject.id}><td>{row.subject.name}</td><td>{row.count}</td><td>{row.average.toFixed(2)}%</td></tr>)}
+          {subjectAnalysis.map(row => <tr key={row.subject.id}><td>{row.subject.name}</td><td>{row.count}</td><td>{Math.round(row.average)}%</td></tr>)}
           {!subjectAnalysis.length && <tr><td colSpan={3}>Subject analysis will appear after marks are entered.</td></tr>}
         </tbody></table></div>
       </section>
@@ -391,8 +391,8 @@ export default function AcademicManagement({ token, classes }: { token: string; 
         <form className="student-form" onSubmit={saveGradingScale}>
           {draftBands.map((band, index) => <div className="student-form-grid" key={index}>
             <label>Grade *<input required maxLength={20} value={band.grade} onChange={e => setDraftBands(rows => rows.map((row, i) => i === index ? { ...row, grade: e.target.value } : row))} placeholder="e.g. A"/></label>
-            <label>Minimum score *<input required type="number" min="0" max="100" step="0.01" value={band.min_score} onChange={e => setDraftBands(rows => rows.map((row, i) => i === index ? { ...row, min_score: Number(e.target.value) } : row))}/></label>
-            <label>Maximum score *<input required type="number" min="0" max="100" step="0.01" value={band.max_score} onChange={e => setDraftBands(rows => rows.map((row, i) => i === index ? { ...row, max_score: Number(e.target.value) } : row))}/></label>
+            <label>Minimum score *<input required type="number" min="0" max="100" step="1" value={band.min_score} onChange={e => setDraftBands(rows => rows.map((row, i) => i === index ? { ...row, min_score: Number(e.target.value) } : row))}/></label>
+            <label>Maximum score *<input required type="number" min="0" max="100" step="1" value={band.max_score} onChange={e => setDraftBands(rows => rows.map((row, i) => i === index ? { ...row, max_score: Number(e.target.value) } : row))}/></label>
             <label>Remark<input maxLength={100} value={band.remark} onChange={e => setDraftBands(rows => rows.map((row, i) => i === index ? { ...row, remark: e.target.value } : row))} placeholder="Optional comment"/></label>
             <div className="form-actions"><button type="button" className="secondary-button" onClick={() => setDraftBands(rows => rows.filter((_, i) => i !== index))}>Remove band</button></div>
           </div>)}
@@ -428,10 +428,10 @@ export default function AcademicManagement({ token, classes }: { token: string; 
             </div>
             <div className="report-section-heading"><span>01</span><h3>Academic performance</h3></div>
             <div className="table-wrap report-results-table"><table><thead><tr><th>SUBJECT</th><th>SCORE</th><th>GRADE</th><th>TEACHER'S SUBJECT REMARK</th></tr></thead><tbody>
-              {historyRows.filter(mark => !selectedExam || mark.exam_id === selectedExam.id).map(mark => <tr key={mark.id}><td><strong>{mark.subject?.name || 'Unknown subject'}</strong></td><td>{mark.score.toFixed(1)}%</td><td><strong>{mark.grade}</strong></td><td>{gradingBands.find(band => band.grade === mark.grade)?.remark || '—'}</td></tr>)}
+              {historyRows.filter(mark => !selectedExam || mark.exam_id === selectedExam.id).map(mark => <tr key={mark.id}><td><strong>{mark.subject?.name || 'Unknown subject'}</strong></td><td>{Math.round(mark.score)}%</td><td><strong>{mark.grade}</strong></td><td>{gradingBands.find(band => band.grade === mark.grade)?.remark || '—'}</td></tr>)}
               {!historyRows.filter(mark => !selectedExam || mark.exam_id === selectedExam.id).length && <tr><td colSpan={4}>No verified subject results for the selected examination.</td></tr>}
             </tbody></table></div>
-            <div className="report-summary-grid"><div><small>SUBJECTS GRADED</small><strong>{historyRows.filter(mark => !selectedExam || mark.exam_id === selectedExam.id).length}</strong></div><div><small>AVERAGE SCORE</small><strong>{(historyRows.filter(mark => !selectedExam || mark.exam_id === selectedExam.id).length ? historyRows.filter(mark => !selectedExam || mark.exam_id === selectedExam.id).reduce((sum, mark) => sum + mark.score, 0) / historyRows.filter(mark => !selectedExam || mark.exam_id === selectedExam.id).length : 0).toFixed(1)}%</strong></div><div><small>OVERALL GRADE</small><strong>{gradingBands.find(band => { const rows = historyRows.filter(mark => !selectedExam || mark.exam_id === selectedExam.id); const avg = rows.length ? rows.reduce((sum, mark) => sum + mark.score, 0) / rows.length : 0; return avg >= band.min_score && (avg < band.max_score || band.max_score === 100) })?.grade || '—'}</strong></div></div>
+            <div className="report-summary-grid"><div><small>SUBJECTS GRADED</small><strong>{historyRows.filter(mark => !selectedExam || mark.exam_id === selectedExam.id).length}</strong></div><div><small>AVERAGE SCORE</small><strong>{(historyRows.filter(mark => !selectedExam || mark.exam_id === selectedExam.id).length ? historyRows.filter(mark => !selectedExam || mark.exam_id === selectedExam.id).reduce((sum, mark) => sum + mark.score, 0) / historyRows.filter(mark => !selectedExam || mark.exam_id === selectedExam.id).length : 0))}%</strong></div><div><small>OVERALL GRADE</small><strong>{gradingBands.find(band => { const rows = historyRows.filter(mark => !selectedExam || mark.exam_id === selectedExam.id); const avg = rows.length ? rows.reduce((sum, mark) => sum + mark.score, 0) / rows.length : 0; return avg >= band.min_score && (avg < band.max_score || band.max_score === 100) })?.grade || '—'}</strong></div></div>
             <div className="report-section-heading"><span>02</span><h3>Progress remarks and recommendations</h3></div>
             <div className="report-remarks-grid">
               <label>Class teacher's remarks<textarea value={reportRemarks.classTeacher} onChange={e => setReportRemarks(v => ({ ...v, classTeacher: e.target.value }))} placeholder="Comment on attendance, conduct, participation and general progress."/></label>
