@@ -1058,3 +1058,79 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 @media(max-width:640px) {
   .teacher-attendance-identity { align-items: flex-start; flex-direction: column; }
 }
+
+
+/* Class-first timetable layout and task-focused overview */
+.timetable-class-block {
+  margin-top: 16px;
+  overflow: hidden;
+  border: 1px solid #e2e8f1;
+  border-radius: 12px;
+  background: #fff;
+}
+.timetable-class-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 16px;
+  background: #f3f6fc;
+  border-bottom: 1px solid #e2e8f1;
+}
+.timetable-class-heading h3 {
+  margin: 0;
+  color: #263d65;
+  font-size: 14px;
+  font-weight: 850;
+}
+.timetable-class-heading > span {
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  border-radius: 20px;
+  background: #e3ebfb;
+  color: #3157b7;
+  font-size: 10px;
+  font-weight: 800;
+}
+.class-timetable-table { width: 100%; border-collapse: collapse; }
+.class-timetable-table th {
+  padding: 10px 12px;
+  background: #fbfcfe;
+  color: #71809a;
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: .45px;
+  text-align: left;
+  text-transform: uppercase;
+}
+.class-timetable-table td {
+  padding: 11px 12px;
+  border-top: 1px solid #edf0f5;
+  color: #42516a;
+  font-size: 12px;
+  vertical-align: middle;
+}
+.subject-abbreviation {
+  display: inline-flex;
+  min-width: 34px;
+  min-height: 25px;
+  align-items: center;
+  justify-content: center;
+  margin-right: 8px;
+  padding: 3px 7px;
+  border-radius: 6px;
+  background: #edf2ff;
+  color: #3157b7;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .35px;
+}
+.subject-full-name { color: #34445e; font-weight: 650; }
+.overview-workflow-grid .quick-panel { min-width: 0; }
+.overview-workflow-grid .quick-action { min-height: 68px; }
+.overview-workflow-grid .quick-action small { line-height: 1.45; }
+@media(max-width:700px) {
+  .class-timetable-table { min-width: 690px; }
+  .timetable-class-heading { padding: 11px 12px; }
+  .overview-workflow-grid { grid-template-columns: 1fr !important; }
+}
