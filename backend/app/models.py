@@ -47,6 +47,7 @@ class Student(Base):
     academic_level: Mapped[str | None] = mapped_column(String(20), nullable=True)
     combination: Mapped[str | None] = mapped_column(String(100), nullable=True)
     optional_subjects: Mapped[str | None] = mapped_column(Text, nullable=True)
+    subsidiary_subjects: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class Attendance(Base):
