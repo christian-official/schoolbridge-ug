@@ -52,6 +52,7 @@ const menu = [
   { label: 'Staff', icon: Users },
   { label: 'Fees & Finance', icon: FileText },
   { label: 'Examinations', icon: FileText },
+  { label: 'Leadership & Duty', icon: ShieldCheck },
 ]
 const teacherMenu = [
   { label: 'My Classes', icon: BookOpen },
@@ -455,6 +456,7 @@ function App() {
                   <button className="quick-action" onClick={() => setActive('Students')}><span className="quick-icon blue"><Plus /></span><span><strong>Manage students</strong><small>View student records</small></span><ArrowUpRight size={17} /></button>
                   <button className="quick-action" onClick={() => { setActive('Settings'); setSettingsSection('classes') }}><span className="quick-icon purple"><BookOpen /></span><span><strong>Manage classes</strong><small>Classes and streams in Settings</small></span><ArrowUpRight size={17} /></button>
                   <button className="quick-action" onClick={() => setActive('Examinations')}><span className="quick-icon orange"><FileText /></span><span><strong>Examinations</strong><small>View exams and marks</small></span><ArrowUpRight size={17} /></button>
+                  <button className="quick-action" onClick={() => setActive('Leadership & Duty')}><span className="quick-icon purple"><ShieldCheck /></span><span><strong>Prefectorial body & duty roster</strong><small>Appoint student leaders and assign teachers on duty</small></span><ArrowUpRight size={17} /></button>
                 </div>
               </section>
             </>
@@ -536,6 +538,7 @@ function App() {
             </div>
           )}
           {active === 'Examinations' && <ComingSoon title="Examinations and results" description="Exam setup, marks entry and student results will be managed here." />}
+          {active === 'Leadership & Duty' && user.role === 'admin' && <LeadershipDuty token={token} />}
           {active === 'Settings' && settingsSection === 'home' && (
             <section className="settings-hub">
               <div className="panel-heading"><div><h2>School settings</h2><p>Choose a category to configure how SchoolBridge works for this school.</p></div></div>
@@ -705,4 +708,124 @@ function SubjectSettings({token}:{token:string}) {
   useEffect(()=>{void load()},[token])
   async function add(e:React.FormEvent){e.preventDefault();setMessage('');try{await api('subjects',token,{method:'POST',body:JSON.stringify({name:name.trim(),code:code.trim()||null})});setName('');setCode('');setMessage('Subject added.');await load()}catch(e){setMessage(e instanceof Error?e.message:'Unable to add subject.')}}
   return <section className="panel settings-panel"><div className="panel-heading"><div><h2>School subjects</h2><p>Manage subjects used for examinations and teacher assignments.</p></div></div>{message&&<div className="success-notice">{message}</div>}<form className="student-form" onSubmit={add}><div className="student-form-grid"><label>Subject name *<input required value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Mathematics"/></label><label>Subject code<input value={code} onChange={e=>setCode(e.target.value)} placeholder="Optional code"/></label></div><div className="form-actions"><button className="primary-button">Add subject</button></div></form><div className="table-wrap"><table><thead><tr><th>Subject</th><th>Code</th></tr></thead><tbody>{subjects.map(subject=><tr key={subject.id}><td>{subject.name}</td><td>{subject.code||'—'}</td></tr>)}</tbody></table></div></section>
+}
+
+
+type PrefectRow = {
+  id: number; student_id: number; student_name: string; admission_number: string;
+  class_name: string; stream?: string | null; position: string; start_date: string;
+  end_date?: string | null; active: boolean;
+}
+type DutyRow = {
+  id: number; staff_id: number; teacher_name: string; staff_number: string;
+  duty_date: string; notes?: string | null;
+}
+type LeadershipStudent = { id: number; first_name: string; last_name: string; admission_number: string; class_id?: number | null }
+type LeadershipStaff = { id: number; first_name: string; last_name: string; staff_number: string; category: string; status: string }
+
+function LeadershipDuty({token}:{token:string}) {
+  const [prefects,setPrefects]=useState<PrefectRow[]>([])
+  const [duties,setDuties]=useState<DutyRow[]>([])
+  const [students,setStudents]=useState<LeadershipStudent[]>([])
+  const [staff,setStaff]=useState<LeadershipStaff[]>([])
+  const [studentSearch,setStudentSearch]=useState('')
+  const [studentId,setStudentId]=useState('')
+  const [position,setPosition]=useState('Head Prefect')
+  const [prefectStart,setPrefectStart]=useState(new Date().toISOString().slice(0,10))
+  const [prefectEnd,setPrefectEnd]=useState('')
+  const [staffId,setStaffId]=useState('')
+  const [dutyDate,setDutyDate]=useState(new Date().toISOString().slice(0,10))
+  const [dutyNotes,setDutyNotes]=useState('')
+  const [message,setMessage]=useState('')
+  const [error,setError]=useState('')
+  const [busy,setBusy]=useState(false)
+
+  async function loadAll() {
+    const [p,d,s,t]=await Promise.all([
+      api<PrefectRow[]>('leadership/prefects?active_only=false',token),
+      api<DutyRow[]>('leadership/teacher-duties',token),
+      api<{items:LeadershipStudent[]}>('students/search?page=1&page_size=100&search='+encodeURIComponent(studentSearch),token),
+      api<{items:LeadershipStaff[]}>('staff?page=1&page_size=100&category=Teaching',token),
+    ])
+    setPrefects(p);setDuties(d);setStudents(s.items);setStaff(t.items.filter(x=>x.status==='active'))
+  }
+  useEffect(()=>{void loadAll().catch(e=>setError(e instanceof Error?e.message:'Unable to load leadership records.'))},[token,studentSearch])
+
+  async function appoint(e:React.FormEvent) {
+    e.preventDefault();setBusy(true);setError('');setMessage('')
+    try {
+      await api('leadership/prefects',token,{method:'POST',body:JSON.stringify({
+        student_id:Number(studentId),position,start_date:prefectStart,end_date:prefectEnd||null
+      })})
+      setMessage('Student prefect appointed successfully.');setStudentId('');setPrefectEnd('');await loadAll()
+    } catch(e) {setError(e instanceof Error?e.message:'Unable to appoint prefect.')}
+    finally {setBusy(false)}
+  }
+  async function assignDuty(e:React.FormEvent) {
+    e.preventDefault();setBusy(true);setError('');setMessage('')
+    try {
+      await api('leadership/teacher-duties',token,{method:'POST',body:JSON.stringify({
+        staff_id:Number(staffId),duty_date:dutyDate,notes:dutyNotes||null
+      })})
+      setMessage('Teacher duty assigned successfully.');setDutyNotes('');await loadAll()
+    } catch(e) {setError(e instanceof Error?e.message:'Unable to assign teacher duty.')}
+    finally {setBusy(false)}
+  }
+  async function endAppointment(id:number) {
+    if(!window.confirm('End this prefect appointment?'))return
+    setError('');setMessage('')
+    try {await api('leadership/prefects/'+id+'/end',token,{method:'PATCH'});setMessage('Prefect appointment ended.');await loadAll()}
+    catch(e){setError(e instanceof Error?e.message:'Unable to update prefect appointment.')}
+  }
+  async function removeDuty(id:number) {
+    if(!window.confirm('Remove this duty assignment?'))return
+    setError('');setMessage('')
+    try {await api('leadership/teacher-duties/'+id,token,{method:'DELETE'});setMessage('Duty assignment removed.');await loadAll()}
+    catch(e){setError(e instanceof Error?e.message:'Unable to remove duty assignment.')}
+  }
+  const activePrefects=prefects.filter(x=>x.active)
+  const today=new Date().toISOString().slice(0,10)
+  const currentDuty=duties.find(x=>x.duty_date===today)
+  return <div className="leadership-workspace">
+    <section className="leadership-summary">
+      <div className="leadership-summary-card"><span>Active prefects</span><strong>{activePrefects.length}</strong><small>Current student leadership team</small></div>
+      <div className="leadership-summary-card"><span>Duty today</span><strong>{currentDuty?.teacher_name||'Not assigned'}</strong><small>{today}</small></div>
+      <div className="leadership-summary-card"><span>Duty records</span><strong>{duties.length}</strong><small>Recent scheduled assignments</small></div>
+    </section>
+    {message&&<div className="success-notice">{message}</div>}
+    {error&&<div className="form-error">{error}</div>}
+    <section className="panel">
+      <div className="panel-heading"><div><h2>Prefectorial body</h2><p>Appoint student leaders and keep track of their service terms.</p></div></div>
+      <form className="student-form" onSubmit={appoint}>
+        <div className="student-form-grid">
+          <label>Find student<input value={studentSearch} onChange={e=>setStudentSearch(e.target.value)} placeholder="Search name or admission number"/></label>
+          <label>Student<select value={studentId} onChange={e=>setStudentId(e.target.value)} required><option value="">Choose student</option>{students.map(s=><option key={s.id} value={s.id}>{s.first_name} {s.last_name} · {s.admission_number}</option>)}</select></label>
+          <label>Prefect position<select value={position} onChange={e=>setPosition(e.target.value)}>{['Head Prefect','Deputy Head Prefect','Head Girl','Head Boy','Games Prefect','Dining Prefect','Health Prefect','Timekeeper','Class Prefect','Library Prefect','Sanitation Prefect','Other'].map(x=><option key={x}>{x}</option>)}</select></label>
+          <label>Start date<input type="date" value={prefectStart} onChange={e=>setPrefectStart(e.target.value)} required/></label>
+          <label>End date (optional)<input type="date" value={prefectEnd} min={prefectStart} onChange={e=>setPrefectEnd(e.target.value)}/></label>
+        </div>
+        <div className="form-actions"><button className="primary-button" disabled={busy||!studentId}>{busy?'Saving...':'Appoint prefect'}</button></div>
+      </form>
+      <div className="table-wrap"><table><thead><tr><th>Position</th><th>Student</th><th>Admission no.</th><th>Class</th><th>Term</th><th>Status</th><th>Action</th></tr></thead><tbody>
+        {prefects.map(p=><tr key={p.id}><td>{p.position}</td><td>{p.student_name}</td><td>{p.admission_number}</td><td>{p.class_name}{p.stream?' · '+p.stream:''}</td><td>{p.start_date}{p.end_date?' – '+p.end_date:''}</td><td>{p.active?'Active':'Ended'}</td><td>{p.active&&<button className="secondary-button" type="button" onClick={()=>void endAppointment(p.id)}>End term</button>}</td></tr>)}
+        {!prefects.length&&<tr><td colSpan={7}>No prefect appointments recorded yet.</td></tr>}
+      </tbody></table></div>
+    </section>
+    <section className="panel">
+      <div className="panel-heading"><div><h2>Teachers on duty</h2><p>Schedule active teaching staff and maintain a duty roster.</p></div></div>
+      <form className="student-form" onSubmit={assignDuty}>
+        <div className="student-form-grid">
+          <label>Teacher<select value={staffId} onChange={e=>setStaffId(e.target.value)} required><option value="">Choose teacher</option>{staff.map(s=><option key={s.id} value={s.id}>{s.first_name} {s.last_name} · {s.staff_number}</option>)}</select></label>
+          <label>Duty date<input type="date" value={dutyDate} onChange={e=>setDutyDate(e.target.value)} required/></label>
+          <label>Notes / duty area<input value={dutyNotes} onChange={e=>setDutyNotes(e.target.value)} placeholder="e.g. Main gate and morning assembly"/></label>
+        </div>
+        <div className="form-actions"><button className="primary-button" disabled={busy||!staffId||staff.length===0}>{busy?'Saving...':'Assign teacher on duty'}</button></div>
+        {staff.length===0&&<p className="form-hint">Add active teaching staff in the Staff section before assigning duty.</p>}
+      </form>
+      <div className="table-wrap"><table><thead><tr><th>Duty date</th><th>Teacher</th><th>Staff no.</th><th>Notes / duty area</th><th>Action</th></tr></thead><tbody>
+        {duties.map(d=><tr key={d.id}><td>{d.duty_date}</td><td>{d.teacher_name}</td><td>{d.staff_number}</td><td>{d.notes||'—'}</td><td><button className="secondary-button" type="button" onClick={()=>void removeDuty(d.id)}>Remove</button></td></tr>)}
+        {!duties.length&&<tr><td colSpan={5}>No teacher duty assignments recorded yet.</td></tr>}
+      </tbody></table></div>
+    </section>
+  </div>
 }
