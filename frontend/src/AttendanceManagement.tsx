@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CalendarDays, Printer, RefreshCw, Save } from 'lucide-react'
+import { Printer, RefreshCw, Save } from 'lucide-react'
 
 type SchoolClass = { id: number; name: string; section?: string }
 type Student = { id: number; first_name: string; last_name: string; admission_number: string; class_id: number | null; status?: string }
