@@ -6,6 +6,7 @@ type Subject = { id: number; name: string }
 type Student = { id: number; first_name: string; middle_name?: string | null; last_name: string; admission_number: string; class_id?: number | null }
 type Exam = { id: number; name: string; term: string; year: number; class_id: number | null }
 type Mark = { id: number; student_id: number; subject_id: number; exam_id: number; score: number }
+type GradeBand = { id?: number; grade: string; min_score: number; max_score: number; remark: string }
 type Page<T> = { items: T[]; total: number }
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
@@ -33,6 +34,8 @@ export default function AcademicManagement({ token, classes }: { token: string; 
   const [subjects, setSubjects] = useState<Subject[]>([])
   const [students, setStudents] = useState<Student[]>([])
   const [marks, setMarks] = useState<Mark[]>([])
+  const [gradingBands, setGradingBands] = useState<GradeBand[]>([])
+  const [draftBands, setDraftBands] = useState<GradeBand[]>([])
   const [selectedExamId, setSelectedExamId] = useState('')
   const [examForm, setExamForm] = useState({ name: '', class_id: '', term: 'Term 1', year: String(new Date().getFullYear()) })
   const [markForm, setMarkForm] = useState({ student_id: '', subject_id: '', score: '' })
@@ -47,12 +50,15 @@ export default function AcademicManagement({ token, classes }: { token: string; 
     setLoading(true)
     setError('')
     try {
-      const [examRows, subjectRows] = await Promise.all([
+      const [examRows, subjectRows, gradeRows] = await Promise.all([
         request<Exam[]>('exams', token),
         request<Subject[]>('subjects', token),
+        request<GradeBand[]>('grading-scale', token),
       ])
       setExams(examRows)
       setSubjects(subjectRows)
+      setGradingBands(gradeRows)
+      setDraftBands(gradeRows.map(({ grade, min_score, max_score, remark }) => ({ grade, min_score, max_score, remark })))
       if (selectedExamId && examRows.some(exam => String(exam.id) === selectedExamId)) {
         setSelectedExamId(selectedExamId)
       } else {
@@ -105,8 +111,11 @@ export default function AcademicManagement({ token, classes }: { token: string; 
       total: value.total,
       count: value.count,
       average: value.count ? value.total / value.count : 0,
+    })).map(result => ({
+      ...result,
+      grade: gradingBands.find(band => result.average >= band.min_score && (result.average < band.max_score || band.max_score === 100))?.grade || '—',
     })).sort((a, b) => b.total - a.total || a.studentId - b.studentId)
-  }, [marks])
+  }, [marks, gradingBands])
 
   const subjectAnalysis = useMemo(() => subjects.map(subject => {
     const rows = marks.filter(mark => mark.subject_id === subject.id)
@@ -176,6 +185,24 @@ export default function AcademicManagement({ token, classes }: { token: string; 
     setMessage('Edit the selected mark and save your changes.')
   }
 
+  async function saveGradingScale(event: FormEvent) {
+    event.preventDefault()
+    setSaving(true); setError(''); setMessage('')
+    try {
+      const rows = await request<GradeBand[]>('grading-scale', token, {
+        method: 'PUT',
+        body: JSON.stringify({ bands: draftBands }),
+      })
+      setGradingBands(rows)
+      setDraftBands(rows.map(({ grade, min_score, max_score, remark }) => ({ grade, min_score, max_score, remark })))
+      setMessage('School grading scale saved.')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to save grading scale.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const selectedClass = classes.find(item => item.id === selectedExam?.class_id)
 
   return <div className="academic-workspace">
@@ -243,15 +270,32 @@ export default function AcademicManagement({ token, classes }: { token: string; 
 
       <section className="panel">
         <div className="panel-heading"><div><h2>Class performance</h2><p>Provisional ranking is based on total marks entered so far. Complete all subject marks before confirming positions.</p></div></div>
-        <div className="table-wrap"><table><thead><tr><th>Position</th><th>Student</th><th>Admission no.</th><th>Subjects entered</th><th>Total</th><th>Average</th></tr></thead><tbody>
-          {results.map((result, index) => <tr key={result.studentId}><td>{index + 1}</td><td>{studentName(studentById.get(result.studentId))}</td><td>{studentById.get(result.studentId)?.admission_number || '—'}</td><td>{result.count}</td><td>{result.total.toFixed(2)}</td><td>{result.average.toFixed(2)}%</td></tr>)}
-          {!results.length && <tr><td colSpan={6}>Performance positions will appear after marks are entered.</td></tr>}
+        <div className="table-wrap"><table><thead><tr><th>Position</th><th>Student</th><th>Admission no.</th><th>Subjects entered</th><th>Total</th><th>Average</th><th>Grade</th></tr></thead><tbody>
+          {results.map((result, index) => <tr key={result.studentId}><td>{index + 1}</td><td>{studentName(studentById.get(result.studentId))}</td><td>{studentById.get(result.studentId)?.admission_number || '—'}</td><td>{result.count}</td><td>{result.total.toFixed(2)}</td><td>{result.average.toFixed(2)}%</td><td>{result.grade}</td></tr>)}
+          {!results.length && <tr><td colSpan={7}>Performance positions will appear after marks are entered.</td></tr>}
         </tbody></table></div>
         <div className="panel-heading"><div><h3>Subject analysis</h3><p>Average score for each subject with recorded marks.</p></div></div>
         <div className="table-wrap"><table><thead><tr><th>Subject</th><th>Students assessed</th><th>Average score</th></tr></thead><tbody>
           {subjectAnalysis.map(row => <tr key={row.subject.id}><td>{row.subject.name}</td><td>{row.count}</td><td>{row.average.toFixed(2)}%</td></tr>)}
           {!subjectAnalysis.length && <tr><td colSpan={3}>Subject analysis will appear after marks are entered.</td></tr>}
         </tbody></table></div>
+      </section>
+      <section className="panel">
+        <div className="panel-heading"><div><h2>School grading scale</h2><p>Configure the grade boundaries and remarks used for student averages. Bands must cover 0–100 without gaps or overlaps.</p></div></div>
+        {gradingBands.length === 0 && <p className="form-hint">No grading scale is configured yet. Add bands to display grades in class performance.</p>}
+        <form className="student-form" onSubmit={saveGradingScale}>
+          {draftBands.map((band, index) => <div className="student-form-grid" key={index}>
+            <label>Grade *<input required maxLength={20} value={band.grade} onChange={e => setDraftBands(rows => rows.map((row, i) => i === index ? { ...row, grade: e.target.value } : row))} placeholder="e.g. A"/></label>
+            <label>Minimum score *<input required type="number" min="0" max="100" step="0.01" value={band.min_score} onChange={e => setDraftBands(rows => rows.map((row, i) => i === index ? { ...row, min_score: Number(e.target.value) } : row))}/></label>
+            <label>Maximum score *<input required type="number" min="0" max="100" step="0.01" value={band.max_score} onChange={e => setDraftBands(rows => rows.map((row, i) => i === index ? { ...row, max_score: Number(e.target.value) } : row))}/></label>
+            <label>Remark<input maxLength={100} value={band.remark} onChange={e => setDraftBands(rows => rows.map((row, i) => i === index ? { ...row, remark: e.target.value } : row))} placeholder="Optional comment"/></label>
+            <div className="form-actions"><button type="button" className="secondary-button" onClick={() => setDraftBands(rows => rows.filter((_, i) => i !== index))}>Remove band</button></div>
+          </div>)}
+          <div className="form-actions">
+            <button type="button" className="secondary-button" onClick={() => setDraftBands(rows => [...rows, { grade: '', min_score: rows.length ? rows[rows.length - 1].max_score : 0, max_score: 100, remark: '' }])}>Add grade band</button>
+            <button className="primary-button" disabled={saving || !draftBands.length}>{saving ? 'Saving...' : 'Save grading scale'}</button>
+          </div>
+        </form>
       </section>
     </>}
     {!selectedExam && !loading && <section className="panel empty-state"><BookOpen size={32}/><h3>No examination selected</h3><p>Create an examination for a class to begin recording results.</p></section>}
