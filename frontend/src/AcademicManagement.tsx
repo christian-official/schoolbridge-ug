@@ -262,13 +262,14 @@ export default function AcademicManagement({ token, classes }: { token: string; 
 
   const selectedClass = classes.find(item => item.id === selectedExam?.class_id)
   const historyStudent = students.find(student => String(student.id) === historyStudentId)
-  const historyRows = historyMarks.map(mark => ({
+  const verifiedHistoryMarks = historyMarks.filter(mark => mark.verified)
+  const historyRows = verifiedHistoryMarks.map(mark => ({
     ...mark,
     exam: exams.find(exam => exam.id === mark.exam_id),
     subject: subjects.find(subject => subject.id === mark.subject_id),
     grade: gradingBands.find(band => mark.score >= band.min_score && (mark.score < band.max_score || band.max_score === 100))?.grade || '—',
   })).sort((a, b) => (b.exam?.year || 0) - (a.exam?.year || 0) || (a.exam?.term || '').localeCompare(b.exam?.term || ''))
-  const historyAverage = historyMarks.length ? historyMarks.reduce((sum, mark) => sum + mark.score, 0) / historyMarks.length : 0
+  const historyAverage = verifiedHistoryMarks.length ? verifiedHistoryMarks.reduce((sum, mark) => sum + mark.score, 0) / verifiedHistoryMarks.length : 0
 
   return <div className="academic-workspace">
     <section className="panel">
@@ -364,7 +365,7 @@ export default function AcademicManagement({ token, classes }: { token: string; 
         </form>
       </section>
       <section className="panel academic-report-print">
-        <div className="panel-heading"><div><h2>Student report card and academic history</h2><p>Review this student's results across examinations and print the report card. Use the browser print option to save as PDF.</p></div><button type="button" className="secondary-button" disabled={!historyStudentId||!historyRows.length} onClick={() => printAcademicSection('report')}><Printer size={15}/> Print report card</button></div>
+        <div className="panel-heading"><div><h2>Student report card and academic history</h2><p>Review administrator-verified results across examinations. Pending marks are excluded from the report card. Use the browser print option to save as PDF.</p></div><button type="button" className="secondary-button" disabled={!historyStudentId||!historyRows.length} onClick={() => printAcademicSection('report')}><Printer size={15}/> Print report card</button></div>
         <label className="academic-exam-select">Student
           <select value={historyStudentId} onChange={e => setHistoryStudentId(e.target.value)}>
             <option value="">Choose a student</option>
@@ -375,7 +376,8 @@ export default function AcademicManagement({ token, classes }: { token: string; 
         {historyStudent && <>
           <div className="panel-heading"><div><h3>{studentName(historyStudent)}</h3><p>Admission number: {historyStudent.admission_number}</p></div></div>
           <div className="stats-grid finance-stats">
-            <div className="stat-card"><span>Assessments recorded</span><strong className="stat-value">{historyMarks.length}</strong></div>
+            <div className="stat-card"><span>Verified assessments</span><strong className="stat-value">{verifiedHistoryMarks.length}</strong></div>
+            <div className="stat-card"><span>Awaiting verification</span><strong className="stat-value">{historyMarks.length - verifiedHistoryMarks.length}</strong></div>
             <div className="stat-card"><span>Overall average</span><strong className="stat-value">{historyAverage.toFixed(2)}%</strong></div>
             <div className="stat-card"><span>Overall grade</span><strong className="stat-value">{gradingBands.find(band => historyAverage >= band.min_score && (historyAverage < band.max_score || band.max_score === 100))?.grade || '—'}</strong></div>
           </div>
