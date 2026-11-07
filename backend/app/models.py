@@ -226,6 +226,8 @@ class SchoolProfile(Base):
     a_level_combinations: Mapped[str | None] = mapped_column(Text, nullable=True)
     o_level_optional_subjects: Mapped[str | None] = mapped_column(Text, nullable=True)
     a_level_subsidiary_subjects: Mapped[str | None] = mapped_column(Text, nullable=True)
+    report_logo: Mapped[str | None] = mapped_column(Text, nullable=True)
+    report_template: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class PrefectAssignment(Base):
