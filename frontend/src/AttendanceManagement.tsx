@@ -7,7 +7,7 @@ type Attendance = { id: number; student_id: number; attendance_date: string; sta
 type Summary = { total_students: number; marked: number; unmarked: number; present: number; absent: number; late: number; excused: number; attendance_rate: number }
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
-const today = () => new Date().toISOString().slice(0, 10)
+const today = () => { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}` }
 
 async function request<T>(path: string, token: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_BASE_URL}/api/${path}`, {
