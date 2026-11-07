@@ -760,3 +760,9 @@ button:disabled { cursor: not-allowed; opacity: .58; }
   .attendance-choice-group { min-width:220px; }
   .attendance-choice { padding:7px 9px; }
 }
+
+.academic-tabs { display:flex; flex-wrap:wrap; gap:7px; margin:18px 0; padding:5px; border:1px solid #e1e7f0; border-radius:11px; background:#f6f8fc; }
+.academic-tab { min-height:40px; padding:9px 15px; border:1px solid transparent; border-radius:8px; background:transparent; color:#5b687d; font-size:13px; font-weight:750; cursor:pointer; }
+.academic-tab:hover { background:#fff; color:#274bb5; }
+.academic-tab.active { border-color:#d8e1f5; background:#fff; color:#244cc2; box-shadow:0 2px 6px #172b4d0d; }
+@media(max-width:640px) { .academic-tabs { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); } .academic-tab { padding:9px 8px; } }
