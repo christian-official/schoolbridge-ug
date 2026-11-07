@@ -84,6 +84,25 @@ class StudentCreate(BaseModel):
 
 
 
+class StudentUpdate(BaseModel):
+    first_name: str | None = None
+    middle_name: str | None = None
+    last_name: str | None = None
+    gender: str | None = None
+    date_of_birth: date | None = None
+    religion: str | None = None
+    nationality: str | None = None
+    phone: str | None = None
+    address: str | None = None
+    guardian_name: str | None = None
+    guardian_relationship: str | None = None
+    guardian_phone: str | None = None
+    previous_school: str | None = None
+    admission_date: date | None = None
+    class_id: int | None = None
+    status: str | None = Field(default=None, pattern="^(active|transferred|dismissed|inactive)$")
+
+
 class AdmissionSettingsUpdate(BaseModel):
     admission_prefix: str = Field(default="SB", max_length=20)
     include_year: bool = True
