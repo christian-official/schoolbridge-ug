@@ -85,7 +85,7 @@ class StudentCreate(BaseModel):
     guardian_phone: str | None = None
     previous_school: str | None = None
     admission_date: date | None = None
-    class_id: int = Field(gt=0)
+    class_id: int | None = None
     fee_amount: int | None = Field(default=None, ge=0)
     academic_level: str | None = Field(default=None, pattern="^(O-Level|A-Level)$")
     combination: str | None = None
@@ -275,12 +275,14 @@ def list_subjects(db: Session = Depends(get_db)):
 def create_student(data: StudentCreate, db: Session = Depends(get_db)):
     if not data.first_name.strip() or not data.last_name.strip():
         raise HTTPException(422, "Enter the student's full name before registering.")
+    if data.class_id is None:
+        raise HTTPException(422, "Select a class and stream before registering the student.")
     selected_class = db.get(models.SchoolClass, data.class_id)
     if not selected_class:
         raise HTTPException(404, "Choose a valid class and stream.")
     profile = db.get(models.SchoolProfile, 1)
     school_type = profile.school_type if profile else "Secondary"
-    class_label = selected_class.name.lower().replace(" ", "")
+    class_label = re.sub(r"[\\s._-]+", "", selected_class.name.lower())
     level_match = re.search(r"(?:senior|s)?([1-6])$", class_label)
     if school_type == "Secondary" and level_match:
         grade = int(level_match.group(1))
