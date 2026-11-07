@@ -501,7 +501,7 @@ function App() {
                   </section>
 
                   <section className="form-section">
-                    <div className="form-section-heading"><span className="form-section-number">02</span><div><h4>Student information</h4><p>Enter the student's official names and personal details.</p></div></div>
+                    <div className="form-section-heading"><span className="form-section-number">02</span><div><h4>Biodata</h4><p>Enter the student's official names and personal details.</p></div></div>
                     <div className="student-form-grid">
                       <label className="field-span-full">Student full name *<input autoComplete="name" value={[studentForm.first_name,studentForm.last_name].filter(Boolean).join(' ')} onChange={e=>{const parts=e.target.value.trim().split(/\s+/);setStudentForm({...studentForm,first_name:parts.shift()||'',last_name:parts.join(' ')})}} placeholder="Enter student's full name" required /></label>
                       <label>Gender<select value={studentForm.gender} onChange={e => setStudentForm({ ...studentForm, gender: e.target.value })}><option value="">Select gender</option><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select></label>
