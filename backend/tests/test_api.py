@@ -654,3 +654,71 @@ def test_grading_scale_requires_complete_non_overlapping_bands():
         fetched = client.get("/api/grading-scale", headers=headers)
         assert fetched.status_code == 200
         assert fetched.json() == saved.json()
+
+
+
+def test_verified_marks_are_locked_for_teachers_until_admin_unlocks():
+    reset_database()
+    admin = create_admin()
+    teacher = create_teacher()
+    admin_headers = {"Authorization": f"Bearer {create_access_token(admin)}"}
+    teacher_headers = {"Authorization": f"Bearer {create_access_token(teacher)}"}
+
+    db = SessionLocal()
+    try:
+        school_class = models.SchoolClass(name="Senior 5", section="Arts")
+        subject = models.Subject(name="History")
+        db.add_all([school_class, subject])
+        db.flush()
+        student = models.Student(
+            admission_number="SB-VERIFY-001", first_name="Martha",
+            last_name="Learner", class_id=school_class.id,
+        )
+        exam = models.Exam(
+            name="Term Assessment", term="Term 1", year=2026,
+            class_id=school_class.id,
+        )
+        db.add_all([student, exam])
+        db.flush()
+        db.add(models.TeacherAssignment(
+            teacher_id=teacher.id, class_id=school_class.id, subject_id=subject.id,
+        ))
+        db.commit()
+        student_id, subject_id, exam_id = student.id, subject.id, exam.id
+    finally:
+        db.close()
+
+    with TestClient(app) as client:
+        saved = client.put(
+            "/api/teacher/marks", headers=teacher_headers,
+            json={"student_id": student_id, "subject_id": subject_id, "exam_id": exam_id, "score": 76},
+        )
+        assert saved.status_code == 200, saved.text
+        mark_id = saved.json()["id"]
+        verified = client.patch(
+            f"/api/marks/{mark_id}/verification?verified=true",
+            headers=admin_headers,
+        )
+        assert verified.status_code == 200, verified.text
+        assert verified.json()["verified"] is True
+
+        locked_edit = client.put(
+            "/api/teacher/marks", headers=teacher_headers,
+            json={"student_id": student_id, "subject_id": subject_id, "exam_id": exam_id, "score": 88},
+        )
+        assert locked_edit.status_code == 409
+
+        unlocked = client.patch(
+            f"/api/marks/{mark_id}/verification?verified=false",
+            headers=admin_headers,
+        )
+        assert unlocked.status_code == 200
+        assert unlocked.json()["verified"] is False
+
+        corrected = client.put(
+            "/api/teacher/marks", headers=teacher_headers,
+            json={"student_id": student_id, "subject_id": subject_id, "exam_id": exam_id, "score": 88},
+        )
+        assert corrected.status_code == 200, corrected.text
+        assert corrected.json()["score"] == 88
+        assert corrected.json()["verified"] is False
