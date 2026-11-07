@@ -19,6 +19,7 @@ export default function StaffFinance({token,active,classes=[]}:{token:string;act
   const [search,setSearch]=useState('')
   const [category,setCategory]=useState('')
   const [showForm,setShowForm]=useState(false)
+  const [editingStaff,setEditingStaff]=useState<number|null>(null)
   const [message,setMessage]=useState('')
   const [form,setForm]=useState({first_name:'',last_name:'',category:'Teaching',position:'',department:'',phone:'',email:'',salary_amount:'',salary_frequency:'Monthly'})
   const [summary,setSummary]=useState<Summary>({fees_expected:0,fees_collected:0,outstanding:0})
@@ -46,8 +47,13 @@ export default function StaffFinance({token,active,classes=[]}:{token:string;act
 
   async function addStaff(e:FormEvent){
     e.preventDefault();setMessage('')
-    try { await request('staff',token,{method:'POST',body:JSON.stringify({...form,salary_amount:form.salary_amount===''?null:Number(form.salary_amount)})});setForm({first_name:'',last_name:'',category:'Teaching',position:'',department:'',phone:'',email:'',salary_amount:'',salary_frequency:'Monthly'});setShowForm(false);setMessage('Staff member registered.');const p=new URLSearchParams({search,page:'1',page_size:'100'});if(category)p.set('category',category);const r=await request<Page<Staff>>('staff?'+p.toString(),token);setStaff(r.items);setStaffTotal(r.total) }
+    try { await request(editingStaff?'staff/'+editingStaff:'staff',token,{method:editingStaff?'PATCH':'POST',body:JSON.stringify({...form,salary_amount:form.salary_amount===''?null:Number(form.salary_amount)})});setEditingStaff(null);setForm({first_name:'',last_name:'',category:'Teaching',position:'',department:'',phone:'',email:'',salary_amount:'',salary_frequency:'Monthly'});setShowForm(false);setMessage(editingStaff?'Staff profile updated.':'Staff member registered.');const p=new URLSearchParams({search,page:'1',page_size:'100'});if(category)p.set('category',category);const r=await request<Page<Staff>>('staff?'+p.toString(),token);setStaff(r.items);setStaffTotal(r.total) }
     catch(e){setMessage(e instanceof Error?e.message:'Unable to save staff member.')}
+  }
+  async function archiveStaff(id:number){
+    if(!window.confirm('Archive this staff member? Their records and salary history will be retained.')) return
+    try {await request('staff/'+id+'/archive',token,{method:'POST'});setMessage('Staff member archived.');const p=new URLSearchParams({search,page:'1',page_size:'100'});if(category)p.set('category',category);const r=await request<Page<Staff>>('staff?'+p.toString(),token);setStaff(r.items);setStaffTotal(r.total)}
+    catch(e){setMessage(e instanceof Error?e.message:'Unable to archive staff member.')}
   }
   async function saveOtherExpense(e:FormEvent){
     e.preventDefault();setMessage('')
@@ -66,7 +72,7 @@ export default function StaffFinance({token,active,classes=[]}:{token:string;act
   }
 
   if(active==='Staff') return <section className="panel">
-    <div className="panel-heading"><div><h2>Staff directory</h2><p>{staffTotal} staff members · teaching and non-teaching</p></div><button className="primary-button add-student-button" onClick={()=>setShowForm(v=>!v)}><Plus size={16}/>{showForm?'Close form':'Add staff member'}</button></div>
+    <div className="panel-heading"><div><h2>Staff directory</h2><p>{staffTotal} staff members · teaching and non-teaching</p></div><button className="primary-button add-student-button" onClick={()=>{setEditingStaff(null);setShowForm(v=>!v)}}><Plus size={16}/>{showForm?'Close form':'Add staff member'}</button></div>
     {message&&<div className="success-notice">{message}</div>}
     {showForm&&<form className="student-form" onSubmit={addStaff}><div className="student-form-grid">
       <label>First name *<input required value={form.first_name} onChange={e=>setForm({...form,first_name:e.target.value})}/></label>
@@ -76,9 +82,9 @@ export default function StaffFinance({token,active,classes=[]}:{token:string;act
       <label>Department<input value={form.department} onChange={e=>setForm({...form,department:e.target.value})}/></label>
       <label>Phone<input value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})}/></label>
       <label>Email<input type="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})}/></label><label>Salary amount (UGX)<input type="number" min="0" value={form.salary_amount} onChange={e=>setForm({...form,salary_amount:e.target.value})}/></label><label>Pay frequency<select value={form.salary_frequency} onChange={e=>setForm({...form,salary_frequency:e.target.value})}><option>Monthly</option><option>Termly</option><option>Weekly</option><option>Daily</option></select></label>
-    </div><div className="form-actions"><button className="primary-button">Save staff member</button></div></form>}
+    </div><div className="form-actions"><button className="primary-button">{editingStaff?'Update staff profile':'Save staff member'}</button></div></form>}
     <div className="table-tools student-tools"><div className="search-box"><Search size={17}/><input placeholder="Search name or staff number..." value={search} onChange={e=>setSearch(e.target.value)}/></div><select className="filter-select" value={category} onChange={e=>setCategory(e.target.value)}><option value="">All staff</option><option>Teaching</option><option>Non-teaching</option></select></div>
-    <div className="table-wrap"><table><thead><tr><th>Staff member</th><th>Staff number</th><th>Category</th><th>Position</th><th>Department</th><th>Phone</th><th>Salary (UGX)</th><th>Status</th></tr></thead><tbody>{staff.map(s=><tr key={s.id}><td>{s.first_name} {s.last_name}</td><td>{s.staff_number}</td><td>{s.category}</td><td>{s.position||'—'}</td><td>{s.department||'—'}</td><td>{s.phone||'—'}</td><td>{s.salary_amount?.toLocaleString()||'—'} {s.salary_frequency||''}</td><td>{s.status||'active'}</td></tr>)}</tbody></table></div>
+    <div className="table-wrap"><table><thead><tr><th>Staff member</th><th>Staff number</th><th>Category</th><th>Position</th><th>Department</th><th>Phone</th><th>Salary (UGX)</th><th>Status</th><th>Actions</th></tr></thead><tbody>{staff.map(s=><tr key={s.id}><td>{s.first_name} {s.last_name}</td><td>{s.staff_number}</td><td>{s.category}</td><td>{s.position||'—'}</td><td>{s.department||'—'}</td><td>{s.phone||'—'}</td><td>{s.salary_amount?.toLocaleString()||'—'} {s.salary_frequency||''}</td><td>{s.status||'active'}</td><td><button type="button" className="secondary-button" onClick={()=>{setEditingStaff(s.id);setForm({first_name:s.first_name,last_name:s.last_name,category:s.category,position:s.position||'',department:s.department||'',phone:s.phone||'',email:s.email||'',salary_amount:s.salary_amount==null?'':String(s.salary_amount),salary_frequency:s.salary_frequency||'Monthly'});setShowForm(true)}}>Edit</button>{s.status!=='archived'&&<button type="button" className="secondary-button" onClick={()=>void archiveStaff(s.id)}>Archive</button>}</td></tr>)}</tbody></table></div>
     {!staff.length&&<div className="empty-state"><Users size={30}/><p>No staff members match this search.</p></div>}
   </section>
 
