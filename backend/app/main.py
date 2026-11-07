@@ -610,7 +610,7 @@ def my_assignments(
         {
             "assignment_id": a.id,
             "class_id": a.class_id,
-            "class": db.get(models.SchoolClass, a.class_id).name,
+            "class": db.get(models.SchoolClass, a.class_id).name + " — " + db.get(models.SchoolClass, a.class_id).section,
             "subject": db.get(models.Subject, a.subject_id).name,
         }
         for a in assignments
