@@ -16,7 +16,7 @@ async function request<T>(path:string, token:string, options:RequestInit={}):Pro
   return data as T
 }
 
-export default function StaffFinance({token,active,classes=[],refreshKey=0}:{token:string;active:string;classes?:{id:number;name?:string;section?:string}[];refreshKey?:number}) {
+export default function StaffFinance({token,active,classes=[],refreshKey=0,initialTab='overview'}:{token:string;active:string;classes?:{id:number;name?:string;section?:string}[];refreshKey?:number;initialTab?:'overview'|'payments'|'balances'}) {
   const [staff,setStaff]=useState<Staff[]>([])
   const [staffTotal,setStaffTotal]=useState(0)
   const [search,setSearch]=useState('')
@@ -42,6 +42,7 @@ export default function StaffFinance({token,active,classes=[],refreshKey=0}:{tok
   const [allOutstanding,setAllOutstanding]=useState<Charge[]>([])
   const [financeTab,setFinanceTab]=useState<'overview'|'payments'|'balances'|'expenses'|'fees'>('overview')
   useEffect(()=>{setMessage('')},[active,financeTab])
+  useEffect(()=>{if(active==='Fees & Finance')setFinanceTab(initialTab)},[active,initialTab])
   const [feeSetup,setFeeSetup]=useState({class_id:'',term:'Term 1',year:String(new Date().getFullYear()),amount:''})
   const [expenseForm,setExpenseForm]=useState({description:'',category:'General',amount:'',reference:''})
   const [salaryForm,setSalaryForm]=useState({staff_id:'',amount:'',period:'',reference:''})
