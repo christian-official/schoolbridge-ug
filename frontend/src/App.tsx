@@ -43,9 +43,7 @@ const menu = [
   { label: 'Overview', icon: LayoutDashboard },
   { label: 'Students', icon: GraduationCap },
   { label: 'Staff', icon: Users },
-  { label: 'Classes', icon: BookOpen },
   { label: 'Fees & Finance', icon: FileText },
-  { label: 'Attendance', icon: ClipboardCheck },
   { label: 'Examinations', icon: FileText },
 ]
 
@@ -71,6 +69,7 @@ function App() {
   const [loginError, setLoginError] = useState('')
   const [loading, setLoading] = useState(false)
   const [active, setActive] = useState('Overview')
+  const [settingsSection, setSettingsSection] = useState('home')
   const [students, setStudents] = useState<RecordItem[]>([])
   const [studentTotal, setStudentTotal] = useState(0)
   const [financeSummary, setFinanceSummary] = useState<FinanceSummary>({ fees_expected: 0, fees_collected: 0, outstanding: 0 })
@@ -368,8 +367,7 @@ function App() {
                 <div className="panel quick-panel">
                   <div className="panel-heading"><div><h2>Quick actions</h2><p>Common school operations</p></div></div>
                   <button className="quick-action" onClick={() => setActive('Students')}><span className="quick-icon blue"><Plus /></span><span><strong>Manage students</strong><small>View student records</small></span><ArrowUpRight size={17} /></button>
-                  <button className="quick-action" onClick={() => setActive('Classes')}><span className="quick-icon purple"><BookOpen /></span><span><strong>Manage classes</strong><small>View school classes</small></span><ArrowUpRight size={17} /></button>
-                  <button className="quick-action" onClick={() => setActive('Attendance')}><span className="quick-icon green"><ClipboardCheck /></span><span><strong>Attendance</strong><small>Open attendance records</small></span><ArrowUpRight size={17} /></button>
+                  <button className="quick-action" onClick={() => { setActive('Settings'); setSettingsSection('classes') }}><span className="quick-icon purple"><BookOpen /></span><span><strong>Manage classes</strong><small>Classes and streams in Settings</small></span><ArrowUpRight size={17} /></button>
                   <button className="quick-action" onClick={() => setActive('Examinations')}><span className="quick-icon orange"><FileText /></span><span><strong>Examinations</strong><small>View exams and marks</small></span><ArrowUpRight size={17} /></button>
                 </div>
               </section>
@@ -415,21 +413,29 @@ function App() {
             </section>
           )}
 
-          {active === 'Classes' && (
-            <section className="panel">
-              <div className="panel-heading"><div><h2>School classes</h2><p>Classes registered in the system</p></div><button className="primary-button add-student-button" onClick={() => { setShowClassForm(v => !v); setClassError(''); setClassSuccess('') }}><Plus size={16} /> {showClassForm ? 'Close form' : 'Add class'}</button></div>
-              {classSuccess && <div className="success-notice">{classSuccess}</div>}
-              {classError && <div className="form-error">{classError}</div>}
-              {showClassForm && <form className="student-form class-form" onSubmit={registerClass}><div className="form-heading"><div><h3>Create a school class</h3><p>Examples: Primary 1, Senior 1, Senior 2.</p></div></div><div className="student-form-grid class-form-grid"><label>Class name *<input value={classForm.name} onChange={e => setClassForm({ ...classForm, name: e.target.value })} placeholder="e.g. Primary 1" required /></label><label>Section (optional)<input value={classForm.section} onChange={e => setClassForm({ ...classForm, section: e.target.value })} placeholder="e.g. East or A" /></label></div><div className="form-actions"><button type="button" className="secondary-button" onClick={() => setShowClassForm(false)}>Cancel</button><button className="primary-button" disabled={savingClass}>{savingClass ? 'Saving...' : 'Save class'}</button></div></form>}
-              <div className="class-grid">{classes.map(item => <div className="class-card" key={item.id}><BookOpen size={22} /><strong>{item.name}</strong><span>{item.section || 'General section'}</span></div>)}</div>
-              {classes.length === 0 && <EmptyState text="No classes have been added yet." />}
-            </section>
-          )}
+
 
           <StaffFinance token={token} active={active} />
           {active === 'Attendance' && <ComingSoon title="Attendance management" description="Daily attendance records and summaries will appear here." />}
           {active === 'Examinations' && <ComingSoon title="Examinations and results" description="Exam setup, marks entry and student results will be managed here." />}
-          {active === 'Settings' && (
+          {active === 'Settings' && settingsSection === 'home' && (
+            <section className="settings-hub">
+              <div className="panel-heading"><div><h2>School settings</h2><p>Choose a category to configure how SchoolBridge works for this school.</p></div></div>
+              <div className="settings-category-grid">
+                <button className="settings-category" onClick={() => setSettingsSection('school')}><span className="settings-category-icon"><GraduationCap /></span><strong>School Profile</strong><small>School name, contacts and identity</small><ArrowUpRight /></button>
+                <button className="settings-category" onClick={() => setSettingsSection('classes')}><span className="settings-category-icon"><BookOpen /></span><strong>Classes & Streams</strong><small>Create classes, streams and manage class fees</small><ArrowUpRight /></button>
+                <button className="settings-category" onClick={() => setSettingsSection('fees')}><span className="settings-category-icon"><FileText /></span><strong>Fee Structure</strong><small>Term fees and billing preferences</small><ArrowUpRight /></button>
+                <button className="settings-category" onClick={() => setSettingsSection('admission')}><span className="settings-category-icon"><Users /></span><strong>Admission Numbers</strong><small>Set the format for student admission numbers</small><ArrowUpRight /></button>
+                <button className="settings-category" onClick={() => setSettingsSection('academic')}><span className="settings-category-icon"><CalendarDays /></span><strong>Academic Year & Terms</strong><small>Set the active academic year and term</small><ArrowUpRight /></button>
+                <button className="settings-category" onClick={() => setSettingsSection('users')}><span className="settings-category-icon"><ShieldCheck /></span><strong>Users & Permissions</strong><small>Administrator and teacher access</small><ArrowUpRight /></button>
+                <button className="settings-category" onClick={() => setSettingsSection('backups')}><span className="settings-category-icon"><Settings /></span><strong>Backups & Restore</strong><small>Protect and restore school records</small><ArrowUpRight /></button>
+              </div>
+            </section>
+          )}
+          {active === 'Settings' && settingsSection !== 'home' && (
+            <div className="settings-detail">
+              <button className="settings-back" onClick={() => setSettingsSection('home')}>← All settings</button>
+              {settingsSection === 'admission' && (
             <section className="panel settings-panel">
               <div className="panel-heading"><div><h2>Admission number settings</h2><p>Choose the format used for newly registered students at this school.</p></div></div>
               {settingsSuccess && <div className="success-notice">{settingsSuccess}</div>}
@@ -446,6 +452,23 @@ function App() {
                 <p className="form-hint">These settings affect new registrations only. Existing admission numbers will not be changed.</p>
                 <div className="form-actions"><button className="primary-button" disabled={savingSettings}>{savingSettings ? 'Saving...' : 'Save numbering settings'}</button></div>
               </form>
+            </section>
+              )}
+              {settingsSection === 'school' && <ComingSoon title="School profile" description="School identity, contact details and official information will be configured here." />}
+              {settingsSection === 'fees' && <ComingSoon title="Fee structure" description="Set standard term fees for each class. This section is being connected to class fee settings." />}
+              {settingsSection === 'academic' && <ComingSoon title="Academic year and terms" description="Choose the active academic year and term used for student billing." />}
+              {settingsSection === 'users' && <ComingSoon title="Users and permissions" description="Manage administrator and teacher accounts and access permissions." />}
+              {settingsSection === 'backups' && <ComingSoon title="Backups and restore" description="Create, download and restore protected school backups." />}
+            </div>
+          )}
+          {active === 'Settings' && settingsSection === 'classes' && (
+            <section className="panel">
+              <div className="panel-heading"><div><h2>School classes</h2><p>Classes registered in the system</p></div><button className="primary-button add-student-button" onClick={() => { setShowClassForm(v => !v); setClassError(''); setClassSuccess('') }}><Plus size={16} /> {showClassForm ? 'Close form' : 'Add class'}</button></div>
+              {classSuccess && <div className="success-notice">{classSuccess}</div>}
+              {classError && <div className="form-error">{classError}</div>}
+              {showClassForm && <form className="student-form class-form" onSubmit={registerClass}><div className="form-heading"><div><h3>Create a school class</h3><p>Examples: Primary 1, Senior 1, Senior 2.</p></div></div><div className="student-form-grid class-form-grid"><label>Class name *<input value={classForm.name} onChange={e => setClassForm({ ...classForm, name: e.target.value })} placeholder="e.g. Primary 1" required /></label><label>Section (optional)<input value={classForm.section} onChange={e => setClassForm({ ...classForm, section: e.target.value })} placeholder="e.g. East or A" /></label></div><div className="form-actions"><button type="button" className="secondary-button" onClick={() => setShowClassForm(false)}>Cancel</button><button className="primary-button" disabled={savingClass}>{savingClass ? 'Saving...' : 'Save class'}</button></div></form>}
+              <div className="class-grid">{classes.map(item => <div className="class-card" key={item.id}><BookOpen size={22} /><strong>{item.name}</strong><span>{item.section || 'General section'}</span></div>)}</div>
+              {classes.length === 0 && <EmptyState text="No classes have been added yet." />}
             </section>
           )}
 
