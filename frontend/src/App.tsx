@@ -325,7 +325,7 @@ function App() {
       const body = new URLSearchParams()
       body.set('username', username)
       body.set('password', password)
-      const response = await fetch('/api/auth/login', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body,
@@ -720,14 +720,14 @@ function BackupSettings({token}:{token:string}) {
   const [busy,setBusy]=useState(false)
   async function createBackup(){
     setBusy(true);setMessage('')
-    try {const response=await fetch('/api/backups/create',{method:'POST',headers:{Authorization:'Bearer '+token}});if(!response.ok){const data=await response.json().catch(()=>({}));throw new Error(data.detail||'Backup failed')}const blob=await response.blob();const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download='schoolbridge-backup-'+new Date().toISOString().slice(0,10)+'.sqlite3';document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url);setMessage('Database backup created and downloaded. Keep a copy somewhere safe.')}
+    try {const response=await fetch(`${API_BASE_URL}/api/backups/create`,{method:'POST',headers:{Authorization:'Bearer '+token}});if(!response.ok){const data=await response.json().catch(()=>({}));throw new Error(data.detail||'Backup failed')}const blob=await response.blob();const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download='schoolbridge-backup-'+new Date().toISOString().slice(0,10)+'.sqlite3';document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url);setMessage('Database backup created and downloaded. Keep a copy somewhere safe.')}
     catch(e){setMessage(e instanceof Error?e.message:'Unable to create backup.')}finally{setBusy(false)}
   }
   async function restoreBackup(){
     if(!file)return
     if(!window.confirm('Restore this backup? Current school data will be replaced. A safety copy of the current database will be kept.'))return
     setBusy(true);setMessage('')
-    try {const body=new FormData();body.append('file',file);const response=await fetch('/api/backups/restore',{method:'POST',headers:{Authorization:'Bearer '+token},body});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.detail||'Restore failed');setMessage(data.message||'Restore staged. Restart the backend to complete it.');setFile(null)}
+    try {const body=new FormData();body.append('file',file);const response=await fetch(`${API_BASE_URL}/api/backups/restore`,{method:'POST',headers:{Authorization:'Bearer '+token},body});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.detail||'Restore failed');setMessage(data.message||'Restore staged. Restart the backend to complete it.');setFile(null)}
     catch(e){setMessage(e instanceof Error?e.message:'Unable to restore backup.')}finally{setBusy(false)}
   }
   return <section className="panel settings-panel"><div className="panel-heading"><div><h2>Backups and restore</h2><p>Download a copy of the local school database or restore from a previous SchoolBridge backup.</p></div></div>{message&&<div className="success-notice">{message}</div>}<div className="backup-action"><h3>Create a backup</h3><p>Includes student, staff, academic, fee, payment and settings records.</p><button className="primary-button" type="button" disabled={busy} onClick={()=>void createBackup()}>{busy?'Working...':'Create and download backup'}</button></div><div className="backup-action"><h3>Restore a backup</h3><p>Only restore a valid SchoolBridge SQLite backup. The current database is copied to a safety file before restoration.</p><label>Select backup file<input type="file" accept=".sqlite,.sqlite3,.db" onChange={e=>setFile(e.target.files?.[0]||null)}/></label><div className="form-actions"><button className="secondary-button" type="button" disabled={!file||busy} onClick={()=>void restoreBackup()}>{busy?'Restoring...':'Restore selected backup'}</button></div></div><p className="form-hint">For PostgreSQL multi-computer installations, use the database administrator's backup procedure. File-based backup and restore here applies to the local SQLite installation.</p></section>
