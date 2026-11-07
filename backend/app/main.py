@@ -122,7 +122,7 @@ def seed_demo_data_if_empty():
         first_names = [
             "Amina", "Brian", "Carol", "Daniel", "Esther", "Farid", "Grace", "Henry",
             "Irene", "James", "Kevin", "Lydia", "Moses", "Nadia", "Oscar", "Patricia",
-            " क्वincy", "Ruth", "Samuel", "Tina", "Umar", "Vanessa", "William", "Xavier",
+            "Quincy", "Ruth", "Samuel", "Tina", "Umar", "Vanessa", "William", "Xavier",
             "Yasmin", "Zach", "Andrew", "Bella", "Charles", "Diana"
         ]
         last_names = [
