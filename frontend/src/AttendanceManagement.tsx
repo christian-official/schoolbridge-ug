@@ -143,9 +143,9 @@ export default function AttendanceManagement({ token }: { token: string }) {
               <td>{index + 1}</td>
               <td>{student.first_name} {student.last_name}</td>
               <td>{student.admission_number}</td>
-              <td><select aria-label={`Attendance for ${student.first_name} ${student.last_name}`} value={statuses[student.id] || 'Present'} onChange={event => setStatuses(current => ({ ...current, [student.id]: event.target.value }))}>
-                <option>Present</option><option>Absent</option><option>Late</option><option>Excused</option>
-              </select></td>
+              <td><div className="attendance-choice-group" role="group" aria-label={`Attendance for ${student.first_name} ${student.last_name}`}>
+                {(['Present', 'Absent', 'Late', 'Excused'] as const).map(status => <button key={status} type="button" className={`attendance-choice attendance-${status.toLowerCase()} ${((statuses[student.id] || 'Present') === status) ? 'selected' : ''}`} aria-pressed={(statuses[student.id] || 'Present') === status} onClick={() => setStatuses(current => ({ ...current, [student.id]: status }))}>{status}</button>)}
+              </div></td>
             </tr>)}</tbody>
           </table>
         </div>
