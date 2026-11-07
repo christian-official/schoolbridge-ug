@@ -14,3 +14,9 @@ services:
         value: sqlite:///./schoolbridge.db
       - key: SCHOOLBRIDGE_CORS_ORIGINS
         value: "*"
+      - key: SCHOOLBRIDGE_INITIAL_ADMIN_USERNAME
+        sync: false
+      - key: SCHOOLBRIDGE_INITIAL_ADMIN_EMAIL
+        sync: false
+      - key: SCHOOLBRIDGE_INITIAL_ADMIN_PASSWORD
+        sync: false
