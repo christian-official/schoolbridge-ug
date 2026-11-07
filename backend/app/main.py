@@ -829,6 +829,10 @@ def appoint_prefect(data: PrefectAssignmentCreate, db: Session = Depends(get_db)
         raise HTTPException(404, "Select an active student.")
     if data.end_date and data.end_date < data.start_date:
         raise HTTPException(422, "End date cannot be earlier than start date.")
+    if db.query(models.PrefectAssignment).filter_by(student_id=student.id, active=True).first():
+        raise HTTPException(409, "This student already has an active prefect appointment.")
+    if db.query(models.PrefectAssignment).filter_by(position=data.position, active=True).first():
+        raise HTTPException(409, "This prefect position already has an active appointment. End the previous term first.")
     assignment = models.PrefectAssignment(**data.model_dump())
     db.add(assignment)
     db.flush()
