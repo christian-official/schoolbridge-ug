@@ -202,3 +202,24 @@ class SchoolProfile(Base):
     phone: Mapped[str | None] = mapped_column(String(40), nullable=True)
     email: Mapped[str | None] = mapped_column(String(150), nullable=True)
     motto: Mapped[str | None] = mapped_column(String(200), nullable=True)
+
+
+class PrefectAssignment(Base):
+    __tablename__ = "prefect_assignments"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    student_id: Mapped[int] = mapped_column(ForeignKey("students.id"), index=True)
+    position: Mapped[str] = mapped_column(String(100))
+    start_date: Mapped[date] = mapped_column(Date, default=date.today)
+    end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    active: Mapped[bool] = mapped_column(default=True)
+
+
+class TeacherDuty(Base):
+    __tablename__ = "teacher_duties"
+    __table_args__ = (UniqueConstraint("duty_date"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    staff_id: Mapped[int] = mapped_column(ForeignKey("staff_members.id"), index=True)
+    duty_date: Mapped[date] = mapped_column(Date, index=True)
+    notes: Mapped[str | None] = mapped_column(String(255), nullable=True)
