@@ -329,7 +329,13 @@ def list_classes(db: Session = Depends(get_db)):
 def create_subject(data: SubjectCreate, db: Session = Depends(get_db)):
     profile = db.get(models.SchoolProfile, 1)
     school_type = profile.school_type if profile else "Secondary"
-    item = models.Subject(**data.model_dump(), school_type=school_type)
+    existing = db.query(models.Subject).filter(
+        models.Subject.school_type == school_type,
+        func.lower(models.Subject.name) == data.name.strip().lower(),
+    ).first()
+    if existing:
+        raise HTTPException(409, "That subject already exists for this school type.")
+    item = models.Subject(**{**data.model_dump(), "name": data.name.strip()}, school_type=school_type)
     db.add(item)
     try:
         db.commit()
