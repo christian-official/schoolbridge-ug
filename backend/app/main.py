@@ -1657,12 +1657,20 @@ def dashboard_summary(db: Session = Depends(get_db)):
     academic_year = settings.academic_year or date.today().year
     year_start = date(academic_year, 1, 1)
     year_end = date(academic_year, 12, 31)
+    students_present_today = db.query(models.Attendance).join(
+        models.Student, models.Student.id == models.Attendance.student_id
+    ).filter(
+        models.Attendance.attendance_date == date.today(),
+        models.Attendance.status == "Present",
+        models.Student.status == "active",
+    ).count()
     return {
         "active_students": db.query(models.Student).filter(models.Student.status == "active").count(),
         "new_admissions_this_year": db.query(models.Student).filter(
             models.Student.admission_date >= year_start,
             models.Student.admission_date <= year_end,
         ).count(),
+        "students_present_today": students_present_today,
         "active_staff": db.query(models.StaffMember).filter(models.StaffMember.status == "active").count(),
         "total_classes": db.query(models.SchoolClass).count(),
         "academic_year": academic_year,
