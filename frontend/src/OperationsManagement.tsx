@@ -15,6 +15,7 @@ const today = () => new Date().toISOString().slice(0, 10)
 
 type Staff = { id: number; first_name: string; last_name: string; staff_number: string; category: string; status: string }
 type StaffAttendance = { id: number; staff_id: number; attendance_date: string; status: string; notes?: string }
+type StaffAttendanceSummary = { total_staff: number; marked: number; unmarked: number; present: number; absent: number; late: number; excused: number }
 type SchoolClass = { id: number; name: string; section?: string }
 type Subject = { id: number; name: string }
 type TimetableEntry = { id: number; class_id: number; subject_id?: number | null; staff_id?: number | null; day_of_week: number; start_time: string; end_time: string; room?: string | null }
@@ -26,6 +27,7 @@ export default function OperationsManagement({ token, active }: { token: string;
   const [staffStatuses, setStaffStatuses] = useState<Record<number, string>>({})
   const [staffDate, setStaffDate] = useState(today())
   const [staffRows, setStaffRows] = useState<StaffAttendance[]>([])
+  const [staffSummary, setStaffSummary] = useState<StaffAttendanceSummary | null>(null)
   const [entries, setEntries] = useState<TimetableEntry[]>([])
   const [classId, setClassId] = useState('')
   const [draft, setDraft] = useState({ class_id: '', subject_id: '', staff_id: '', day_of_week: '1', start_time: '08:00', end_time: '08:40', room: '' })
@@ -51,8 +53,11 @@ export default function OperationsManagement({ token, active }: { token: string;
 
   async function loadStaffAttendance() {
     try {
-      const rows = await request<StaffAttendance[]>(`staff-attendance?attendance_date=${staffDate}`, token)
-      setStaffRows(rows)
+      const [rows, totals] = await Promise.all([
+        request<StaffAttendance[]>(`staff-attendance?attendance_date=${staffDate}`, token),
+        request<StaffAttendanceSummary>(`staff-attendance/summary?attendance_date=${staffDate}`, token),
+      ])
+      setStaffRows(rows); setStaffSummary(totals)
       const values: Record<number, string> = {}
       staff.forEach(person => { values[person.id] = rows.find(row => row.staff_id === person.id)?.status || 'Present' })
       setStaffStatuses(values)
@@ -117,6 +122,13 @@ export default function OperationsManagement({ token, active }: { token: string;
       {message && <div className="success-notice" role="status">{message}</div>}
       {active === 'Staff Attendance' ? <>
         <label>Attendance date<input type="date" value={staffDate} onChange={event => setStaffDate(event.target.value)}/></label>
+        {staffSummary && <div className="stats-grid finance-stats">
+          <div className="stat-card"><span>Active staff</span><strong className="stat-value">{staffSummary.total_staff}</strong></div>
+          <div className="stat-card"><span>Present</span><strong className="stat-value">{staffSummary.present}</strong></div>
+          <div className="stat-card"><span>Absent</span><strong className="stat-value">{staffSummary.absent}</strong></div>
+          <div className="stat-card"><span>Late / Excused</span><strong className="stat-value">{staffSummary.late + staffSummary.excused}</strong></div>
+          <div className="stat-card"><span>Not marked</span><strong className="stat-value">{staffSummary.unmarked}</strong></div>
+        </div>}
         {loading ? <p className="form-hint">Loading staff...</p> : <div className="table-wrap"><table><thead><tr><th>Staff member</th><th>Staff number</th><th>Category</th><th>Status</th></tr></thead><tbody>
           {staff.map(person => <tr key={person.id}><td>{person.first_name} {person.last_name}</td><td>{person.staff_number}</td><td>{person.category}</td><td><select value={staffStatuses[person.id] || 'Present'} onChange={event => setStaffStatuses(current => ({ ...current, [person.id]: event.target.value }))}><option>Present</option><option>Absent</option><option>Late</option><option>Excused</option></select></td></tr>)}
           {!staff.length && <tr><td colSpan={4}>No active staff records found.</td></tr>}
