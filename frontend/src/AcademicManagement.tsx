@@ -53,8 +53,6 @@ export default function AcademicManagement({ token, classes }: { token: string; 
   const [historyError, setHistoryError] = useState('')
   const [selectedExamId, setSelectedExamId] = useState('')
   const [examForm, setExamForm] = useState({ name: '', class_id: '', term: 'Term 1', year: String(new Date().getFullYear()) })
-  const [markForm, setMarkForm] = useState({ student_id: '', subject_id: '', score: '' })
-  const [editingMarkId, setEditingMarkId] = useState<number | null>(null)
   const [showExamForm, setShowExamForm] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -185,38 +183,6 @@ export default function AcademicManagement({ token, classes }: { token: string; 
     }
   }
 
-  async function saveMark(event: FormEvent) {
-    event.preventDefault()
-    if (!selectedExam || !markForm.student_id || !markForm.subject_id || markForm.score === '') {
-      setError('Select a student and subject, then enter a mark from 0 to 100.')
-      return
-    }
-    const score = Number(markForm.score)
-    if (!Number.isFinite(score) || score < 0 || score > 100) {
-      setError('Marks must be between 0 and 100.')
-      return
-    }
-    setSaving(true); setError(''); setMessage('')
-    try {
-      const existing = editingMarkId ? marks.find(mark => mark.id === editingMarkId) : marks.find(mark => mark.student_id === Number(markForm.student_id) && mark.subject_id === Number(markForm.subject_id))
-      if (existing) {
-        if (existing.verified) throw new Error('This mark is verified. Unlock it before making corrections.')
-        await request<Mark>(`marks/${existing.id}`, token, { method: 'PATCH', body: JSON.stringify({ score }) })
-      } else {
-        await request<Mark>('marks', token, { method: 'POST', body: JSON.stringify({ exam_id: selectedExam.id, student_id: Number(markForm.student_id), subject_id: Number(markForm.subject_id), score }) })
-      }
-      const next = await request<Mark[]>(`marks?exam_id=${selectedExam.id}`, token)
-      setMarks(next)
-      setMarkForm({ student_id: '', subject_id: '', score: '' })
-      setEditingMarkId(null)
-      setMessage(existing ? 'Mark updated successfully.' : 'Mark recorded successfully.')
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Unable to save mark.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
   async function saveClassMarks() {
     if (!selectedExam || !students.length || !subjects.length) return
     setSaving(true); setError(''); setMessage('')
@@ -255,14 +221,6 @@ export default function AcademicManagement({ token, classes }: { token: string; 
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to update mark verification.')
     } finally { setSaving(false) }
-  }
-
-  function editMark(mark: Mark) {
-    if (mark.verified) { setError('Unlock this verified mark before editing it.'); return }
-    setEditingMarkId(mark.id)
-    setMarkForm({ student_id: String(mark.student_id), subject_id: String(mark.subject_id), score: String(mark.score) })
-    setError('')
-    setMessage('Edit the selected mark and save your changes.')
   }
 
   async function saveGradingScale(event: FormEvent) {
@@ -311,7 +269,7 @@ export default function AcademicManagement({ token, classes }: { token: string; 
       {message && <div className="success-notice" role="status">{message}</div>}
       <div className="finance-toolbar">
         <label className="academic-exam-select">Selected examination
-          <select value={selectedExamId} onChange={e => { setSelectedExamId(e.target.value); setEditingMarkId(null); setMarkForm({ student_id: '', subject_id: '', score: '' }) }}>
+          <select value={selectedExamId} onChange={e => setSelectedExamId(e.target.value)}>
             <option value="">Choose an examination</option>
             {exams.map(exam => <option key={exam.id} value={exam.id}>{exam.name} · {exam.term} {exam.year} · {classes.find(item => item.id === exam.class_id)?.name || 'Unassigned class'}</option>)}
           </select>
@@ -358,7 +316,7 @@ export default function AcademicManagement({ token, classes }: { token: string; 
         <div className="form-actions"><button type="button" className="primary-button" onClick={() => void saveClassMarks()} disabled={saving || !students.length || !subjects.length}><Save size={15}/>{saving ? 'Saving class marks…' : 'Save all marks'}</button></div>
         <p className="form-hint">Leave a cell blank if no score has been awarded. Scores must be between 0 and 100. Use the verification controls in the results list below to lock approved marks.</p>
         <div className="table-wrap"><table><thead><tr><th>Student</th><th>Admission no.</th><th>Subject</th><th>Score</th><th>Verification</th><th>Action</th></tr></thead><tbody>
-          {marks.map(mark => <tr key={mark.id}><td>{studentName(studentById.get(mark.student_id))}</td><td>{studentById.get(mark.student_id)?.admission_number || '—'}</td><td>{subjectById.get(mark.subject_id)?.name || 'Unknown subject'}</td><td><strong>{mark.score.toFixed(2)}</strong></td><td>{mark.verified ? 'Verified' : 'Pending'}</td><td><button type="button" className="secondary-button" onClick={() => void setMarkVerification(mark, !mark.verified)} disabled={saving}>{mark.verified ? 'Unlock' : 'Verify'}</button> <button type="button" className="secondary-button" onClick={() => editMark(mark)} disabled={mark.verified}>Edit</button></td></tr>)}
+          {marks.map(mark => <tr key={mark.id}><td>{studentName(studentById.get(mark.student_id))}</td><td>{studentById.get(mark.student_id)?.admission_number || '—'}</td><td>{subjectById.get(mark.subject_id)?.name || 'Unknown subject'}</td><td><strong>{mark.score.toFixed(2)}</strong></td><td>{mark.verified ? 'Verified' : 'Pending'}</td><td><button type="button" className="secondary-button" onClick={() => void setMarkVerification(mark, !mark.verified)} disabled={saving}>{mark.verified ? 'Unlock' : 'Verify'}</button></td></tr>)}
           {!marks.length && <tr><td colSpan={6}>No marks have been recorded for this examination yet.</td></tr>}
         </tbody></table></div>
       </section>>
