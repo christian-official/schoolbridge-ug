@@ -724,7 +724,7 @@ function App() {
             </section>
               )}
               {settingsSection === 'school' && <SchoolProfileSettings token={token} onSaved={() => { api<any>('settings/school-profile',token).then(setSchoolConfig).catch(()=>{}); setSettingsSection('home') }} />}
-              {settingsSection === 'academic' && <><AcademicSettings token={token} onSaved={() => setSettingsSection('home')} /><SubjectSettings token={token} /></>}
+              {settingsSection === 'academic' && <><AcademicSettings token={token} onSaved={() => setSettingsSection('home')} /><SubjectSettings token={token} schoolType={schoolConfig.school_type === 'Secondary' ? 'Secondary' : 'Primary'} /></>}
               {settingsSection === 'curriculum' && <AcademicCurriculumSettings token={token} onSaved={() => setSettingsSection('home')} />}
               {settingsSection === 'users' && <TeacherUsersSettings token={token} classes={classes} onSaved={() => setSettingsSection('home')} />}
               {settingsSection === 'backups' && <BackupSettings token={token} />}
@@ -1104,7 +1104,15 @@ function AuditLogSettings({token}:{token:string}) {
   </section>
 }
 
-const SUBJECT_CATALOGUE = [
+const PRIMARY_SUBJECT_CATALOGUE = [
+  { group: 'Languages', names: ['English', 'Luganda', 'Kiswahili', 'Runyankole-Rukiga', 'Lusoga', 'Ateso', 'Luo'] },
+  { group: 'Mathematics', names: ['Mathematics'] },
+  { group: 'Integrated learning', names: ['Literacy', 'Reading', 'Writing', 'Social Studies', 'Religious Education', 'Christian Religious Education', 'Islamic Religious Education'] },
+  { group: 'Science and environment', names: ['Primary Science', 'Agriculture', 'Environmental Studies', 'Health Education'] },
+  { group: 'Creative and practical', names: ['Physical Education', 'Creative Arts', 'Music', 'Art and Craft', 'ICT'] },
+]
+
+const SECONDARY_SUBJECT_CATALOGUE = [
   { group: 'Languages', names: ['English Language', 'Literature in English', 'Kiswahili', 'French', 'German', 'Arabic', 'Chinese', 'Luganda', 'Runyankole-Rukiga', 'Lusoga', 'Ateso', 'Luo'] },
   { group: 'Sciences', names: ['Biology', 'Chemistry', 'Physics', 'Agriculture', 'General Science', 'Computer Studies'] },
   { group: 'Mathematics', names: ['Mathematics', 'Additional Mathematics', 'Subsidiary Mathematics'] },
@@ -1112,7 +1120,8 @@ const SUBJECT_CATALOGUE = [
   { group: 'Business and technical', names: ['Commerce', 'Entrepreneurship Education', 'Economics', 'Accounting', 'Business Studies', 'Food and Nutrition', 'Home Economics', 'Art and Design', 'Fine Art', 'Music', 'Physical Education', 'Agriculture and Nutrition', 'Technical Drawing', 'Woodwork', 'Metalwork', 'ICT'] },
 ]
 
-function SubjectSettings({token}:{token:string}) {
+function SubjectSettings({token,schoolType}:{token:string;schoolType:'Primary'|'Secondary'}) {
+  const catalogue = schoolType === 'Primary' ? PRIMARY_SUBJECT_CATALOGUE : SECONDARY_SUBJECT_CATALOGUE;
   const [subjects,setSubjects]=useState<any[]>([])
   const [selected,setSelected]=useState<string[]>([])
   const [customName,setCustomName]=useState('')
@@ -1132,7 +1141,7 @@ function SubjectSettings({token}:{token:string}) {
 
   const existingNames=new Set(subjects.map(subject=>String(subject.name).trim().toLocaleLowerCase()))
   const available=(name:string)=>!existingNames.has(name.trim().toLocaleLowerCase())
-  const visibleGroups=SUBJECT_CATALOGUE.map(group=>({
+  const visibleGroups=catalogue.map(group=>({
     ...group,
     names:group.names.filter(name=>available(name)&&name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()))
   })).filter(group=>group.names.length)
@@ -1177,7 +1186,7 @@ function SubjectSettings({token}:{token:string}) {
   }
 
   return <section className="panel settings-panel">
-    <div className="panel-heading"><div><h2>School subjects</h2><p>Select several subjects, review your choices, then confirm once to add them together.</p></div><button type="button" className="secondary-button" onClick={()=>void load()} disabled={loading||busy}>{loading?'Loading...':'Refresh subjects'}</button></div>
+    <div className="panel-heading"><div><h2>{schoolType} school subjects</h2><p>Only the {schoolType.toLowerCase()} curriculum is shown here. Primary and secondary subject lists are kept separate.</p></div><button type="button" className="secondary-button" onClick={()=>void load()} disabled={loading||busy}>{loading?'Loading...':'Refresh subjects'}</button></div>
     {error&&<div className="form-error" role="alert">{error}</div>}
     {message&&<div className="success-notice" role="status">{message}</div>}
     <details className="form-disclosure" open><summary>Add school subjects</summary>
