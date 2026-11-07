@@ -275,3 +275,100 @@ td,th,.stat-top,.stat-card small,.quick-action strong,.quick-action small { font
   .welcome-row h1 { font-size: 21px; }
   .stat-value { font-size: 22px; }
 }
+
+
+/* SchoolBridge readable type scale and consistent interactive controls */
+:root { font-size: 16px; }
+body, #root { font-size: 16px; }
+.content { font-size: 15px; }
+.nav-item { font-size: 15px; }
+.breadcrumb, .muted, .panel-heading p, .form-heading p, .required-note,
+.student-form-grid label, .settings-category strong, .settings-back,
+.filter-select, .pagination-row, .record-count, .date-chip { font-size: 14px; }
+td, th, td strong, .stat-top, .stat-card small, .quick-action strong,
+.quick-action small, .settings-category small, .form-hint, .form-error,
+.success-notice, .notice, .empty-state p { font-size: 14px; }
+.panel-heading h2 { font-size: 19px; }
+.form-heading h3 { font-size: 17px; }
+.welcome-row h1 { font-size: 27px; }
+.login-card h1 { font-size: 25px; }
+.login-card label, .login-card input, .login-subtitle { font-size: 14px; }
+.primary-button, .secondary-button, .finance-tab, .text-button,
+.settings-category, .finance-shortcuts button { font-size: 14px; }
+.student-form-grid input, .student-form-grid select, .filter-select,
+.search-box, .search-box input, .login-card input { font-size: 15px; }
+.stat-value { font-size: 27px; }
+.finance-overview h3 { font-size: 20px; }
+.finance-overview p { font-size: 15px; }
+.finance-class-card strong { font-size: 16px; }
+.finance-class-card span { font-size: 14px; }
+.profile-info strong { font-size: 14px; }
+.profile-info small, .online-status, .footer, .login-foot { font-size: 13px; }
+
+/* All controls have visible hover, pressed, keyboard-focus and disabled states. */
+button, [role="button"] {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+button:not(:disabled) { cursor: pointer; }
+button:not(.nav-item):not(.quick-action):not(.mobile-overlay):not(.logout-button):not(.icon-button):not(.mobile-close):not(.mobile-menu-button) {
+  transition: background-color .16s ease, border-color .16s ease, color .16s ease,
+    box-shadow .16s ease, transform .12s ease, opacity .16s ease;
+}
+button:not(:disabled):not(.mobile-overlay):hover { filter: brightness(.98); }
+button:not(:disabled):not(.mobile-overlay):active { transform: translateY(1px); }
+button:focus-visible, [role="button"]:focus-visible {
+  outline: 3px solid rgba(49,94,232,.28);
+  outline-offset: 2px;
+}
+button:disabled { cursor: not-allowed; opacity: .58; }
+.primary-button { min-height: 44px; padding: 11px 16px; }
+.secondary-button { min-height: 42px; padding: 10px 15px; }
+.finance-tab { min-height: 44px; }
+.settings-category { min-height: 142px; }
+.icon-button, .logout-button, .mobile-menu-button, .mobile-close {
+  min-width: 42px; min-height: 42px; border-radius: 9px;
+}
+.nav-item { min-height: 46px; }
+.quick-action { min-height: 64px; border-radius: 8px; }
+.quick-action:hover { background: #f7f9ff; color: #315ee8; }
+.nav-item:hover { background: rgba(255,255,255,.08); }
+.nav-item.active:hover { background: rgba(49,94,232,.12); }
+.finance-class-card:hover, .settings-category:hover {
+  border-color: #9eb2f8; box-shadow: 0 5px 16px rgba(35,58,101,.07);
+}
+.clickable-row:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+.search-box:focus-within { border-color: #7893f3; box-shadow: 0 0 0 3px #315ee812; }
+.student-form-grid input:focus-visible, .student-form-grid select:focus-visible,
+.filter-select:focus-visible, .search-box input:focus-visible {
+  outline: 2px solid rgba(49,94,232,.3); outline-offset: 1px;
+}
+@media (max-width: 700px) {
+  .content { padding: 22px 14px 16px; }
+  .welcome-row h1 { font-size: 23px; }
+  .welcome-row { flex-wrap: wrap; }
+  .panel { padding: 16px; }
+  .panel-heading { flex-wrap: wrap; }
+  .panel-heading > * { min-width: 0; }
+  .form-actions { flex-wrap: wrap; }
+  .form-actions > button { flex: 1 1 140px; }
+  .profile-actions { width: 100%; }
+  .profile-actions > button { flex: 1 1 130px; }
+  .top-actions { gap: 6px; }
+  .refresh-button { min-width: 42px; }
+  .finance-shortcuts { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .finance-shortcuts button { min-height: 58px; }
+  .table-wrap { max-width: 100%; }
+}
+@media (max-width: 420px) {
+  .content { padding-inline: 10px; }
+  .welcome-row h1 { font-size: 21px; }
+  .finance-shortcuts { grid-template-columns: 1fr; }
+  .finance-tabs { grid-template-columns: 1fr 1fr; }
+  .topbar { padding-inline: 10px; }
+  .breadcrumb { font-size: 12px; }
+  .primary-button, .secondary-button { min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+}
