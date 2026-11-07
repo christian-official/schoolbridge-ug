@@ -79,6 +79,104 @@ def apply_pending_database_restore():
 apply_pending_database_restore()
 upgrade_database(DATABASE_URL)
 
+
+def seed_demo_data_if_empty():
+    """Populate a fresh preview database with clearly labelled demo records."""
+    if os.getenv("SCHOOLBRIDGE_SEED_DEMO_DATA", "true").lower() not in {"1", "true", "yes"}:
+        return
+    db = SessionLocal()
+    try:
+        profile = db.get(models.SchoolProfile, 1)
+        if profile is None:
+            profile = models.SchoolProfile(id=1, name="SchoolBridge Demo School", school_type="Secondary")
+            db.add(profile)
+            db.flush()
+        school_type = profile.school_type or "Secondary"
+
+        classes = db.query(models.SchoolClass).all()
+        if not classes:
+            class_names = [f"S{i}" for i in range(1, 7)] if school_type == "Secondary" else [f"P{i}" for i in range(1, 8)]
+            classes = [models.SchoolClass(name=name, section="") for name in class_names]
+            db.add_all(classes)
+            db.flush()
+
+        existing_subjects = {
+            item.name.lower()
+            for item in db.query(models.Subject).filter(models.Subject.school_type == school_type).all()
+        }
+        subject_names = (
+            ["Mathematics", "English", "Biology", "Chemistry", "Physics", "Geography", "History", "Christian Religious Education"]
+            if school_type == "Secondary"
+            else ["English", "Mathematics", "Science", "Social Studies", "Literacy", "Religious Education"]
+        )
+        for name in subject_names:
+            if name.lower() not in existing_subjects:
+                db.add(models.Subject(name=name, school_type=school_type))
+
+        if db.query(models.Student).count() == 0:
+            class_by_name = {item.name.upper(): item for item in classes}
+            sample_students = [
+                ("Amina", "Demo", "Female", "S1"),
+                ("Brian", "Sample", "Male", "S1"),
+                ("Carol", "Test", "Female", "S2"),
+                ("Daniel", "Preview", "Male", "S2"),
+                ("Esther", "Demo", "Female", "S3"),
+                ("Farid", "Sample", "Male", "S3"),
+                ("Grace", "Test", "Female", "S4"),
+                ("Henry", "Preview", "Male", "S4"),
+                ("Irene", "Demo", "Female", "S5"),
+                ("James", "Sample", "Male", "S5"),
+                ("Kevin", "Test", "Male", "S6"),
+                ("Lydia", "Preview", "Female", "S6"),
+            ] if school_type == "Secondary" else [
+                ("Amina", "Demo", "Female", "P1"), ("Brian", "Sample", "Male", "P1"),
+                ("Carol", "Test", "Female", "P2"), ("Daniel", "Preview", "Male", "P2"),
+                ("Esther", "Demo", "Female", "P3"), ("Farid", "Sample", "Male", "P3"),
+                ("Grace", "Test", "Female", "P4"), ("Henry", "Preview", "Male", "P4"),
+                ("Irene", "Demo", "Female", "P5"), ("James", "Sample", "Male", "P5"),
+                ("Kevin", "Test", "Male", "P6"), ("Lydia", "Preview", "Female", "P7"),
+            ]
+            for index, (first, last, gender, class_name) in enumerate(sample_students, start=1):
+                selected = class_by_name.get(class_name)
+                if not selected:
+                    continue
+                level = None
+                combination = None
+                if school_type == "Secondary":
+                    level = "A-Level" if class_name in {"S5", "S6"} else "O-Level"
+                    if level == "A-Level":
+                        combination = "Sciences — PCB"
+                db.add(models.Student(
+                    admission_number=f"DEMO-{date.today().year}-{index:03d}",
+                    first_name=first,
+                    last_name=last,
+                    gender=gender,
+                    guardian_name=f"{first} Demo Guardian",
+                    guardian_relationship="Parent",
+                    guardian_phone="0000000000",
+                    previous_school="Demo Primary School",
+                    admission_date=date.today(),
+                    class_id=selected.id,
+                    academic_level=level,
+                    combination=combination,
+                ))
+
+        if db.query(models.StaffMember).count() == 0:
+            db.add_all([
+                models.StaffMember(staff_number="DEMO-ST-001", first_name="Peter", last_name="Teacher", category="Teaching", position="Class Teacher", department="Academics", status="active"),
+                models.StaffMember(staff_number="DEMO-ST-002", first_name="Sarah", last_name="Instructor", category="Teaching", position="Subject Teacher", department="Sciences", status="active"),
+                models.StaffMember(staff_number="DEMO-ST-003", first_name="David", last_name="Accounts", category="Non-Teaching", position="Accounts Assistant", department="Finance", status="active"),
+            ])
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
+seed_demo_data_if_empty()
+
 app = FastAPI(
     title="SchoolBridge API",
     description="Offline-first school management system API.",
