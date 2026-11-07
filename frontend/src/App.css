@@ -738,3 +738,25 @@ button:disabled { cursor: not-allowed; opacity: .58; }
 .subject-selection-review > strong { display:block; margin-bottom:9px; color:var(--navy); }
 .subject-selection-tags { display:flex; flex-wrap:wrap; gap:7px; }
 .subject-selection-tags span { border-radius:20px; padding:6px 10px; background:#edf2ff; color:#2447a8; font-size:13px; }
+
+
+/* Fast, accessible register controls and spreadsheet-style class marks entry. */
+.attendance-choice-group { display:flex; flex-wrap:wrap; gap:6px; min-width:260px; }
+.attendance-choice { min-height:34px; padding:7px 11px; border:1px solid #d7deea; border-radius:7px; background:#fff; color:#526078; font-size:12px; font-weight:700; cursor:pointer; transition:background .15s ease,border-color .15s ease,color .15s ease; }
+.attendance-choice:hover { border-color:#8295b8; background:#f7f9fc; }
+.attendance-choice.selected { color:#fff; border-color:#315ee8; background:#315ee8; box-shadow:0 2px 5px #315ee826; }
+.attendance-choice.selected.attendance-absent { border-color:#c24141; background:#c24141; }
+.attendance-choice.selected.attendance-late { border-color:#b7791f; background:#b7791f; }
+.attendance-choice.selected.attendance-excused { border-color:#64748b; background:#64748b; }
+.class-marks-register { max-height:650px; overflow:auto; }
+.class-marks-register table { min-width:900px; }
+.class-marks-register thead th { position:sticky; top:0; z-index:2; background:#f5f7fb; }
+.class-marks-register .marks-student-column { min-width:190px; }
+.class-mark-input { width:78px; min-height:38px; padding:7px 8px; border:1px solid #d8e0ec; border-radius:7px; background:#fff; color:#1f2d43; font:600 13px inherit; text-align:center; }
+.class-mark-input:focus { outline:2px solid #315ee855; border-color:#315ee8; }
+.class-mark-input:disabled { background:#edf1f7; color:#667085; cursor:not-allowed; }
+.mark-locked { display:block; margin-top:3px; color:#64748b; font-size:10px; font-weight:700; }
+@media(max-width:640px) {
+  .attendance-choice-group { min-width:220px; }
+  .attendance-choice { padding:7px 9px; }
+}
