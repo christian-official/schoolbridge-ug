@@ -794,6 +794,85 @@ def my_assignments(
     ]
 
 
+@app.get("/api/teacher/exams", tags=["Teacher Workspace"])
+def teacher_exams(db: Session = Depends(get_db), teacher=Depends(get_current_user)):
+    if teacher.role != "teacher":
+        raise HTTPException(403, "Teacher account required.")
+    class_ids = [
+        row.class_id for row in db.query(models.TeacherAssignment).filter_by(
+            teacher_id=teacher.id
+        ).all()
+    ]
+    if not class_ids:
+        return []
+    return db.query(models.Exam).filter(
+        models.Exam.class_id.in_(class_ids)
+    ).order_by(models.Exam.year.desc(), models.Exam.term, models.Exam.name).all()
+
+
+@app.get("/api/teacher/marks", tags=["Teacher Workspace"])
+def teacher_marks(exam_id: int | None = None, db: Session = Depends(get_db),
+                  teacher=Depends(get_current_user)):
+    if teacher.role != "teacher":
+        raise HTTPException(403, "Teacher account required.")
+    assignments = db.query(models.TeacherAssignment).filter_by(
+        teacher_id=teacher.id
+    ).all()
+    allowed = {(row.class_id, row.subject_id) for row in assignments}
+    if not allowed:
+        return []
+    query = db.query(models.Mark, models.Student, models.Exam).join(
+        models.Student, models.Student.id == models.Mark.student_id
+    ).join(models.Exam, models.Exam.id == models.Mark.exam_id)
+    if exam_id is not None:
+        query = query.filter(models.Mark.exam_id == exam_id)
+    rows = []
+    for mark, student, exam in query.order_by(
+        models.Mark.exam_id, models.Student.last_name, models.Mark.subject_id
+    ).all():
+        if (student.class_id, mark.subject_id) not in allowed:
+            continue
+        rows.append({
+            "id": mark.id, "student_id": mark.student_id,
+            "subject_id": mark.subject_id, "exam_id": mark.exam_id,
+            "score": mark.score, "student_name": " ".join(
+                part for part in [student.first_name, student.middle_name, student.last_name] if part
+            ), "admission_number": student.admission_number,
+            "class_id": student.class_id,
+        })
+    return rows
+
+
+@app.put("/api/teacher/marks", tags=["Teacher Workspace"])
+def save_teacher_mark(data: MarkCreate, db: Session = Depends(get_db),
+                      teacher=Depends(get_current_user)):
+    if teacher.role != "teacher":
+        raise HTTPException(403, "Teacher account required.")
+    student = db.get(models.Student, data.student_id)
+    subject = db.get(models.Subject, data.subject_id)
+    exam = db.get(models.Exam, data.exam_id)
+    if not student or not subject or not exam:
+        raise HTTPException(404, "Student, subject or examination not found.")
+    if exam.class_id is None or student.class_id != exam.class_id:
+        raise HTTPException(422, "The student does not belong to this class examination.")
+    assignment = db.query(models.TeacherAssignment).filter_by(
+        teacher_id=teacher.id, class_id=exam.class_id, subject_id=subject.id
+    ).first()
+    if not assignment:
+        raise HTTPException(403, "You are not assigned to teach this subject in this class.")
+    item = db.query(models.Mark).filter_by(
+        student_id=student.id, subject_id=subject.id, exam_id=exam.id
+    ).first()
+    if item is None:
+        item = models.Mark(**data.model_dump())
+        db.add(item)
+    else:
+        item.score = data.score
+    db.commit()
+    db.refresh(item)
+    return item
+
+
 class StaffCreate(BaseModel):
     first_name: str
     last_name: str
