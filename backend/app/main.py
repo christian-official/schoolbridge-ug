@@ -139,6 +139,16 @@ class AttendanceCreate(BaseModel):
     attendance_date: date = Field(default_factory=date.today)
     status: str = Field(pattern="^(Present|Absent|Late|Excused)$")
 
+class AttendanceRegisterEntry(BaseModel):
+    student_id: int
+    status: str = Field(pattern="^(Present|Absent|Late|Excused)$")
+
+
+class AttendanceRegisterUpdate(BaseModel):
+    class_id: int
+    attendance_date: date = Field(default_factory=date.today)
+    records: list[AttendanceRegisterEntry] = Field(min_length=1, max_length=500)
+
 
 class ExamCreate(BaseModel):
     name: str = Field(min_length=2, max_length=100)
@@ -418,10 +428,101 @@ def record_attendance(data: AttendanceCreate, db: Session = Depends(get_db)):
 
 
 @app.get("/api/attendance", response_model=list[AttendanceOut], tags=["Attendance"])
-def list_attendance(db: Session = Depends(get_db)):
-    return db.query(models.Attendance).order_by(
-        models.Attendance.attendance_date.desc()
+def list_attendance(
+    attendance_date: date | None = None,
+    class_id: int | None = None,
+    db: Session = Depends(get_db),
+):
+    query = db.query(models.Attendance).join(
+        models.Student, models.Student.id == models.Attendance.student_id
+    )
+    if attendance_date:
+        query = query.filter(models.Attendance.attendance_date == attendance_date)
+    if class_id:
+        query = query.filter(models.Student.class_id == class_id)
+    return query.order_by(
+        models.Attendance.attendance_date.desc(), models.Attendance.id.desc()
     ).all()
+
+
+@app.get("/api/attendance/summary", tags=["Attendance"])
+def attendance_summary(
+    attendance_date: date = date.today(),
+    class_id: int | None = None,
+    db: Session = Depends(get_db),
+):
+    students_query = db.query(models.Student).filter(models.Student.status == "active")
+    if class_id:
+        students_query = students_query.filter(models.Student.class_id == class_id)
+    students = students_query.all()
+    student_ids = [student.id for student in students]
+    rows = db.query(models.Attendance).filter(
+        models.Attendance.attendance_date == attendance_date,
+        models.Attendance.student_id.in_(student_ids or [-1]),
+    ).all()
+    counts = {status: sum(1 for row in rows if row.status == status)
+              for status in ("Present", "Absent", "Late", "Excused")}
+    return {
+        "attendance_date": attendance_date,
+        "class_id": class_id,
+        "total_students": len(students),
+        "marked": len(rows),
+        "unmarked": max(0, len(students) - len(rows)),
+        "present": counts["Present"],
+        "absent": counts["Absent"],
+        "late": counts["Late"],
+        "excused": counts["Excused"],
+        "attendance_rate": round(
+            (counts["Present"] + counts["Late"] + counts["Excused"]) / len(students) * 100, 2
+        ) if students else 0,
+    }
+
+
+@app.put("/api/attendance/register", tags=["Attendance"])
+def save_attendance_register(
+    data: AttendanceRegisterUpdate,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    selected_class = db.get(models.SchoolClass, data.class_id)
+    if not selected_class:
+        raise HTTPException(404, "Class not found.")
+    if user.role != "admin":
+        if user.role != "teacher" or not db.query(models.TeacherAssignment).filter_by(
+            teacher_id=user.id, class_id=data.class_id
+        ).first():
+            raise HTTPException(403, "You are not assigned to this class.")
+    student_ids = [entry.student_id for entry in data.records]
+    if len(student_ids) != len(set(student_ids)):
+        raise HTTPException(422, "A student can appear only once in a class register.")
+    students = db.query(models.Student).filter(
+        models.Student.id.in_(student_ids),
+        models.Student.class_id == data.class_id,
+        models.Student.status == "active",
+    ).all()
+    if len(students) != len(student_ids):
+        raise HTTPException(422, "Every selected student must be active and belong to the chosen class.")
+    saved = 0
+    for entry in data.records:
+        record = db.query(models.Attendance).filter_by(
+            student_id=entry.student_id, attendance_date=data.attendance_date
+        ).first()
+        if record:
+            record.status = entry.status
+        else:
+            db.add(models.Attendance(
+                student_id=entry.student_id,
+                attendance_date=data.attendance_date,
+                status=entry.status,
+            ))
+        saved += 1
+    db.commit()
+    return {
+        "message": "Class attendance register saved.",
+        "class_id": data.class_id,
+        "attendance_date": data.attendance_date,
+        "saved": saved,
+    }
 
 
 @app.post("/api/exams", response_model=ExamOut, tags=["Exams"])
