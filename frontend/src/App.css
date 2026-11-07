@@ -913,3 +913,131 @@ select option:checked { background: #edf2ff; color: #244cc2; }
  body[data-schoolbridge-print="report"] .report-section-heading { break-after:avoid; }
  body[data-schoolbridge-print="report"] .report-signatures { break-inside:avoid; }
 }
+
+
+/* Daily operations, school-wide timetable and date-picker polish */
+.attendance-help {
+  margin: 10px 0 16px;
+  padding: 11px 14px;
+  border: 1px solid #e1e8f4;
+  border-left: 3px solid #5578df;
+  border-radius: 8px;
+  background: #f7f9fe;
+  color: #61708a;
+  font-size: 12px;
+  line-height: 1.55;
+}
+.staff-category-row td {
+  padding: 10px 13px !important;
+  background: #f1f5fc !important;
+  color: #31476b !important;
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: .55px;
+  text-transform: uppercase;
+}
+.staff-category-row td span {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  margin-left: 7px;
+  padding: 0 6px;
+  border-radius: 20px;
+  background: #e1e9fb;
+  color: #3157b7;
+  font-size: 10px;
+}
+.attendance-status-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 25px;
+  padding: 4px 9px;
+  border-radius: 20px;
+  background: #edf2ff;
+  color: #3157b7;
+  font-size: 11px;
+  font-weight: 800;
+}
+.attendance-status-pill.status-absent { background: #fff0f0; color: #b42323; }
+.attendance-status-pill.status-late { background: #fff6e6; color: #9a650d; }
+.attendance-status-pill.status-excused { background: #eef1f5; color: #5b6678; }
+.timetable-day {
+  margin-top: 17px;
+  padding: 14px;
+  border: 1px solid #e7ebf2;
+  border-radius: 11px;
+  background: #fff;
+}
+.timetable-day > h3 {
+  margin: 0 0 11px;
+  color: #293e65;
+  font-size: 14px;
+  font-weight: 850;
+}
+.timetable-day .table-wrap { margin: 0; }
+.timetable-count {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  padding: 7px 10px;
+  border-radius: 20px;
+  background: #edf2ff;
+  color: #3157b7;
+  font-size: 11px;
+  font-weight: 800;
+}
+.date-field {
+  display: grid;
+  width: min(100%, 320px);
+  gap: 7px;
+  margin: 4px 0 12px;
+  color: #43536d;
+  font-size: 12px;
+  font-weight: 750;
+}
+.content input[type="date"],
+.panel input[type="date"],
+.content input[type="time"],
+.panel input[type="time"] {
+  box-sizing: border-box;
+  min-height: 42px;
+  padding: 9px 12px;
+  border: 1px solid #d8e1ed;
+  border-radius: 9px;
+  background: #fff;
+  color: #26364f;
+  font: 600 13px inherit;
+  color-scheme: light;
+  transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+}
+.content input[type="date"]:hover,
+.panel input[type="date"]:hover,
+.content input[type="time"]:hover,
+.panel input[type="time"]:hover { border-color: #9aadd0; }
+.content input[type="date"]:focus,
+.panel input[type="date"]:focus,
+.content input[type="time"]:focus,
+.panel input[type="time"]:focus {
+  outline: none;
+  border-color: #5578e8;
+  box-shadow: 0 0 0 3px #315ee81a;
+}
+input[type="date"]::-webkit-calendar-picker-indicator {
+  width: 18px;
+  height: 18px;
+  padding: 3px;
+  border-radius: 5px;
+  cursor: pointer;
+  opacity: .72;
+}
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  background: #edf2ff;
+  opacity: 1;
+}
+@media(max-width:640px) {
+  .timetable-day { padding: 10px; }
+  .timetable-day .table-wrap { overflow-x: auto; }
+  .timetable-day table { min-width: 650px; }
+  .date-field { width: 100%; }
+}
