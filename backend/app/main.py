@@ -447,10 +447,11 @@ def list_attendance(
 
 @app.get("/api/attendance/summary", tags=["Attendance"])
 def attendance_summary(
-    attendance_date: date = date.today(),
+    attendance_date: date | None = None,
     class_id: int | None = None,
     db: Session = Depends(get_db),
 ):
+    attendance_date = attendance_date or date.today()
     students_query = db.query(models.Student).filter(models.Student.status == "active")
     if class_id:
         students_query = students_query.filter(models.Student.class_id == class_id)
