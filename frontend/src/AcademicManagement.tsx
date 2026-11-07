@@ -45,6 +45,7 @@ export default function AcademicManagement({ token, classes }: { token: string; 
   const [subjects, setSubjects] = useState<Subject[]>([])
   const [students, setStudents] = useState<Student[]>([])
   const [marks, setMarks] = useState<Mark[]>([])
+  const [markDrafts, setMarkDrafts] = useState<Record<string, string>>({})
   const [gradingBands, setGradingBands] = useState<GradeBand[]>([])
   const [draftBands, setDraftBands] = useState<GradeBand[]>([])
   const [historyStudentId, setHistoryStudentId] = useState('')
@@ -104,6 +105,7 @@ export default function AcademicManagement({ token, classes }: { token: string; 
       if (cancelled) return
       setStudents(studentRows)
       setMarks(markRows)
+      setMarkDrafts(Object.fromEntries(markRows.map(mark => [String(mark.student_id) + ':' + String(mark.subject_id), String(mark.score)])))
     }).catch(e => {
       if (!cancelled) setError(e instanceof Error ? e.message : 'Unable to load this examination.')
     })
@@ -215,6 +217,34 @@ export default function AcademicManagement({ token, classes }: { token: string; 
     }
   }
 
+  async function saveClassMarks() {
+    if (!selectedExam || !students.length || !subjects.length) return
+    setSaving(true); setError(''); setMessage('')
+    let saved = 0
+    try {
+      for (const student of students) {
+        for (const subject of subjects) {
+          const key = String(student.id) + ':' + String(subject.id)
+          const raw = markDrafts[key]
+          if (raw === undefined || raw.trim() === '') continue
+          const score = Number(raw)
+          if (!Number.isFinite(score) || score < 0 || score > 100) throw new Error('Enter a valid score from 0 to 100 for ' + studentName(student) + ' — ' + subject.name + '.')
+          const existing = marks.find(mark => mark.student_id === student.id && mark.subject_id === subject.id)
+          if (existing && existing.verified) continue
+          if (existing && Number(existing.score) === score) continue
+          if (existing) await request<Mark>('marks/' + existing.id, token, { method: 'PATCH', body: JSON.stringify({ score }) })
+          else await request<Mark>('marks', token, { method: 'POST', body: JSON.stringify({ exam_id: selectedExam.id, student_id: student.id, subject_id: subject.id, score }) })
+          saved += 1
+        }
+      }
+      const next = await request<Mark[]>('marks?exam_id=' + selectedExam.id, token)
+      setMarks(next)
+      setMarkDrafts(Object.fromEntries(next.map(mark => [String(mark.student_id) + ':' + String(mark.subject_id), String(mark.score)])))
+      setMessage(saved + ' mark(s) saved for ' + (selectedClass?.name || 'the class') + '.')
+    } catch (e) { setError(e instanceof Error ? e.message : 'Unable to save class marks.') }
+    finally { setSaving(false) }
+  }
+
   async function setMarkVerification(mark: Mark, verified: boolean) {
     setSaving(true); setError(''); setMessage('')
     try {
@@ -315,25 +345,23 @@ export default function AcademicManagement({ token, classes }: { token: string; 
       </section>
 
       <section className="panel">
-        <div className="panel-heading"><div><h2>Marks entry</h2><p>Record a score or select an existing mark to correct it. Scores are limited to 0–100.</p></div></div>
-        <form className="student-form" onSubmit={saveMark}>
-          <div className="student-form-grid">
-            <label>Student *<select required value={markForm.student_id} onChange={e => setMarkForm({ ...markForm, student_id: e.target.value })}><option value="">Select student</option>{students.map(student => <option key={student.id} value={student.id}>{studentName(student)} · {student.admission_number}</option>)}</select></label>
-            <label>Subject *<select required value={markForm.subject_id} onChange={e => setMarkForm({ ...markForm, subject_id: e.target.value })}><option value="">Select subject</option>{subjects.map(subject => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label>
-            <label>Score (0–100) *<input required type="number" min="0" max="100" step="0.01" value={markForm.score} onChange={e => setMarkForm({ ...markForm, score: e.target.value })} placeholder="Enter score"/></label>
-          </div>
-          <div className="form-actions">
-            {editingMarkId !== null && <button type="button" className="secondary-button" onClick={() => { setEditingMarkId(null); setMarkForm({ student_id: '', subject_id: '', score: '' }) }}>Cancel edit</button>}
-            <button className="primary-button" disabled={saving || !students.length || !subjects.length}><Save size={15}/>{saving ? 'Saving...' : editingMarkId !== null ? 'Update mark' : 'Record mark'}</button>
-          </div>
-        </form>
+        <div className="panel-heading"><div><h2>Class marks register</h2><p>Enter scores directly across the class register. No repeated student or subject selection is required. Verified scores are locked.</p></div><button type="button" className="primary-button" onClick={() => void saveClassMarks()} disabled={saving || !students.length || !subjects.length}><Save size={15}/>{saving ? 'Saving class marks…' : 'Save all marks'}</button></div>
         {!students.length && <p className="form-hint">No students are registered in this class yet.</p>}
-        {!subjects.length && <p className="form-hint">Add school subjects under Settings before entering marks.</p>}
+        {!subjects.length && <p className="form-hint">No subjects are configured for this school type.</p>}
+        {!!students.length && !!subjects.length && <div className="table-wrap class-marks-register"><table><thead><tr><th className="marks-student-column">Student</th><th>Admission no.</th>{subjects.map(subject => <th key={subject.id}>{subject.name}</th>)}</tr></thead><tbody>
+          {students.map((student, index) => <tr key={student.id}><td><strong>{index + 1}. {studentName(student)}</strong></td><td>{student.admission_number}</td>{subjects.map(subject => {
+            const mark = marks.find(row => row.student_id === student.id && row.subject_id === subject.id)
+            const key = String(student.id) + ':' + String(subject.id)
+            return <td key={subject.id}><input className="class-mark-input" aria-label={studentName(student) + ' — ' + subject.name} type="number" min="0" max="100" step="0.01" inputMode="decimal" placeholder="—" value={markDrafts[key] ?? ''} disabled={!!mark?.verified || saving} onChange={event => setMarkDrafts(current => ({ ...current, [key]: event.target.value }))}/>{mark?.verified && <small className="mark-locked">Verified</small>}</td>
+          })}</tr>)}
+        </tbody></table></div>}
+        <div className="form-actions"><button type="button" className="primary-button" onClick={() => void saveClassMarks()} disabled={saving || !students.length || !subjects.length}><Save size={15}/>{saving ? 'Saving class marks…' : 'Save all marks'}</button></div>
+        <p className="form-hint">Leave a cell blank if no score has been awarded. Scores must be between 0 and 100. Use the verification controls in the results list below to lock approved marks.</p>
         <div className="table-wrap"><table><thead><tr><th>Student</th><th>Admission no.</th><th>Subject</th><th>Score</th><th>Verification</th><th>Action</th></tr></thead><tbody>
           {marks.map(mark => <tr key={mark.id}><td>{studentName(studentById.get(mark.student_id))}</td><td>{studentById.get(mark.student_id)?.admission_number || '—'}</td><td>{subjectById.get(mark.subject_id)?.name || 'Unknown subject'}</td><td><strong>{mark.score.toFixed(2)}</strong></td><td>{mark.verified ? 'Verified' : 'Pending'}</td><td><button type="button" className="secondary-button" onClick={() => void setMarkVerification(mark, !mark.verified)} disabled={saving}>{mark.verified ? 'Unlock' : 'Verify'}</button> <button type="button" className="secondary-button" onClick={() => editMark(mark)} disabled={mark.verified}>Edit</button></td></tr>)}
-          {!marks.length && <tr><td colSpan={6}>No marks have been entered for this examination.</td></tr>}
+          {!marks.length && <tr><td colSpan={6}>No marks have been recorded for this examination yet.</td></tr>}
         </tbody></table></div>
-      </section>
+      </section>>
 
       <section className="panel academic-results-print">
         <div className="panel-heading"><div><h2>Class performance</h2><p>{selectedExam.name} · {selectedClass?.name || 'Class'}{selectedClass?.section ? ' — ' + selectedClass.section : ''} · {selectedExam.term} {selectedExam.year}</p><p>Provisional ranking uses average scores. Complete and verify all subject marks before issuing final results.</p></div></div>
