@@ -954,28 +954,65 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
 }
 function BackupSettings({token}:{token:string}) {
   const [file,setFile]=useState<File|null>(null)
+  const [error,setError]=useState('')
   const [message,setMessage]=useState('')
   const [busy,setBusy]=useState(false)
   async function createBackup(){
-    setBusy(true);setMessage('')
-    try {const response=await fetch(`${API_BASE_URL}/api/backups/create`,{method:'POST',headers:{Authorization:'Bearer '+token}});if(!response.ok){const data=await response.json().catch(()=>({}));throw new Error(data.detail||'Backup failed')}const blob=await response.blob();const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download='schoolbridge-backup-'+new Date().toISOString().slice(0,10)+'.sqlite3';document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url);setMessage('Database backup created and downloaded. Keep a copy somewhere safe.')}
-    catch(e){setMessage(e instanceof Error?e.message:'Unable to create backup.')}finally{setBusy(false)}
+    setBusy(true);setError('');setMessage('')
+    try {
+      const response=await fetch(`${API_BASE_URL}/api/backups/create`,{method:'POST',headers:{Authorization:'Bearer '+token}})
+      if(!response.ok){const data=await response.json().catch(()=>({}));throw new Error(data.detail||'Backup failed')}
+      const blob=await response.blob()
+      const url=URL.createObjectURL(blob)
+      const link=document.createElement('a');link.href=url;link.download='schoolbridge-backup-'+new Date().toISOString().slice(0,10)+'.sqlite3'
+      document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url)
+      setMessage('Database backup created and downloaded. Keep a copy somewhere safe.')
+    } catch(e){setError(e instanceof Error?e.message:'Unable to create backup.')}
+    finally{setBusy(false)}
   }
   async function restoreBackup(){
     if(!file)return
     if(!window.confirm('Restore this backup? Current school data will be replaced. A safety copy of the current database will be kept.'))return
-    setBusy(true);setMessage('')
-    try {const body=new FormData();body.append('file',file);const response=await fetch(`${API_BASE_URL}/api/backups/restore`,{method:'POST',headers:{Authorization:'Bearer '+token},body});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.detail||'Restore failed');setMessage(data.message||'Restore staged. Restart the backend to complete it.');setFile(null)}
-    catch(e){setMessage(e instanceof Error?e.message:'Unable to restore backup.')}finally{setBusy(false)}
+    setBusy(true);setError('');setMessage('')
+    try {
+      const body=new FormData();body.append('file',file)
+      const response=await fetch(`${API_BASE_URL}/api/backups/restore`,{method:'POST',headers:{Authorization:'Bearer '+token},body})
+      const data=await response.json().catch(()=>({}))
+      if(!response.ok)throw new Error(data.detail||'Restore failed')
+      setMessage(data.message||'Restore staged. Restart the backend to complete it.')
+      setFile(null)
+    } catch(e){setError(e instanceof Error?e.message:'Unable to restore backup.')}
+    finally{setBusy(false)}
   }
-  return <section className="panel settings-panel"><div className="panel-heading"><div><h2>Backups and restore</h2><p>Download a copy of the local school database or restore from a previous SchoolBridge backup.</p></div></div>{message&&<div className="success-notice">{message}</div>}<div className="backup-action"><h3>Create a backup</h3><p>Includes student, staff, academic, fee, payment and settings records.</p><button className="primary-button" type="button" disabled={busy} onClick={()=>void createBackup()}>{busy?'Working...':'Create and download backup'}</button></div><div className="backup-action"><h3>Restore a backup</h3><p>Only restore a valid SchoolBridge SQLite backup. The current database is copied to a safety file before restoration.</p><label>Select backup file<input type="file" accept=".sqlite,.sqlite3,.db" onChange={e=>setFile(e.target.files?.[0]||null)}/></label><div className="form-actions"><button className="secondary-button" type="button" disabled={!file||busy} onClick={()=>void restoreBackup()}>{busy?'Restoring...':'Restore selected backup'}</button></div></div><p className="form-hint">For PostgreSQL multi-computer installations, use the database administrator's backup procedure. File-based backup and restore here applies to the local SQLite installation.</p></section>
+  return <section className="panel settings-panel">
+    <div className="panel-heading"><div><h2>Backups and restore</h2><p>Download a copy of the local school database or restore from a previous SchoolBridge backup.</p></div></div>
+    {error&&<div className="form-error" role="alert">{error}</div>}
+    {message&&<div className="success-notice" role="status">{message}</div>}
+    <div className="backup-action"><h3>Create a backup</h3><p>Includes student, staff, academic, fee, payment and settings records.</p><button className="primary-button" type="button" disabled={busy} onClick={()=>void createBackup()}>{busy?'Working...':'Create and download backup'}</button></div>
+    <div className="backup-action"><h3>Restore a backup</h3><p>Only restore a valid SchoolBridge SQLite backup. The current database is copied to a safety file before restoration.</p><label>Select backup file<input type="file" accept=".sqlite,.sqlite3,.db" disabled={busy} onChange={e=>setFile(e.target.files?.[0]||null)}/></label>{file&&<p className="form-hint">Selected: {file.name}</p>}<div className="form-actions"><button className="secondary-button" type="button" disabled={!file||busy} onClick={()=>void restoreBackup()}>{busy?'Restoring...':'Restore selected backup'}</button></div></div>
+    <p className="form-hint">For PostgreSQL multi-computer installations, use the database administrator's backup procedure. File-based backup and restore here applies to the local SQLite installation.</p>
+  </section>
 }
 
 function AuditLogSettings({token}:{token:string}) {
   const [items,setItems]=useState<any[]>([])
-  const [message,setMessage]=useState('')
-  useEffect(()=>{api<{items:any[]}>('audit-logs?page=1&page_size=100',token).then(r=>setItems(r.items)).catch(e=>setMessage(e.message))},[token])
-  return <section className="panel settings-panel"><div className="panel-heading"><div><h2>Audit log</h2><p>Recent administrator actions, financial entries and profile changes. Financial records are retained rather than silently deleted.</p></div></div>{message&&<div className="form-error">{message}</div>}<div className="table-wrap"><table><thead><tr><th>Date and time</th><th>User</th><th>Action</th><th>Record</th><th>Details</th></tr></thead><tbody>{items.map(item=><tr key={item.id}><td>{new Date(item.created_at).toLocaleString()}</td><td>{item.actor_username}</td><td>{item.action}</td><td>{item.entity_type} #{item.entity_id}</td><td>{item.details||'—'}</td></tr>)}</tbody></table></div>{!items.length&&!message&&<div className="empty-state"><ShieldCheck size={30}/><p>No audit events have been recorded yet.</p></div>}</section>
+  const [error,setError]=useState('')
+  const [loading,setLoading]=useState(true)
+  async function load(){
+    setLoading(true);setError('')
+    try {const result=await api<{items:any[]}>('audit-logs?page=1&page_size=100',token);setItems(result.items)}
+    catch(e){setError(e instanceof Error?e.message:'Unable to load audit records.')}
+    finally{setLoading(false)}
+  }
+  useEffect(()=>{void load()},[token])
+  return <section className="panel settings-panel">
+    <div className="panel-heading"><div><h2>Audit log</h2><p>Recent administrator actions, financial entries and profile changes. Financial records are retained rather than silently deleted.</p></div><button type="button" className="secondary-button" onClick={()=>void load()} disabled={loading}>{loading?'Loading...':'Refresh audit log'}</button></div>
+    {error&&<div className="form-error" role="alert">{error}</div>}
+    {loading?<p className="form-hint">Loading audit records...</p>:<div className="table-wrap"><table><thead><tr><th>Date and time</th><th>User</th><th>Action</th><th>Record</th><th>Details</th></tr></thead><tbody>
+      {items.map(item=><tr key={item.id}><td>{new Date(item.created_at).toLocaleString()}</td><td>{item.actor_username}</td><td>{item.action}</td><td>{item.entity_type} #{item.entity_id}</td><td>{item.details||'—'}</td></tr>)}
+      {!items.length&&<tr><td colSpan={5}>No audit events have been recorded yet.</td></tr>}
+    </tbody></table></div>}
+  </section>
 }
 
 function SubjectSettings({token,onSaved}:{token:string;onSaved:()=>void}) {
