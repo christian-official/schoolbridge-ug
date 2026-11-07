@@ -686,7 +686,10 @@ async def protect_school_data(request: Request, call_next):
 
         if path == "/api/auth/me":
             pass
-        elif path in {"/api/teacher/my-assignments", "/api/teacher/students", "/api/teacher/attendance"}:
+        elif path in {
+            "/api/teacher/my-assignments", "/api/teacher/students",
+            "/api/teacher/attendance", "/api/teacher/exams", "/api/teacher/marks",
+        }:
             if user.role != "teacher":
                 return JSONResponse(
                     {"detail": "Teacher permission required."},
