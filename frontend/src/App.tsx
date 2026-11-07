@@ -471,7 +471,7 @@ function App() {
 
           {active === 'Students' && (
             <section className="panel">
-              <div className="panel-heading"><div><h2>Student records</h2><p>{studentTotal.toLocaleString()} registered students · 25 records per page</p></div><button className="primary-button add-student-button" onClick={() => { setShowStudentForm(v => !v); setStudentError(''); setStudentSuccess('') }}><UserPlus size={16} /> {showStudentForm ? 'Close form' : 'Register student'}</button></div>
+              <div className="panel-heading student-workspace-heading"><div><h2>Students</h2><p>{studentTotal.toLocaleString()} registered students · Select a class to view its student list.</p></div><button type="button" className="primary-button add-student-button" onClick={() => { setShowStudentForm(v => !v); setStudentError(''); setStudentSuccess('') }}><UserPlus size={16} /> {showStudentForm ? 'Close registration' : 'Register student'}</button></div>
               {studentSuccess && <div className="success-notice">{studentSuccess}</div>}
               {studentError && <div className="form-error">{studentError}</div>}
               {showStudentForm && (
@@ -526,8 +526,15 @@ function App() {
                   <div className="form-actions registration-actions"><button type="button" className="secondary-button" onClick={() => setShowStudentForm(false)}>Cancel</button><button className="primary-button" disabled={savingStudent || classes.length === 0}>{savingStudent ? <><LoaderCircle className="spin" size={16} /> Saving student...</> : 'Register student'}</button></div>
                 </form>
               )}
-              <div className="table-tools student-tools"><div className="search-box"><Search size={17} /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name or admission number..." /></div><select className="filter-select" value={studentClassFilter} onChange={e => setStudentClassFilter(e.target.value)}><option value="">All classes</option>{classes.map(item => <option key={item.id} value={item.id}>{item.name}{item.section ? ` — ${item.section}` : ""}</option>)}</select></div>
-              <StudentTable students={filteredStudents} classes={classes} onSelect={id => void openStudentProfile(id)} />
+              <section className="student-class-browser">
+                <div className="student-class-browser-heading"><div><h3>Browse by class</h3><p>Choose a class or stream to see only its students.</p></div><span>{classes.length} classes</span></div>
+                <div className="student-class-tabs" role="tablist" aria-label="Student classes">
+                  <button type="button" role="tab" aria-selected={!studentClassFilter} className={!studentClassFilter?'student-class-tab active':'student-class-tab'} onClick={()=>{setStudentClassFilter('');setStudentPage(1)}}>All students</button>
+                  {classes.map(item=><button type="button" role="tab" aria-selected={studentClassFilter===String(item.id)} className={studentClassFilter===String(item.id)?'student-class-tab active':'student-class-tab'} key={item.id} onClick={()=>{setStudentClassFilter(String(item.id));setStudentPage(1)}}>{item.name}{item.section? ` · ${item.section}`:''}</button>)}
+                </div>
+              </section>
+              <div className="student-search-panel"><div className="search-box"><Search size={19}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder={studentClassFilter?'Search this class by student name or admission number...':'Search all students by name or admission number...'} aria-label="Search students by name or admission number"/></div><span>Search results update automatically</span></div>
+              <div className="student-list-heading"><div><h3>{studentClassFilter ? (classes.find(item=>String(item.id)===studentClassFilter)?.name||'Selected class') : 'All students'}{studentClassFilter && classes.find(item=>String(item.id)===studentClassFilter)?.section ? ` · ${classes.find(item=>String(item.id)===studentClassFilter)?.section}` : ''}</h3><p>{studentTotal.toLocaleString()} matching student records</p></div></div><StudentTable students={filteredStudents} classes={classes} onSelect={id => void openStudentProfile(id)} />
               <div className="pagination-row"><span>Showing {students.length ? (studentPage - 1) * 25 + 1 : 0}–{Math.min(studentPage * 25, studentTotal)} of {studentTotal}</span><div><button className="secondary-button" disabled={studentPage <= 1} onClick={() => void loadStudentPage(studentPage - 1)}>Previous</button><button className="secondary-button" disabled={studentPage * 25 >= studentTotal} onClick={() => void loadStudentPage(studentPage + 1)}>Next</button></div></div>
             </section>
           )}
