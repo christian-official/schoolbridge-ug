@@ -274,13 +274,17 @@ function App() {
 
   async function saveAdmissionSettings(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    const prefix=admissionSettings.admission_prefix.trim()
+    const sequence=Number(admissionSettings.next_admission_number)
+    if(!prefix){setSettingsError('Enter a school prefix before saving.');return}
+    if(!Number.isInteger(sequence)||sequence<1){setSettingsError('The next sequence number must be a whole number greater than zero.');return}
     setSavingSettings(true)
     setSettingsError('')
     setSettingsSuccess('')
     try {
       const saved = await api<AdmissionSettings & { message: string }>('settings/admission-number', token, {
         method: 'PUT',
-        body: JSON.stringify(admissionSettings),
+        body: JSON.stringify({...admissionSettings,admission_prefix:prefix,next_admission_number:sequence}),
       })
       setAdmissionSettings(saved)
       setSettingsSuccess('Admission numbering settings saved successfully.')
@@ -694,8 +698,8 @@ function App() {
               {settingsSection === 'admission' && (
             <section className="panel settings-panel">
               <div className="panel-heading"><div><h2>Admission number settings</h2><p>Choose the format used for newly registered students at this school.</p></div></div>
-              {settingsSuccess && <div className="success-notice">{settingsSuccess}</div>}
-              {settingsError && <div className="form-error">{settingsError}</div>}
+              {settingsSuccess && <div className="success-notice" role="status">{settingsSuccess}</div>}
+              {settingsError && <div className="form-error" role="alert">{settingsError}</div>}
               <details className="form-disclosure"><summary>Edit admission number settings</summary><form className="student-form" onSubmit={saveAdmissionSettings}>
                 <div className="student-form-grid">
                   <label>School prefix *<input required maxLength={20} value={admissionSettings.admission_prefix} onChange={e => setAdmissionSettings({ ...admissionSettings, admission_prefix: e.target.value })} placeholder="e.g. KIS" /></label>
