@@ -542,7 +542,7 @@ function App() {
               {showStudentForm && (
                 <form className="student-form registration-form" onSubmit={registerStudent}>
                   <div className="form-heading">
-                    <div><h3>Register a new student</h3><p>Complete the sections below. Only the fields marked with * are compulsory.</p></div>
+                    <div><h3>Register a new student</h3><p>Complete the sections below. Compulsory fields are full name, class, gender, parent/guardian name and guardian phone. Other details are optional unless required by the selected class.</p></div>
                     <span className="required-note">* Required</span>
                   </div>
 
