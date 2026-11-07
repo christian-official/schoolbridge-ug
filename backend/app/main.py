@@ -46,6 +46,11 @@ def get_current_user(
     return user
 
 
+def require_admin(user=Depends(get_current_user)):
+    if user.role != "admin":
+        raise HTTPException(403, "Administrator permission required.")
+    return user
+
 
 def apply_pending_database_restore():
     """Apply a validated restore before SQLAlchemy opens the database at startup."""
@@ -768,12 +773,6 @@ def create_access_token(user):
         "exp": expires,
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
-
-
-def require_admin(user=Depends(get_current_user)):
-    if user.role != "admin":
-        raise HTTPException(403, "Administrator permission required.")
-    return user
 
 
 
