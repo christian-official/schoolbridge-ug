@@ -1134,3 +1134,74 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   .timetable-class-heading { padding: 11px 12px; }
   .overview-workflow-grid { grid-template-columns: 1fr !important; }
 }
+
+
+/* Recorded assessment scores grouped by subject and verification state */
+.recorded-subject-groups { display: grid; gap: 16px; padding-top: 14px; }
+.recorded-subject-card {
+  overflow: hidden;
+  border: 1px solid #e3e9f2;
+  border-radius: 12px;
+  background: #fff;
+}
+.recorded-subject-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 15px;
+  background: #f3f6fc;
+  border-bottom: 1px solid #e3e9f2;
+}
+.recorded-subject-heading h3 {
+  margin: 0;
+  color: #293e65;
+  font-size: 14px;
+  font-weight: 850;
+}
+.recorded-subject-heading > span {
+  color: #65748e;
+  font-size: 11px;
+  font-weight: 750;
+}
+.recorded-status-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  padding: 14px;
+}
+.recorded-status-group {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #e9edf3;
+  border-radius: 9px;
+}
+.recorded-status-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #e9edf3;
+  color: #34445e;
+  font-size: 12px;
+}
+.recorded-count {
+  display: inline-grid;
+  min-width: 23px;
+  height: 23px;
+  place-items: center;
+  padding: 0 6px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 850;
+}
+.verified-count { background: #e8f7ef; color: #187346; }
+.pending-count { background: #fff4df; color: #94600a; }
+.recorded-status-group .table-wrap { margin: 0; }
+.recorded-status-group table { min-width: 0; }
+.recorded-status-group th,
+.recorded-status-group td { padding: 9px 10px; font-size: 11px; }
+@media(max-width:760px) {
+  .recorded-status-columns { grid-template-columns: 1fr; padding: 10px; }
+}
