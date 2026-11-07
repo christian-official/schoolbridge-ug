@@ -546,115 +546,6 @@ def save_attendance_register(
     }
 
 
-@app.get("/api/staff-attendance", tags=["Attendance"])
-def list_staff_attendance(
-    attendance_date: date | None = None,
-    db: Session = Depends(get_db),
-    admin=Depends(require_admin),
-):
-    query = db.query(models.StaffAttendance)
-    if attendance_date:
-        query = query.filter(models.StaffAttendance.attendance_date == attendance_date)
-    return query.order_by(models.StaffAttendance.attendance_date.desc(), models.StaffAttendance.id.desc()).all()
-
-
-@app.put("/api/staff-attendance/register", tags=["Attendance"])
-def save_staff_attendance_register(
-    data: StaffAttendanceRegisterUpdate,
-    db: Session = Depends(get_db),
-    admin=Depends(require_admin),
-):
-    staff_ids = [entry.staff_id for entry in data.records]
-    if len(staff_ids) != len(set(staff_ids)):
-        raise HTTPException(422, "A staff member can appear only once in a daily register.")
-    staff_rows = db.query(models.StaffMember).filter(
-        models.StaffMember.id.in_(staff_ids),
-        models.StaffMember.status == "active",
-    ).all()
-    if len(staff_rows) != len(staff_ids):
-        raise HTTPException(422, "Every selected staff member must be active.")
-    for entry in data.records:
-        record = db.query(models.StaffAttendance).filter_by(
-            staff_id=entry.staff_id, attendance_date=data.attendance_date
-        ).first()
-        if record:
-            record.status = entry.status
-            record.notes = entry.notes
-        else:
-            db.add(models.StaffAttendance(
-                staff_id=entry.staff_id,
-                attendance_date=data.attendance_date,
-                status=entry.status,
-                notes=entry.notes,
-            ))
-    db.commit()
-    return {"message": "Staff attendance register saved.", "attendance_date": data.attendance_date, "saved": len(staff_ids)}
-
-
-@app.get("/api/timetable", tags=["Timetable"])
-def list_timetable(
-    class_id: int | None = None,
-    db: Session = Depends(get_db),
-):
-    query = db.query(models.TimetableEntry)
-    if class_id:
-        query = query.filter(models.TimetableEntry.class_id == class_id)
-    return query.order_by(
-        models.TimetableEntry.day_of_week,
-        models.TimetableEntry.start_time,
-        models.TimetableEntry.id,
-    ).all()
-
-
-@app.post("/api/timetable", tags=["Timetable"])
-def create_timetable_entry(
-    data: TimetableEntryCreate,
-    db: Session = Depends(get_db),
-    admin=Depends(require_admin),
-):
-    if data.end_time <= data.start_time:
-        raise HTTPException(422, "Lesson end time must be later than its start time.")
-    if not db.get(models.SchoolClass, data.class_id):
-        raise HTTPException(404, "Class not found.")
-    if data.subject_id is not None and not db.get(models.Subject, data.subject_id):
-        raise HTTPException(404, "Subject not found.")
-    if data.staff_id is not None:
-        staff = db.get(models.StaffMember, data.staff_id)
-        if not staff or staff.status != "active":
-            raise HTTPException(404, "Active staff member not found.")
-    overlaps = db.query(models.TimetableEntry).filter(
-        models.TimetableEntry.class_id == data.class_id,
-        models.TimetableEntry.day_of_week == data.day_of_week,
-        models.TimetableEntry.start_time < data.end_time,
-        models.TimetableEntry.end_time > data.start_time,
-    ).first()
-    if overlaps:
-        raise HTTPException(409, "This lesson overlaps another lesson for the selected class.")
-    item = models.TimetableEntry(**data.model_dump())
-    db.add(item)
-    try:
-        db.commit()
-        db.refresh(item)
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(409, "A timetable entry already exists for this class and start time.")
-    return item
-
-
-@app.delete("/api/timetable/{entry_id}", tags=["Timetable"])
-def delete_timetable_entry(
-    entry_id: int,
-    db: Session = Depends(get_db),
-    admin=Depends(require_admin),
-):
-    item = db.get(models.TimetableEntry, entry_id)
-    if not item:
-        raise HTTPException(404, "Timetable entry not found.")
-    db.delete(item)
-    db.commit()
-    return {"message": "Timetable entry removed."}
-
-
 @app.post("/api/exams", response_model=ExamOut, tags=["Exams"])
 def create_exam(data: ExamCreate, db: Session = Depends(get_db)):
     if not db.get(models.SchoolClass, data.class_id):
@@ -891,6 +782,117 @@ def require_admin(user=Depends(get_current_user)):
     if user.role != "admin":
         raise HTTPException(403, "Administrator permission required.")
     return user
+
+
+@app.get("/api/staff-attendance", tags=["Attendance"])
+def list_staff_attendance(
+    attendance_date: date | None = None,
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+):
+    query = db.query(models.StaffAttendance)
+    if attendance_date:
+        query = query.filter(models.StaffAttendance.attendance_date == attendance_date)
+    return query.order_by(models.StaffAttendance.attendance_date.desc(), models.StaffAttendance.id.desc()).all()
+
+
+@app.put("/api/staff-attendance/register", tags=["Attendance"])
+def save_staff_attendance_register(
+    data: StaffAttendanceRegisterUpdate,
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+):
+    staff_ids = [entry.staff_id for entry in data.records]
+    if len(staff_ids) != len(set(staff_ids)):
+        raise HTTPException(422, "A staff member can appear only once in a daily register.")
+    staff_rows = db.query(models.StaffMember).filter(
+        models.StaffMember.id.in_(staff_ids),
+        models.StaffMember.status == "active",
+    ).all()
+    if len(staff_rows) != len(staff_ids):
+        raise HTTPException(422, "Every selected staff member must be active.")
+    for entry in data.records:
+        record = db.query(models.StaffAttendance).filter_by(
+            staff_id=entry.staff_id, attendance_date=data.attendance_date
+        ).first()
+        if record:
+            record.status = entry.status
+            record.notes = entry.notes
+        else:
+            db.add(models.StaffAttendance(
+                staff_id=entry.staff_id,
+                attendance_date=data.attendance_date,
+                status=entry.status,
+                notes=entry.notes,
+            ))
+    db.commit()
+    return {"message": "Staff attendance register saved.", "attendance_date": data.attendance_date, "saved": len(staff_ids)}
+
+
+@app.get("/api/timetable", tags=["Timetable"])
+def list_timetable(
+    class_id: int | None = None,
+    db: Session = Depends(get_db),
+):
+    query = db.query(models.TimetableEntry)
+    if class_id:
+        query = query.filter(models.TimetableEntry.class_id == class_id)
+    return query.order_by(
+        models.TimetableEntry.day_of_week,
+        models.TimetableEntry.start_time,
+        models.TimetableEntry.id,
+    ).all()
+
+
+@app.post("/api/timetable", tags=["Timetable"])
+def create_timetable_entry(
+    data: TimetableEntryCreate,
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+):
+    if data.end_time <= data.start_time:
+        raise HTTPException(422, "Lesson end time must be later than its start time.")
+    if not db.get(models.SchoolClass, data.class_id):
+        raise HTTPException(404, "Class not found.")
+    if data.subject_id is not None and not db.get(models.Subject, data.subject_id):
+        raise HTTPException(404, "Subject not found.")
+    if data.staff_id is not None:
+        staff = db.get(models.StaffMember, data.staff_id)
+        if not staff or staff.status != "active":
+            raise HTTPException(404, "Active staff member not found.")
+    overlaps = db.query(models.TimetableEntry).filter(
+        models.TimetableEntry.class_id == data.class_id,
+        models.TimetableEntry.day_of_week == data.day_of_week,
+        models.TimetableEntry.start_time < data.end_time,
+        models.TimetableEntry.end_time > data.start_time,
+    ).first()
+    if overlaps:
+        raise HTTPException(409, "This lesson overlaps another lesson for the selected class.")
+    item = models.TimetableEntry(**data.model_dump())
+    db.add(item)
+    try:
+        db.commit()
+        db.refresh(item)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "A timetable entry already exists for this class and start time.")
+    return item
+
+
+@app.delete("/api/timetable/{entry_id}", tags=["Timetable"])
+def delete_timetable_entry(
+    entry_id: int,
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+):
+    item = db.get(models.TimetableEntry, entry_id)
+    if not item:
+        raise HTTPException(404, "Timetable entry not found.")
+    db.delete(item)
+    db.commit()
+    return {"message": "Timetable entry removed."}
+
+
 
 
 @app.middleware("http")
