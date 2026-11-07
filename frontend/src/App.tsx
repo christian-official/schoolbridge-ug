@@ -21,6 +21,8 @@ type User = {
 
 type StudentPage = { items: RecordItem[]; total: number; page: number; pages: number }
 
+type FinanceDashboardSummary = { fees_expected: number; fees_collected: number; outstanding: number }
+
 type DashboardSummary = {
   active_students: number
   new_admissions_this_year: number
@@ -114,6 +116,7 @@ function App() {
   const [students, setStudents] = useState<RecordItem[]>([])
   const [studentTotal, setStudentTotal] = useState(0)
   const [dashboardSummary, setDashboardSummary] = useState<DashboardSummary>({ active_students: 0, new_admissions_this_year: 0, students_present_today: 0, active_staff: 0, total_classes: 0, academic_year: new Date().getFullYear() })
+  const [financeDashboard, setFinanceDashboard] = useState<FinanceDashboardSummary>({ fees_expected: 0, fees_collected: 0, outstanding: 0 })
   const [studentPage, setStudentPage] = useState(1)
   const [studentClassFilter, setStudentClassFilter] = useState('')
   const [classes, setClasses] = useState<RecordItem[]>([])
@@ -152,11 +155,12 @@ function App() {
   async function loadSchoolData(authToken: string) {
     setDataError('')
     try {
-      const [studentData, classData, admissionData, summaryData] = await Promise.all([
+      const [studentData, classData, admissionData, summaryData, financeSummaryData] = await Promise.all([
         api<StudentPage>('students/search?page=1&page_size=25', authToken),
         api<RecordItem[]>('classes', authToken),
         api<AdmissionSettings>('settings/admission-number', authToken),
         api<DashboardSummary>(`dashboard/summary?attendance_date=${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`, authToken),
+        api<FinanceDashboardSummary>('finance/summary', authToken),
       ])
       setStudents(studentData.items)
       setStudentTotal(studentData.total)
@@ -164,6 +168,7 @@ function App() {
       setClasses(classData)
       setAdmissionSettings(admissionData)
       setDashboardSummary(summaryData)
+      setFinanceDashboard(financeSummaryData)
     } catch {
       setDataError('Some school records could not be loaded. Check your connection and permissions.')
     }
@@ -523,15 +528,17 @@ function App() {
               </section>
               <section className="dashboard-grid overview-workflow-grid">
                 <div className="panel quick-panel">
+                  <div className="panel-heading"><div><h2>Academic & finance centre</h2><p>Priority school controls, collections and fee follow-up.</p></div></div>
+                  <div className="overview-finance-metrics"><div><small>PAYMENTS RECEIVED</small><strong>UGX {financeDashboard.fees_collected.toLocaleString('en-UG')}</strong></div><div><small>OUTSTANDING BALANCES</small><strong>UGX {financeDashboard.outstanding.toLocaleString('en-UG')}</strong></div></div>
+                  <button className="quick-action" onClick={() => setActive('Examinations')}><span className="quick-icon orange"><FileText /></span><span><strong>Enter and verify assessment marks</strong><small>Open subject registers, class performance and report cards.</small></span><ArrowUpRight size={17} /></button>
+                  <button className="quick-action" onClick={() => setActive('Fees & Finance')}><span className="quick-icon blue"><ShieldCheck /></span><span><strong>Record student payments</strong><small>Post collections and issue payment receipts.</small></span><ArrowUpRight size={17} /></button>
+                  <button className="quick-action" onClick={() => setActive('Fees & Finance')}><span className="quick-icon purple"><FileText /></span><span><strong>Outstanding fee balances</strong><small>Identify unpaid charges and follow up by class.</small></span><ArrowUpRight size={17} /></button>
+                  <button className="quick-action" onClick={() => setActive('Timetable')}><span className="quick-icon purple"><BookOpen /></span><span><strong>Review whole-school timetable</strong><small>Check lesson allocation by class, day and teacher.</small></span><ArrowUpRight size={17} /></button>
+                </div>
+                <div className="panel quick-panel">
                   <div className="panel-heading"><div><h2>Daily registers</h2><p>Complete the records that keep today’s operations accurate.</p></div></div>
                   <button className="quick-action" onClick={() => setActive('Attendance')}><span className="quick-icon blue"><CalendarDays /></span><span><strong>Record class attendance</strong><small>Mark students present, absent or late for each class.</small></span><ArrowUpRight size={17} /></button>
                   <button className="quick-action" onClick={() => setActive('Staff Attendance')}><span className="quick-icon purple"><Users /></span><span><strong>Complete staff daily register</strong><small>Review teaching and non-teaching staff attendance and unmarked records.</small></span><ArrowUpRight size={17} /></button>
-                </div>
-                <div className="panel quick-panel">
-                  <div className="panel-heading"><div><h2>Academic & finance follow-through</h2><p>Move directly to the next important school task.</p></div></div>
-                  <button className="quick-action" onClick={() => setActive('Examinations')}><span className="quick-icon orange"><FileText /></span><span><strong>Enter and verify assessment marks</strong><small>Open subject registers, class performance and report cards.</small></span><ArrowUpRight size={17} /></button>
-                  <button className="quick-action" onClick={() => setActive('Fees & Finance')}><span className="quick-icon blue"><ShieldCheck /></span><span><strong>Review fee balances and payments</strong><small>Follow up outstanding charges and recorded collections.</small></span><ArrowUpRight size={17} /></button>
-                  <button className="quick-action" onClick={() => setActive('Timetable')}><span className="quick-icon purple"><BookOpen /></span><span><strong>Review the whole-school timetable</strong><small>Check lesson allocation by class, day and teacher.</small></span><ArrowUpRight size={17} /></button>
                 </div>
               </section>
               <section className="panel overview-leadership">
