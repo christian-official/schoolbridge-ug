@@ -15,6 +15,38 @@ from .database import DATABASE_URL, Base, engine, get_db, SessionLocal
 from .migrations import upgrade_database
 from . import models
 
+from dotenv import load_dotenv
+import jwt
+from datetime import timedelta, timezone
+from pwdlib import PasswordHash
+from jwt.exceptions import InvalidTokenError
+from fastapi import Request
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+
+load_dotenv()
+password_hash = PasswordHash.recommended()
+JWT_SECRET = os.environ["SCHOOLBRIDGE_SECRET_KEY"]
+JWT_ALGORITHM = "HS256"
+TOKEN_HOURS = 8
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+
+
+def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
+):
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        user_id = int(payload["sub"])
+    except (InvalidTokenError, ValueError, KeyError, TypeError):
+        raise HTTPException(401, "Invalid or expired login token.")
+    user = db.get(models.User, user_id)
+    if not user or not user.is_active:
+        raise HTTPException(401, "Account is unavailable.")
+    return user
+
+
+
 def apply_pending_database_restore():
     """Apply a validated restore before SQLAlchemy opens the database at startup."""
     import os, sqlite3
@@ -671,23 +703,6 @@ def update_grading_scale(data: GradingScaleUpdate, db: Session = Depends(get_db)
 
 # ========== AUTHENTICATION AND USER MANAGEMENT ==========
 
-import os
-from dotenv import load_dotenv
-import jwt
-from datetime import datetime, timedelta, timezone
-from pwdlib import PasswordHash
-from jwt.exceptions import InvalidTokenError
-from fastapi import Request
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from sqlalchemy.exc import IntegrityError
-
-password_hash = PasswordHash.recommended()
-load_dotenv()
-JWT_SECRET = os.environ["SCHOOLBRIDGE_SECRET_KEY"]
-JWT_ALGORITHM = "HS256"
-TOKEN_HOURS = 8
-
-
 def bootstrap_initial_admin():
     """Create the first administrator only when explicitly configured by environment."""
     username = os.getenv("SCHOOLBRIDGE_INITIAL_ADMIN_USERNAME", "").strip()
@@ -727,9 +742,6 @@ def bootstrap_initial_admin():
 
 
 bootstrap_initial_admin()
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
-
 
 class LoginInput(BaseModel):
     username: str
