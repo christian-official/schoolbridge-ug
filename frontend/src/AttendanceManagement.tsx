@@ -22,7 +22,6 @@ async function request<T>(path: string, token: string, options: RequestInit = {}
 export default function AttendanceManagement({ token }: { token: string }) {
   const [classes, setClasses] = useState<SchoolClass[]>([])
   const [students, setStudents] = useState<Student[]>([])
-  const [attendance, setAttendance] = useState<Attendance[]>([])
   const [statuses, setStatuses] = useState<Record<number, string>>({})
   const [classId, setClassId] = useState('')
   const [attendanceDate, setAttendanceDate] = useState(today())
@@ -37,10 +36,10 @@ export default function AttendanceManagement({ token }: { token: string }) {
     try {
       const [classRows, studentRows] = await Promise.all([
         request<SchoolClass[]>('classes', token),
-        request<Student[]>('students', token),
+        request<{ items: Student[] }>('students/search?page=1&page_size=100', token),
       ])
       setClasses(classRows)
-      setStudents(studentRows.filter(student => student.status === 'active' && student.class_id !== null))
+      setStudents(studentRows.items.filter(student => student.status === 'active' && student.class_id !== null))
       if (!classId && classRows.length) setClassId(String(classRows[0].id))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to load class registers.')
@@ -48,20 +47,19 @@ export default function AttendanceManagement({ token }: { token: string }) {
   }
 
   async function loadRegister(selectedClass = classId, selectedDate = attendanceDate) {
-    if (!selectedClass) { setAttendance([]); setSummary(null); return }
+    if (!selectedClass) { setSummary(null); return }
     setLoading(true); setError('')
     try {
       const [rows, totals] = await Promise.all([
         request<Attendance[]>(`attendance?class_id=${selectedClass}&attendance_date=${selectedDate}`, token),
         request<Summary>(`attendance/summary?class_id=${selectedClass}&attendance_date=${selectedDate}`, token),
       ])
-      setAttendance(rows)
       setSummary(totals)
       const byStudent = Object.fromEntries(rows.map(row => [row.student_id, row.status]))
-      setStatuses(current => {
+      setStatuses(() => {
         const next: Record<number, string> = {}
         students.filter(student => String(student.class_id) === selectedClass).forEach(student => {
-          next[student.id] = byStudent[student.id] || current[student.id] || 'Present'
+          next[student.id] = byStudent[student.id] || 'Present'
         })
         return next
       })
