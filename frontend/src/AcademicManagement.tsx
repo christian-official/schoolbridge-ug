@@ -7,7 +7,7 @@ type Student = { id: number; first_name: string; middle_name?: string | null; la
 type Exam = { id: number; name: string; term: string; year: number; class_id: number | null }
 type Mark = { id: number; student_id: number; subject_id: number; exam_id: number; score: number; verified: boolean }
 type GradeBand = { id?: number; grade: string; min_score: number; max_score: number; remark: string }
-type SchoolProfile = { name?: string; address?: string | null; phone?: string | null; email?: string | null; motto?: string | null }
+type SchoolProfile = { name?: string; address?: string | null; phone?: string | null; email?: string | null; motto?: string | null; school_type?: string; a_level_combinations?: string | null; o_level_optional_subjects?: string | null; a_level_subsidiary_subjects?: string | null; report_logo?: string | null; report_template?: string | null }
 type ReportTemplateConfig = { title?: string; footer?: string }
 type Page<T> = { items: T[]; total: number; pages?: number }
 
@@ -86,6 +86,8 @@ export default function AcademicManagement({ token, classes }: { token: string; 
       setSubjects(subjectRows)
       setGradingBands(gradeRows)
       setSchoolProfile(profile || {})
+      if (profile?.report_logo) { setReportLogo(profile.report_logo); localStorage.setItem('schoolbridge-report-logo', profile.report_logo) }
+      if (profile?.report_template) { try { const config = JSON.parse(profile.report_template); setReportTemplateConfig(config); setReportTitle(config.title || 'STUDENT PROGRESS REPORT'); setReportFooter(config.footer || 'SchoolBridge · Official student progress report · Keep this report for your records'); localStorage.setItem('schoolbridge-report-template', profile.report_template) } catch { /* Keep the local editable defaults if an older template cannot be parsed. */ } }
       setDraftBands(gradeRows.map(({ grade, min_score, max_score, remark }) => ({ grade, min_score, max_score, remark })))
       if (selectedExamId && examRows.some(exam => String(exam.id) === selectedExamId)) {
         setSelectedExamId(selectedExamId)
@@ -278,9 +280,17 @@ export default function AcademicManagement({ token, classes }: { token: string; 
     }
   }
 
-  function saveReportTemplateEdits() {
+  async function persistReportBranding(logo: string, config: ReportTemplateConfig) {
+    await request('settings/school-profile', token, { method: 'PUT', body: JSON.stringify({ name: schoolProfile.name || 'My School', address: schoolProfile.address || null, phone: schoolProfile.phone || null, email: schoolProfile.email || null, motto: schoolProfile.motto || null, school_type: schoolProfile.school_type || 'Secondary', a_level_combinations: schoolProfile.a_level_combinations || null, o_level_optional_subjects: schoolProfile.o_level_optional_subjects || null, a_level_subsidiary_subjects: schoolProfile.a_level_subsidiary_subjects || null, report_logo: logo || null, report_template: JSON.stringify(config) }) })
+    localStorage.setItem('schoolbridge-report-logo', logo)
+    localStorage.setItem('schoolbridge-report-template', JSON.stringify(config))
+  }
+  async function saveReportTemplateEdits() {
     const next = { ...reportTemplateConfig, title: reportTitle.trim(), footer: reportFooter.trim() }
-    setReportTemplateConfig(next); localStorage.setItem('schoolbridge-report-template', JSON.stringify(next)); setMessage('Report layout text saved on this browser.')
+    setSaving(true); setError('')
+    try { await persistReportBranding(reportLogo, next); setReportTemplateConfig(next); setMessage('Report design saved to the school database.') }
+    catch (e) { setError(e instanceof Error ? e.message : 'Unable to save report design.') }
+    finally { setSaving(false) }
   }
   async function uploadReportTemplate(file?: File) {
     if (!file) return
@@ -289,7 +299,7 @@ export default function AcademicManagement({ token, classes }: { token: string; 
       const parsed = JSON.parse(await file.text())
       if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) || (parsed.title !== undefined && typeof parsed.title !== 'string') || (parsed.footer !== undefined && typeof parsed.footer !== 'string')) throw new Error('Use a JSON template with optional title and footer text fields.')
       const next = { title: parsed.title || reportTitle, footer: parsed.footer || reportFooter }
-      setReportTemplateConfig(next); setReportTitle(next.title); setReportFooter(next.footer); localStorage.setItem('schoolbridge-report-template', JSON.stringify(next)); setMessage('Custom report template imported and saved on this browser.')
+      await persistReportBranding(reportLogo, next); setReportTemplateConfig(next); setReportTitle(next.title); setReportFooter(next.footer); setMessage('Custom report template imported and saved to the school database.')
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to read this report template.') }
   }
   async function uploadSchoolLogo(file?: File) {
@@ -297,7 +307,7 @@ export default function AcademicManagement({ token, classes }: { token: string; 
     if (!file.type.startsWith('image/')) { setError('Choose an image file for the school badge.'); return }
     if (file.size > 1500000) { setError('School badge image must be 1.5 MB or smaller.'); return }
     const reader = new FileReader()
-    reader.onload = () => { const value = String(reader.result || ''); try { localStorage.setItem('schoolbridge-report-logo', value); setReportLogo(value); setMessage('School badge saved on this browser and added to report cards.') } catch { setError('The image could not be saved. Choose a smaller image.') } }
+    reader.onload = () => { const value = String(reader.result || ''); void persistReportBranding(value, reportTemplateConfig).then(() => { setReportLogo(value); setMessage('School badge saved to the school database and added to report cards.') }).catch(e => setError(e instanceof Error ? e.message : 'Unable to save school badge.')) }
     reader.onerror = () => setError('Unable to read the selected image.')
     reader.readAsDataURL(file)
   }
@@ -515,7 +525,7 @@ export default function AcademicManagement({ token, classes }: { token: string; 
           <label className="academic-exam-select report-student-picker">Preview student<select value={historyStudentId} onChange={e => setHistoryStudentId(e.target.value)}><option value="">Choose a student</option>{students.map(student => <option key={student.id} value={student.id}>{studentName(student)} · {student.admission_number}</option>)}</select></label>
           <button type="button" className="primary-button" disabled={!historyStudentId} onClick={() => printAcademicSection('report')}><Printer size={15}/> Print selected report</button>
         </div>
-        <div className="report-customisation-panel report-screen-controls"><div><strong>School badge / logo</strong><p>Upload the school's crest, badge or logo for every report.</p><input type="file" accept="image/*" onChange={e => void uploadSchoolLogo(e.target.files?.[0])}/>{reportLogo && <button type="button" className="secondary-button" onClick={() => { localStorage.removeItem('schoolbridge-report-logo'); setReportLogo('') }}>Remove badge</button>}</div><div><strong>Upload a report template</strong><p>Import a JSON template with editable report heading and footer fields.</p><input type="file" accept=".json,application/json" onChange={e => void uploadReportTemplate(e.target.files?.[0])}/></div><label>Editable report heading<input value={reportTitle} maxLength={100} onChange={e => setReportTitle(e.target.value)}/></label><label>Editable report footer<input value={reportFooter} maxLength={180} onChange={e => setReportFooter(e.target.value)}/></label><button type="button" className="primary-button" onClick={saveReportTemplateEdits}>Save report design</button></div>
+        <div className="report-customisation-panel report-screen-controls"><div><strong>School badge / logo</strong><p>Upload the school's crest, badge or logo for every report.</p><input type="file" accept="image/*" onChange={e => void uploadSchoolLogo(e.target.files?.[0])}/>{reportLogo && <button type="button" className="secondary-button" onClick={() => { void persistReportBranding('', reportTemplateConfig).then(() => { setReportLogo(''); setMessage('School badge removed from reports.') }).catch(e => setError(e instanceof Error ? e.message : 'Unable to remove school badge.')) }}>Remove badge</button>}</div><div><strong>Upload a report template</strong><p>Import a JSON template with editable report heading and footer fields.</p><input type="file" accept=".json,application/json" onChange={e => void uploadReportTemplate(e.target.files?.[0])}/></div><label>Editable report heading<input value={reportTitle} maxLength={100} onChange={e => setReportTitle(e.target.value)}/></label><label>Editable report footer<input value={reportFooter} maxLength={180} onChange={e => setReportFooter(e.target.value)}/></label><button type="button" className="primary-button" onClick={saveReportTemplateEdits}>Save report design</button></div>
         {historyError && <div className="form-error" role="alert">{historyError}</div>}
         {historyStudent && reportCardMarkup(historyStudent, selectedReportRows)}
         {!historyStudent && <div className="subject-marks-empty"><BookOpen size={25}/><strong>Choose a student to preview a report</strong><span>Use Print whole class to produce every student's report in one print job.</span></div>}
