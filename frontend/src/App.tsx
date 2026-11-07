@@ -8,6 +8,7 @@ import {
 import StaffFinance from './StaffFinance'
 import AcademicManagement from './AcademicManagement'
 import AttendanceManagement from './AttendanceManagement'
+import OperationsManagement from './OperationsManagement'
 import './App.css'
 
 type User = {
@@ -55,6 +56,8 @@ const menu = [
   { label: 'Fees & Finance', icon: FileText },
   { label: 'Examinations', icon: FileText },
   { label: 'Attendance', icon: CalendarDays },
+  { label: 'Staff Attendance', icon: Users },
+  { label: 'Timetable', icon: CalendarDays },
   { label: 'Leadership & Duty', icon: ShieldCheck },
 ]
 const teacherMenu = [
@@ -681,6 +684,7 @@ function App() {
           )}
           {active === 'Examinations' && user.role === 'admin' && <AcademicManagement token={token} classes={classes} />}
           {active === 'Attendance' && user.role === 'admin' && <AttendanceManagement token={token} />}
+          {(active === 'Staff Attendance' || active === 'Timetable') && user.role === 'admin' && <OperationsManagement token={token} active={active} />}
           {active === 'Leadership & Duty' && user.role === 'admin' && <LeadershipDuty token={token} />}
           {active === 'Settings' && settingsSection === 'home' && (
             <section className="settings-hub">
