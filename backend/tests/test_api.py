@@ -336,3 +336,127 @@ def test_fee_payment_amount_must_be_positive():
         )
 
     assert response.status_code == 422
+
+
+def test_phase_one_staff_and_finance_workflow_end_to_end():
+    reset_database()
+    admin = create_admin()
+    token = create_access_token(admin)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    db = SessionLocal()
+    try:
+        school_class = models.SchoolClass(name="Senior 2", section="East")
+        db.add(school_class)
+        db.flush()
+        student = models.Student(
+            admission_number="SB-FIN-001",
+            first_name="Amina",
+            middle_name="N.",
+            last_name="Learner",
+            class_id=school_class.id,
+            status="active",
+        )
+        db.add(student)
+        db.commit()
+        class_id = school_class.id
+        student_id = student.id
+    finally:
+        db.close()
+
+    with TestClient(app) as client:
+        # Staff registration, listing and salary history.
+        created_staff = client.post(
+            "/api/staff",
+            headers=headers,
+            json={
+                "first_name": "Alex",
+                "last_name": "Teacher",
+                "category": "Non-teaching",
+                "position": "Bursar",
+                "department": "Finance",
+                "salary_amount": 500000,
+                "salary_frequency": "Monthly",
+            },
+        )
+        assert created_staff.status_code == 200, created_staff.text
+        staff_id = created_staff.json()["id"]
+
+        staff_page = client.get("/api/staff?page=1&page_size=100", headers=headers)
+        assert staff_page.status_code == 200, staff_page.text
+        assert any(item["id"] == staff_id for item in staff_page.json()["items"])
+
+        salary = client.post(
+            "/api/finance/salary-payments",
+            headers=headers,
+            json={"staff_id": staff_id, "amount": 450000, "period": "November 2026"},
+        )
+        assert salary.status_code == 200, salary.text
+
+        # Configure the active term fee and confirm it creates student charges.
+        academic = client.put(
+            "/api/settings/academic",
+            headers=headers,
+            json={"academic_year": 2026, "active_term": "Term 1"},
+        )
+        assert academic.status_code == 200, academic.text
+
+        class_fee = client.put(
+            f"/api/classes/{class_id}/fees",
+            headers=headers,
+            json={"term": "Term 1", "year": 2026, "amount": 800000},
+        )
+        assert class_fee.status_code == 200, class_fee.text
+        assert class_fee.json()["charges_created"] == 1
+
+        matches = client.get(
+            "/api/students/search?search=SB-FIN-001&page=1&page_size=30",
+            headers=headers,
+        )
+        assert matches.status_code == 200, matches.text
+        assert matches.json()["total"] == 1
+        assert matches.json()["items"][0]["id"] == student_id
+
+        charges = client.get(
+            "/api/finance/charges?search=SB-FIN-001",
+            headers=headers,
+        )
+        assert charges.status_code == 200, charges.text
+        charge = charges.json()[0]
+        assert charge["balance"] == 800000
+
+        payment = client.post(
+            "/api/finance/payments",
+            headers=headers,
+            json={"charge_id": charge["id"], "amount": 300000, "method": "Mobile Money"},
+        )
+        assert payment.status_code == 200, payment.text
+        assert payment.json()["receipt_number"].startswith("RCPT-")
+
+        expense = client.post(
+            "/api/finance/other-expenses",
+            headers=headers,
+            json={"description": "Classroom stationery", "category": "Supplies", "amount": 50000},
+        )
+        assert expense.status_code == 200, expense.text
+
+        balances = client.get(
+            "/api/finance/charges?class_id=" + str(class_id) + "&outstanding_only=true",
+            headers=headers,
+        )
+        assert balances.status_code == 200, balances.text
+        assert len(balances.json()) == 1
+        assert balances.json()[0]["balance"] == 500000
+
+        summary = client.get("/api/finance/summary", headers=headers)
+        assert summary.status_code == 200, summary.text
+        totals = summary.json()
+        assert totals["fees_expected"] == 800000
+        assert totals["fees_collected"] == 300000
+        assert totals["outstanding"] == 500000
+        assert totals["salary_expenses"] == 450000
+        assert totals["other_expenses"] == 50000
+        assert totals["net_cash_position"] == -200000
+
+        archived = client.post(f"/api/staff/{staff_id}/archive", headers=headers)
+        assert archived.status_code == 200, archived.text
