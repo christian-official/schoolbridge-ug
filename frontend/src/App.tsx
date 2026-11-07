@@ -861,7 +861,7 @@ function TeacherWorkspace({token,active}:{token:string;active:string}) {
         </form>
         <div className="table-wrap"><table><thead><tr><th>Student</th><th>Admission number</th><th>Subject</th><th>Score</th><th>Verification</th><th>Action</th></tr></thead><tbody>
           {resultMarks.filter(mark=>assignedSubjects.some(row=>row.subject_id===mark.subject_id)).map(mark=><tr key={mark.id}><td>{mark.student_name}</td><td>{mark.admission_number}</td><td>{assignedSubjects.find(row=>row.subject_id===mark.subject_id)?.subject}</td><td>{mark.score.toFixed(2)}</td><td>{mark.verified?'Verified':'Pending administrator review'}</td><td><button type="button" className="secondary-button" disabled={mark.verified} onClick={()=>setResultForm({student_id:String(mark.student_id),subject_id:String(mark.subject_id),score:String(mark.score)})}>{mark.verified?'Locked':'Edit'}</button></td></tr>)}
-          {!resultMarks.length&&<tr><td colSpan={5}>No marks have been entered for this examination yet.</td></tr>}
+          {!resultMarks.length&&<tr><td colSpan={6}>No marks have been entered for this examination yet.</td></tr>}
         </tbody></table></div>
       </>}
     </section>
