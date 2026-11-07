@@ -789,6 +789,115 @@ def dashboard_summary(db: Session = Depends(get_db)):
     }
 
 
+
+class PrefectAssignmentCreate(BaseModel):
+    student_id: int
+    position: str = Field(min_length=2, max_length=100)
+    start_date: date = Field(default_factory=date.today)
+    end_date: date | None = None
+
+
+class TeacherDutyCreate(BaseModel):
+    staff_id: int
+    duty_date: date
+    notes: str | None = Field(default=None, max_length=255)
+
+
+@app.get("/api/leadership/prefects", tags=["Leadership"])
+def list_prefects(active_only: bool = True, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    query = db.query(models.PrefectAssignment, models.Student, models.SchoolClass).join(
+        models.Student, models.Student.id == models.PrefectAssignment.student_id
+    ).outerjoin(models.SchoolClass, models.SchoolClass.id == models.Student.class_id)
+    if active_only:
+        query = query.filter(models.PrefectAssignment.active.is_(True))
+    rows = query.order_by(models.PrefectAssignment.active.desc(), models.PrefectAssignment.position).all()
+    return [{
+        "id": assignment.id, "student_id": student.id,
+        "student_name": f"{student.first_name} {student.last_name}",
+        "admission_number": student.admission_number,
+        "class_name": school_class.name if school_class else "Unassigned",
+        "stream": school_class.section if school_class else None,
+        "position": assignment.position, "start_date": assignment.start_date,
+        "end_date": assignment.end_date, "active": assignment.active,
+    } for assignment, student, school_class in rows]
+
+
+@app.post("/api/leadership/prefects", tags=["Leadership"])
+def appoint_prefect(data: PrefectAssignmentCreate, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    student = db.get(models.Student, data.student_id)
+    if not student or student.status != "active":
+        raise HTTPException(404, "Select an active student.")
+    if data.end_date and data.end_date < data.start_date:
+        raise HTTPException(422, "End date cannot be earlier than start date.")
+    assignment = models.PrefectAssignment(**data.model_dump())
+    db.add(assignment)
+    db.flush()
+    write_audit(db, admin, "prefect_appointed", "prefect_assignment", assignment.id,
+                f"{student.admission_number}; {data.position}")
+    db.commit()
+    db.refresh(assignment)
+    return {"id": assignment.id, "message": "Prefect appointed successfully."}
+
+
+@app.patch("/api/leadership/prefects/{assignment_id}/end", tags=["Leadership"])
+def end_prefect_term(assignment_id: int, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    assignment = db.get(models.PrefectAssignment, assignment_id)
+    if not assignment:
+        raise HTTPException(404, "Prefect appointment not found.")
+    assignment.active = False
+    assignment.end_date = date.today()
+    write_audit(db, admin, "prefect_term_ended", "prefect_assignment", assignment.id, assignment.position)
+    db.commit()
+    return {"message": "Prefect appointment ended."}
+
+
+@app.get("/api/leadership/teacher-duties", tags=["Leadership"])
+def list_teacher_duties(from_date: date | None = None, to_date: date | None = None,
+                        db: Session = Depends(get_db), admin=Depends(require_admin)):
+    query = db.query(models.TeacherDuty, models.StaffMember).join(
+        models.StaffMember, models.StaffMember.id == models.TeacherDuty.staff_id
+    )
+    if from_date:
+        query = query.filter(models.TeacherDuty.duty_date >= from_date)
+    if to_date:
+        query = query.filter(models.TeacherDuty.duty_date <= to_date)
+    rows = query.order_by(models.TeacherDuty.duty_date.desc()).limit(150).all()
+    return [{
+        "id": duty.id, "staff_id": staff.id,
+        "teacher_name": f"{staff.first_name} {staff.last_name}",
+        "staff_number": staff.staff_number, "duty_date": duty.duty_date,
+        "notes": duty.notes,
+    } for duty, staff in rows]
+
+
+@app.post("/api/leadership/teacher-duties", tags=["Leadership"])
+def assign_teacher_duty(data: TeacherDutyCreate, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    staff = db.get(models.StaffMember, data.staff_id)
+    if not staff or staff.status != "active" or staff.category != "Teaching":
+        raise HTTPException(404, "Select an active teaching staff member.")
+    if db.query(models.TeacherDuty).filter_by(duty_date=data.duty_date).first():
+        raise HTTPException(409, "A teacher is already assigned to this duty date.")
+    duty = models.TeacherDuty(**data.model_dump())
+    db.add(duty)
+    db.flush()
+    write_audit(db, admin, "teacher_duty_assigned", "teacher_duty", duty.id,
+                f"{staff.staff_number}; {data.duty_date}")
+    db.commit()
+    db.refresh(duty)
+    return {"id": duty.id, "message": "Teacher duty assigned successfully."}
+
+
+@app.delete("/api/leadership/teacher-duties/{duty_id}", tags=["Leadership"])
+def remove_teacher_duty(duty_id: int, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    duty = db.get(models.TeacherDuty, duty_id)
+    if not duty:
+        raise HTTPException(404, "Duty assignment not found.")
+    write_audit(db, admin, "teacher_duty_removed", "teacher_duty", duty.id, str(duty.duty_date))
+    db.delete(duty)
+    db.commit()
+    return {"message": "Duty assignment removed."}
+
+
 @app.post("/api/staff", tags=["Staff"])
 def create_staff(data: StaffCreate, db: Session = Depends(get_db)):
     item = models.StaffMember(staff_number="STF-" + str(date.today().year) + "-" + uuid4().hex[:6].upper(), **data.model_dump())
