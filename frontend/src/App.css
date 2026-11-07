@@ -696,34 +696,63 @@ button:disabled { cursor: not-allowed; opacity: .58; }
 .form-disclosure > .student-form { margin:0; }
 
 
-/* Academic results and individual report cards have independent print targets. */
+.class-results-print-sheet,.class-reports-print-batch { display:none; }
+.report-template-classic { border-top:6px double #263e70; border-radius:0; box-shadow:none; }
+.report-template-classic .report-school-title > strong { border:1px solid #263e70; border-radius:0; background:#fff; color:#263e70; }
+.report-template-modern { border-top:5px solid #315ee8; }
+.report-template-modern .report-school-emblem { border-radius:14px; background:#edf2ff; }
+.report-template-detailed { border-top:5px solid #16805a; }
+.report-template-detailed .report-school-emblem { border-color:#16805a; color:#16805a; }
+.report-template-detailed .report-school-title > strong { background:#e8f7ef; color:#176b4b; }
+.report-template-toolbar { display:flex; align-items:flex-end; gap:14px; flex-wrap:wrap; margin:14px 0 18px; padding:14px; border:1px solid #e3e9f2; border-radius:11px; background:#f8faff; }
+.report-template-toolbar label { display:grid; gap:7px; min-width:220px; flex:1; color:#43536d; font-size:12px; font-weight:750; }
+.report-template-toolbar .report-student-picker { margin:0; }
+.class-results-print-header { display:flex; justify-content:space-between; align-items:center; gap:20px; padding-bottom:15px; border-bottom:3px solid #263e70; }
+.class-results-print-header span { color:#73829b; font-size:9px; font-weight:850; letter-spacing:1px; }
+.class-results-print-header h1 { margin:5px 0; color:#20365e; font-size:23px; text-transform:uppercase; }
+.class-results-print-header p { margin:0; color:#71809a; font-size:10px; }
+.class-results-print-header > strong { padding:9px 12px; background:#edf2ff; color:#274aab; font-size:12px; letter-spacing:.6px; }
+.class-results-print-meta { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin:16px 0; }
+.class-results-print-meta span,.class-results-print-stats > div { display:grid; gap:5px; padding:9px 11px; border:1px solid #e1e7f0; border-radius:6px; color:#34445e; font-size:10px; }
+.class-results-print-meta b,.class-results-print-stats small { color:#8390a5; font-size:8px; letter-spacing:.5px; }
+.class-results-print-stats { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin-bottom:18px; }
+.class-results-print-stats strong { color:#263e70; font-size:18px; }
+.class-results-print-sheet h2 { margin:17px 0 8px; color:#263b62; font-size:13px; }
+.class-results-print-sheet table { width:100%; border-collapse:collapse; }
+.class-results-print-sheet th { padding:7px 6px; background:#edf2fa; color:#53647e; font-size:8px; text-align:left; }
+.class-results-print-sheet td { padding:7px 6px; border-bottom:1px solid #e5eaf2; color:#35445d; font-size:9px; }
+.class-results-print-sheet footer { margin-top:20px; padding-top:10px; border-top:1px solid #dce3ed; color:#73829b; font-size:9px; }
+.class-reports-print-batch .report-card-sheet { page-break-after:always; break-after:page; }
+.class-reports-print-batch .report-card-sheet:last-child { page-break-after:auto; break-after:auto; }
 @media print {
-  body[data-schoolbridge-print="results"] *,
-  body[data-schoolbridge-print="report"] * {
-    visibility: hidden !important;
-  }
+  @page { size:A4 landscape; margin:10mm; }
+  body[data-schoolbridge-print="results"] * { visibility:hidden !important; }
+  body[data-schoolbridge-print="results"] .class-results-print-sheet,
+  body[data-schoolbridge-print="results"] .class-results-print-sheet * { visibility:visible !important; }
+  body[data-schoolbridge-print="results"] .class-results-print-sheet { display:block !important; position:absolute !important; inset:0 auto auto 0 !important; width:100% !important; padding:0 !important; }
+  body[data-schoolbridge-print="report"] * { visibility:hidden !important; }
+  body[data-schoolbridge-print="report"] .academic-report-print .report-card-sheet,
+  body[data-schoolbridge-print="report"] .academic-report-print .report-card-sheet * { visibility:visible !important; }
+  body[data-schoolbridge-print="report"] .academic-report-print > .report-card-sheet { display:block !important; position:absolute !important; inset:0 auto auto 0 !important; width:100% !important; max-width:none !important; margin:0 !important; padding:0 !important; border:0 !important; box-shadow:none !important; }
+  body[data-schoolbridge-print="class-reports"] * { visibility:hidden !important; }
+  body[data-schoolbridge-print="class-reports"] .class-reports-print-batch,
+  body[data-schoolbridge-print="class-reports"] .class-reports-print-batch * { visibility:visible !important; }
+  body[data-schoolbridge-print="class-reports"] .class-reports-print-batch { display:block !important; position:absolute !important; inset:0 auto auto 0 !important; width:100% !important; }
+  body[data-schoolbridge-print="class-reports"] .report-card-sheet { max-width:none !important; margin:0 !important; padding:0 !important; border:0 !important; border-radius:0 !important; box-shadow:none !important; }
+  body[data-schoolbridge-print="report"] .report-screen-controls,
+  body[data-schoolbridge-print="class-reports"] .report-screen-controls { display:none !important; }
   body[data-schoolbridge-print="results"] .academic-results-print,
-  body[data-schoolbridge-print="results"] .academic-results-print *,
   body[data-schoolbridge-print="report"] .academic-report-print,
-  body[data-schoolbridge-print="report"] .academic-report-print * {
-    visibility: visible !important;
-  }
-  body[data-schoolbridge-print="results"] .academic-results-print,
-  body[data-schoolbridge-print="report"] .academic-report-print {
-    position: absolute !important;
-    inset: 0 auto auto 0 !important;
-    width: 100% !important;
-    max-width: none !important;
-    margin: 0 !important;
-    padding: 20px !important;
-    box-shadow: none !important;
-    border: 0 !important;
-    background: #fff !important;
-  }
+  body[data-schoolbridge-print="class-reports"] .academic-report-print { background:#fff !important; box-shadow:none !important; border:0 !important; }
   body[data-schoolbridge-print="results"] .academic-results-print button,
-  body[data-schoolbridge-print="report"] .academic-report-print button {
-    display: none !important;
-  }
+  body[data-schoolbridge-print="report"] .academic-report-print button,
+  body[data-schoolbridge-print="class-reports"] .academic-report-print button { display:none !important; }
+  body[data-schoolbridge-print="report"] .class-reports-print-batch,
+  body[data-schoolbridge-print="class-reports"] .academic-report-print > .report-card-sheet { display:none !important; }
+  body[data-schoolbridge-print="results"] .academic-results-print > :not(.class-results-print-sheet) { display:none !important; }
+  body[data-schoolbridge-print="results"] .class-results-print-sheet * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  body[data-schoolbridge-print="report"] .report-card-sheet *,
+  body[data-schoolbridge-print="class-reports"] .report-card-sheet * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
 }
 
 
@@ -1205,3 +1234,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 @media(max-width:760px) {
   .recorded-status-columns { grid-template-columns: 1fr; padding: 10px; }
 }
+
+/* Overview: put the highest-priority academic and finance workspace first. */
+.overview-finance-metrics { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; margin:4px 0 12px; }
+.overview-finance-metrics > div { display:grid; gap:5px; min-width:0; padding:12px; border:1px solid #e2e8f1; border-radius:9px; background:#f8faff; }
+.overview-finance-metrics small { color:#7b879b; font-size:9px; font-weight:850; letter-spacing:.5px; }
+.overview-finance-metrics strong { color:#263e70; font-size:clamp(13px,1.6vw,19px); overflow-wrap:anywhere; }
+@media(max-width:640px) { .overview-finance-metrics { grid-template-columns:1fr; } }
