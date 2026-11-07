@@ -41,7 +41,7 @@ export default function StaffFinance({token,active}:{token:string;active:string}
 
   async function addStaff(e:FormEvent){
     e.preventDefault();setMessage('')
-    try { await request('staff',token,{method:'POST',body:JSON.stringify(form)});setForm({first_name:'',last_name:'',category:'Teaching',position:'',department:'',phone:'',email:'',salary_amount:'',salary_frequency:'Monthly'});setShowForm(false);setMessage('Staff member registered.');const p=new URLSearchParams({search,page:'1',page_size:'100'});if(category)p.set('category',category);const r=await request<Page<Staff>>('staff?'+p.toString(),token);setStaff(r.items);setStaffTotal(r.total) }
+    try { await request('staff',token,{method:'POST',body:JSON.stringify({...form,salary_amount:form.salary_amount===''?null:Number(form.salary_amount)})});setForm({first_name:'',last_name:'',category:'Teaching',position:'',department:'',phone:'',email:'',salary_amount:'',salary_frequency:'Monthly'});setShowForm(false);setMessage('Staff member registered.');const p=new URLSearchParams({search,page:'1',page_size:'100'});if(category)p.set('category',category);const r=await request<Page<Staff>>('staff?'+p.toString(),token);setStaff(r.items);setStaffTotal(r.total) }
     catch(e){setMessage(e instanceof Error?e.message:'Unable to save staff member.')}
   }
   async function pay(e:FormEvent){
