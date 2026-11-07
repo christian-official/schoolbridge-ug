@@ -13,7 +13,7 @@ async function request<T>(path:string, token:string, options:RequestInit={}):Pro
   return data as T
 }
 
-export default function StaffFinance({token,active,classes=[]}:{token:string;active:string;classes?:{id:number;name?:string;section?:string}[]}) {
+export default function StaffFinance({token,active,classes=[],refreshKey=0}:{token:string;active:string;classes?:{id:number;name?:string;section?:string}[];refreshKey?:number}) {
   const [staff,setStaff]=useState<Staff[]>([])
   const [staffTotal,setStaffTotal]=useState(0)
   const [search,setSearch]=useState('')
@@ -37,11 +37,11 @@ export default function StaffFinance({token,active,classes=[]}:{token:string;act
   const [schoolProfile,setSchoolProfile]=useState<{name:string;phone?:string;email?:string;address?:string}>({name:'SchoolBridge'})
 
   useEffect(()=>{
-    if(active!=='Staff') return
+    if(active!=='Staff' && active!=='Fees & Finance') return
     const params=new URLSearchParams({search,page:'1',page_size:'100'})
     if(category) params.set('category',category)
     request<Page<Staff>>('staff?'+params.toString(),token).then(r=>{setStaff(r.items);setStaffTotal(r.total)}).catch(e=>setMessage(e.message))
-  },[active,search,category,token])
+  },[active,search,category,token,refreshKey])
 
   async function refreshFinance(){
     const params=new URLSearchParams({search:feeSearch,outstanding_only:String(outstandingOnly)})
@@ -53,7 +53,7 @@ export default function StaffFinance({token,active,classes=[]}:{token:string;act
     ])
     setSummary(s);setCharges(rows);setAllOutstanding(balances)
   }
-  useEffect(()=>{if(active==='Fees & Finance'){refreshFinance().catch(e=>setMessage(e.message));request<any>('settings/school-profile',token).then(setSchoolProfile).catch(()=>{})}},[active,feeSearch,feeClass,outstandingOnly,token])
+  useEffect(()=>{if(active==='Fees & Finance'){refreshFinance().catch(e=>setMessage(e.message));request<any>('settings/school-profile',token).then(setSchoolProfile).catch(()=>{})}},[active,feeSearch,feeClass,outstandingOnly,token,refreshKey])
 
   useEffect(()=>{
     if(active!=='Fees & Finance'||!feeSetup.class_id)return
