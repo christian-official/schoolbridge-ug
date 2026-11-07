@@ -267,7 +267,6 @@ export default function AcademicManagement({ token, classes }: { token: string; 
     subject: subjects.find(subject => subject.id === mark.subject_id),
     grade: gradingBands.find(band => mark.score >= band.min_score && (mark.score < band.max_score || band.max_score === 100))?.grade || '—',
   })).sort((a, b) => (b.exam?.year || 0) - (a.exam?.year || 0) || (a.exam?.term || '').localeCompare(b.exam?.term || ''))
-  const historyAverage = verifiedHistoryMarks.length ? verifiedHistoryMarks.reduce((sum, mark) => sum + mark.score, 0) / verifiedHistoryMarks.length : 0
 
   return <div className="academic-workspace">
     <section className="panel">
