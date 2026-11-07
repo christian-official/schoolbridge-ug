@@ -1,7 +1,9 @@
 from datetime import date
 from uuid import uuid4
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from starlette.background import BackgroundTask
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
@@ -1127,3 +1129,86 @@ def save_school_profile(data: SchoolProfileUpdate, db: Session = Depends(get_db)
     db.commit()
     db.refresh(profile)
     return {"message": "School profile saved.", "profile": profile}
+
+
+@app.post("/api/backups/create", tags=["Backups"])
+def create_database_backup(admin=Depends(require_admin)):
+    import os, sqlite3, tempfile
+    if engine.dialect.name != "sqlite":
+        raise HTTPException(501, "Direct file backups are currently supported for the local SQLite installation.")
+    db_path = engine.url.database
+    if not db_path or db_path == ":memory:":
+        raise HTTPException(400, "A file-based school database is required.")
+    fd, backup_path = tempfile.mkstemp(prefix="schoolbridge-backup-", suffix=".sqlite3")
+    os.close(fd)
+    try:
+        source = sqlite3.connect(os.path.abspath(db_path))
+        destination = sqlite3.connect(backup_path)
+        try:
+            source.backup(destination)
+        finally:
+            destination.close()
+            source.close()
+    except Exception:
+        if os.path.exists(backup_path):
+            os.unlink(backup_path)
+        raise HTTPException(500, "Could not create a database backup.")
+    filename = "schoolbridge-backup-" + date.today().isoformat() + ".sqlite3"
+    return FileResponse(
+        backup_path, media_type="application/vnd.sqlite3", filename=filename,
+        background=BackgroundTask(lambda: os.path.exists(backup_path) and os.unlink(backup_path))
+    )
+
+
+@app.post("/api/backups/restore", tags=["Backups"])
+async def restore_database_backup(file: UploadFile = File(...), admin=Depends(require_admin)):
+    import os, sqlite3, tempfile, shutil
+    if engine.dialect.name != "sqlite":
+        raise HTTPException(501, "Direct file restore is currently supported for the local SQLite installation.")
+    db_path = engine.url.database
+    if not db_path or db_path == ":memory:":
+        raise HTTPException(400, "A file-based school database is required.")
+    payload = await file.read(512 * 1024 * 1024 + 1)
+    if len(payload) > 512 * 1024 * 1024:
+        raise HTTPException(413, "Backup file is larger than 512 MB.")
+    directory = os.path.dirname(os.path.abspath(db_path))
+    fd, uploaded_path = tempfile.mkstemp(prefix="schoolbridge-restore-", suffix=".sqlite3", dir=directory)
+    os.close(fd)
+    safety_path = os.path.abspath(db_path) + ".before_restore_" + str(int(datetime.now().timestamp())) + ".bak"
+    try:
+        with open(uploaded_path, "wb") as output:
+            output.write(payload)
+        candidate = sqlite3.connect(uploaded_path)
+        try:
+            integrity = candidate.execute("PRAGMA integrity_check").fetchone()
+            tables = {row[0] for row in candidate.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+            required = {"users", "students", "classes", "school_settings"}
+            if not integrity or integrity[0] != "ok" or not required.issubset(tables):
+                raise HTTPException(400, "This file is not a valid SchoolBridge database backup.")
+        finally:
+            candidate.close()
+        current = sqlite3.connect(os.path.abspath(db_path))
+        safety = sqlite3.connect(safety_path)
+        try:
+            current.backup(safety)
+        finally:
+            safety.close()
+            current.close()
+        engine.dispose()
+        os.replace(uploaded_path, os.path.abspath(db_path))
+        engine.dispose()
+        Base.metadata.create_all(bind=engine)
+        upgrade_existing_database()
+        upgrade_class_stream_uniqueness()
+        return {"message": "School database restored successfully. A safety copy of the previous database was kept beside the database file."}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        if os.path.exists(safety_path):
+            engine.dispose()
+            shutil.copy2(safety_path, os.path.abspath(db_path))
+            engine.dispose()
+        raise HTTPException(500, "Restore failed. The previous database was restored from its safety copy.") from exc
+    finally:
+        if os.path.exists(uploaded_path):
+            os.unlink(uploaded_path)
