@@ -725,3 +725,16 @@ button:disabled { cursor: not-allowed; opacity: .58; }
     display: none !important;
   }
 }
+
+
+/* Multi-select school subject catalogue */
+.subject-catalogue { display:grid; gap:14px; margin:12px 0 18px; }
+.subject-catalogue-group { min-width:0; border:1px solid var(--line); border-radius:10px; padding:14px; margin:0; }
+.subject-catalogue-group legend { padding:0 7px; font-weight:700; color:var(--navy); }
+.subject-catalogue-options { display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:8px 14px; }
+.subject-choice { display:flex !important; align-items:center; gap:9px !important; min-height:38px; padding:7px 9px; border:1px solid var(--line); border-radius:8px; font-weight:500 !important; cursor:pointer; }
+.subject-choice input { width:17px; height:17px; flex:0 0 auto; accent-color:var(--blue); }
+.subject-selection-review { border:1px solid var(--line); border-radius:10px; padding:14px; margin-top:16px; }
+.subject-selection-review > strong { display:block; margin-bottom:9px; color:var(--navy); }
+.subject-selection-tags { display:flex; flex-wrap:wrap; gap:7px; }
+.subject-selection-tags span { border-radius:20px; padding:6px 10px; background:#edf2ff; color:#2447a8; font-size:13px; }
