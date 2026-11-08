@@ -117,14 +117,20 @@
 }
 
 
-/* White SchoolBridge brand header, separate from the role-coloured navigation */
-.redesigned-app-shell .redesigned-brand{
-  background:#ffffff;
+/* White SchoolBridge logo header, targeting the actual sidebar-brand markup */
+.redesigned-app-shell .sidebar .sidebar-brand{
+  background:#ffffff!important;
+  color:#1d2b42!important;
   border-radius:14px;
   margin:0 0 18px;
   padding:13px 10px 16px!important;
+  min-height:70px;
 }
-.redesigned-app-shell .redesigned-brand .brand-name{color:#1d2b42}
-.redesigned-app-shell .redesigned-brand .brand-name span{color:var(--role-primary)}
-.redesigned-app-shell .redesigned-brand .brand-lockup small{color:#8994a5}
-.redesigned-app-shell .redesigned-brand .mobile-close{color:#536176}
+.redesigned-app-shell .sidebar .sidebar-brand .brand-mark{
+  background:var(--role-soft)!important;
+  color:var(--role-primary)!important;
+  box-shadow:none!important;
+}
+.redesigned-app-shell .sidebar .sidebar-brand .brand-name{color:#1d2b42!important}
+.redesigned-app-shell .sidebar .sidebar-brand .brand-name span{color:var(--role-primary)!important}
+.redesigned-app-shell .sidebar .sidebar-brand .mobile-close{color:#536176!important}
