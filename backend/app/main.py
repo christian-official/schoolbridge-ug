@@ -2201,6 +2201,7 @@ def parent_liaison_recipients(class_id: int | None = None, search: str = "", db:
             "class_name": school_class.name if school_class else "Unassigned",
             "parent_account": primary_parent.username,
             "parents": [{"id": primary_parent.id, "username": primary_parent.username, "email": primary_parent.email}],
+            "parents": [{"id": primary_parent.id, "username": primary_parent.username, "email": primary_parent.email}],
         })
     return output
 
