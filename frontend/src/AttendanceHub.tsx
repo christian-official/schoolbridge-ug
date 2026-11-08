@@ -2,7 +2,7 @@ import { useState } from 'react'
 import AttendanceManagement from './AttendanceManagement'
 import OperationsManagement from './OperationsManagement'
 
-export default function AttendanceHub({ token, canViewStudents = true, canViewStaff = true, canEditStudents = true, canEditStaff = true, permissions = {}, isAdmin = false, roleLabel = '' }: { token: string; canViewStudents?: boolean; canViewStaff?: boolean; canEditStudents?: boolean; canEditStaff?: boolean; permissions?: Record<string,string[]>; isAdmin?: boolean; roleLabel?: string }) {
+export default function AttendanceHub({ token, canViewStudents = true, canViewStaff = true, canEditStudents = true, permissions = {}, isAdmin = false, roleLabel = '' }: { token: string; canViewStudents?: boolean; canViewStaff?: boolean; canEditStudents?: boolean; permissions?: Record<string,string[]>; isAdmin?: boolean; roleLabel?: string }) {
   const [section, setSection] = useState<'students' | 'staff'>(canViewStudents ? 'students' : 'staff')
   const showBoth = canViewStudents && canViewStaff
   return <div className="academic-workspace">
