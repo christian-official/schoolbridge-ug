@@ -95,3 +95,71 @@
  .redesigned-app-shell .admin-command-hero h2,.redesigned-app-shell .dos-hero h2,.redesigned-app-shell .dashboard-role-heading h2,.redesigned-app-shell .secretary-office-hero h2,.redesigned-app-shell .attendance-control-hero h2,.redesigned-app-shell .teacher-workspace-hero h2{font-size:24px}
  .redesigned-app-shell .top-actions{gap:8px}.redesigned-app-shell .refresh-button{padding:8px!important;font-size:0!important}
 }
+
+/* Sidebar refinement: quiet, readable navigation with role colour as an accent */
+.redesigned-app-shell .sidebar{
+  background:linear-gradient(180deg,#ffffff 0%,#f8f9fc 100%);
+  color:#26364d;
+  border-right:1px solid #e6eaf1;
+  box-shadow:4px 0 20px #182b4508;
+}
+.redesigned-app-shell .brand-mark{
+  background:linear-gradient(145deg,var(--role-primary),var(--role-accent));
+  box-shadow:0 5px 13px color-mix(in srgb,var(--role-primary) 18%,transparent);
+}
+.redesigned-app-shell .brand-name{color:#1d2b42}
+.redesigned-app-shell .brand-name span{color:var(--role-primary)}
+.brand-lockup small{color:#8a95a6}
+.redesigned-app-shell .mobile-close{color:#5b687b}
+.sidebar-school-card{
+  background:var(--role-soft);
+  border:1px solid color-mix(in srgb,var(--role-primary) 14%,#ffffff);
+}
+.sidebar-school-symbol{
+  background:#fff;
+  color:var(--role-primary);
+}
+.sidebar-school-card strong{color:#26364d}
+.sidebar-school-card small{color:#7a8799}
+.sidebar-school-card i{
+  background:#29a66b;
+  box-shadow:0 0 0 4px #29a66b18;
+}
+.redesigned-app-shell .school-label{color:#8994a5}
+.redesigned-app-shell .sidebar .nav-item{
+  color:#58667a;
+  font-weight:600;
+}
+.redesigned-app-shell .sidebar .nav-item svg{color:#8490a2;opacity:1}
+.redesigned-app-shell .sidebar .nav-item:hover{
+  background:#eef1f6;
+  color:#26364d;
+  transform:translateX(2px);
+}
+.redesigned-app-shell .sidebar .nav-item:hover svg{color:var(--role-primary)}
+.redesigned-app-shell .sidebar .nav-item.active{
+  background:var(--role-soft);
+  color:var(--role-deep);
+  box-shadow:inset 3px 0 var(--role-primary);
+  font-weight:750;
+}
+.redesigned-app-shell .sidebar .nav-item.active svg{color:var(--role-primary)}
+.redesigned-app-shell .active-dot{background:var(--role-primary)}
+.redesigned-app-shell .sidebar-settings-link{
+  color:#58667a;
+}
+.redesigned-profile{border-top:1px solid #e5e9f0!important}
+.redesigned-app-shell .avatar{
+  background:var(--role-soft);
+  color:var(--role-primary);
+}
+.redesigned-app-shell .profile-info strong{color:#26364d}
+.redesigned-app-shell .profile-info small{color:#8994a5}
+.redesigned-app-shell .logout-button{color:#7a8799}
+.redesigned-app-shell .logout-button:hover{color:#b4233c}
+@media(max-width:760px){
+  .redesigned-app-shell .sidebar{
+    background:#fff;
+    box-shadow:12px 0 32px #172b4520;
+  }
+}
