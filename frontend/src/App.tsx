@@ -135,6 +135,7 @@ function PasswordRecovery({onBack}:{onBack:()=>void}) {
   return <div className="password-recovery">
     <h2>{stage==='request'?'Recover your password':'Enter verification code'}</h2>
     <p className="muted">{stage==='request'?'Enter your username, staff number, surname or registered email address.':'Enter the six-digit code sent to your registered email address.'}</p>
+    <p className="form-hint">If no code arrives, contact your school administrator. Email recovery requires the school's email service to be configured.</p>
     {error&&<p className="error" role="alert">{error}</p>}{message&&<p className="success-notice" role="status">{message}</p>}
     {stage==='request'?<form onSubmit={requestCode}>
       <label htmlFor="recovery-identifier">Account identifier</label><input id="recovery-identifier" value={identifier} onChange={e=>setIdentifier(e.target.value)} autoComplete="username" required placeholder="Staff number, surname or email"/>
