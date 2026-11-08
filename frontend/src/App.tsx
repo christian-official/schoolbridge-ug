@@ -698,7 +698,7 @@ function App() {
           </div>
         </header>
 
-        <div className="content">
+        <div className="content" key={refreshKey}>
           <div className="welcome-row">
             <div>
               <p className="eyebrow">SCHOOL MANAGEMENT SYSTEM</p>
