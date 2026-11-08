@@ -483,6 +483,11 @@ class StudentCreate(BaseModel):
     guardian_name: str | None = None
     guardian_relationship: str | None = None
     guardian_phone: str | None = None
+    guardian2_name: str | None = None
+    guardian2_relationship: str | None = None
+    guardian2_phone: str | None = None
+    study_mode: str = Field(default="Day", pattern="^(Boarding|Day)$")
+    house: str | None = None
     previous_school: str | None = None
     admission_date: date | None = None
     class_id: int | None = None
@@ -831,7 +836,9 @@ def create_student(data: StudentCreate, db: Session = Depends(get_db), admin=Dep
             class_fee = db.query(models.ClassFee).filter_by(
                 class_id=item.class_id, term=active_term, year=active_year
             ).first()
-            selected_fee = data.fee_amount if data.fee_amount is not None else (class_fee.amount if class_fee else 0)
+            default_fee = (class_fee.boarding_amount if item.study_mode == "Boarding" else class_fee.day_amount) if class_fee else None
+            if default_fee is None and class_fee: default_fee = class_fee.amount
+            selected_fee = data.fee_amount if data.fee_amount is not None else (default_fee or 0)
             if selected_fee > 0:
                 db.add(models.FeeCharge(
                     student_id=item.id, term=active_term,
@@ -1243,7 +1250,7 @@ class ParentAccountCreate(BaseModel):
 
 class ParentLiaisonThreadCreate(BaseModel):
     student_id: int
-    parent_user_id: int
+    parent_user_id: int | None = None
     subject: str = Field(min_length=3, max_length=160)
     category: str = Field(default="General enquiry", pattern="^(Academic performance|Attendance|Behaviour and discipline|Fees and payments|Meeting request|General enquiry)$")
     message: str = Field(min_length=2, max_length=5000)
@@ -2164,27 +2171,30 @@ def _liaison_thread_access(db: Session, user, thread):
 
 
 @app.get("/api/parent-liaison/recipients", tags=["Parent Liaison"])
-def parent_liaison_recipients(db: Session = Depends(get_db), user=Depends(get_current_user)):
+def parent_liaison_recipients(class_id: int | None = None, search: str = "", db: Session = Depends(get_db), user=Depends(get_current_user)):
     _parent_liaison_staff_access(user, "add")
-    students = db.query(models.Student).filter(models.Student.status == "active").order_by(
-        models.Student.last_name, models.Student.first_name
-    ).all()
+    query = db.query(models.Student).filter(models.Student.status == "active")
+    if class_id is not None: query = query.filter(models.Student.class_id == class_id)
+    if search.strip():
+        term = "%" + search.strip() + "%"
+        query = query.filter(or_(models.Student.admission_number.ilike(term), models.Student.first_name.ilike(term), models.Student.middle_name.ilike(term), models.Student.last_name.ilike(term)))
+    students = query.order_by(models.Student.last_name, models.Student.first_name).limit(500).all()
     output = []
     for student in students:
         if not _staff_can_contact_student(db, user, student):
             continue
         links = db.query(models.ParentStudentLink, models.User).join(
             models.User, models.User.id == models.ParentStudentLink.user_id
-        ).filter(models.ParentStudentLink.student_id == student.id, models.User.is_active.is_(True)).all()
-        if not links:
-            continue
+        ).filter(models.ParentStudentLink.student_id == student.id, models.User.is_active.is_(True), models.User.role == "parent").order_by(models.ParentStudentLink.created_at.asc(), models.User.id.asc()).all()
+        if not links: continue
+        primary_parent = links[0][1]
         school_class = db.get(models.SchoolClass, student.class_id) if student.class_id else None
         output.append({
             "student_id": student.id,
             "student_name": " ".join(part for part in [student.first_name, student.middle_name, student.last_name] if part),
             "admission_number": student.admission_number,
             "class_name": school_class.name if school_class else "Unassigned",
-            "parents": [{"id": parent.id, "username": parent.username, "email": parent.email} for _, parent in links],
+            "parent_account": primary_parent.username,
         })
     return output
 
@@ -2197,12 +2207,12 @@ def create_parent_liaison_thread(data: ParentLiaisonThreadCreate, db: Session = 
         raise HTTPException(404, "Active student record not found.")
     if not _staff_can_contact_student(db, user, student):
         raise HTTPException(403, "You are not authorised to contact parents for this student.")
-    parent = db.query(models.User).filter_by(id=data.parent_user_id, role="parent", is_active=True).first()
-    link = db.query(models.ParentStudentLink.id).filter_by(
-        user_id=data.parent_user_id, student_id=data.student_id
-    ).first()
-    if not parent or not link:
-        raise HTTPException(422, "The selected parent account is not linked to this student.")
+    linked_accounts = db.query(models.User).join(models.ParentStudentLink, models.ParentStudentLink.user_id == models.User.id).filter(
+        models.ParentStudentLink.student_id == student.id, models.User.role == "parent", models.User.is_active.is_(True)
+    ).order_by(models.ParentStudentLink.created_at.asc(), models.User.id.asc()).all()
+    if not linked_accounts:
+        raise HTTPException(422, "No active parent account is linked to this student. Link one parent account before sending a communication.")
+    parent = linked_accounts[0]
     thread = models.ParentLiaisonThread(
         student_id=student.id, parent_user_id=parent.id, initiated_by=user.id,
         subject=data.subject.strip(), category=data.category,
@@ -2826,6 +2836,7 @@ class StaffCreate(BaseModel):
     email: str | None = None
     salary_amount: int | None = Field(default=None, ge=0)
     salary_frequency: str = Field(default="Monthly", pattern="^(Monthly|Termly|Weekly|Daily)$")
+    house: str | None = None
 
 def write_audit(db: Session, actor, action: str, entity_type: str, entity_id: int, details: str = ""):
     db.add(models.AuditLog(
@@ -2854,6 +2865,7 @@ def upgrade_existing_database():
         "previous_school": "VARCHAR(160)", "admission_date": "DATE",
         "status": "VARCHAR(20) NOT NULL DEFAULT 'active'",
         "academic_level": "VARCHAR(20)", "combination": "VARCHAR(100)", "optional_subjects": "TEXT", "subsidiary_subjects": "TEXT",
+        "guardian2_name": "VARCHAR(160)", "guardian2_relationship": "VARCHAR(60)", "guardian2_phone": "VARCHAR(30)", "study_mode": "VARCHAR(20) NOT NULL DEFAULT 'Day'", "house": "VARCHAR(80)",
     }
     settings_columns = {c["name"] for c in inspector.get_columns("school_settings")} if "school_settings" in inspector.get_table_names() else set()
     staff_columns = {c["name"] for c in inspector.get_columns("staff_members")} if "staff_members" in inspector.get_table_names() else set()
@@ -2865,13 +2877,14 @@ def upgrade_existing_database():
             if "subjects" not in staff_columns: connection.execute(text("ALTER TABLE staff_members ADD COLUMN subjects TEXT"))
             if "salary_amount" not in staff_columns: connection.execute(text("ALTER TABLE staff_members ADD COLUMN salary_amount INTEGER"))
             if "salary_frequency" not in staff_columns: connection.execute(text("ALTER TABLE staff_members ADD COLUMN salary_frequency VARCHAR(20) NOT NULL DEFAULT 'Monthly'"))
+            if "house" not in staff_columns: connection.execute(text("ALTER TABLE staff_members ADD COLUMN house VARCHAR(80)"))
         if "fee_payments" in inspector.get_table_names() and "receipt_number" not in payment_columns:
             connection.execute(text("ALTER TABLE fee_payments ADD COLUMN receipt_number VARCHAR(50)"))
         if "fee_payments" in inspector.get_table_names():
             connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_fee_payments_receipt_number ON fee_payments (receipt_number)"))
         if "school_profile" in inspector.get_table_names():
             profile_columns = {c["name"] for c in inspector.get_columns("school_profile")}
-            profile_additions = {"school_type": "VARCHAR(20) NOT NULL DEFAULT 'Secondary'", "a_level_combinations": "TEXT", "o_level_optional_subjects": "TEXT", "a_level_subsidiary_subjects": "TEXT"}
+            profile_additions = {"school_type": "VARCHAR(20) NOT NULL DEFAULT 'Secondary'", "a_level_combinations": "TEXT", "o_level_optional_subjects": "TEXT", "a_level_subsidiary_subjects": "TEXT", "house_names": "TEXT"}
             for name, sql_type in profile_additions.items():
                 if name not in profile_columns: connection.execute(text("ALTER TABLE school_profile ADD COLUMN " + name + " " + sql_type))
         if "school_settings" in inspector.get_table_names():
@@ -3326,7 +3339,8 @@ def record_fee_payment(data: FeePaymentCreate, db: Session = Depends(get_db), ad
 class ClassFeeUpdate(BaseModel):
     term: str = Field(pattern="^(Term 1|Term 2|Term 3)$")
     year: int = Field(ge=2000, le=2100)
-    amount: int = Field(ge=0)
+    boarding_amount: int = Field(ge=0)
+    day_amount: int = Field(ge=0)
 
 
 class AcademicSettingsUpdate(BaseModel):
@@ -3358,15 +3372,17 @@ def update_academic_settings(data: AcademicSettingsUpdate, db: Session = Depends
         class_fee = db.query(models.ClassFee).filter_by(
             class_id=student.class_id, term=data.active_term, year=data.academic_year
         ).first()
-        if not class_fee or class_fee.amount <= 0:
-            continue
+        if not class_fee: continue
+        selected_amount = class_fee.boarding_amount if student.study_mode == "Boarding" else class_fee.day_amount
+        if selected_amount is None: selected_amount = class_fee.amount
+        if selected_amount <= 0: continue
         existing = db.query(models.FeeCharge).filter_by(
             student_id=student.id, term=data.active_term, year=data.academic_year
         ).first()
         if existing is None:
             db.add(models.FeeCharge(
                 student_id=student.id, term=data.active_term,
-                year=data.academic_year, amount=class_fee.amount
+                year=data.academic_year, amount=selected_amount
             ))
             created += 1
     db.commit()
@@ -3381,9 +3397,11 @@ def get_class_fees(class_id: int, year: int | None = None, db: Session = Depends
     settings = get_or_create_school_settings(db)
     selected_year = year or settings.academic_year or date.today().year
     rows = db.query(models.ClassFee).filter_by(class_id=class_id, year=selected_year).all()
-    by_term = {row.term: row.amount for row in rows}
+    by_term = {row.term: row for row in rows}
     return {"class_id": class_id, "year": selected_year,
-            "fees": [{"term": term, "amount": by_term.get(term, 0)}
+            "fees": [{"term": term, "amount": by_term[term].amount if term in by_term else 0,
+                      "boarding_amount": (by_term[term].boarding_amount if by_term[term].boarding_amount is not None else by_term[term].amount) if term in by_term else 0,
+                      "day_amount": (by_term[term].day_amount if by_term[term].day_amount is not None else by_term[term].amount) if term in by_term else 0}
                      for term in ("Term 1", "Term 2", "Term 3")]}
 
 
@@ -3403,11 +3421,13 @@ def save_class_fee(class_id: int, data: ClassFeeUpdate, db: Session = Depends(ge
             class_id=grade_class.id, term=data.term, year=data.year
         ).first()
         if row is None:
-            row = models.ClassFee(class_id=grade_class.id, **data.model_dump())
+            row = models.ClassFee(class_id=grade_class.id, amount=max(data.boarding_amount, data.day_amount), **data.model_dump())
             db.add(row)
             db.flush()
         else:
-            row.amount = data.amount
+            row.boarding_amount = data.boarding_amount
+            row.day_amount = data.day_amount
+            row.amount = max(data.boarding_amount, data.day_amount)
         if settings.active_term == data.term and (settings.academic_year or date.today().year) == data.year:
             active_students = db.query(models.Student).filter_by(
                 class_id=grade_class.id, status="active"
@@ -3416,17 +3436,15 @@ def save_class_fee(class_id: int, data: ClassFeeUpdate, db: Session = Depends(ge
                 existing = db.query(models.FeeCharge).filter_by(
                     student_id=student.id, term=data.term, year=data.year
                 ).first()
-                if existing is None and data.amount > 0:
-                    db.add(models.FeeCharge(
-                        student_id=student.id, term=data.term,
-                        year=data.year, amount=data.amount
-                    ))
+                selected_amount = data.boarding_amount if student.study_mode == "Boarding" else data.day_amount
+                if existing is None and selected_amount > 0:
+                    db.add(models.FeeCharge(student_id=student.id, term=data.term, year=data.year, amount=selected_amount))
                     created += 1
     db.flush()
     write_audit(db, admin, "class_fee_updated", "class_fee", class_id,
-                f"Grade {selected_class.name}; {data.term} {data.year}; UGX {data.amount}")
+                f"Grade {selected_class.name}; {data.term} {data.year}; boarding UGX {data.boarding_amount}; day UGX {data.day_amount}")
     db.commit()
-    return {"message": "Class fee saved for all streams. Existing charges were not changed.",
+    return {"message": "Boarding and day fee structures saved for all streams. Existing charges were not changed.",
             "class_id": class_id, "term": data.term, "year": data.year,
             "amount": data.amount, "streams_updated": len(grade_classes),
             "charges_created": created}
@@ -3505,6 +3523,7 @@ class StaffUpdate(BaseModel):
     email: str | None = None
     salary_amount: int | None = Field(default=None, ge=0)
     salary_frequency: str | None = Field(default=None, pattern="^(Monthly|Termly|Weekly|Daily)$")
+    house: str | None = None
     status: str | None = Field(default=None, pattern="^(active|archived|inactive)$")
 
 
@@ -3705,6 +3724,7 @@ class SchoolProfileUpdate(BaseModel):
     a_level_subsidiary_subjects: str | None = None
     report_logo: str | None = Field(default=None, max_length=2_000_000)
     report_template: str | None = Field(default=None, max_length=100_000)
+    house_names: str | None = Field(default=None, max_length=5000)
 
 
 @app.get("/api/settings/school-profile", tags=["School Settings"])

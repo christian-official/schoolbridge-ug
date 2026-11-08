@@ -219,6 +219,14 @@ body { font-size: 16px; }
 td,th,.stat-top,.stat-card small,.quick-action strong,.quick-action small { font-size: 13px; }
 .panel-heading h2 { font-size: 18px; }
 .student-form-grid input,.student-form-grid select,.filter-select,.search-box { font-size: 15px; min-height: 44px; }
+.student-form-grid select,.filter-select,select { appearance:none; -webkit-appearance:none; border:1px solid #dce4f0; border-radius:10px; background-color:#fff; color:#253650; padding:11px 42px 11px 13px; font:inherit; line-height:1.35; box-shadow:0 1px 2px rgba(20,40,75,.04); background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23677991' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 13px center; }
+.student-form-grid select:hover,.filter-select:hover,select:hover { border-color:#aebed5; }
+.student-form-grid select:focus,.filter-select:focus,select:focus { outline:none; border-color:#6c8cf0; box-shadow:0 0 0 3px rgba(49,94,232,.12); }
+select:disabled { background-color:#f4f6fa; color:#99a4b5; cursor:not-allowed; }
+.settings-section-tabs { display:flex; flex-wrap:wrap; gap:7px; padding:6px; margin:0 0 20px; border:1px solid #e5eaf3; border-radius:12px; background:#f7f9fd; }
+.settings-section-tabs button { border:0; border-radius:8px; padding:10px 16px; color:#61718a; background:transparent; font-weight:700; cursor:pointer; }
+.settings-section-tabs button.active,.settings-section-tabs button:focus { color:#244fb9; background:#fff; box-shadow:0 2px 8px #1b376018; }
+
 .primary-button,.secondary-button { min-height: 42px; }
 .finance-toolbar { display:flex; justify-content:space-between; align-items:center; gap:14px; flex-wrap:wrap; margin:8px 0 22px; }
 .finance-tabs { display:flex; gap:7px; flex-wrap:wrap; }

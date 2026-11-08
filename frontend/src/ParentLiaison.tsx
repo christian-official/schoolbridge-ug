@@ -11,7 +11,7 @@ async function api<T>(path: string, token: string, options: RequestInit = {}): P
   if (!response.ok) throw new Error(result.detail || `Request failed: ${response.status}`)
   return result as T
 }
-type Recipient = { student_id: number; student_name: string; admission_number: string; class_name: string; parents: { id: number; username: string; email: string }[] }
+type Recipient = { student_id: number; student_name: string; admission_number: string; class_name: string; parent_account: string }
 type LiaisonThread = { id: number; student_id: number; student_name: string; parent_name: string; subject: string; category: string; status: string; updated_at: string; last_message: string; last_sender_id: number | null }
 type LiaisonDetail = { current_user_id: number; id: number; student_id: number; student_name: string; subject: string; category: string; status: string; messages: { id: number; sender_id: number; sender_name: string; sender_role: string; message: string; created_at: string; read_at: string | null }[] }
 
@@ -23,7 +23,8 @@ export default function ParentLiaisonWorkspace({ token, role }: { token: string;
   const [detail, setDetail] = useState<LiaisonDetail | null>(null)
   const [compose, setCompose] = useState(false)
   const [studentId, setStudentId] = useState('')
-  const [parentId, setParentId] = useState('')
+  const [studentSearch, setStudentSearch] = useState('')
+  const [classFilter, setClassFilter] = useState('')
   const [subject, setSubject] = useState('')
   const [category, setCategory] = useState('General enquiry')
   const [firstMessage, setFirstMessage] = useState('')
@@ -72,9 +73,9 @@ export default function ParentLiaisonWorkspace({ token, role }: { token: string;
     event.preventDefault(); setBusy(true); setError(''); setNotice('')
     try {
       const created = await api<{ id: number }>('parent-liaison/threads', token, { method: 'POST', body: JSON.stringify({
-        student_id: Number(studentId), parent_user_id: Number(parentId), subject, category, message: firstMessage,
+        student_id: Number(studentId), subject, category, message: firstMessage,
       }) })
-      setCompose(false); setStudentId(''); setParentId(''); setSubject(''); setFirstMessage('')
+      setCompose(false); setStudentId(''); setStudentSearch(''); setClassFilter(''); setSubject(''); setFirstMessage('')
       await loadThreads(created.id)
       setNotice('Communication sent to the linked parent account.')
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to send communication.') }
@@ -109,6 +110,8 @@ export default function ParentLiaisonWorkspace({ token, role }: { token: string;
   }
 
   const selectedRecipient = recipients.find(row => String(row.student_id) === studentId)
+  const availableClasses = Array.from(new Set(recipients.map(row => row.class_name))).sort()
+  const visibleRecipients = recipients.filter(row => (!classFilter || row.class_name === classFilter) && (!studentSearch.trim() || [row.student_name,row.admission_number,row.class_name].join(' ').toLowerCase().includes(studentSearch.trim().toLowerCase())))
   return <div className="phase4-workspace parent-liaison-workspace">
     <section className="panel">
       <div className="panel-heading">
@@ -118,19 +121,16 @@ export default function ParentLiaisonWorkspace({ token, role }: { token: string;
       {error && <div className="form-error" role="alert">{error}</div>}
       {notice && <div className="success-notice" role="status">{notice}</div>}
       {!isParent && compose && <form className="student-form parent-liaison-compose" onSubmit={startCommunication}>
-        <div className="form-heading"><div><h3>Start a school communication</h3><p>Choose a student first. Only parent accounts linked to that student will be available.</p></div></div>
+        <div className="form-heading"><div><h3>Start a school communication</h3><p>Search by student name or admission number, then narrow the results by class. The linked shared parent account is selected automatically.</p></div></div>
         <div className="student-form-grid">
-          <label>Student *
-            <select required value={studentId} onChange={e => { setStudentId(e.target.value); setParentId('') }}>
-              <option value="">Select an authorised student</option>
-              {recipients.map(row => <option key={row.student_id} value={row.student_id}>{row.student_name} · {row.admission_number} · {row.class_name}</option>)}
+          <label>Search student *<input required value={studentSearch} onChange={e => { setStudentSearch(e.target.value); setStudentId('') }} placeholder="Name or admission number" /></label>
+          <label>Filter by class<select value={classFilter} onChange={e => { setClassFilter(e.target.value); setStudentId('') }}><option value="">All classes</option>{availableClasses.map(item => <option key={item}>{item}</option>)}</select></label>
+          <label className="field-span-full">Matching student *
+            <select required value={studentId} onChange={e => setStudentId(e.target.value)}>
+              <option value="">Choose a student from the filtered results</option>
+              {visibleRecipients.map(row => <option key={row.student_id} value={row.student_id}>{row.student_name} · {row.admission_number} · {row.class_name}</option>)}
             </select>
-          </label>
-          <label>Linked parent account *
-            <select required value={parentId} onChange={e => setParentId(e.target.value)} disabled={!selectedRecipient}>
-              <option value="">Select linked parent</option>
-              {selectedRecipient?.parents.map(parent => <option key={parent.id} value={parent.id}>{parent.username} · {parent.email}</option>)}
-            </select>
+            <small className="field-hint">{visibleRecipients.length} matching students. Parent account: {selectedRecipient?.parent_account || 'Select a student to resolve the linked account'}.</small>
           </label>
           <label>Communication category *
             <select value={category} onChange={e => setCategory(e.target.value)}>

@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Users, Plus, Search, Wallet, ReceiptText, RefreshCw, Building2 } from 'lucide-react'
 
-type Staff = { id:number; staff_number:string; first_name:string; last_name:string; category:string; position?:string; department?:string; subjects?:string|null; phone?:string; email?:string; salary_amount?:number|null; salary_frequency?:string; status?:string }
+type Staff = { id:number; staff_number:string; first_name:string; last_name:string; category:string; position?:string; department?:string; subjects?:string|null; phone?:string; email?:string; house?:string|null; salary_amount?:number|null; salary_frequency?:string; status?:string }
 type Page<T> = { items:T[]; total:number; page:number; pages:number }
 type Summary = { fees_expected:number; fees_collected:number; outstanding:number; salary_expenses?:number; other_expenses?:number; total_expenses?:number; net_cash_position?:number }
 type Charge = { id:number; student_id:number; student_name:string; admission_number:string; class_id?:number|null; class_name?:string; stream?:string; term:string; year:number; amount:number; paid:number; balance:number }
@@ -35,7 +35,7 @@ export default function StaffFinance({token,active,classes=[],refreshKey=0,initi
   const [editingStaff,setEditingStaff]=useState<number|null>(null)
   const [message,setMessage]=useState('')
   const [newStaffLogin,setNewStaffLogin]=useState<{name:string;username:string;email:string;temporary_passcode:string}|null>(null)
-  const emptyStaffForm={full_name:'',category:'Teaching',position:'',department:'',subjects:'',phone:'',email:'',salary_amount:'',salary_frequency:'Monthly'}
+  const emptyStaffForm={full_name:'',category:'Teaching',position:'',department:'',subjects:'',phone:'',email:'',house:'',salary_amount:'',salary_frequency:'Monthly'}
   const [form,setForm]=useState(emptyStaffForm)
   const [summary,setSummary]=useState<Summary>({fees_expected:0,fees_collected:0,outstanding:0})
   const [charges,setCharges]=useState<Charge[]>([])
@@ -134,7 +134,7 @@ export default function StaffFinance({token,active,classes=[],refreshKey=0,initi
     if(missingStaffFields.length){setMessage('Cannot save staff member. Complete: '+missingStaffFields.join(', ')+'.');return}
     setMessage('');setSavingStaff(true)
     try {
-      const payload={...(()=>{const names=form.full_name.trim().split(/\s+/);return {first_name:names.shift()||'',last_name:names.join(' ')||'—'}})(),...form,salary_amount:form.salary_amount===''?null:Number(form.salary_amount),subjects:form.category==='Teaching'?form.subjects:null}
+      const payload={...(()=>{const names=form.full_name.trim().split(/\s+/);return {first_name:names.shift()||'',last_name:names.join(' ')||'—'}})(),...form,house:form.house||null,salary_amount:form.salary_amount===''?null:Number(form.salary_amount),subjects:form.category==='Teaching'?form.subjects:null}
       if(editingStaff){
         await request('staff/'+editingStaff,token,{method:'PATCH',body:JSON.stringify(payload)})
         setMessage('Staff profile updated.')
@@ -208,6 +208,7 @@ export default function StaffFinance({token,active,classes=[],refreshKey=0,initi
         {form.category==='Teaching'&&<div className="field-span-full staff-subject-picker"><div className="staff-subject-picker-heading"><strong>Subjects this teacher is qualified to teach *</strong><span>{selectedStaffSubjects.length} selected</span></div><p className="field-hint">Select every subject assigned to this teacher during registration. You can select more than one. Only these subjects will be available when assigning classes.</p><div className="permission-choice-grid staff-subject-choice-grid">{subjectOptions.map(subject=><button type="button" key={subject.id} className={selectedStaffSubjects.includes(subject.name)?'permission-choice active':'permission-choice'} aria-pressed={selectedStaffSubjects.includes(subject.name)} onClick={()=>toggleStaffSubject(subject.name)}><span>{subject.name}</span><small>{selectedStaffSubjects.includes(subject.name)?'Selected':'Select subject'}</small></button>)}</div>{!subjectOptions.length&&<small className="field-hint">No registered subjects are available. Add subjects under Examinations before registering a subject teacher.</small>}{!selectedStaffSubjects.length&&<small className="field-error">Select at least one subject for this teaching staff member.</small>}</div>}
       </div></section>
       <section className="form-section"><div className="form-section-heading"><span className="form-section-number">03</span><div><h4>Contact information</h4><p>How the school can contact this employee.</p></div></div><div className="student-form-grid">
+        <label>House<select value={form.house} onChange={e=>setForm({...form,house:e.target.value})}><option value="">Select house (optional)</option>{(schoolProfile as any).house_names?.split(/\r?\n/).map((h:string)=>h.trim()).filter(Boolean).map((h:string)=><option key={h}>{h}</option>)}</select></label>
         <label>Phone number<input type="tel" autoComplete="tel" value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})} placeholder="e.g. 07XX XXX XXX"/></label>
         <label>Email address<input type="email" autoComplete="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})} placeholder="name@example.com"/></label>
       </div></section>

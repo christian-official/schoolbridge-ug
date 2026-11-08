@@ -50,6 +50,11 @@ class Student(Base):
     combination: Mapped[str | None] = mapped_column(String(100), nullable=True)
     optional_subjects: Mapped[str | None] = mapped_column(Text, nullable=True)
     subsidiary_subjects: Mapped[str | None] = mapped_column(Text, nullable=True)
+    guardian2_name: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    guardian2_relationship: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    guardian2_phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    study_mode: Mapped[str] = mapped_column(String(20), default="Day", server_default="Day", nullable=False)
+    house: Mapped[str | None] = mapped_column(String(80), nullable=True)
 
 
 class Attendance(Base):
@@ -168,6 +173,7 @@ class StaffMember(Base):
     salary_amount: Mapped[int | None] = mapped_column(Integer, nullable=True)
     salary_frequency: Mapped[str] = mapped_column(String(20), default="Monthly")
     subjects: Mapped[str | None] = mapped_column(Text, nullable=True)
+    house: Mapped[str | None] = mapped_column(String(80), nullable=True)
 
 class FeeCharge(Base):
     __tablename__ = "fee_charges"
@@ -199,6 +205,8 @@ class ClassFee(Base):
     term: Mapped[str] = mapped_column(String(20))
     year: Mapped[int] = mapped_column(Integer)
     amount: Mapped[int] = mapped_column(Integer, default=0)
+    boarding_amount: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    day_amount: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class SalaryPayment(Base):
@@ -247,6 +255,7 @@ class SchoolProfile(Base):
     a_level_subsidiary_subjects: Mapped[str | None] = mapped_column(Text, nullable=True)
     report_logo: Mapped[str | None] = mapped_column(Text, nullable=True)
     report_template: Mapped[str | None] = mapped_column(Text, nullable=True)
+    house_names: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class ParentStudentLink(Base):

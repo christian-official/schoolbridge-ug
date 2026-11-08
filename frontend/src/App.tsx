@@ -666,7 +666,7 @@ function App() {
   const [studentSuccess, setStudentSuccess] = useState('')
   const [studentForm, setStudentForm] = useState({
     first_name: '', middle_name: '', last_name: '', full_name: '', a_level_stream: '', gender: '', date_of_birth: '', class_id: '',
-    religion: '', nationality: '', phone: '', address: '', guardian_name: '', guardian_relationship: '', guardian_phone: '', previous_school: '',
+    religion: '', nationality: '', phone: '', address: '', guardian_name: '', guardian_relationship: '', guardian_phone: '', guardian2_name: '', guardian2_relationship: '', guardian2_phone: '', study_mode: 'Day', house: '', previous_school: '',
     admission_date: new Date().toISOString().slice(0, 10), fee_amount: '', academic_level: '', combination: '', optional_subjects: '', subsidiary_subjects: '',
   })
   const [mobileMenu, setMobileMenu] = useState(false)
@@ -795,6 +795,11 @@ function App() {
           guardian_name: studentForm.guardian_name.trim() || null,
           guardian_relationship: studentForm.guardian_relationship || null,
           guardian_phone: studentForm.guardian_phone.trim() || null,
+          guardian2_name: studentForm.guardian2_name.trim() || null,
+          guardian2_relationship: studentForm.guardian2_relationship || null,
+          guardian2_phone: studentForm.guardian2_phone.trim() || null,
+          study_mode: studentForm.study_mode,
+          house: studentForm.house || null,
           previous_school: studentForm.previous_school.trim() || null,
           admission_date: studentForm.admission_date || null,
           gender: studentForm.gender || null,
@@ -807,7 +812,7 @@ function App() {
           subsidiary_subjects: selectedAcademicLevel==='A-Level' ? studentForm.subsidiary_subjects || null : null,
         }),
       })
-      setStudentForm({ first_name: '', middle_name: '', last_name: '', full_name: '', a_level_stream: '', gender: '', date_of_birth: '', class_id: '', religion: '', nationality: '', phone: '', address: '', guardian_name: '', guardian_relationship: '', guardian_phone: '', previous_school: '', admission_date: new Date().toISOString().slice(0, 10), fee_amount: '', academic_level: '', combination: '', optional_subjects: '', subsidiary_subjects: '' })
+      setStudentForm({ first_name: '', middle_name: '', last_name: '', full_name: '', a_level_stream: '', gender: '', date_of_birth: '', class_id: '', religion: '', nationality: '', phone: '', address: '', guardian_name: '', guardian_relationship: '', guardian_phone: '', guardian2_name: '', guardian2_relationship: '', guardian2_phone: '', study_mode: 'Day', house: '', previous_school: '', admission_date: new Date().toISOString().slice(0, 10), fee_amount: '', academic_level: '', combination: '', optional_subjects: '', subsidiary_subjects: '' })
       setShowStudentForm(false)
       setStudentSuccess(`Student registered successfully. Admission number: ${createdStudent.admission_number}`)
       await loadSchoolData(token)
@@ -870,7 +875,7 @@ function App() {
         gender:student.gender||null,date_of_birth:student.date_of_birth||null,religion:student.religion||null,
         nationality:student.nationality||null,phone:student.phone||null,address:student.address||null,
         guardian_name:student.guardian_name||null,guardian_relationship:student.guardian_relationship||null,
-        guardian_phone:student.guardian_phone||null,previous_school:student.previous_school||null,
+        guardian_phone:student.guardian_phone||null,guardian2_name:student.guardian2_name||null,guardian2_relationship:student.guardian2_relationship||null,guardian2_phone:student.guardian2_phone||null,study_mode:student.study_mode||'Day',house:student.house||null,previous_school:student.previous_school||null,
         admission_date:student.admission_date||null,class_id:student.class_id,status:student.status
       })})
       setStudentProfile({...studentProfile,student:updated.student})
@@ -1095,6 +1100,8 @@ function App() {
                     <div className="student-form-grid">
                       <div className="generated-admission"><strong>Admission number</strong><span>Generated automatically when you save</span><b>{[admissionSettings.admission_prefix.trim(), ...(admissionSettings.include_year ? [String(new Date().getFullYear())] : []), String(admissionSettings.next_admission_number).padStart(admissionSettings.admission_padding, '0')].filter(Boolean).join(admissionSettings.admission_separator)}</b></div>
                       <label>Class *<select required value={studentForm.class_id} onChange={e => setStudentForm({ ...studentForm, class_id: e.target.value, a_level_stream: '', combination: '', optional_subjects: '', subsidiary_subjects: '' })}><option value="">Choose the student's class</option>{classes.map(item => <option key={item.id} value={item.id}>{item.name}{item.section ? ` — ${item.section}` : ''}</option>)}</select></label>
+                      <label>Student type *<select required value={studentForm.study_mode} onChange={e=>setStudentForm({...studentForm,study_mode:e.target.value})}><option value="Day">Day scholar</option><option value="Boarding">Boarding</option></select></label>
+                      <label>House<select value={studentForm.house} onChange={e=>setStudentForm({...studentForm,house:e.target.value})}><option value="">Select house (optional)</option>{(schoolConfig.house_names||'').split(/\r?\n/).map((h:string)=>h.trim()).filter(Boolean).map((h:string)=><option key={h}>{h}</option>)}</select></label>
                       <label>Admission date<input type="date" value={studentForm.admission_date} onChange={e => setStudentForm({ ...studentForm, admission_date: e.target.value })} /><small className="field-hint">Date the student officially joins the school.</small></label>
                       <label>Term fee (UGX)<input type="number" min="0" step="1" value={studentForm.fee_amount} onChange={e => setStudentForm({ ...studentForm, fee_amount: e.target.value })} placeholder="Automatically uses the class fee" /><small className="field-hint">Prefilled from the selected class and active term. You can adjust it if authorised.</small></label>
                     </div>
@@ -1120,6 +1127,8 @@ function App() {
                       <label>Relationship<select value={studentForm.guardian_relationship} onChange={e => setStudentForm({ ...studentForm, guardian_relationship: e.target.value })}><option value="">Select relationship</option><option>Parent</option><option>Guardian</option><option>Other relative</option></select></label>
                       <label>Guardian phone *<input required type="tel" autoComplete="tel" value={studentForm.guardian_phone} onChange={e => setStudentForm({ ...studentForm, guardian_phone: e.target.value })} placeholder="e.g. 07XX XXX XXX" /></label>
                     </div>
+                    <div className="form-section-heading" style={{marginTop:18}}><span className="form-section-number">+</span><div><h4>Additional parent / guardian</h4><p>Optional second guardian contact. Both guardians can share the single linked parent account.</p></div></div>
+                    <div className="student-form-grid"><label>Second parent / guardian name<input value={studentForm.guardian2_name} onChange={e=>setStudentForm({...studentForm,guardian2_name:e.target.value})} placeholder="Full name"/></label><label>Relationship<select value={studentForm.guardian2_relationship} onChange={e=>setStudentForm({...studentForm,guardian2_relationship:e.target.value})}><option value="">Select relationship</option><option>Mother</option><option>Father</option><option>Guardian</option><option>Other relative</option></select></label><label>Phone number<input type="tel" value={studentForm.guardian2_phone} onChange={e=>setStudentForm({...studentForm,guardian2_phone:e.target.value})} placeholder="e.g. 07XX XXX XXX"/></label></div>
                   </section>
 
                   <section className="form-section">
@@ -1550,7 +1559,7 @@ function TeacherWorkspace({token,active}:{token:string;active:string}) {
   return <section className="panel teacher-class-attendance"><div className="panel-heading"><div><h2>Class attendance</h2><p>Mark the whole class register and submit it once. Only your separately assigned class-teacher responsibilities appear here.</p></div></div>{message&&<div className="notice">{message}</div>}<div className="teacher-attendance-controls"><div><strong>Choose your responsible class</strong><div className="teacher-class-picks">{classTeacherAssignments.map(a=><button type="button" key={a.assignment_id} className={String(classId)===String(a.class_id)?"teacher-class-pick active":"teacher-class-pick"} aria-pressed={String(classId)===String(a.class_id)} onClick={()=>{setClassId(String(a.class_id));setStatuses({})}}>{a.class}</button>)}</div></div><label className="teacher-attendance-date">Attendance date<input type="date" value={attendanceDate} onChange={e=>setAttendanceDate(e.target.value)}/></label></div><div className="table-wrap"><table><thead><tr><th>#</th><th>Student</th><th>Admission number</th><th>Status</th></tr></thead><tbody>{students.map((student,index)=><tr key={student.id}><td>{index+1}</td><td>{student.first_name} {student.last_name}</td><td>{student.admission_number}</td><td><div className="attendance-choice-group" role="group" aria-label={"Attendance status for "+student.first_name+" "+student.last_name}>{["Present","Absent","Late","Excused"].map(status=><button type="button" key={status} className={(statuses[student.id]||"Present")===status?"attendance-choice active status-"+status.toLowerCase():"attendance-choice"} aria-pressed={(statuses[student.id]||"Present")===status} onClick={()=>setStatuses(old=>({...old,[student.id]:status}))}>{status}</button>)}</div></td></tr>)}</tbody></table></div>{students.length>0&&<div className="form-actions"><button type="button" className="primary-button" disabled={busy!==null} onClick={()=>void saveClassAttendance()}>{busy!==null?'Saving register...':'Submit class attendance'}</button></div>}{!students.length&&<div className="empty-state"><Users size={30}/><p>{classTeacherAssignments.length?'Choose one of your assigned classes to load its active students.':'No class has been assigned to you as class teacher. Subject teaching assignments do not grant class attendance access.'}</p></div>}</section>
 }
 function SchoolProfileSettings({token,onSaved}:{token:string;onSaved:()=>void}) {
-  const [form,setForm]=useState({name:'',address:'',phone:'',email:'',motto:'',school_type:'Secondary',a_level_combinations:'',o_level_optional_subjects:'',a_level_subsidiary_subjects:'',report_logo:''})
+  const [form,setForm]=useState({name:'',address:'',phone:'',email:'',motto:'',school_type:'Secondary',a_level_combinations:'',o_level_optional_subjects:'',a_level_subsidiary_subjects:'',report_logo:'',house_names:''})
   const [message,setMessage]=useState('')
   const [error,setError]=useState('')
   const [busy,setBusy]=useState(false)
@@ -1561,7 +1570,7 @@ function SchoolProfileSettings({token,onSaved}:{token:string;onSaved:()=>void}) 
     api<any>('settings/school-profile',token).then(p=>{
       if(cancelled)return
       setForm({
-        name:p.name||'',address:p.address||'',phone:p.phone||'',email:p.email||'',
+        name:p.name||'',address:p.address||'',phone:p.phone||'',email:p.email||'',house_names:p.house_names||'',
         motto:p.motto||'',school_type:p.school_type||'Secondary',
         a_level_combinations:p.a_level_combinations||'',
         o_level_optional_subjects:p.o_level_optional_subjects||'',
@@ -1582,7 +1591,7 @@ function SchoolProfileSettings({token,onSaved}:{token:string;onSaved:()=>void}) 
     try{
       await api('settings/school-profile',token,{method:'PUT',body:JSON.stringify({
         ...form,name,address:form.address.trim()||null,phone:form.phone.trim()||null,
-        email:email||null,motto:form.motto.trim()||null,report_logo:form.report_logo||null
+        email:email||null,motto:form.motto.trim()||null,report_logo:form.report_logo||null,house_names:form.house_names.split(/\r?\n/).map((h:string)=>h.trim()).filter(Boolean).join('\n')||null
       })})
       setMessage('School profile saved successfully.')
       onSaved()
@@ -1596,6 +1605,7 @@ function SchoolProfileSettings({token,onSaved}:{token:string;onSaved:()=>void}) 
     {message&&<div className="success-notice" role="status">{message}</div>}
     {!loaded&&!error&&<p className="form-hint">Loading saved school details...</p>}
     <form className="student-form" onSubmit={save}>
+      <div className="settings-section-tabs" role="tablist" aria-label="School profile sections"><button type="button" className="active" onClick={e=>{const root=(e.currentTarget.closest('form'));root?.querySelectorAll('.form-section').forEach((el,i)=>(el as HTMLElement).style.display=i===0?'block':'none')}}>Identity</button><button type="button" onClick={e=>{const root=e.currentTarget.closest('form');root?.querySelectorAll('.form-section').forEach((el,i)=>(el as HTMLElement).style.display=i===1?'block':'none')}}>Contact</button><button type="button" onClick={e=>{const root=e.currentTarget.closest('form');root?.querySelectorAll('.form-section').forEach((el,i)=>(el as HTMLElement).style.display=i===2?'block':'none')}}>Houses</button><button type="button" onClick={e=>{const root=e.currentTarget.closest('form');root?.querySelectorAll('.form-section').forEach((el,i)=>(el as HTMLElement).style.display=i===3?'block':'none')}}>Branding</button></div>
       <div className="form-section">
         <div className="form-section-heading"><span className="form-section-number">01</span><div><h4>School identity</h4><p>These details identify your institution in the school workspace.</p></div></div>
         <div className="student-form-grid">
@@ -1613,7 +1623,10 @@ function SchoolProfileSettings({token,onSaved}:{token:string;onSaved:()=>void}) 
         </div>
       </div>
       <div className="form-section">
-        <div className="form-section-heading"><span className="form-section-number">03</span><div><h4>School logo</h4><p>This logo appears beside the school name on printed student reports.</p></div></div>
+        <div className="form-section-heading"><span className="form-section-number">03</span><div><h4>House system</h4><p>Create the houses used to classify students and staff. Enter one house name per line.</p></div></div><label className="field-span-full">School houses<textarea rows={5} value={form.house_names} onChange={e=>setForm({...form,house_names:e.target.value})} placeholder={'e.g. Griffin\nPhoenix\nEagle\nLion'}/><small className="field-hint">House options appear in student and staff registration. Administrators are excluded from staff house assignment.</small></label>
+      </div>
+      <div className="form-section">
+        <div className="form-section-heading"><span className="form-section-number">04</span><div><h4>School logo</h4><p>This logo appears beside the school name on printed student reports.</p></div></div>
         <label className="file-upload-button"><span>{form.report_logo ? 'Replace school logo' : 'Choose school logo'}</span><input type="file" accept="image/*" onChange={e=>{const file=e.target.files?.[0];if(!file)return;if(!file.type.startsWith('image/')){setError('Choose an image file.');return}if(file.size>1400000){setError('School logo must be 1.4 MB or smaller.');return}const reader=new FileReader();reader.onload=()=>setForm(current=>({...current,report_logo:String(reader.result||'')}));reader.onerror=()=>setError('Unable to read the selected logo.');reader.readAsDataURL(file)}}/></label>
         {form.report_logo && <div className="school-logo-settings-preview"><img src={form.report_logo} alt="School logo preview"/><button type="button" className="secondary-button" onClick={()=>setForm(current=>({...current,report_logo:''}))}>Remove logo</button></div>}
       </div>
