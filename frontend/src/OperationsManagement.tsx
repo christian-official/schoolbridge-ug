@@ -168,14 +168,7 @@ export default function OperationsManagement({ token, active, permissions = {}, 
       {message && <div className="success-notice" role="status">{message}</div>}
       {active === 'Staff Attendance' ? <>
         <label className="date-field">Attendance date<input type="date" value={staffDate} onChange={event => setStaffDate(event.target.value)}/></label>
-        <p className="attendance-help">Daily register: choose each staff member’s status, then save. The saved register below is the official status for the selected date.</p>
-        {staffSummary && <div className="stats-grid finance-stats">
-          <div className="stat-card"><span>Active staff</span><strong className="stat-value">{staffSummary.total_staff}</strong></div>
-          <div className="stat-card"><span>Present</span><strong className="stat-value">{staffSummary.present}</strong></div>
-          <div className="stat-card"><span>Absent</span><strong className="stat-value">{staffSummary.absent}</strong></div>
-          <div className="stat-card"><span>Late / Excused</span><strong className="stat-value">{staffSummary.late + staffSummary.excused}</strong></div>
-          <div className="stat-card"><span>Not marked</span><strong className="stat-value">{staffSummary.unmarked}</strong></div>
-        </div>}
+        <p className="attendance-help">Staff record their own attendance using Check in and Check out on their staff dashboard. Each successful check-in is automatically recorded as <strong>Present</strong> and appears below for authorised administrators to review.</p>
         <div className="staff-attendance-calendar">
           <div className="staff-attendance-calendar-heading"><strong>Attendance calendar · {new Date(staffDate + 'T00:00:00').toLocaleDateString('en-UG', { month: 'long', year: 'numeric' })}</strong><span>{staffMonthRows.length} saved daily records</span></div>
           <div className="staff-attendance-calendar-days">
@@ -186,18 +179,9 @@ export default function OperationsManagement({ token, active, permissions = {}, 
                 <strong>{new Date(day + 'T00:00:00').toLocaleDateString('en-UG', { day: 'numeric', month: 'short' })}</strong><span>{dayRows.length} recorded · {present} present</span>
               </button>
             })}
-            {!staffMonthRows.length && <span className="form-hint">No attendance records have been saved for this month yet.</span>}
+            {!staffMonthRows.length && <span className="form-hint">No staff check-ins have been recorded for this month yet.</span>}
           </div>
         </div>
-        {loading ? <p className="form-hint">Loading staff...</p> : <div className="table-wrap"><table><thead><tr><th>Staff member</th><th>Staff number</th><th>Category</th><th>Check in</th><th>Check out</th><th>Status</th><th>Notes / admin correction</th></tr></thead><tbody>
-          {staffCategories.map(category => <Fragment key={category}>
-            <tr className="staff-category-row"><td colSpan={7}>{category} staff <span>{staff.filter(person => (person.category || 'Other') === category).length}</span></td></tr>
-            {staff.filter(person => (person.category || 'Other') === category).map(person => <tr key={person.id}><td><strong>{person.first_name} {person.last_name}</strong></td><td>{person.staff_number}</td><td>{person.category || 'Other'}</td><td>{canEditStaffAttendance ? <input aria-label={'Check-in time for ' + person.first_name} type="time" value={staffTimeDrafts[person.id]?.checkIn || ''} onChange={event => setStaffTimeDrafts(current => ({ ...current, [person.id]: { checkIn: event.target.value, checkOut: current[person.id]?.checkOut || '' } }))}/> : staffTimeDrafts[person.id]?.checkIn || '—'}</td><td>{canEditStaffAttendance ? <input aria-label={'Check-out time for ' + person.first_name} type="time" value={staffTimeDrafts[person.id]?.checkOut || ''} onChange={event => setStaffTimeDrafts(current => ({ ...current, [person.id]: { checkIn: current[person.id]?.checkIn || '', checkOut: event.target.value } }))}/> : staffTimeDrafts[person.id]?.checkOut || '—'}</td><td>{canEditStaffAttendance ? <div className="attendance-choice-group" role="group" aria-label={'Attendance for ' + person.first_name + ' ' + person.last_name}>{(['Present', 'Absent', 'Late', 'Excused'] as const).map(status => <button key={status} type="button" className={'attendance-choice attendance-' + status.toLowerCase() + (staffStatuses[person.id] === status ? ' selected' : '')} aria-pressed={staffStatuses[person.id] === status} onClick={() => setStaffStatuses(current => ({ ...current, [person.id]: status }))}>{status}</button>)}</div> : <span className="attendance-status-pill">{staffStatuses[person.id] || 'Not marked'}</span>}</td><td>{canEditStaffAttendance ? <input aria-label={'Attendance note for ' + person.first_name} type="text" maxLength={255} placeholder="Optional note" value={staffNotes[person.id] || ''} onChange={event => setStaffNotes(current => ({ ...current, [person.id]: event.target.value }))}/> : staffNotes[person.id] || '—'}</td></tr>)}
-          </Fragment>)}
-          {!staff.length && <tr><td colSpan={7}>No active staff records found.</td></tr>}
-        </tbody></table></div>}
-        {canEditStaffAttendance && <div className="form-actions"><button className="primary-button" type="button" disabled={saving || !staff.length} onClick={() => void saveStaffRegister()}><Save size={15}/>{saving ? 'Saving...' : 'Save staff attendance'}</button></div>}
-        {!canEditStaffAttendance && <p className="form-hint">View-only staff attendance access. You cannot change this register.</p>}
         <h3>Saved attendance · {staffDate}</h3>
         <p className="attendance-help">Self check-in times are submitted here for review. Authorised attendance administrators can revise check-in, check-out, notes and the final attendance status before saving.</p>
         <div className="table-wrap"><table><thead><tr><th>Staff member</th><th>Category</th><th>Check in</th><th>Check out</th><th>Recorded status</th><th>Notes</th></tr></thead><tbody>{staffRows.map(row => { const person = staff.find(item => item.id === row.staff_id); return <tr key={row.id}><td>{person ? person.first_name + ' ' + person.last_name : 'Staff #' + row.staff_id}</td><td>{person?.category || '—'}</td><td>{row.check_in_at?.slice(11,16) || '—'}</td><td>{row.check_out_at?.slice(11,16) || '—'}</td><td><span className={'attendance-status-pill status-' + row.status.toLowerCase()}>{row.status}</span></td><td>{row.notes || '—'}</td></tr> })}{!staffRows.length && <tr><td colSpan={6}>No saved staff attendance yet for this date.</td></tr>}</tbody></table></div>
