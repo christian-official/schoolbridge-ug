@@ -1363,7 +1363,19 @@ def list_timetable(
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    query = db.query(models.TimetableEntry)
+    # Fetch lesson details in one joined query instead of issuing three extra
+    # database lookups for every timetable row.
+    query = (
+        db.query(
+            models.TimetableEntry,
+            models.SchoolClass,
+            models.Subject,
+            models.StaffMember,
+        )
+        .join(models.SchoolClass, models.TimetableEntry.class_id == models.SchoolClass.id)
+        .outerjoin(models.Subject, models.TimetableEntry.subject_id == models.Subject.id)
+        .outerjoin(models.StaffMember, models.TimetableEntry.staff_id == models.StaffMember.id)
+    )
     if user.role == "teacher":
         staff_id = user.staff_id
         if staff_id:
@@ -1379,20 +1391,22 @@ def list_timetable(
         models.TimetableEntry.start_time,
         models.TimetableEntry.id,
     ).all()
-    output = []
-    for entry in rows:
-        school_class = db.get(models.SchoolClass, entry.class_id)
-        subject = db.get(models.Subject, entry.subject_id) if entry.subject_id else None
-        staff = db.get(models.StaffMember, entry.staff_id) if entry.staff_id else None
-        output.append({
-            "id": entry.id, "class_id": entry.class_id, "class_name": school_class.name if school_class else "Class",
-            "class_section": school_class.section if school_class else "",
-            "subject_id": entry.subject_id, "subject_name": subject.name if subject else "Lesson",
-            "staff_id": entry.staff_id, "teacher_name": (staff.first_name + " " + staff.last_name) if staff else "Unassigned",
-            "day_of_week": entry.day_of_week, "start_time": entry.start_time, "end_time": entry.end_time,
-        })
-    return output
-
+    return [
+        {
+            "id": entry.id,
+            "class_id": entry.class_id,
+            "class_name": school_class.name,
+            "class_section": school_class.section or "",
+            "subject_id": entry.subject_id,
+            "subject_name": subject.name if subject else "Lesson",
+            "staff_id": entry.staff_id,
+            "teacher_name": (staff.first_name + " " + staff.last_name) if staff else "Unassigned",
+            "day_of_week": entry.day_of_week,
+            "start_time": entry.start_time,
+            "end_time": entry.end_time,
+        }
+        for entry, school_class, subject, staff in rows
+    ]
 
 @app.get("/api/timetable/options", tags=["Timetable"])
 def timetable_options(db: Session = Depends(get_db), academic=Depends(require_timetable_editor)):
