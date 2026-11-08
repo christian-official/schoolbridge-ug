@@ -1069,8 +1069,9 @@ class LoginInput(BaseModel):
 
 
 class TeacherCreate(BaseModel):
-    username: str
-    email: str
+    staff_id: int
+    username: str = Field(min_length=3, max_length=80)
+    email: str = Field(min_length=5, max_length=150)
     password: str = Field(min_length=12)
 
 
@@ -1444,12 +1445,19 @@ def create_teacher(
     db: Session = Depends(get_db),
     admin=Depends(require_admin),
 ):
+    staff = db.get(models.StaffMember, data.staff_id)
+    if not staff or staff.status != "active":
+        raise HTTPException(404, "Select an existing active staff member.")
+    if db.query(models.User).filter(models.User.staff_id == staff.id).first():
+        raise HTTPException(409, "This staff member already has a login account.")
+    role_type = "teacher" if staff.category == "Teaching" else "staff"
     teacher = models.User(
-        username=data.username,
-        email=data.email,
+        username=data.username.strip(),
+        email=data.email.strip().lower(),
         hashed_password=password_hash.hash(data.password),
-        role="teacher",
-        role_label="Teacher",
+        role=role_type,
+        role_label=(staff.position or ("Teacher" if role_type == "teacher" else "Staff"))[:80],
+        staff_id=staff.id,
     )
     db.add(teacher)
 
@@ -1529,6 +1537,7 @@ def list_users(
             "role_label": u.role_label or u.role.title(),
             "permissions": {k: sorted(v) for k, v in user_permissions(u).items()},
             "active": u.is_active,
+            "staff_id": u.staff_id,
         }
         for u in users
     ]
