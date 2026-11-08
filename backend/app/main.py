@@ -144,6 +144,23 @@ def require_admin(request: Request, user=Depends(get_current_user)):
     return user
 
 
+def is_academic_officer(user) -> bool:
+    label = (user.role_label or "").strip().lower()
+    return user.role == "admin" or label in {
+        "academic administrator", "academics administrator", "academics officer",
+        "director of studies", "dos", "deputy director of studies",
+    }
+
+
+def require_timetable_editor(request: Request, user=Depends(get_current_user)):
+    if user.role == "admin":
+        return user
+    action = action_for_method(request.method, request.url.path)
+    if not is_academic_officer(user) or action not in user_permissions(user).get("Timetable", set()):
+        raise HTTPException(403, "Only the Academics Administrator or a designated academic officer may change the timetable.")
+    return user
+
+
 def apply_pending_database_restore():
     """Apply a validated restore before SQLAlchemy opens the database at startup."""
     import os, sqlite3
@@ -1300,7 +1317,7 @@ def list_timetable(
 def create_timetable_entry(
     data: TimetableEntryCreate,
     db: Session = Depends(get_db),
-    admin=Depends(require_admin),
+    admin=Depends(require_timetable_editor),
 ):
     if data.end_time <= data.start_time:
         raise HTTPException(422, "Lesson end time must be later than its start time.")
@@ -1347,7 +1364,7 @@ def create_timetable_entry(
 def delete_timetable_entry(
     entry_id: int,
     db: Session = Depends(get_db),
-    admin=Depends(require_admin),
+    admin=Depends(require_timetable_editor),
 ):
     item = db.get(models.TimetableEntry, entry_id)
     if not item:
@@ -1410,7 +1427,12 @@ async def protect_school_data(request: Request, call_next):
                 return JSONResponse({"detail": "Teacher account required."}, status_code=403)
             section = permission_for_path(path)
             action = action_for_method(request.method, path)
-            if not section or action not in user_permissions(user).get(section, set()):
+            class_teacher_attendance = path == "/api/teacher/attendance" and request.method == "POST"
+            if class_teacher_attendance:
+                # The route validates the submitted student's class against
+                # the distinct class-teacher assignment before writing.
+                pass
+            elif not section or action not in user_permissions(user).get(section, set()):
                 return JSONResponse({"detail": "Your teacher account is not permitted to perform this action."}, status_code=403)
         elif path.startswith("/api/parent/"):
             if user.role != "parent":
@@ -1422,7 +1444,13 @@ async def protect_school_data(request: Request, call_next):
                 return JSONResponse({"detail": "Administrator permission required."}, status_code=403)
             section = permission_for_path(path)
             action = action_for_method(request.method, path)
-            if not section or action not in user_permissions(user).get(section, set()):
+            class_teacher_register = path in {"/api/attendance", "/api/attendance/summary"} and user.role == "teacher"
+            if class_teacher_register:
+                class_id = request.query_params.get("class_id")
+                allowed = bool(class_id and is_assigned_class_teacher(db, user.id, int(class_id)))
+                if not allowed:
+                    return JSONResponse({"detail": "Only the assigned class teacher may access this register."}, status_code=403)
+            elif not section or action not in user_permissions(user).get(section, set()):
                 return JSONResponse({"detail": "You do not have permission to access this section or perform this action."}, status_code=403)
 
         return await call_next(request)
@@ -2151,6 +2179,54 @@ def search_students(page: int = 1, page_size: int = 25, search: str = "", class_
     total = query.count()
     rows = query.order_by(models.Student.last_name, models.Student.first_name).offset((page - 1) * page_size).limit(page_size).all()
     return {"items": rows, "total": total, "page": page, "page_size": page_size, "pages": (total + page_size - 1) // page_size}
+
+
+@app.get("/api/dashboard/my-work", tags=["Dashboard"])
+def my_dashboard_work(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    today = date.today()
+    staff_id = user.staff_id
+    staff = db.get(models.StaffMember, staff_id) if staff_id else None
+    permissions = user_permissions(user)
+    today_lessons = []
+    class_teacher_classes = []
+    today_duty = None
+    if staff:
+        lessons = db.query(models.TimetableEntry, models.SchoolClass, models.Subject).outerjoin(
+            models.SchoolClass, models.SchoolClass.id == models.TimetableEntry.class_id
+        ).outerjoin(models.Subject, models.Subject.id == models.TimetableEntry.subject_id).filter(
+            models.TimetableEntry.staff_id == staff.id,
+            models.TimetableEntry.day_of_week == today.weekday() + 1,
+        ).order_by(models.TimetableEntry.start_time).all()
+        today_lessons = [{
+            "class_id": cls.id if cls else None,
+            "class_name": (cls.name + (" — " + cls.section if cls.section else "")) if cls else "Class",
+            "subject": subject.name if subject else "Lesson",
+            "start_time": entry.start_time, "end_time": entry.end_time,
+        } for entry, cls, subject in lessons]
+        duty = db.query(models.TeacherDuty).filter_by(staff_id=staff.id, duty_date=today).first()
+        if duty:
+            today_duty = {"date": duty.duty_date, "notes": duty.notes or "Assigned duty"}
+    if user.role == "teacher":
+        rows = db.query(models.ClassTeacherAssignment, models.SchoolClass).join(
+            models.SchoolClass, models.SchoolClass.id == models.ClassTeacherAssignment.class_id
+        ).filter(models.ClassTeacherAssignment.teacher_id == user.id).all()
+        class_teacher_classes = [{
+            "class_id": assignment.class_id,
+            "class_name": cls.name + (" — " + cls.section if cls.section else ""),
+        } for assignment, cls in rows]
+    available_sections = sorted(
+        section for section, actions in permissions.items() if "view" in actions
+    )
+    if user.role == "admin":
+        available_sections = sorted(PERMISSION_SECTIONS)
+    return {
+        "staff_name": f"{staff.first_name} {staff.last_name}" if staff else user.username,
+        "role_label": user.role_label or user.role.title(),
+        "available_sections": available_sections,
+        "today_lessons": today_lessons,
+        "class_teacher_classes": class_teacher_classes,
+        "today_duty": today_duty,
+    }
 
 
 @app.get("/api/dashboard/summary", tags=["Dashboard"])
