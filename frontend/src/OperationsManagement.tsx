@@ -18,9 +18,10 @@ type StaffAttendance = { id: number; staff_id: number; attendance_date: string; 
 type StaffAttendanceSummary = { total_staff: number; marked: number; unmarked: number; present: number; absent: number; late: number; excused: number }
 type SchoolClass = { id: number; name: string; section?: string }
 type Subject = { id: number; name: string; code?: string | null }
-type TimetableEntry = { id: number; class_id: number; subject_id?: number | null; staff_id?: number | null; day_of_week: number; start_time: string; end_time: string }
+type TimetableEntry = { id: number; class_id: number; class_name?: string; class_section?: string; subject_id?: number | null; subject_name?: string; staff_id?: number | null; teacher_name?: string; day_of_week: number; start_time: string; end_time: string }
 
-export default function OperationsManagement({ token, active }: { token: string; active: string }) {
+export default function OperationsManagement({ token, active, permissions = {}, isAdmin = false, roleLabel = '' }: { token: string; active: string; permissions?: Record<string, string[]>; isAdmin?: boolean; roleLabel?: string }) {
+  const canEditTimetable = isAdmin || (['Academic Administrator','Academics Administrator','Academics Officer','Director of Studies','DOS'].includes(roleLabel.trim()) && ['add','edit','delete'].some(action => (permissions['Timetable'] || []).includes(action)))
   const [staff, setStaff] = useState<Staff[]>([])
   const [classes, setClasses] = useState<SchoolClass[]>([])
   const [subjects, setSubjects] = useState<Subject[]>([])
@@ -29,6 +30,7 @@ export default function OperationsManagement({ token, active }: { token: string;
   const [staffRows, setStaffRows] = useState<StaffAttendance[]>([])
   const [staffSummary, setStaffSummary] = useState<StaffAttendanceSummary | null>(null)
   const [entries, setEntries] = useState<TimetableEntry[]>([])
+  const [selectedTimetableClass, setSelectedTimetableClass] = useState('')
   const [draft, setDraft] = useState({ class_id: '', subject_id: '', staff_id: '', day_of_week: '1', start_time: '08:00', end_time: '08:40' })
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
@@ -38,14 +40,23 @@ export default function OperationsManagement({ token, active }: { token: string;
   async function loadSetup() {
     setLoading(true); setError('')
     try {
-      const [staffResult, classResult, subjectResult] = await Promise.all([
-        request<{ items: Staff[] }>('staff?page=1&page_size=100', token),
-        request<SchoolClass[]>('classes', token),
-        request<Subject[]>('subjects', token),
-      ])
-      setStaff(staffResult.items.filter(person => person.status === 'active'))
-      setClasses(classResult); setSubjects(subjectResult)
-      if (!draft.class_id && classResult.length) setDraft(old => ({ ...old, class_id: String(classResult[0].id) }))
+      if (active === 'Timetable') {
+        const [rows, options] = await Promise.all([
+          request<TimetableEntry[]>('timetable', token),
+          canEditTimetable ? request<{classes:SchoolClass[];subjects:Subject[];staff:Staff[]}>('timetable/options', token) : Promise.resolve(null),
+        ])
+        setEntries(rows)
+        if (options) {
+          setClasses(options.classes); setSubjects(options.subjects); setStaff(options.staff)
+          if (!draft.class_id && options.classes.length) setDraft(old => ({ ...old, class_id: String(options.classes[0].id) }))
+        } else {
+          const unique = Array.from(new Map(rows.map(row => [row.class_id, {id:row.class_id,name:row.class_name || 'Class',section:row.class_section || ''}])).values())
+          setClasses(unique)
+        }
+      } else {
+        const [staffResult] = await Promise.all([request<{ items: Staff[] }>('staff?page=1&page_size=100', token)])
+        setStaff(staffResult.items.filter(person => person.status === 'active'))
+      }
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to load school operations.') }
     finally { setLoading(false) }
   }
@@ -68,9 +79,9 @@ export default function OperationsManagement({ token, active }: { token: string;
     catch (e) { setError(e instanceof Error ? e.message : 'Unable to load timetable.') }
   }
 
-  useEffect(() => { void loadSetup() }, [token])
+  useEffect(() => { void loadSetup() }, [token, active, canEditTimetable])
   useEffect(() => { if (active === 'Staff Attendance' && staff.length) void loadStaffAttendance() }, [active, staff.length, staffDate])
-  useEffect(() => { if (active === 'Timetable') void loadTimetable() }, [active])
+  useEffect(() => { if (active === 'Timetable') void loadTimetable() }, [active, token])
 
   async function saveStaffRegister() {
     if (staff.some(person => !staffStatuses[person.id])) { setError('Select an attendance status for every staff member before saving the register.'); return }
@@ -141,43 +152,39 @@ export default function OperationsManagement({ token, active }: { token: string;
         <p className="attendance-help">Staff can verify their record by checking their name and status here. If a status is incorrect, ask the administrator to correct that date’s register. Individual staff sign-in confirmation is not yet enabled.</p>
         <div className="table-wrap"><table><thead><tr><th>Staff member</th><th>Category</th><th>Recorded status</th><th>Notes</th></tr></thead><tbody>{staffRows.map(row => { const person = staff.find(item => item.id === row.staff_id); return <tr key={row.id}><td>{person ? person.first_name + ' ' + person.last_name : 'Staff #' + row.staff_id}</td><td>{person?.category || '—'}</td><td><span className={'attendance-status-pill status-' + row.status.toLowerCase()}>{row.status}</span></td><td>{row.notes || '—'}</td></tr> })}{!staffRows.length && <tr><td colSpan={4}>No saved staff attendance yet for this date.</td></tr>}</tbody></table></div>
       </> : <>
-        <p className="attendance-help">One whole-school timetable, organised by weekday. Each lesson is linked to its class, subject and teacher.</p>
-        <details className="form-disclosure"><summary><Plus size={15}/> Add a lesson</summary>
+        <p className="attendance-help">A weekly class timetable. Choose a class to see its lessons arranged by weekday and period. Lesson cards show the subject, teacher and time.</p>
+        {canEditTimetable && <details className="form-disclosure"><summary><Plus size={15}/> Add a lesson</summary>
           <form className="student-form" onSubmit={addTimetableEntry}>
             <div className="student-form-grid">
               <label>Class *<select required value={draft.class_id} onChange={event => setDraft({ ...draft, class_id: event.target.value })}><option value="">Choose class</option>{classes.map(item => <option key={item.id} value={item.id}>{item.name}{item.section ? ' — ' + item.section : ''}</option>)}</select></label>
               <label>Subject<select value={draft.subject_id} onChange={event => setDraft({ ...draft, subject_id: event.target.value })}><option value="">Not specified</option>{subjects.map(subject => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label>
-              <label>Teacher<select value={draft.staff_id} onChange={event => setDraft({ ...draft, staff_id: event.target.value })}><option value="">Not assigned</option>{staff.filter(person => person.category === 'Teaching').map(person => <option key={person.id} value={person.id}>{person.first_name} {person.last_name}</option>)}</select></label>
+              <label>Teacher<select value={draft.staff_id} onChange={event => setDraft({ ...draft, staff_id: event.target.value })}><option value="">Not assigned</option>{staff.map(person => <option key={person.id} value={person.id}>{person.first_name} {person.last_name}</option>)}</select></label>
               <label>Day<select value={draft.day_of_week} onChange={event => setDraft({ ...draft, day_of_week: event.target.value })}>{dayNames.map((day, index) => <option key={day} value={index + 1}>{day}</option>)}</select></label>
               <label>Start time<input required type="time" value={draft.start_time} onChange={event => setDraft({ ...draft, start_time: event.target.value })}/></label>
               <label>End time<input required type="time" value={draft.end_time} onChange={event => setDraft({ ...draft, end_time: event.target.value })}/></label>
             </div>
             <div className="form-actions"><button className="primary-button" disabled={saving || !classes.length}>{saving ? 'Saving...' : 'Add lesson'}</button></div>
           </form>
-        </details>
-        <div className="panel-heading"><div><h3>Whole-school timetable by class</h3><p>Each class has one clear weekly table. Subject codes are shown where available; otherwise short abbreviations are generated from the subject name.</p></div><span className="timetable-count">{entries.length} lessons</span></div>
-        {classes.slice().sort((a,b) => a.name.localeCompare(b.name) || (a.section || '').localeCompare(b.section || '')).map(schoolClass => {
-          const classEntries = entries.filter(entry => entry.class_id === schoolClass.id).sort((a,b) => a.day_of_week - b.day_of_week || a.start_time.localeCompare(b.start_time));
-          const subjectAbbreviation = (subject?: Subject) => {
-            if (!subject) return '—';
-            if (subject.code?.trim()) return subject.code.trim().toUpperCase();
-            const words = subject.name.trim().split(/\\s+/);
-            return (words.length > 1 ? words.map(word => word[0]).join('') : subject.name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 3)).toUpperCase();
-          };
-          return <div key={schoolClass.id} className="timetable-class-block">
-            <div className="timetable-class-heading"><h3>{schoolClass.name}{schoolClass.section ? ' — ' + schoolClass.section : ''}</h3><span>{classEntries.length} lessons</span></div>
-            <div className="table-wrap"><table className="class-timetable-table"><thead><tr><th>Day</th><th>Time</th><th>Subject</th><th>Teacher</th><th>Action</th></tr></thead><tbody>
-              {classEntries.map(entry => {
-                const subject = subjects.find(item => item.id === entry.subject_id);
-                const teacher = staff.find(person => person.id === entry.staff_id);
-                return <tr key={entry.id}><td><strong>{dayNames[entry.day_of_week - 1]?.slice(0, 3).toUpperCase() || '—'}</strong></td><td>{entry.start_time}–{entry.end_time}</td><td><span className="subject-abbreviation" title={subject?.name || 'Lesson'}>{subjectAbbreviation(subject)}</span><span className="subject-full-name">{subject?.name || 'Lesson'}</span></td><td>{teacher ? teacher.first_name + ' ' + teacher.last_name : '—'}</td><td><button type="button" className="secondary-button" disabled={saving} onClick={() => void removeEntry(entry.id)}><Trash2 size={14}/> Remove</button></td></tr>
-              })}
-              {!classEntries.length && <tr><td colSpan={5}>No lessons scheduled for this class.</td></tr>}
+        </details>}
+        <div className="panel-heading"><div><h3>Weekly timetable</h3><p>Displayed as a weekday grid, with no room column.</p></div><span className="timetable-count">{entries.length} lessons</span></div>
+        <label className="date-field">Class timetable<select value={selectedTimetableClass || (classes[0] ? String(classes[0].id) : '')} onChange={e=>setSelectedTimetableClass(e.target.value)}><option value="">Choose class</option>{classes.map(item=><option key={item.id} value={item.id}>{item.name}{item.section ? ' — '+item.section : ''}</option>)}</select></label>
+        {(() => {
+          const classId = Number(selectedTimetableClass || classes[0]?.id || 0)
+          const classEntries = entries.filter(entry => entry.class_id === classId)
+          const slots = Array.from(new Set(classEntries.map(entry => entry.start_time + '–' + entry.end_time))).sort()
+          const days = ['Mon','Tue','Wed','Thu','Fri']
+          const chosenClass = classes.find(item => item.id === classId)
+          return <div className="timetable-class-block">
+            {chosenClass && <div className="timetable-class-heading"><h3>{chosenClass.name}{chosenClass.section ? ' — ' + chosenClass.section : ''}</h3><span>{classEntries.length} lessons this week</span></div>}
+            <div className="table-wrap"><table className="class-timetable-table timetable-week-grid"><thead><tr><th>Period</th>{days.map(day=><th key={day}>{day}</th>)}</tr></thead><tbody>
+              {slots.map(slot => <tr key={slot}><th>{slot}</th>{days.map((day,index) => {
+                const entry = classEntries.find(row => row.day_of_week === index + 1 && row.start_time + '–' + row.end_time === slot)
+                return <td key={day}>{entry ? <div className="timetable-lesson-card"><strong>{entry.subject_name || 'Lesson'}</strong><span>{entry.teacher_name || 'Teacher not assigned'}</span><small>{entry.start_time}–{entry.end_time}</small>{canEditTimetable && <button type="button" className="secondary-button" disabled={saving} onClick={() => void removeEntry(entry.id)}><Trash2 size={13}/> Remove</button>}</div> : <span className="timetable-empty-cell">—</span>}</td>
+              })}</tr>)}
+              {!slots.length && <tr><td colSpan={6}>No lessons scheduled for this class.</td></tr>}
             </tbody></table></div>
-          </div>;
-        })}
-        {!classes.length && <p className="form-hint">Create classes before adding timetable lessons.</p>}
-      </>}
-    </section>
-  </div>
-}
+          </div>
+        })()}
+        {!classes.length && <p className="form-hint">No timetable classes are available.</p>}
+        {!canEditTimetable && <p className="form-hint">View-only timetable access. Changes can be made only by the Academics Administrator or a designated academic officer.</p>}
+
