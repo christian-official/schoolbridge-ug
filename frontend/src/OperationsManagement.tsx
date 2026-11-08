@@ -45,7 +45,7 @@ export default function OperationsManagement({ token, active, permissions = {}, 
       if (active === 'Timetable') {
         const [rows, options] = await Promise.all([
           request<TimetableEntry[]>('timetable', token),
-          canEditTimetable ? request<{classes:SchoolClass[];subjects:Subject[];staff:Staff[]}>('timetable/options', token) : Promise.resolve(null),
+          request<{classes:SchoolClass[];subjects:Subject[];staff:Staff[]}>('timetable/options', token),
         ])
         setEntries(rows)
         if (options) {
