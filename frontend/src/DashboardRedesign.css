@@ -413,3 +413,37 @@
 .redesigned-app-shell.role-theme-teacher>.sidebar{
   background:linear-gradient(180deg,#3d2169 0%,#633b96 62%,#825bb1 100%)!important;
 }
+
+
+/* Keep the SchoolBridge logo fixed while the navigation list scrolls beneath it. */
+.redesigned-app-shell>.sidebar{
+  display:flex!important;
+  flex-direction:column!important;
+  overflow:hidden!important;
+}
+.redesigned-app-shell>.sidebar>.sidebar-brand{
+  position:relative!important;
+  z-index:2!important;
+  flex:0 0 auto!important;
+}
+.redesigned-app-shell>.sidebar>.school-label{
+  flex:0 0 auto!important;
+}
+.redesigned-app-shell>.sidebar>nav{
+  flex:1 1 auto!important;
+  min-height:0!important;
+  overflow-y:auto!important;
+  overflow-x:hidden!important;
+  overscroll-behavior:contain;
+  scrollbar-width:none!important;
+  -ms-overflow-style:none!important;
+}
+.redesigned-app-shell>.sidebar>nav::-webkit-scrollbar{
+  display:none!important;
+  width:0!important;
+  height:0!important;
+}
+.redesigned-app-shell>.sidebar>.sidebar-bottom{
+  flex:0 0 auto!important;
+  margin-top:0!important;
+}
