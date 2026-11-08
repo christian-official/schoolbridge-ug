@@ -114,6 +114,7 @@ class User(Base):
     reset_code_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
     reset_expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     reset_requested_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    reset_attempts: Mapped[int] = mapped_column(default=0, nullable=False)
     must_change_password: Mapped[bool] = mapped_column(default=False, nullable=False)
 
 
