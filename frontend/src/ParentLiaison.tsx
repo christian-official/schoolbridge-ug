@@ -13,7 +13,7 @@ async function api<T>(path: string, token: string, options: RequestInit = {}): P
 }
 type Recipient = { student_id: number; student_name: string; admission_number: string; class_name: string; parents: { id: number; username: string; email: string }[] }
 type LiaisonThread = { id: number; student_id: number; student_name: string; parent_name: string; subject: string; category: string; status: string; updated_at: string; last_message: string; last_sender_id: number | null }
-type LiaisonDetail = { id: number; student_id: number; student_name: string; subject: string; category: string; status: string; messages: { id: number; sender_id: number; sender_name: string; message: string; created_at: string; read_at: string | null }[] }
+type LiaisonDetail = { current_user_id: number; id: number; student_id: number; student_name: string; subject: string; category: string; status: string; messages: { id: number; sender_id: number; sender_name: string; message: string; created_at: string; read_at: string | null }[] }
 
 export default function ParentLiaisonWorkspace({ token, role }: { token: string; role: string }) {
   const isParent = role === 'parent'
@@ -141,7 +141,7 @@ export default function ParentLiaisonWorkspace({ token, role }: { token: string;
           {detail ? <>
             <header className="parent-liaison-conversation-head"><div><strong>{detail.subject}</strong><span>{detail.student_name} · {detail.category}</span></div><span className={detail.status === 'Open' ? 'attendance-status-pill status-present' : 'attendance-status-pill'}>{detail.status}</span></header>
             <div className="parent-liaison-messages">
-              {detail.messages.map((item, index) => <article key={item.id} className={index % 2 === 0 ? 'parent-liaison-message sent' : 'parent-liaison-message received'}>
+              {detail.messages.map((item, index) => <article key={item.id} className={item.sender_id === detail.current_user_id ? 'parent-liaison-message sent' : 'parent-liaison-message received'}>
                 <div className="parent-liaison-message-meta"><strong>{item.sender_name}</strong><time>{new Date(item.created_at).toLocaleString('en-UG', { dateStyle: 'medium', timeStyle: 'short' })}</time></div>
                 <p>{item.message}</p>
                 {item.read_at && <small><CheckCheck size={12}/> Read</small>}

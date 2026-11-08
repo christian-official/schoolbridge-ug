@@ -1918,17 +1918,17 @@ class UserPermissionsUpdate(BaseModel):
 @app.get("/api/auth/permissions", tags=["User Management"])
 def permission_catalog(admin=Depends(require_admin)):
     presets = {
-        "Headteacher": ["Overview", "Students", "Staff", "Fees & Finance", "Examinations", "Attendance", "Staff Attendance", "Timetable", "Leadership & Duty", "Parent Access", "Announcements", "Reports"],
-        "Deputy Headteacher": ["Overview", "Students", "Staff", "Examinations", "Attendance", "Timetable", "Leadership & Duty", "Announcements", "Reports"],
-        "DOS": ["Overview", "Staff", "Examinations", "Attendance", "Timetable", "Students", "Reports", "Announcements"],
-        "Academic Administrator": ["Overview", "Examinations", "Timetable", "Students", "Reports", "Announcements"],
+        "Headteacher": ["Overview", "Students", "Staff", "Fees & Finance", "Examinations", "Attendance", "Staff Attendance", "Timetable", "Leadership & Duty", "Parent Access", "Parent Liaison", "Announcements", "Reports"],
+        "Deputy Headteacher": ["Overview", "Students", "Staff", "Examinations", "Attendance", "Timetable", "Leadership & Duty", "Parent Liaison", "Announcements", "Reports"],
+        "DOS": ["Overview", "Staff", "Examinations", "Attendance", "Timetable", "Students", "Parent Liaison", "Reports", "Announcements"],
+        "Academic Administrator": ["Overview", "Examinations", "Timetable", "Students", "Parent Liaison", "Reports", "Announcements"],
         "Academics Officer": ["Overview", "Examinations", "Timetable", "Students", "Reports"],
         "Bursar": ["Overview", "Fees & Finance", "Students", "Reports"],
         "Accountant": ["Overview", "Fees & Finance", "Staff", "Reports"],
-        "Secretary": ["Overview", "Students", "Staff", "Parent Access", "Announcements", "Reports"],
+        "Secretary": ["Overview", "Students", "Staff", "Parent Access", "Parent Liaison", "Announcements", "Reports"],
         "Attendance Officer": ["Overview", "Attendance", "Staff Attendance", "Reports"],
-        "Teacher": ["My Classes", "My Attendance", "My Results", "Announcements", "Timetable"],
-        "Class Teacher": ["My Classes", "Students", "Attendance", "My Attendance", "My Results", "Announcements", "Timetable"],
+        "Teacher": ["My Classes", "My Attendance", "My Results", "Parent Liaison", "Announcements", "Timetable"],
+        "Class Teacher": ["My Classes", "Students", "Attendance", "My Attendance", "My Results", "Parent Liaison", "Announcements", "Timetable"],
     }
     return {"sections": sorted(PERMISSION_SECTIONS), "actions": sorted(PERMISSION_ACTIONS), "presets": presets}
 
