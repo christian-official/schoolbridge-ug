@@ -1103,6 +1103,7 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
       next['My Classes']=['view'];next['My Attendance']=['view'];next['My Results']=['view','add','edit'];next['Announcements']=['view'];next['Timetable']=['view']
     }
     if(['Academic Administrator','Academics Officer','DOS'].includes(label)) next['Timetable']=['view','add','edit','delete']
+    if(label==='Attendance Officer'){next['Attendance']=['view','add','edit'];next['Staff Attendance']=['view','add','edit']}
     setRoleLabel(label);setRoleType(label==='Teacher'||label==='Class Teacher'?'teacher':'staff');setPermissions(next)
   }
   function toggleSection(section:string,checked:boolean) {
