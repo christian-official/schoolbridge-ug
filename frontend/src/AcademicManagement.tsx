@@ -121,6 +121,7 @@ export default function AcademicManagement({ token, classes, canVerify = false }
   const [showExamForm, setShowExamForm] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [saveProgress, setSaveProgress] = useState(0)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
 
@@ -296,27 +297,30 @@ export default function AcademicManagement({ token, classes, canVerify = false }
     }
     const subject = subjects.find(item => String(item.id) === selectedSubjectId)
     if (!subject) return
-    setSaving(true); setError(''); setMessage('')
+    setSaving(true); setSaveProgress(0); setError(''); setMessage('')
     let saved = 0
     try {
-      for (const student of eligibleStudents) {
+      for (let index = 0; index < eligibleStudents.length; index += 1) {
+        const student = eligibleStudents[index]
         const key = String(student.id) + ':' + selectedSubjectId
         const raw = markDrafts[key]
-        if (raw === undefined || raw.trim() === '') continue
-        const score = Number(raw)
+        const score = raw === undefined || raw.trim() === '' ? 0 : Number(raw)
         if (!Number.isFinite(score) || !Number.isInteger(score) || score < 0 || score > 100) throw new Error('Enter a valid score from 0 to 100 for ' + studentName(student) + '.')
         const existing = marks.find(mark => mark.student_id === student.id && String(mark.subject_id) === selectedSubjectId)
-        if (existing && existing.verified) continue
-        if (existing && Number(existing.score) === score) continue
-        if (existing) await request<Mark>('marks/' + existing.id, token, { method: 'PATCH', body: JSON.stringify({ score }) })
-        else await request<Mark>('marks', token, { method: 'POST', body: JSON.stringify({ exam_id: selectedExam.id, student_id: student.id, subject_id: Number(selectedSubjectId), score }) })
-        saved += 1
+        if (!(existing && existing.verified) && !(existing && Number(existing.score) === score)) {
+          if (existing) await request<Mark>('marks/' + existing.id, token, { method: 'PATCH', body: JSON.stringify({ score }) })
+          else await request<Mark>('marks', token, { method: 'POST', body: JSON.stringify({ exam_id: selectedExam.id, student_id: student.id, subject_id: Number(selectedSubjectId), score }) })
+          saved += 1
+        }
+        setSaveProgress(Math.round(((index + 1) / eligibleStudents.length) * 100))
       }
       const next = await request<Mark[]>('marks?exam_id=' + selectedExam.id, token)
       setMarks(next)
       setMarkDrafts(Object.fromEntries(next.map(mark => [String(mark.student_id) + ':' + String(mark.subject_id), String(Math.round(mark.score))])))
-      setMessage(saved + ' ' + subject.name + ' score(s) saved.')
-    } catch (e) { setError(e instanceof Error ? e.message : 'Unable to save subject marks.') }
+      setSubmittedSubjectId(selectedSubjectId)
+      setMessage(`${subject.name}: ${eligibleStudents.length} student results submitted. Blank scores were recorded as No score (0). Status: Submitted · Not verified.`)
+      setActiveAcademicTab('submitted')
+    } catch (e) { setError(e instanceof Error ? e.message : 'Unable to submit subject results.') }
     finally { setSaving(false) }
   }
 
@@ -515,6 +519,7 @@ export default function AcademicManagement({ token, classes, canVerify = false }
       {activeAcademicTab === 'marks' && (
       <section className="panel subject-marks-workspace">
         <div className="panel-heading"><div><h2>Enter subject marks</h2><p>Select the subject you teach, then enter scores beside each student. Only the selected subject is shown.</p></div></div>
+        {saving && activeAcademicTab === 'marks' && <div className="teacher-results-progress" role="status"><div><strong>Submitting ${subjects.find(item => String(item.id) === selectedSubjectId)?.name || 'subject'} results</strong><span>{saveProgress}% complete · ${eligibleStudents.length} students</span></div><div className="teacher-results-progress-track"><span style={{ width: saveProgress + '%' }} /></div></div>}
         <div className="subject-marks-toolbar">
           <label className="academic-exam-select">Subject to enter
             <select value={selectedSubjectId} onChange={e => setSelectedSubjectId(e.target.value)}>
@@ -523,11 +528,11 @@ export default function AcademicManagement({ token, classes, canVerify = false }
             </select>
           </label>
           <div className="subject-marks-count"><strong>{selectedSubjectId ? eligibleStudents.length : students.length}</strong><span>{selectedSubjectId ? 'students offering this subject' : 'students in this class'}</span></div>
-          <button type="button" className="primary-button" onClick={() => void saveClassMarks()} disabled={saving || !eligibleStudents.length || !selectedSubjectId}><Save size={15}/>{saving ? 'Saving scores…' : 'Save subject scores'}</button>
+          <button type="button" className="primary-button" onClick={() => void saveClassMarks()} disabled={saving || !eligibleStudents.length || !selectedSubjectId}><Save size={15}/>{saving ? 'Submitting…' : 'Submit class results'}</button>
         </div>
         {!students.length && <p className="form-hint">No students are registered in this class yet.</p>}
         {!subjects.length && <p className="form-hint">No subjects are configured for this school type.</p>}
-        {!!students.length && !selectedSubjectId && <div className="subject-marks-empty"><BookOpen size={25}/><strong>Choose a subject to begin</strong><span>The student list and score boxes will appear here.</span></div>}
+        {!!students.length && !selectedSubjectId && <div className="subject-marks-empty"><BookOpen size={25}/><strong>Choose a subject to begin</strong><span>The student list and score boxes will appear here. Submit the subject once all scores are ready; blank scores are recorded as No score (0).</span></div>}
         {!!students.length && !!selectedSubjectId && !eligibleStudents.length && <div className="subject-marks-empty"><BookOpen size={25}/><strong>No students offer this subject</strong><span>Check each A-Level student's combination and subsidiary/optional subjects.</span></div>}
         {!!students.length && !!selectedSubjectId && !!eligibleStudents.length && <div className="student-score-list">
           <div className="student-score-list-heading"><span>STUDENT</span><span>ADMISSION NUMBER</span><span>SCORE / 100</span><span>STATUS</span></div>
@@ -538,10 +543,10 @@ export default function AcademicManagement({ token, classes, canVerify = false }
               <div className="student-score-name"><span className="student-score-number">{index + 1}</span><strong>{studentName(student)}</strong></div>
               <span className="student-score-admission">{student.admission_number}</span>
               <input className="student-score-input" aria-label={studentName(student) + ' score'} type="number" min="0" max="100" step="1" inputMode="numeric" placeholder="Enter score" value={markDrafts[key] ?? ''} disabled={!!mark?.verified || saving} onChange={event => setMarkDrafts(current => ({ ...current, [key]: event.target.value }))}/>
-              <span className={mark?.verified ? 'student-score-status verified' : mark ? 'student-score-status recorded' : 'student-score-status pending'}>{mark?.verified ? 'Verified' : mark ? 'Recorded' : 'Not entered'}</span>
+              <span className={mark?.verified ? 'student-score-status verified' : mark ? 'student-score-status recorded' : 'student-score-status pending'}>{mark?.verified ? 'Verified' : mark ? 'Submitted · Not verified' : 'Not submitted'}</span>
             </div>
           })}
-          <div className="student-score-footer"><span>Blank scores are skipped. Scores must be between 0 and 100.</span><button type="button" className="primary-button" onClick={() => void saveClassMarks()} disabled={saving || !eligibleStudents.length}><Save size={15}/>{saving ? 'Saving…' : 'Save scores'}</button></div>
+          <div className="student-score-footer"><span>Blank scores are submitted as No score (0). Scores must be between 0 and 100.</span><button type="button" className="primary-button" onClick={() => void saveClassMarks()} disabled={saving || !eligibleStudents.length}><Save size={15}/>{saving ? 'Submitting…' : 'Submit class results'}</button></div>
         </div>}
         <details className="recorded-marks-details"><summary>Recorded scores · by subject and verification status</summary>
           <div className="recorded-marks-filters"><label>Subject<select value={recordedSubjectFilter} onChange={e => setRecordedSubjectFilter(e.target.value)}><option value="all">All subjects</option>{subjects.map(subject => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label><label>Verification status<select value={recordedStatusFilter} onChange={e => setRecordedStatusFilter(e.target.value as 'all' | 'verified' | 'unverified')}><option value="all">All statuses</option><option value="verified">Verified</option><option value="unverified">Unverified</option></select></label></div>
@@ -576,7 +581,7 @@ export default function AcademicManagement({ token, classes, canVerify = false }
       {activeAcademicTab === 'submitted' && (
         <section className="panel submitted-results-workspace">
           <div className="panel-heading">
-            <div><h2>Submitted results</h2><p>Choose a subject to review its submitted scores and current verification status.</p></div>
+            <div><h2>Submitted results</h2><p>Results are grouped by subject. Select a subject tab to review each learner and see whether results are Submitted · Not verified or Verified.</p></div>
             <div className="dashboard-heading-actions"><span className="count-pill">{marks.filter(mark => !mark.verified).length} not verified</span>{canVerify && marks.some(mark => !mark.verified) && <button type="button" className="primary-button" disabled={saving} onClick={() => void verifyAllExamResults()}>Verify all submitted results</button>}</div>
           </div>
           {!selectedExam && <p className="form-hint">Select an examination to review submitted results.</p>}
