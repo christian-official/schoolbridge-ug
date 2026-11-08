@@ -1038,10 +1038,10 @@ def verify_mark(mark_id: int, verified: bool, db: Session = Depends(get_db), adm
     db.refresh(item)
     return item
 
-@app.patch("/api/marks/verification/batch", tags=["Marks"])
+@app.patch("/api/subjects/{subject_id}/marks/verification", tags=["Marks"])
 def verify_subject_marks_batch(
-    exam_id: int,
     subject_id: int,
+    exam_id: int,
     verified: bool = True,
     db: Session = Depends(get_db),
     admin=Depends(require_admin),
