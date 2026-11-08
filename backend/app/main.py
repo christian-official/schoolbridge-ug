@@ -1660,6 +1660,10 @@ async def protect_school_data(request: Request, call_next):
             if path in ADMIN_ONLY_PATHS or path.startswith("/api/auth/"):
                 return JSONResponse({"detail": "Administrator permission required."}, status_code=403)
             section = permission_for_path(path)
+            # Finance staff need student lookup for payment processing, without
+            # granting them access to the wider Students workspace.
+            if path == "/api/students/search" and "view" in user_permissions(user).get("Fees & Finance", set()):
+                section = "Fees & Finance"
             action = action_for_method(request.method, path)
             class_teacher_register = path in {"/api/attendance", "/api/attendance/summary", "/api/attendance/options", "/api/attendance/students"} and user.role == "teacher"
             if class_teacher_register:
@@ -2307,7 +2311,7 @@ def staff_self_check_in(db: Session = Depends(get_db), user=Depends(get_current_
     if record is None:
         record = models.StaffAttendance(
             staff_id=staff_member.id, attendance_date=local_now.date(),
-            status="Present", notes="Staff self check-in",
+            status="Present", notes="On shift",
         )
         db.add(record)
     record.check_in_at = local_now
@@ -2335,6 +2339,7 @@ def staff_self_check_out(db: Session = Depends(get_db), user=Depends(get_current
     if record.check_out_at:
         raise HTTPException(409, "You have already checked out today.")
     record.check_out_at = local_now
+    record.notes = "Shift ended"
     write_audit(db, user, "staff_self_check_out", "staff_attendance", staff_member.id,
                 f"Checked out at {local_now.strftime('%H:%M')} on {local_now.date()}.")
     db.commit()
