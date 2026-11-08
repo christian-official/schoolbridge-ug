@@ -1309,7 +1309,7 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
     return haystack.includes(staffLoginSearch.trim().toLowerCase())
   })
   const otherLoginMatches=otherAccounts.filter(u=>[u.username,u.email,u.role_label,u.role].filter(Boolean).join(' ').toLowerCase().includes(otherLoginSearch.trim().toLowerCase()))
-  const visibleStaffLogins=staffLoginSearch.trim()?staffLoginMatches:staffLoginMatches.slice(0,8)
+  const visibleStaffLogins=staffLoginMatches.slice(0,5)
   const visibleOtherLogins=otherLoginSearch.trim()?otherLoginMatches:otherLoginMatches.slice(0,8)
   const presetNames=Object.keys(catalog.presets||{})
   return <section className="panel settings-panel">
@@ -1357,8 +1357,8 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
     </div>}
     {accountTab==='staff'&&<div className="account-tab-panel">
     <h3>School staff login accounts</h3>
-    <p className="form-hint">Staff accounts are separate from administrator and parent accounts. The first 8 are shown; search to find any other account.</p>
-    <div className="table-tools student-tools"><div className="search-box"><Search size={17}/><input aria-label="Search staff login accounts" placeholder="Search staff name, staff number or username..." value={staffLoginSearch} onChange={e=>setStaffLoginSearch(e.target.value)}/></div><span className="count-pill">{staffLoginMatches.length} staff accounts</span></div>
+    <p className="form-hint">Staff accounts are separate from administrator and parent accounts. The first 5 matching accounts are shown; search to find any other account.</p>
+    <div className="table-tools student-tools"><div className="search-box"><Search size={17}/><input aria-label="Search staff login accounts" placeholder="Search staff name, staff number or username..." value={staffLoginSearch} onChange={e=>setStaffLoginSearch(e.target.value)}/></div><span className="count-pill">Showing {visibleStaffLogins.length} of {staffLoginMatches.length} matching staff accounts</span></div>
     <div className="table-wrap"><table><thead><tr><th>Staff member</th><th>Username</th><th>Job role</th><th>Areas available</th><th>Status</th><th>Actions</th></tr></thead><tbody>
       {visibleStaffLogins.map(u=>{const person=staff.find((p:any)=>p.id===u.staff_id);return <tr key={u.id}><td>{person?person.first_name+' '+person.last_name:'Unlinked staff login'}</td><td>{u.username}</td><td>{u.role_label||u.role}</td><td>{Object.keys(u.permissions||{}).length||'Limited'}</td><td>{u.active?'Active':'Disabled'}</td><td><button type="button" className="secondary-button" disabled={busy} onClick={()=>{setSelectedId(String(u.id));setResetPasscode(null);setRoleLabel(u.role_label||u.role);setRoleType(u.role==='teacher'?'teacher':'staff');setPermissions(u.permissions||{});void resetAccountPassword(String(u.id),u.username)}}>Reset password</button></td></tr>})}
       {!staffLoginMatches.length&&<tr><td colSpan={6}>No staff login accounts match this search.</td></tr>}
