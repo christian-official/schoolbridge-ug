@@ -2026,6 +2026,24 @@ def list_parent_accounts(db: Session = Depends(get_db), admin=Depends(require_ad
     return output
 
 
+@app.delete("/api/parent-accounts/{parent_id}", tags=["Parent Access"])
+def remove_parent_account(parent_id: int, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    parent = db.query(models.User).filter_by(id=parent_id, role="parent").first()
+    if not parent:
+        raise HTTPException(404, "Parent account not found.")
+    links = db.query(models.ParentStudentLink).filter_by(user_id=parent.id).all()
+    linked_student_ids = [str(link.student_id) for link in links]
+    for link in links:
+        db.delete(link)
+    write_audit(
+        db, admin, "parent_account_removed", "user", parent.id,
+        f"username={parent.username}; unlinked_student_ids={','.join(linked_student_ids)}",
+    )
+    db.delete(parent)
+    db.commit()
+    return {"removed": True, "parent_id": parent_id, "unlinked_students": len(links)}
+
+
 @app.get("/api/parent/children", tags=["Parent Portal"])
 def parent_children(db: Session = Depends(get_db), parent=Depends(require_parent)):
     links = db.query(models.ParentStudentLink).filter_by(user_id=parent.id).all()
