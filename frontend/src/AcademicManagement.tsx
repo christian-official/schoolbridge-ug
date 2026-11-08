@@ -32,7 +32,7 @@ function studentName(student?: Student) {
 }
 
 function normaliseSubjectText(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().replace(/\\s+/g, ' ')
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ')
 }
 
 const aLevelSubjectAliases: Record<string, string> = {
