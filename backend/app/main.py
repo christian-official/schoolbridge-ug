@@ -1376,7 +1376,9 @@ async def protect_school_data(request: Request, call_next):
                 {"detail": "Account is unavailable."}, status_code=401
             )
 
-        if path == "/api/auth/me":
+        if path == "/api/auth/me" or path.startswith("/api/me/"):
+            # Authenticated users may manage their own linked staff profile
+            # and password without requiring broad Staff or Settings access.
             pass
         elif path.startswith("/api/teacher/"):
             if user.role != "teacher":
