@@ -870,3 +870,94 @@ def test_parent_portal_only_exposes_linked_child_records_and_audience_announceme
         teacher_announcements = client.get("/api/announcements", headers=teacher_headers)
         assert {row["title"] for row in parent_announcements.json()} == {"Parent Update", "Whole School Update"}
         assert {row["title"] for row in teacher_announcements.json()} == {"Teacher Update", "Whole School Update"}
+
+
+def test_parent_liaison_is_staff_initiated_and_student_linked():
+    reset_database()
+    db = SessionLocal()
+    try:
+        school_class = models.SchoolClass(name="S2", section="A")
+        db.add(school_class)
+        db.flush()
+        student = models.Student(
+            admission_number="PL-001", first_name="Amina", last_name="Sample",
+            class_id=school_class.id, status="active",
+        )
+        teacher = models.User(
+            username="liaison-teacher", email="liaison-teacher@example.invalid",
+            hashed_password=password_hash.hash("TeacherPassword123!"),
+            role="teacher", is_active=True,
+        )
+        parent = models.User(
+            username="liaison-parent", email="liaison-parent@example.invalid",
+            hashed_password=password_hash.hash("ParentPassword123!"),
+            role="parent", is_active=True,
+        )
+        unrelated_parent = models.User(
+            username="other-parent", email="other-parent@example.invalid",
+            hashed_password=password_hash.hash("ParentPassword123!"),
+            role="parent", is_active=True,
+        )
+        db.add_all([student, teacher, parent, unrelated_parent])
+        db.flush()
+        db.add(models.ParentStudentLink(user_id=parent.id, student_id=student.id))
+        db.add(models.ClassTeacherAssignment(teacher_id=teacher.id, class_id=school_class.id))
+        db.commit()
+        student_id, teacher_id, parent_id, unrelated_parent_id = student.id, teacher.id, parent.id, unrelated_parent.id
+    finally:
+        db.close()
+
+    teacher_token = create_access_token(SimpleNamespace(id=teacher_id, role="teacher"))
+    parent_token = create_access_token(SimpleNamespace(id=parent_id, role="parent"))
+    unrelated_token = create_access_token(SimpleNamespace(id=unrelated_parent_id, role="parent"))
+    teacher_headers = {"Authorization": f"Bearer {teacher_token}"}
+    parent_headers = {"Authorization": f"Bearer {parent_token}"}
+    unrelated_headers = {"Authorization": f"Bearer {unrelated_token}"}
+
+    with TestClient(app) as client:
+        recipients = client.get("/api/parent-liaison/recipients", headers=teacher_headers)
+        assert recipients.status_code == 200
+        assert [row["student_id"] for row in recipients.json()] == [student_id]
+        assert recipients.json()[0]["parents"][0]["id"] == parent_id
+
+        created = client.post(
+            "/api/parent-liaison/threads",
+            headers=teacher_headers,
+            json={
+                "student_id": student_id,
+                "parent_user_id": parent_id,
+                "subject": "Attendance follow-up",
+                "category": "Attendance",
+                "message": "Please contact the school office about the recent absence.",
+            },
+        )
+        assert created.status_code == 200
+        thread_id = created.json()["id"]
+
+        parent_threads = client.get("/api/parent-liaison/threads", headers=parent_headers)
+        assert parent_threads.status_code == 200
+        assert len(parent_threads.json()) == 1
+        assert parent_threads.json()[0]["id"] == thread_id
+
+        parent_cannot_start = client.post(
+            "/api/parent-liaison/threads",
+            headers=parent_headers,
+            json={
+                "student_id": student_id, "parent_user_id": parent_id,
+                "subject": "Unrestricted message", "category": "General enquiry",
+                "message": "This should not be allowed.",
+            },
+        )
+        assert parent_cannot_start.status_code == 403
+
+        reply = client.post(
+            f"/api/parent-liaison/threads/{thread_id}/messages",
+            headers=parent_headers,
+            json={"message": "Thank you. I will follow up with the office."},
+        )
+        assert reply.status_code == 200
+
+        unrelated_access = client.get(
+            f"/api/parent-liaison/threads/{thread_id}", headers=unrelated_headers
+        )
+        assert unrelated_access.status_code == 404
