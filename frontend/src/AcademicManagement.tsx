@@ -586,14 +586,14 @@ export default function AcademicManagement({ token, classes, canVerify = false }
                 const subjectMarks = marks.filter(mark => mark.subject_id === subject.id && students.some(student => student.id === mark.student_id && studentOffersSubject(student, subject)))
                 const verifiedCount = subjectMarks.filter(mark => mark.verified).length
                 const pendingCount = subjectMarks.length - verifiedCount
-                const activeId = submittedSubjectId || String(subjects.find(row => marks.some(mark => mark.subject_id === row.id))?.id || '')
+                const activeId = (subjects.some(row => String(row.id) === submittedSubjectId && marks.some(mark => mark.subject_id === row.id)) ? submittedSubjectId : String(subjects.find(row => marks.some(mark => mark.subject_id === row.id))?.id || ''))
                 return <button type="button" role="tab" aria-selected={String(subject.id) === activeId} className={String(subject.id) === activeId ? 'submitted-subject-tab active' : 'submitted-subject-tab'} key={subject.id} onClick={() => setSubmittedSubjectId(String(subject.id))}>
                   <strong>{subject.name}</strong><span>{subjectMarks.length} submitted</span><small>{verifiedCount} verified · {pendingCount} not verified</small>
                 </button>
               })}
             </div>
             {(() => {
-              const subject = subjects.find(row => String(row.id) === submittedSubjectId) || subjects.find(row => marks.some(mark => mark.subject_id === row.id))
+              const subject = subjects.find(row => String(row.id) === submittedSubjectId && marks.some(mark => mark.subject_id === row.id)) || subjects.find(row => marks.some(mark => mark.subject_id === row.id))
               if (!subject) return <p className="empty-state">No subject results have been submitted for this examination yet.</p>
               const subjectMarks = marks.filter(mark => mark.subject_id === subject.id && students.some(student => student.id === mark.student_id && studentOffersSubject(student, subject))).sort((a,b) => studentName(studentById.get(a.student_id)).localeCompare(studentName(studentById.get(b.student_id))))
               const pendingCount = subjectMarks.filter(mark => !mark.verified).length

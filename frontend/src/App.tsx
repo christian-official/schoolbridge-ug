@@ -1129,7 +1129,7 @@ function TeacherWorkspace({token,active}:{token:string;active:string}) {
   if(active==='My Classes') return <section className="panel"><div className="panel-heading"><div><h2>My assigned classes</h2><p>Only classes and subjects assigned to your teacher account appear here.</p></div></div>{message&&<div className="notice">{message}</div>}<h3>Subject teaching assignments</h3><div className="class-grid">{assignments.map(a=><div className="class-card" key={a.assignment_id}><BookOpen size={22}/><strong>{a.class}</strong><span>{a.subject}</span></div>)}</div>{!assignments.length&&<p className="form-hint">No subject and class combinations have been assigned to you yet.</p>}<h3>Class-teacher responsibilities</h3><div className="class-grid">{classTeacherAssignments.map(a=><div className="class-card" key={a.assignment_id}><Users size={22}/><strong>{a.class}</strong><span>Responsible for the full class register</span></div>)}</div>{!classTeacherAssignments.length&&<p className="form-hint">You are not currently assigned as a class teacher.</p>}</section>
   if(active==='My Attendance') return <div className="academic-workspace">
     <section className="panel">
-      <div className="panel-heading"><div><h2>My attendance record</h2><p>Review the daily attendance status recorded against your staff profile.</p></div></div>
+      <div className="panel-heading"><div><h2>My attendance record</h2><p>Review the daily attendance status recorded against your staff profile.</p></div><button type="button" className="secondary-button" disabled={ownAttendanceLoading||ownAttendanceActionBusy} onClick={()=>{setOwnAttendanceLoading(true);api<TeacherOwnAttendance>('me/staff-attendance',token).then(setOwnAttendance).catch(e=>setOwnAttendanceError(e instanceof Error?e.message:'Unable to refresh attendance.')).finally(()=>setOwnAttendanceLoading(false))}}>Refresh status</button></div>
       {ownAttendanceLoading&&<p className="form-hint">Loading your attendance...</p>}
       {ownAttendanceError&&<div className="form-error" role="alert">{ownAttendanceError}</div>}
       {ownAttendance&&<>
@@ -1148,7 +1148,7 @@ function TeacherWorkspace({token,active}:{token:string;active:string}) {
   </div>
     if(active==='My Results') return <div className="academic-workspace">
     <section className="panel">
-      <div className="panel-heading"><div><h2>Class results entry</h2><p>Your assigned subject and class are loaded automatically. Enter the whole class register and submit once. Blank scores are submitted as <strong>No score (0)</strong> for academic officers to review.</p></div></div>
+      <div className="panel-heading"><div><h2>Class results entry</h2><p>Your assigned subject and class are loaded automatically. Enter the whole class register and submit once. Blank scores are submitted as <strong>No score (0)</strong> for academic officers to review.</p></div>{selectedTeacherExam&&<button type="button" className="secondary-button" disabled={resultSaving} onClick={()=>api<TeacherMark[]>('teacher/marks?exam_id='+selectedTeacherExam.id,token).then(setResultMarks).catch(e=>setResultError(e instanceof Error?e.message:'Unable to refresh result status.'))}>Refresh status</button>}</div>
       {resultError&&<div className="form-error" role="alert">{resultError}</div>}
       {resultMessage&&<div className="success-notice" role="status">{resultMessage}</div>}
       <div className="student-form-grid">
