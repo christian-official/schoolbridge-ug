@@ -1057,15 +1057,15 @@ function TeacherWorkspace({token,active}:{token:string;active:string}) {
   async function saveTeacherMarksBulk(e:React.FormEvent){
     e.preventDefault()
     if(!selectedTeacherExam||!selectedSubjectId){setResultError('Choose an examination and one of your assigned subjects.');return}
-    const missing=resultStudents.filter(student=>resultScores[student.id]===undefined||resultScores[student.id].trim()==='')
-    if(missing.length){setResultError('Enter a score for every student before submitting the class results.');return}
-    const records=resultStudents.map(student=>({student_id:student.id,score:Number(resultScores[student.id])}))
+    const noScoreCount=resultStudents.filter(student=>resultScores[student.id]===undefined||resultScores[student.id].trim()==='').length
+    // A blank entry is an explicit "No score" and is submitted as zero.
+    const records=resultStudents.map(student=>({student_id:student.id,score:resultScores[student.id]===undefined||resultScores[student.id].trim()===''?0:Number(resultScores[student.id])}))
     if(records.some(row=>!Number.isFinite(row.score)||row.score<0||row.score>100)){setResultError('Every score must be between 0 and 100.');return}
     setResultSaving(true);setResultError('');setResultMessage('')
     try{
-      const result=await api<{saved:number}>('teacher/marks/bulk',token,{method:'POST',body:JSON.stringify({exam_id:selectedTeacherExam.id,subject_id:Number(selectedSubjectId),records})})
+      const result=await api<{saved:number;no_score?:number}>('teacher/marks/bulk',token,{method:'POST',body:JSON.stringify({exam_id:selectedTeacherExam.id,subject_id:Number(selectedSubjectId),records})})
       const rows=await api<TeacherMark[]>('teacher/marks?exam_id='+selectedTeacherExam.id,token)
-      setResultMarks(rows);setResultMessage(result.saved+' marks submitted for the whole class.')
+      setResultMarks(rows);setResultMessage(result.saved+' results submitted for academic verification, including '+(result.no_score ?? noScoreCount)+' No score (0) entries.')
     }catch(e){setResultError(e instanceof Error?e.message:'Unable to submit class results.')}
     finally{setResultSaving(false)}
   }
