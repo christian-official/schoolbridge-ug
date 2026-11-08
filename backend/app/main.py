@@ -1437,6 +1437,7 @@ def create_teacher(
         email=data.email,
         hashed_password=password_hash.hash(data.password),
         role="teacher",
+        role_label="Teacher",
     )
     db.add(teacher)
 
