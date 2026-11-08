@@ -163,25 +163,28 @@ function App() {
 
   useEffect(()=>{if(token && user?.role==='admin')api<any>('settings/school-profile',token).then(setSchoolConfig).catch(()=>{})},[token,user?.role])
 
-  async function loadSchoolData(authToken: string) {
+  async function loadSchoolData(authToken: string, profile: User | null = user) {
     setDataError('')
+    const isAdmin = profile?.role === 'admin'
+    const allowed = (section:string) => isAdmin || (profile?.permissions?.[section] || []).includes('view')
+    const canLoadStudents = allowed('Students')
+    const canLoadClasses = canLoadStudents || allowed('Timetable') || allowed('Examinations') || allowed('Attendance')
+    const jobs: Promise<any>[] = [
+      canLoadStudents ? api<StudentPage>('students/search?page=1&page_size=25', authToken) : Promise.resolve(null),
+      canLoadClasses ? api<RecordItem[]>('classes', authToken) : Promise.resolve(null),
+      isAdmin ? api<AdmissionSettings>('settings/admission-number', authToken) : Promise.resolve(null),
+      allowed('Overview') ? api<DashboardSummary>(`dashboard/summary?attendance_date=${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`, authToken) : Promise.resolve(null),
+      allowed('Fees & Finance') ? api<FinanceDashboardSummary>('finance/summary', authToken) : Promise.resolve(null),
+    ]
     try {
-      const [studentData, classData, admissionData, summaryData, financeSummaryData] = await Promise.all([
-        api<StudentPage>('students/search?page=1&page_size=25', authToken),
-        api<RecordItem[]>('classes', authToken),
-        api<AdmissionSettings>('settings/admission-number', authToken),
-        api<DashboardSummary>(`dashboard/summary?attendance_date=${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`, authToken),
-        api<FinanceDashboardSummary>('finance/summary', authToken),
-      ])
-      setStudents(studentData.items)
-      setStudentTotal(studentData.total)
-      setStudentPage(1)
-      setClasses(classData)
-      setAdmissionSettings(admissionData)
-      setDashboardSummary(summaryData)
-      setFinanceDashboard(financeSummaryData)
+      const [studentData, classData, admissionData, summaryData, financeSummaryData] = await Promise.all(jobs)
+      if(studentData){setStudents(studentData.items);setStudentTotal(studentData.total);setStudentPage(1)}
+      if(classData)setClasses(classData)
+      if(admissionData)setAdmissionSettings(admissionData)
+      if(summaryData)setDashboardSummary(summaryData)
+      if(financeSummaryData)setFinanceDashboard(financeSummaryData)
     } catch {
-      setDataError('Some school records could not be loaded. Check your connection and permissions.')
+      setDataError('Some records could not be loaded. Check your assigned permissions or contact the administrator.')
     }
   }
 
@@ -392,10 +395,11 @@ function App() {
       setUser(profile)
       if(profile.role==='teacher') setActive('My Classes')
       else if(profile.role==='parent') setActive('My Children')
-      else if(profile.role==='admin') await loadSchoolData(authToken)
+      else if(profile.role==='admin') await loadSchoolData(authToken,profile)
       else {
-        const firstAllowed = menu.find(item => (profile.permissions?.[item.label] || []).includes('view'))
-        setActive(firstAllowed?.label || 'Overview')
+        const allowedItems = [...menu, ...teacherMenu.filter(item => !menu.some(base => base.label === item.label))].filter(item => (profile.permissions?.[item.label] || []).includes('view'))
+        setActive(allowedItems[0]?.label || 'Overview')
+        await loadSchoolData(authToken,profile)
       }
     } catch (error) {
       sessionStorage.removeItem('sb_token')
