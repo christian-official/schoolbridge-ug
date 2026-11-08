@@ -13,7 +13,7 @@ type Page<T> = { items: T[]; total: number; pages?: number }
 
 const EXAM_TYPES = ['Beginning of Term', 'Mid-Term', 'End of Term', 'Mock', 'Promotional', 'Other'] as const
 
-function examGroupKey(exam: Exam) { return [exam.exam_type || 'Other', exam.name, exam.term, exam.year].join('::') }
+function examGroupKey(exam: Exam) { return [exam.exam_type || 'Other', exam.term, exam.year].join('::') }
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 
@@ -117,7 +117,7 @@ export default function AcademicManagement({ token, classes, canVerify = false }
   const [selectedExamGroupKey, setSelectedExamGroupKey] = useState('')
   const [activeAcademicTab, setActiveAcademicTab] = useState<'marks' | 'submitted' | 'results' | 'grading' | 'history'>('marks')
   const [submittedSubjectId, setSubmittedSubjectId] = useState('')
-  const [examForm, setExamForm] = useState<{name:string;exam_type:string;class_ids:number[];term:string;year:string}>({ name: '', exam_type: 'End of Term', class_ids: [], term: 'Term 1', year: String(new Date().getFullYear()) })
+  const [examForm, setExamForm] = useState<{exam_type:string;class_ids:number[];term:string;year:string}>({ exam_type: 'End of Term', class_ids: [], term: 'Term 1', year: String(new Date().getFullYear()) })
   const [showExamForm, setShowExamForm] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -255,13 +255,14 @@ export default function AcademicManagement({ token, classes, canVerify = false }
 
   async function createExam(event: FormEvent) {
     event.preventDefault()
-    if (!examForm.name.trim() || !examForm.class_ids.length || !examForm.year.trim()) {
-      setError('Enter the examination name and select at least one class.')
+    if (!examForm.class_ids.length || !examForm.year.trim() || !examForm.exam_type || !examForm.term) {
+      setError('Select an examination type, term, academic year and at least one class.')
       return
     }
     setSaving(true); setError(''); setMessage('')
     try {
-      const existing = exams.filter(exam => exam.name.trim().toLowerCase() === examForm.name.trim().toLowerCase() && exam.exam_type === examForm.exam_type && exam.term === examForm.term && exam.year === Number(examForm.year))
+      const generatedExamName = examForm.exam_type
+      const existing = exams.filter(exam => (exam.exam_type || 'Other') === examForm.exam_type && exam.term === examForm.term && exam.year === Number(examForm.year))
       const existingClassIds = new Set(existing.map(exam => exam.class_id))
       const classIdsToCreate = examForm.class_ids.filter(classId => !existingClassIds.has(classId))
       const skipped = examForm.class_ids.length - classIdsToCreate.length
@@ -269,7 +270,7 @@ export default function AcademicManagement({ token, classes, canVerify = false }
       for (const classId of classIdsToCreate) {
         const row = await request<Exam>('exams', token, {
           method: 'POST',
-          body: JSON.stringify({ name: examForm.name.trim(), exam_type: examForm.exam_type, term: examForm.term, year: Number(examForm.year), class_id: classId }),
+          body: JSON.stringify({ name: generatedExamName, exam_type: examForm.exam_type, term: examForm.term, year: Number(examForm.year), class_id: classId }),
         })
         created.push(row)
       }
@@ -281,7 +282,7 @@ export default function AcademicManagement({ token, classes, canVerify = false }
         setSelectedExamId(String(created[0].id))
       }
       setShowExamForm(false)
-      setExamForm(old => ({ ...old, name: '', class_ids: [] }))
+      setExamForm(old => ({ ...old, class_ids: [] }))
       setMessage(`Examination created for ${created.length} class(es).${skipped ? ` ${skipped} already existed and were not duplicated.` : ''}`)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to create examination.')
@@ -472,7 +473,7 @@ export default function AcademicManagement({ token, classes, canVerify = false }
           {Array.from(new Map(exams.filter(exam => activeExamType === 'All exams' || (exam.exam_type || 'Other') === activeExamType).map(exam => [examGroupKey(exam), exam])).values()).map(exam => {
             const key = examGroupKey(exam)
             return <button type="button" key={key} className={selectedExamGroupKey === key ? 'exam-choice active' : 'exam-choice'} onClick={() => { setSelectedExamGroupKey(key); setSelectedExamId('') }}>
-              <strong>{exam.name}</strong><span>{exam.term} · {exam.year}</span><small>{exams.filter(row => examGroupKey(row) === key).length} class(es)</small>
+              <strong>{exam.exam_type || 'Other'}</strong><span>{exam.term} · {exam.year}</span><small>{exams.filter(row => examGroupKey(row) === key).length} class(es)</small>
             </button>
           })}
           {!exams.some(exam => activeExamType === 'All exams' || (exam.exam_type || 'Other') === activeExamType) && <p className="form-hint">No examinations have been created under this type yet.</p>}
@@ -487,8 +488,8 @@ export default function AcademicManagement({ token, classes, canVerify = false }
       </div>
       {showExamForm && <form className="student-form registration-form exam-create-form" onSubmit={createExam}>
         <div className="form-section">
-          <div className="form-section-heading"><span className="form-section-number">01</span><div><h3>Create examination</h3><p>Enter the exam name, then select every class that will sit this examination.</p></div></div>
-          <label>Examination name *<input required maxLength={100} value={examForm.name} onChange={e => setExamForm({ ...examForm, name: e.target.value })} placeholder="e.g. End of Term One Examination"/></label>
+          <div className="form-section-heading"><span className="form-section-number">01</span><div><h3>Create examination</h3><p>Choose the examination type and term. The selected type becomes the examination category; term and year distinguish each sitting.</p></div></div>
+          
           <div className="exam-create-meta">
             <div><strong>Exam type</strong><div className="exam-pill-options">{EXAM_TYPES.map(type => <button type="button" key={type} className={examForm.exam_type === type ? 'exam-pill active' : 'exam-pill'} onClick={() => setExamForm({ ...examForm, exam_type: type })}>{type}</button>)}</div></div>
             <div><strong>Term</strong><div className="exam-pill-options">{['Term 1','Term 2','Term 3'].map(term => <button type="button" key={term} className={examForm.term === term ? 'exam-pill active' : 'exam-pill'} onClick={() => setExamForm({ ...examForm, term })}>{term}</button>)}</div></div>
@@ -498,13 +499,13 @@ export default function AcademicManagement({ token, classes, canVerify = false }
             <div className="exam-class-choices">{classes.map(item => { const id = item.id; const chosen = examForm.class_ids.includes(id); return <button type="button" key={id} className={chosen ? 'exam-class-choice active' : 'exam-class-choice'} onClick={() => setExamForm(old => ({ ...old, class_ids: chosen ? old.class_ids.filter(value => value !== id) : [...old.class_ids, id] }))}>{item.name}{item.section ? ' · ' + item.section : ''}</button> })}</div>
           </div>
         </div>
-        <div className="form-actions"><button type="button" className="secondary-button" onClick={() => setShowExamForm(false)}>Cancel</button><button className="primary-button" disabled={saving || !classes.length || !examForm.class_ids.length}>{saving ? 'Saving...' : 'Create for selected classes'}</button></div>
+        <div className="form-actions"><button type="button" className="secondary-button" onClick={() => setShowExamForm(false)}>Cancel</button><button className="primary-button" disabled={saving || !classes.length || !examForm.class_ids.length}>{saving ? 'Saving...' : 'Create examination'}</button></div>
       </form>}
     </section>
 
     {selectedExam && <>
       <section className="panel">
-        <div className="panel-heading"><div><h2>{selectedExam.name}</h2><p>{selectedClass?.name || 'Class'}{selectedClass?.section ? ' — ' + selectedClass.section : ''} · {selectedExam.term} {selectedExam.year}</p></div></div>
+        <div className="panel-heading"><div><h2>{selectedExam.exam_type || selectedExam.name}</h2><p>{selectedClass?.name || 'Class'}{selectedClass?.section ? ' — ' + selectedClass.section : ''} · {selectedExam.term} {selectedExam.year}</p></div></div>
         <div className="stats-grid finance-stats">
           <div className="stat-card"><span>Students in class</span><strong className="stat-value">{students.length}</strong></div>
           <div className="stat-card"><span>Marks recorded</span><strong className="stat-value">{marks.length}</strong></div>
@@ -519,14 +520,9 @@ export default function AcademicManagement({ token, classes, canVerify = false }
       {activeAcademicTab === 'marks' && (
       <section className="panel subject-marks-workspace">
         <div className="panel-heading"><div><h2>Enter subject marks</h2><p>Select the subject you teach, then enter scores beside each student. Only the selected subject is shown.</p></div></div>
-        {saving && activeAcademicTab === 'marks' && <div className="teacher-results-progress" role="status"><div><strong>Submitting ${subjects.find(item => String(item.id) === selectedSubjectId)?.name || 'subject'} results</strong><span>{saveProgress}% complete · ${eligibleStudents.length} students</span></div><div className="teacher-results-progress-track"><span style={{ width: saveProgress + '%' }} /></div></div>}
+        {saving && activeAcademicTab === 'marks' && <div className="teacher-results-progress" role="status"><div><strong>Submitting {subjects.find(item => String(item.id) === selectedSubjectId)?.name || 'subject'} results</strong><span>{saveProgress}% complete · {eligibleStudents.length} students</span></div><div className="teacher-results-progress-track"><span style={{ width: saveProgress + '%' }} /></div></div>}
         <div className="subject-marks-toolbar">
-          <label className="academic-exam-select">Subject to enter
-            <select value={selectedSubjectId} onChange={e => setSelectedSubjectId(e.target.value)}>
-              <option value="">Choose your subject</option>
-              {subjects.map(subject => <option key={subject.id} value={subject.id}>{subject.name}</option>)}
-            </select>
-          </label>
+          <div className="academic-exam-select"><strong>Subject to enter</strong><div className="exam-pill-options subject-choice-options">{subjects.map(subject => <button type="button" key={subject.id} className={String(subject.id) === selectedSubjectId ? 'exam-pill active' : 'exam-pill'} onClick={() => setSelectedSubjectId(String(subject.id))}>{subject.name}</button>)}</div></div>
           <div className="subject-marks-count"><strong>{selectedSubjectId ? eligibleStudents.length : students.length}</strong><span>{selectedSubjectId ? 'students offering this subject' : 'students in this class'}</span></div>
           <button type="button" className="primary-button" onClick={() => void saveClassMarks()} disabled={saving || !eligibleStudents.length || !selectedSubjectId}><Save size={15}/>{saving ? 'Submitting…' : 'Submit class results'}</button>
         </div>
@@ -549,7 +545,7 @@ export default function AcademicManagement({ token, classes, canVerify = false }
           <div className="student-score-footer"><span>Blank scores are submitted as No score (0). Scores must be between 0 and 100.</span><button type="button" className="primary-button" onClick={() => void saveClassMarks()} disabled={saving || !eligibleStudents.length}><Save size={15}/>{saving ? 'Submitting…' : 'Submit class results'}</button></div>
         </div>}
         <details className="recorded-marks-details"><summary>Recorded scores · by subject and verification status</summary>
-          <div className="recorded-marks-filters"><label>Subject<select value={recordedSubjectFilter} onChange={e => setRecordedSubjectFilter(e.target.value)}><option value="all">All subjects</option>{subjects.map(subject => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label><label>Verification status<select value={recordedStatusFilter} onChange={e => setRecordedStatusFilter(e.target.value as 'all' | 'verified' | 'unverified')}><option value="all">All statuses</option><option value="verified">Verified</option><option value="unverified">Unverified</option></select></label></div>
+          <div className="recorded-marks-filters"><div><strong>Subject</strong><div className="exam-pill-options">{['all', ...subjects.map(subject => String(subject.id))].map(id => <button type="button" key={id} className={recordedSubjectFilter === id ? 'exam-pill active' : 'exam-pill'} onClick={() => setRecordedSubjectFilter(id)}>{id === 'all' ? 'All subjects' : subjects.find(subject => String(subject.id) === id)?.name}</button>)}</div></div><div><strong>Verification status</strong><div className="exam-pill-options">{(['all','verified','unverified'] as const).map(status => <button type="button" key={status} className={recordedStatusFilter === status ? 'exam-pill active' : 'exam-pill'} onClick={() => setRecordedStatusFilter(status)}>{status === 'all' ? 'All statuses' : status === 'verified' ? 'Verified' : 'Submitted · Not verified'}</button>)}</div></div></div>
           <div className="recorded-subject-groups">
             {subjects.filter(subject => marks.some(mark => mark.subject_id === subject.id) && (recordedSubjectFilter === 'all' || String(subject.id) === recordedSubjectFilter)).map(subject => {
               const subjectMarks = marks.filter(mark => mark.subject_id === subject.id && students.some(student => student.id === mark.student_id && studentOffersSubject(student, subject)) && (recordedStatusFilter === 'all' || (recordedStatusFilter === 'verified' ? mark.verified : !mark.verified))).sort((a, b) => studentName(studentById.get(a.student_id)).localeCompare(studentName(studentById.get(b.student_id))));
@@ -608,7 +604,7 @@ export default function AcademicManagement({ token, classes, canVerify = false }
                   {subjectMarks.map(mark => <tr key={mark.id}><td>{studentName(studentById.get(mark.student_id))}</td><td>{studentById.get(mark.student_id)?.admission_number || '—'}</td><td><strong>{mark.score === 0 ? 'No score (0)' : Math.round(mark.score)}</strong></td><td><span className={mark.verified ? 'student-score-status verified' : 'student-score-status recorded'}>{mark.verified ? 'Verified' : 'Submitted · Not verified'}</span></td></tr>)}
                   {!subjectMarks.length && <tr><td colSpan={4}>No submitted scores for this subject.</td></tr>}
                 </tbody></table></div>
-                {canVerify && pendingCount > 0 ? <div className="form-actions"><button type="button" className="primary-button subject-verification-action" disabled={saving} onClick={() => void setSubjectVerification(subject.id, true)}>Verify all {subject.name} results</button></div> : !canVerify && pendingCount > 0 ? <p className="form-hint">View-only: an authorised academic officer must verify these results.</p> : <p className="success-notice">All submitted {subject.name} results are verified.</p>}
+                {pendingCount > 0 && <div className="form-actions"><button type="button" className="secondary-button" onClick={() => { setSelectedSubjectId(String(subject.id)); setActiveAcademicTab('marks') }}>Review & edit {subject.name} results</button>{canVerify && <button type="button" className="primary-button subject-verification-action" disabled={saving} onClick={() => void setSubjectVerification(subject.id, true)}>Verify all {subject.name} results</button>}</div>}  : pendingCount === 0 ? <p className="success-notice">All submitted {subject.name} results are verified.</p> : !canVerify ? <p className="form-hint">View-only: an authorised academic officer must verify these results.</p> : null}
               </section>
             })()}
           </>}
