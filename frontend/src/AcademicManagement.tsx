@@ -58,17 +58,14 @@ function studentOffersSubject(student: Student, subject: Subject) {
   const subjectCode = normaliseSubjectText(subject.code || '')
   const allText = normaliseSubjectText(sources.join(' '))
   if (subjectName && allText.includes(subjectName)) return true
-  if (subjectCode && new RegExp('(^| )' + subjectCode.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\function studentName(student?: Student) {
-  return student ? [student.first_name, student.middle_name, student.last_name].filter(Boolean).join(' ') : 'Unknown student'
-}
-') + '( |$)', 'i').test(allText)) return true
+  const sourceTokens = sources.flatMap(source => normaliseSubjectText(source).split(' '))
+  if (subjectCode && sourceTokens.includes(subjectCode)) return true
 
-  const tokens = sources.flatMap(source => source.match(/[A-Za-z]+/g) || [])
-  for (const token of tokens) {
+  for (const token of sources.flatMap(source => source.match(/[A-Za-z]+/g) || [])) {
     const key = token.toLowerCase()
     const mapped = aLevelSubjectAliases[key]
     if (mapped && (subjectName === mapped || subjectName.includes(mapped) || (subjectCode && subjectCode === key))) return true
-    // A compact combination such as PCB or BCM represents individual subject codes.
+    // Compact combinations such as PCB or BCM represent individual subject codes.
     if (/^[A-Z]{2,5}$/.test(token)) {
       for (const letter of token) {
         const letterSubject = aLevelSubjectAliases[letter.toLowerCase()]
