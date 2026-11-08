@@ -20,7 +20,7 @@ type Subject = { id: number; name: string; code?: string | null }
 type TimetableEntry = { id: number; class_id: number; class_name?: string; class_section?: string; subject_id?: number | null; subject_name?: string; staff_id?: number | null; teacher_name?: string; day_of_week: number; start_time: string; end_time: string }
 
 export default function OperationsManagement({ token, active, permissions = {}, isAdmin = false, roleLabel = '' }: { token: string; active: string; permissions?: Record<string, string[]>; isAdmin?: boolean; roleLabel?: string }) {
-  const canEditTimetable = isAdmin || (['Academic Administrator','Academics Administrator','Academics Officer','Director of Studies','DOS'].includes(roleLabel.trim()) && ['add','edit','delete'].some(action => (permissions['Timetable'] || []).includes(action)))
+  const canEditTimetable = isAdmin || (/^(academic administrator|academics administrator|academics officer|director of studies|dos|deputy director of studies)$/i.test(roleLabel.trim()) && ['add','edit','delete'].some(action => (permissions['Timetable'] || []).includes(action)))
   const [staff, setStaff] = useState<Staff[]>([])
   const [classes, setClasses] = useState<SchoolClass[]>([])
   const [subjects, setSubjects] = useState<Subject[]>([])
