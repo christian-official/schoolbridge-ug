@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { MessageSquareText, Send, PlusCircle, ArrowLeft, UserRound, GraduationCap, Clock3, CheckCheck } from 'lucide-react'
+import { MessageSquareText, Send, PlusCircle, GraduationCap, CheckCheck } from 'lucide-react'
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 async function api<T>(path: string, token: string, options: RequestInit = {}): Promise<T> {
@@ -11,7 +11,6 @@ async function api<T>(path: string, token: string, options: RequestInit = {}): P
   if (!response.ok) throw new Error(result.detail || `Request failed: ${response.status}`)
   return result as T
 }
-
 type Recipient = { student_id: number; student_name: string; admission_number: string; class_name: string; parents: { id: number; username: string; email: string }[] }
 type LiaisonThread = { id: number; student_id: number; student_name: string; parent_name: string; subject: string; category: string; status: string; updated_at: string; last_message: string; last_sender_id: number | null }
 type LiaisonDetail = { id: number; student_id: number; student_name: string; subject: string; category: string; status: string; messages: { id: number; sender_id: number; sender_name: string; message: string; created_at: string; read_at: string | null }[] }
@@ -36,28 +35,28 @@ export default function ParentLiaisonWorkspace({ token, role }: { token: string;
   async function loadThreads(preferredId?: number | null) {
     const rows = await api<LiaisonThread[]>('parent-liaison/threads', token)
     setThreads(rows)
-    const nextId = preferredId ?? selectedId
-    const chosen = nextId && rows.some(row => row.id === nextId) ? nextId : rows[0]?.id ?? null
+    const wanted = preferredId ?? selectedId
+    const chosen = wanted && rows.some(row => row.id === wanted) ? wanted : rows[0]?.id ?? null
     setSelectedId(chosen)
-    if (chosen) {
-      const item = await api<LiaisonDetail>(`parent-liaison/threads/${chosen}`, token)
-      setDetail(item)
-    } else setDetail(null)
+    if (chosen) setDetail(await api<LiaisonDetail>(`parent-liaison/threads/${chosen}`, token))
+    else setDetail(null)
   }
 
   useEffect(() => {
     let cancelled = false
     setBusy(true); setError('')
-    const requests: Promise<unknown>[] = [api<LiaisonThread[]>('parent-liaison/threads', token)]
-    if (!isParent) requests.push(api<Recipient[]>('parent-liaison/recipients', token))
-    Promise.all(requests).then(([rows, targets]) => {
+    Promise.all([
+      api<LiaisonThread[]>('parent-liaison/threads', token),
+      isParent ? Promise.resolve([] as Recipient[]) : api<Recipient[]>('parent-liaison/recipients', token),
+    ]).then(async ([rows, targets]) => {
       if (cancelled) return
-      const items = rows as LiaisonThread[]
-      setThreads(items)
-      const chosen = items[0]?.id ?? null
+      setThreads(rows); setRecipients(targets)
+      const chosen = rows[0]?.id ?? null
       setSelectedId(chosen)
-      if (chosen) api<LiaisonDetail>(`parent-liaison/threads/${chosen}`, token).then(value => { if (!cancelled) setDetail(value) }).catch(e => { if (!cancelled) setError(e instanceof Error ? e.message : 'Unable to load communication.') })
-      if (!isParent) setRecipients((targets as Recipient[]) || [])
+      if (chosen) {
+        const value = await api<LiaisonDetail>(`parent-liaison/threads/${chosen}`, token)
+        if (!cancelled) setDetail(value)
+      }
     }).catch(e => { if (!cancelled) setError(e instanceof Error ? e.message : 'Unable to load Parent Liaison.') })
       .finally(() => { if (!cancelled) setBusy(false) })
     return () => { cancelled = true }
@@ -95,8 +94,6 @@ export default function ParentLiaisonWorkspace({ token, role }: { token: string;
   }
 
   const selectedRecipient = recipients.find(row => String(row.student_id) === studentId)
-  const selectedThread = threads.find(row => row.id === selectedId)
-
   return <div className="phase4-workspace parent-liaison-workspace">
     <section className="panel">
       <div className="panel-heading">
@@ -144,7 +141,7 @@ export default function ParentLiaisonWorkspace({ token, role }: { token: string;
           {detail ? <>
             <header className="parent-liaison-conversation-head"><div><strong>{detail.subject}</strong><span>{detail.student_name} · {detail.category}</span></div><span className={detail.status === 'Open' ? 'attendance-status-pill status-present' : 'attendance-status-pill'}>{detail.status}</span></header>
             <div className="parent-liaison-messages">
-              {detail.messages.map(item => <article key={item.id} className={item.sender_id === detail.messages[0]?.sender_id ? 'parent-liaison-message sent' : 'parent-liaison-message received'}>
+              {detail.messages.map((item, index) => <article key={item.id} className={index % 2 === 0 ? 'parent-liaison-message sent' : 'parent-liaison-message received'}>
                 <div className="parent-liaison-message-meta"><strong>{item.sender_name}</strong><time>{new Date(item.created_at).toLocaleString('en-UG', { dateStyle: 'medium', timeStyle: 'short' })}</time></div>
                 <p>{item.message}</p>
                 {item.read_at && <small><CheckCheck size={12}/> Read</small>}

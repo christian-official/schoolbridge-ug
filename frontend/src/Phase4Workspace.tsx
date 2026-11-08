@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import ParentLiaisonWorkspace from './ParentLiaison'
 import { Bell, GraduationCap, Wallet, Users, PlusCircle } from 'lucide-react'
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')

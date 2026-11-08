@@ -1,2222 +1,3821 @@
-:root { --navy: #172b4d; --blue: #315ee8; --muted: #8793a8; --line: #e9edf4; }
-#root { min-height: 100vh; }
-.app-shell { min-height: 100vh; display: flex; }
-.sidebar { width: 252px; background: #fff; border-right: 1px solid var(--line); padding: 25px 17px 18px; display: flex; flex-direction: column; flex-shrink: 0; z-index: 5; }
-.sidebar-brand { display: flex; align-items: center; gap: 11px; padding: 0 9px 34px; }
-.brand-mark { width: 43px; height: 43px; display: grid; place-items: center; border-radius: 13px; color: white; background: linear-gradient(135deg,#315ee8,#6d8bff); box-shadow: 0 7px 18px #315ee833; }
-.brand-name { font: 800 21px Manrope,sans-serif; letter-spacing: -.8px; color: #172b4d; }
-.brand-name span { color: #315ee8; }
-.school-label,.eyebrow { color: #a0aabe; font-size: 10px; font-weight: 800; letter-spacing: 1.3px; }
-.school-label { padding: 0 12px 13px; }
-.sidebar nav { display: grid; gap: 5px; }
-.nav-item { position: relative; display: flex; align-items: center; gap: 13px; border: 0; background: transparent; color: #77849b; padding: 12px 13px; border-radius: 9px; text-align: left; font-size: 13px; font-weight: 600; width: 100%; transition: .2s; }
-.nav-item:hover { background: #f4f6fc; color: var(--blue); }
-.nav-item.active { background: #edf2ff; color: var(--blue); }
-.active-dot { margin-left: auto; width: 6px; height: 6px; border-radius: 50%; background: var(--blue); }
-.sidebar-bottom { margin-top: auto; }
-.profile-card { margin-top: 20px; border-top: 1px solid var(--line); padding: 18px 4px 0; display: flex; align-items: center; gap: 10px; }
-.avatar,.top-avatar,.student-avatar { display: grid; place-items: center; border-radius: 50%; font-weight: 800; }
-.avatar { width: 36px; height: 36px; background: #eaf0ff; color: var(--blue); }
-.profile-info { display: grid; gap: 3px; min-width: 0; }
-.profile-info strong { font-size: 12px; }
-.profile-info small { color: var(--muted); font-size: 11px; text-transform: capitalize; }
-.logout-button,.icon-button,.mobile-close,.mobile-menu-button { border: 0; background: transparent; color: #8793a8; display: grid; place-items: center; }
-.logout-button { margin-left: auto; padding: 8px; }
-.main-area { flex: 1; min-width: 0; }
-.topbar { height: 76px; background: #fff; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; padding: 0 36px; }
-.breadcrumb { color: #9aa5b6; font-size: 12px; }
-.breadcrumb span { padding: 0 10px; color: #c5ccd7; }
-.breadcrumb strong { color: #33435d; font-weight: 700; }
-.top-actions { display: flex; align-items: center; gap: 21px; }
-.online-status { display: flex; align-items: center; gap: 7px; color: #718096; font-size: 11px; }
-.online-status i { width: 7px; height: 7px; border-radius: 50%; background: #24bd82; box-shadow: 0 0 0 3px #e7f8f1; }
-.icon-button { padding: 7px; }
-.top-avatar { width: 34px; height: 34px; color: #315ee8; background: #edf2ff; font-size: 13px; }
-.content { padding: 34px 36px 20px; max-width: 1600px; margin: auto; }
-.welcome-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 27px; }
-.eyebrow { margin: 0 0 8px; }
-h1,h2,p { margin-top: 0; }
-.welcome-row h1 { font: 800 26px Manrope,sans-serif; letter-spacing: -.7px; margin-bottom: 6px; color: #172b4d; }
-.muted { color: var(--muted); font-size: 12px; margin-bottom: 0; }
-.date-chip { display: flex; align-items: center; gap: 9px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: #66748b; padding: 10px 13px; font-size: 11px; }
-.stats-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 17px; margin-bottom: 20px; }
-.stat-card,.panel { background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 3px 12px #25385805; }
-.stat-card { padding: 19px 20px; }
-.stat-top { display: flex; justify-content: space-between; align-items: center; color: #77849b; font-size: 12px; font-weight: 600; }
-.stat-icon { width: 35px; height: 35px; display: grid; place-items: center; border-radius: 9px; background: #edf2ff; color: #315ee8; }
-.stat-icon svg { width: 18px; }
-.stat-value { display: block; font: 800 27px Manrope,sans-serif; margin: 12px 0 7px; color: #172b4d; }
-.stat-card small { display: flex; align-items: center; gap: 5px; color: #97a2b4; font-size: 10px; }
-.stat-card small svg { color: #23b681; }
-.dashboard-grid { display: grid; grid-template-columns: minmax(0,1.7fr) minmax(270px,1fr); gap: 18px; }
-.panel { padding: 21px; min-width: 0; }
-.panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 19px; }
-.panel-heading h2 { font: 800 15px Manrope,sans-serif; margin: 0 0 5px; color: #243550; }
-.panel-heading p { color: #9aa5b6; font-size: 11px; margin: 0; }
-.text-button { border: 0; background: transparent; color: var(--blue); display: flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; }
-.quick-panel { padding-bottom: 12px; }
-.quick-action { display: flex; align-items: center; width: 100%; gap: 12px; border: 0; border-top: 1px solid #f0f2f7; padding: 13px 2px; background: transparent; text-align: left; color: #8d9aaf; }
-.quick-action > span:nth-child(2) { display: grid; gap: 4px; flex: 1; }
-.quick-action strong { font-size: 11px; color: #34445e; }
-.quick-action small { font-size: 10px; color: #9aa5b6; }
-.quick-icon { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; }
-.quick-icon svg { width: 17px; }
-.quick-icon.blue { background: #edf2ff; color: #315ee8; }
-.quick-icon.purple { background: #f3efff; color: #8965d7; }
-.quick-icon.green { background: #eaf8f2; color: #22a979; }
-.quick-icon.orange { background: #fff4e9; color: #df994a; }
-.table-wrap { overflow-x: auto; }
-table { border-collapse: collapse; width: 100%; text-align: left; white-space: nowrap; }
-th { color: #a0aabe; font-size: 10px; font-weight: 700; padding: 11px 10px; background: #fafbfe; }
-td { padding: 12px 10px; border-top: 1px solid #f0f2f7; color: #6f7e94; font-size: 11px; }
-td strong { color: #34445e; font-size: 11px; }
-.student-cell { display: flex; align-items: center; gap: 9px; }
-.student-avatar { width: 28px; height: 28px; background: #eef2ff; color: #496ce1; font-size: 10px; }
-.record-count { display: flex; align-items: center; gap: 7px; border-radius: 7px; padding: 8px 10px; color: #65748b; background: #f6f8fc; font-size: 11px; }
-.table-tools { margin-bottom: 15px; }
-.search-box { display: flex; align-items: center; gap: 8px; max-width: 360px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; color: #9aa5b6; }
-.search-box input { border: 0; outline: 0; width: 100%; color: #34445e; font-size: 11px; background: transparent; }
-.class-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(160px,1fr)); gap: 12px; }
-.class-card { border: 1px solid var(--line); border-radius: 10px; padding: 18px; display: grid; gap: 9px; color: var(--blue); }
-.class-card strong { color: #34445e; font-size: 13px; }
-.class-card span { color: #9aa5b6; font-size: 11px; }
-.empty-state { padding: 30px 12px; text-align: center; color: #a5afbf; }
-.empty-state svg { opacity: .55; }
-.empty-state p { font-size: 11px; margin: 9px 0 0; }
-.coming-soon { min-height: 280px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
-.coming-icon { width: 54px; height: 54px; border-radius: 16px; background: #edf2ff; color: var(--blue); display: grid; place-items: center; margin-bottom: 15px; }
-.coming-soon h2 { font: 800 17px Manrope,sans-serif; margin-bottom: 7px; }
-.coming-soon p { color: #8d9aaf; font-size: 12px; }
-.coming-soon span { color: #315ee8; background: #edf2ff; padding: 7px 12px; border-radius: 20px; font-size: 10px; font-weight: 700; }
-.footer { margin-top: 26px; color: #a3adbd; font-size: 10px; padding: 12px 2px; }
-.footer > span:first-child { color: #60718c; font-weight: 800; }
-.footer-version { float: right; }
-.notice { background: #fff6e9; color: #936b30; padding: 12px 14px; border-radius: 8px; margin-bottom: 15px; font-size: 12px; }
-.notice button { border: 0; color: #315ee8; background: transparent; font-weight: 700; margin-left: 10px; }
-.login-page { min-height: 100vh; display: grid; place-items: center; padding: 20px; background: radial-gradient(ellipse at top left,#e6edff 0,transparent 48%),#f5f7fb; }
-.login-card { width: 100%; max-width: 410px; background: white; padding: 38px; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 15px 50px #233a650d; }
-.login-card > .brand-mark { margin-bottom: 12px; }
-.login-subtitle { color: #98a4b6; font-size: 11px; margin: 6px 0 30px; }
-.login-card h1 { font: 800 23px Manrope,sans-serif; margin-bottom: 7px; }
-.login-card form { display: grid; margin-top: 24px; }
-.login-card label { color: #52617a; font-size: 11px; font-weight: 700; margin: 0 0 7px; }
-.login-card input { border: 1px solid #e5eaf2; border-radius: 8px; padding: 12px; outline: none; margin-bottom: 17px; font-size: 12px; }
-.login-card input:focus { border-color: #7893f3; box-shadow: 0 0 0 3px #315ee812; }
-.primary-button { display: flex; align-items: center; justify-content: center; gap: 8px; border: 0; background: #315ee8; color: white; border-radius: 8px; padding: 13px; font-size: 12px; font-weight: 700; }
-.primary-button:disabled { opacity: .7; }
-.login-button { margin-top: 3px; }
-.error { color: #c04444; font-size: 11px; margin: 0 0 12px; }
-.login-foot { margin: 22px 0 0; display: flex; justify-content: center; gap: 7px; align-items: center; color: #9aa5b6; font-size: 10px; }
-.login-foot svg { color: #23b681; }
-.mobile-menu-button,.mobile-close,.mobile-overlay { display: none; }
-.spin { animation: spin 1s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
-@media(max-width:1050px) { .stats-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } .dashboard-grid { grid-template-columns: 1fr; } }
-@media(max-width:700px) {
-  .sidebar { position: fixed; inset: 0 auto 0 0; width: 270px; transform: translateX(-100%); transition: transform .25s; box-shadow: 10px 0 35px #15294b12; }
-  .sidebar.sidebar-open { transform: translateX(0); }
-  .mobile-close { display: grid; margin-left: auto; }
-  .mobile-overlay { display: block; position: fixed; inset: 0; z-index: 4; border: 0; background: #15294b55; }
-  .topbar { height: 62px; padding: 0 17px; }
-  .mobile-menu-button { display: grid; }
-  .breadcrumb { margin-right: auto; margin-left: 12px; }
-  .online-status { display: none; }
-  .content { padding: 25px 16px 15px; }
-  .welcome-row { align-items: flex-start; gap: 10px; }
-  .welcome-row h1 { font-size: 21px; }
-  .date-chip { font-size: 0; padding: 9px; }
-  .date-chip svg { width: 18px; }
-  .stats-grid { gap: 10px; }
-  .stat-card { padding: 14px; }
-  .stat-top { font-size: 10px; }
-  .stat-value { font-size: 23px; }
-  .panel { padding: 15px; }
-  .footer-version { float: none; display: block; margin-top: 5px; }
-  .login-card { padding: 28px 22px; }
-}
-
-.add-student-button { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; padding: 10px 14px; }
-.student-form { border: 1px solid #e5eaf4; background: #fbfcff; border-radius: 11px; padding: 20px; margin: 0 0 20px; }
-.form-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 17px; }
-.form-heading h3 { color: #243550; font: 800 14px Manrope,sans-serif; margin: 0 0 5px; }
-.form-heading p,.required-note { color: #98a4b6; font-size: 10px; margin: 0; }
-.student-form-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 15px; }
-.student-form-grid label { display: grid; gap: 7px; color: #52617a; font-size: 11px; font-weight: 700; }
-.student-form-grid input,.student-form-grid select { width: 100%; min-width: 0; border: 1px solid #e3e8f1; border-radius: 7px; background: #fff; color: #34445e; padding: 11px; font: inherit; font-weight: 400; outline: none; }
-.student-form-grid input:focus,.student-form-grid select:focus { border-color: #7893f3; box-shadow: 0 0 0 3px #315ee812; }
-.form-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 18px; }
-.secondary-button { border: 1px solid #e1e7f0; background: #fff; color: #65748b; border-radius: 8px; padding: 10px 14px; font-size: 11px; font-weight: 700; }
-.form-actions .primary-button { padding: 10px 16px; }
-.form-actions .primary-button:disabled { opacity: .55; cursor: not-allowed; }
-.form-hint { color: #9a6a27; background: #fff6e9; padding: 10px 12px; border-radius: 7px; font-size: 11px; margin: 13px 0 0; }
-.form-error { color: #b53d3d; background: #fff0f0; border-radius: 7px; padding: 11px 13px; margin-bottom: 13px; font-size: 11px; }
-.success-notice { color: #187a55; background: #eaf8f2; border-radius: 7px; padding: 11px 13px; margin-bottom: 13px; font-size: 11px; }
-@media(max-width:900px) { .student-form-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
-@media(max-width:520px) { .student-form-grid { grid-template-columns: 1fr; } .form-heading { flex-direction: column; } .panel-heading .add-student-button { padding: 9px 10px; font-size: 10px; } }
-
-
-.settings-panel { max-width: 900px; }
-.settings-checkbox { display: flex !important; align-items: center; gap: 10px !important; min-height: 40px; }
-.settings-checkbox input { width: 17px !important; height: 17px; accent-color: #315ee8; }
-.number-preview { display: flex; flex-direction: column; gap: 8px; border: 1px dashed #cbd6f5; background: #f4f7ff; border-radius: 9px; padding: 16px; margin-top: 18px; }
-.number-preview span { color: #7c8ba5; font-size: 11px; }
-.number-preview strong { color: #315ee8; font: 800 22px Manrope,sans-serif; letter-spacing: .5px; overflow-wrap: anywhere; }
-
-.student-tools { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
-.filter-select { border:1px solid var(--line); border-radius:8px; padding:10px 12px; color:#52617a; background:white; font-size:11px; min-width:150px; }
-.pagination-row { display:flex; justify-content:space-between; align-items:center; gap:12px; padding-top:16px; color:#8793a8; font-size:11px; }
-.pagination-row > div { display:flex; gap:8px; }
-.finance-stats { grid-template-columns:repeat(3,minmax(0,1fr)); margin:0 0 22px; }
-@media(max-width:700px) { .pagination-row { align-items:flex-start; flex-direction:column; } .student-tools .search-box { max-width:none; width:100%; } .finance-stats { grid-template-columns:1fr; } }
-
-
-.settings-hub { background:#fff; border:1px solid var(--line); border-radius:12px; padding:24px; }
-.settings-category-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
-.settings-category { min-height:142px; display:grid; grid-template-columns:38px 1fr 18px; grid-template-rows:auto auto; align-items:center; column-gap:12px; row-gap:6px; text-align:left; padding:18px; border:1px solid var(--line); border-radius:11px; background:#fff; color:#34445e; cursor:pointer; }
-.settings-category:hover { border-color:#b9c8fa; background:#f8faff; }
-.settings-category-icon { grid-row:1 / span 2; width:38px; height:38px; display:grid; place-items:center; border-radius:10px; color:var(--blue); background:#edf2ff; }
-.settings-category strong { font-size:12px; align-self:end; }
-.settings-category small { color:#8d9aaf; font-size:10px; line-height:1.5; align-self:start; }
-.settings-category > svg { grid-column:3; grid-row:1 / span 2; width:16px; color:#9aa5b6; }
-.settings-detail { display:grid; gap:14px; }
-.settings-back { justify-self:start; border:0; background:transparent; color:var(--blue); font-size:12px; font-weight:700; padding:7px 0; cursor:pointer; }
-@media(max-width:900px) { .settings-category-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
-@media(max-width:520px) { .settings-category-grid { grid-template-columns:1fr; } .settings-hub { padding:16px; } }
-
-
-.clickable-row { cursor: pointer; }
-.clickable-row:hover { background: rgba(59, 130, 246, 0.06); }
-.modal-backdrop { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(15, 23, 42, 0.62); }
-.student-profile-modal .student-profile-details { display: block !important; visibility: visible !important; opacity: 1 !important; }
-.student-profile-modal { width: min(980px, 100%); max-height: 90vh; overflow: auto; background: var(--panel, #fff); box-shadow: 0 24px 80px rgba(0,0,0,.25); }
-.student-profile-modal .panel-heading { position: sticky; top: -1px; z-index: 2; padding: 12px 0; background: inherit; }
-@media (max-width: 640px) {
-  .modal-backdrop { padding: 8px; align-items: flex-start; }
-  .student-profile-modal { max-height: 96vh; }
-}
-
-@media print {
-  body[data-schoolbridge-print="receipt"] * { visibility: hidden !important; }
-  body[data-schoolbridge-print="receipt"] .receipt-print,
-  body[data-schoolbridge-print="receipt"] .receipt-print * { visibility: visible !important; }
-  body[data-schoolbridge-print="receipt"] .receipt-print { position: absolute !important; inset: 0 auto auto 0 !important; width: 100% !important; max-width: none !important; box-shadow: none !important; border: 0 !important; }
-  body[data-schoolbridge-print="receipt"] .receipt-print button { display: none !important; }
-}
-
-.backup-action { padding: 20px 0; border-bottom: 1px solid var(--border, #e5e7eb); }
-.backup-action:last-of-type { border-bottom: 0; }
-.backup-action h3 { margin: 0 0 6px; }
-.backup-action p { color: var(--muted, #64748b); margin: 0 0 14px; }
-.backup-action label { display: grid; gap: 8px; max-width: 480px; font-weight: 600; }
-
-
-/* Accessibility and responsive finance workspace */
-:root { font-size: 16px; }
-body { font-size: 16px; }
-.nav-item { font-size: 15px; min-height: 46px; }
-.breadcrumb,.muted,.panel-heading p,.form-heading p,.required-note,.student-form-grid label,
-.secondary-button,.primary-button,.filter-select,.search-box input,.pagination-row,
-td,th,.stat-top,.stat-card small,.quick-action strong,.quick-action small { font-size: 13px; }
-.panel-heading h2 { font-size: 18px; }
-.student-form-grid input,.student-form-grid select,.filter-select,.search-box { font-size: 15px; min-height: 44px; }
-.primary-button,.secondary-button { min-height: 42px; }
-.finance-toolbar { display:flex; justify-content:space-between; align-items:center; gap:14px; flex-wrap:wrap; margin:8px 0 22px; }
-.finance-tabs { display:flex; gap:7px; flex-wrap:wrap; }
-.finance-tab { border:1px solid var(--line); background:#fff; color:#53627a; border-radius:9px; padding:11px 15px; font-size:14px; font-weight:700; cursor:pointer; }
-.finance-tab.active { color:var(--blue); border-color:#b9c8ff; background:#edf2ff; }
-.finance-overview { border:1px solid var(--line); border-radius:12px; padding:22px; margin-bottom:20px; }
-.finance-overview h3 { margin:0 0 7px; font-size:19px; color:var(--navy); }
-.finance-overview p { color:var(--muted); font-size:14px; }
-.finance-shortcuts { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }
-.finance-shortcuts button { border:1px solid var(--line); background:#f9fbff; border-radius:9px; padding:15px; color:var(--navy); font-size:14px; font-weight:700; cursor:pointer; }
-.finance-class-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(205px,1fr)); gap:12px; margin:15px 0 24px; }
-.finance-class-card { display:grid; gap:8px; text-align:left; border:1px solid var(--line); border-radius:11px; padding:17px; background:#fff; color:var(--blue); cursor:pointer; min-width:0; }
-.finance-class-card.selected { border-color:var(--blue); background:#f2f5ff; box-shadow:0 0 0 2px #315ee815; }
-.finance-class-card strong { color:var(--navy); font-size:16px; overflow-wrap:anywhere; }
-.finance-class-card span { color:var(--muted); font-size:13px; }
-.finance-class-card b { color:var(--navy); font-size:15px; }
-.finance-search-results { border:1px solid var(--line); border-radius:10px; padding:14px; margin:12px 0 22px; }
-.finance-search-results .panel-heading { margin-bottom:10px; }
-.finance-search-results h3 { margin:0; font-size:16px; color:var(--navy); }
-.profile-actions { display:flex; gap:8px; flex-wrap:wrap; }
-.refresh-button { display:flex; align-items:center; gap:7px; }
-@media(max-width:760px) {
- .finance-shortcuts { grid-template-columns:repeat(2,minmax(0,1fr)); }
- .finance-toolbar { align-items:stretch; }
- .finance-tabs { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
- .finance-tab { padding:10px 8px; }
- .top-actions { gap:8px; }
- .refresh-button { padding:8px 10px; }
-}
-@media(max-width:480px) {
- .finance-shortcuts { grid-template-columns:1fr; }
- .finance-tabs { grid-template-columns:1fr 1fr; }
- .finance-class-grid { grid-template-columns:1fr; }
-}
-
-
-/* Refined typography and responsive refresh feedback */
-:root { font-size: 15px; }
-body { font-size: 15px; }
-.nav-item { font-size: 14px; }
-.breadcrumb,.muted,.panel-heading p,.form-heading p,.required-note,.student-form-grid label,
-.secondary-button,.primary-button,.filter-select,.search-box input,.pagination-row,
-td,th,.stat-top,.stat-card small,.quick-action strong,.quick-action small { font-size: 13px; }
-.welcome-row h1 { font-size: 25px; }
-.panel-heading h2 { font-size: 17px; }
-.stat-value { font-size: 25px; }
-.student-form-grid input,.student-form-grid select,.filter-select,.search-box { font-size: 14px; }
-.finance-tab { font-size: 13px; padding: 11px 14px; }
-.finance-overview h3 { font-size: 18px; }
-.finance-overview p { font-size: 14px; }
-.finance-class-card strong { font-size: 15px; }
-.finance-class-card span { font-size: 13px; }
-.refresh-button { min-width: 104px; justify-content: center; }
-.refresh-button:disabled { opacity: .7; cursor: wait; }
-@media(max-width:700px) {
-  .welcome-row h1 { font-size: 21px; }
-  .stat-value { font-size: 22px; }
-}
-
-
-/* SchoolBridge readable type scale and consistent interactive controls */
-:root { font-size: 16px; }
-body, #root { font-size: 16px; }
-.content { font-size: 15px; }
-.nav-item { font-size: 15px; }
-.breadcrumb, .muted, .panel-heading p, .form-heading p, .required-note,
-.student-form-grid label, .settings-category strong, .settings-back,
-.filter-select, .pagination-row, .record-count, .date-chip { font-size: 14px; }
-td, th, td strong, .stat-top, .stat-card small, .quick-action strong,
-.quick-action small, .settings-category small, .form-hint, .form-error,
-.success-notice, .notice, .empty-state p { font-size: 14px; }
-.panel-heading h2 { font-size: 19px; }
-.form-heading h3 { font-size: 17px; }
-.welcome-row h1 { font-size: 27px; }
-.login-card h1 { font-size: 25px; }
-.login-card label, .login-card input, .login-subtitle { font-size: 14px; }
-.primary-button, .secondary-button, .finance-tab, .text-button,
-.settings-category, .finance-shortcuts button { font-size: 14px; }
-.student-form-grid input, .student-form-grid select, .filter-select,
-.search-box, .search-box input, .login-card input { font-size: 15px; }
-.stat-value { font-size: 27px; }
-.finance-overview h3 { font-size: 20px; }
-.finance-overview p { font-size: 15px; }
-.finance-class-card strong { font-size: 16px; }
-.finance-class-card span { font-size: 14px; }
-.profile-info strong { font-size: 14px; }
-.profile-info small, .online-status, .footer, .login-foot { font-size: 13px; }
-
-/* All controls have visible hover, pressed, keyboard-focus and disabled states. */
-button, [role="button"] {
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
-}
-button:not(:disabled) { cursor: pointer; }
-button:not(.nav-item):not(.quick-action):not(.mobile-overlay):not(.logout-button):not(.icon-button):not(.mobile-close):not(.mobile-menu-button) {
-  transition: background-color .16s ease, border-color .16s ease, color .16s ease,
-    box-shadow .16s ease, transform .12s ease, opacity .16s ease;
-}
-button:not(:disabled):not(.mobile-overlay):hover { filter: brightness(.98); }
-button:not(:disabled):not(.mobile-overlay):active { transform: translateY(1px); }
-button:focus-visible, [role="button"]:focus-visible {
-  outline: 3px solid rgba(49,94,232,.28);
-  outline-offset: 2px;
-}
-button:disabled { cursor: not-allowed; opacity: .58; }
-.primary-button { min-height: 44px; padding: 11px 16px; }
-.secondary-button { min-height: 42px; padding: 10px 15px; }
-.finance-tab { min-height: 44px; }
-.settings-category { min-height: 142px; }
-.icon-button, .logout-button, .mobile-menu-button, .mobile-close {
-  min-width: 42px; min-height: 42px; border-radius: 9px;
-}
-.nav-item { min-height: 46px; }
-.quick-action { min-height: 64px; border-radius: 8px; }
-.quick-action:hover { background: #f7f9ff; color: #315ee8; }
-.nav-item:hover { background: rgba(255,255,255,.08); }
-.nav-item.active:hover { background: rgba(49,94,232,.12); }
-.finance-class-card:hover, .settings-category:hover {
-  border-color: #9eb2f8; box-shadow: 0 5px 16px rgba(35,58,101,.07);
-}
-.clickable-row:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
-.search-box:focus-within { border-color: #7893f3; box-shadow: 0 0 0 3px #315ee812; }
-.student-form-grid input:focus-visible, .student-form-grid select:focus-visible,
-.filter-select:focus-visible, .search-box input:focus-visible {
-  outline: 2px solid rgba(49,94,232,.3); outline-offset: 1px;
-}
-@media (max-width: 700px) {
-  .content { padding: 22px 14px 16px; }
-  .welcome-row h1 { font-size: 23px; }
-  .welcome-row { flex-wrap: wrap; }
-  .panel { padding: 16px; }
-  .panel-heading { flex-wrap: wrap; }
-  .panel-heading > * { min-width: 0; }
-  .form-actions { flex-wrap: wrap; }
-  .form-actions > button { flex: 1 1 140px; }
-  .profile-actions { width: 100%; }
-  .profile-actions > button { flex: 1 1 130px; }
-  .top-actions { gap: 6px; }
-  .refresh-button { min-width: 42px; }
-  .finance-shortcuts { grid-template-columns: repeat(2,minmax(0,1fr)); }
-  .finance-shortcuts button { min-height: 58px; }
-  .table-wrap { max-width: 100%; }
-}
-@media (max-width: 420px) {
-  .content { padding-inline: 10px; }
-  .welcome-row h1 { font-size: 21px; }
-  .finance-shortcuts { grid-template-columns: 1fr; }
-  .finance-tabs { grid-template-columns: 1fr 1fr; }
-  .topbar { padding-inline: 10px; }
-  .breadcrumb { font-size: 12px; }
-  .primary-button, .secondary-button { min-height: 44px; }
-}
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
-}
-
-
-/* Prefect and teacher duty management */
-.overview-leadership { margin-top: 18px; }
-.overview-leadership .panel-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
-.overview-leadership .panel-heading .secondary-button { display:inline-flex; align-items:center; gap:7px; white-space:nowrap; }
-.overview-leadership-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:13px; }
-.leadership-shortcut { display:flex; align-items:center; gap:13px; width:100%; min-width:0; text-align:left; border:1px solid var(--line); border-radius:10px; background:#fbfcff; padding:16px; color:var(--navy); }
-.leadership-shortcut > span:nth-child(2) { display:grid; gap:5px; flex:1; min-width:0; }
-.leadership-shortcut strong { font-size:15px; }
-.leadership-shortcut small { color:var(--muted); font-size:13px; line-height:1.45; }
-.leadership-shortcut > svg { flex:0 0 auto; color:var(--muted); }
-.leadership-shortcut:hover { border-color:#aebff5; background:#f6f8ff; }
-.leadership-workspace { display:grid; gap:18px; }
-.leadership-summary { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:13px; }
-.leadership-summary-card { display:grid; gap:7px; padding:18px; background:#fff; border:1px solid var(--line); border-radius:11px; min-width:0; }
-.leadership-summary-card span { color:var(--muted); font-size:14px; }
-.leadership-summary-card strong { color:var(--navy); font-size:22px; overflow-wrap:anywhere; }
-.leadership-summary-card small { color:var(--muted); font-size:12px; }
-.leadership-workspace .table-wrap { margin-top:14px; }
-.leadership-workspace .table-wrap table { min-width:760px; }
-.leadership-workspace .student-form { margin-bottom:14px; }
-@media(max-width:760px) {
- .overview-leadership-grid { grid-template-columns:1fr; }
- .leadership-summary { grid-template-columns:1fr 1fr; }
- .overview-leadership .panel-heading { align-items:flex-start; flex-direction:column; }
-}
-@media(max-width:480px) { .leadership-summary { grid-template-columns:1fr; } }
-
-
-/* SchoolBridge form system: consistent, guided and accessible forms */
-.student-form {
-  display: grid;
-  gap: 22px;
-  padding: clamp(18px, 2.5vw, 30px);
-  margin: 18px 0 24px;
-  border: 1px solid #dfe6f1;
-  border-radius: 16px;
-  background: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
-  box-shadow: 0 8px 26px rgba(28, 48, 84, .045);
-}
-.student-form .form-heading {
-  padding: 0 0 17px;
-  margin: 0;
-  border-bottom: 1px solid #e9edf5;
-}
-.student-form .form-heading h3 {
-  color: #1f304b;
-  font-size: 19px;
-  line-height: 1.35;
-  letter-spacing: -.25px;
-}
-.student-form .form-heading p {
-  max-width: 680px;
-  margin-top: 6px;
-  color: #738198;
-  font-size: 14px;
-  line-height: 1.55;
-}
-.student-form .required-note {
-  padding: 7px 10px;
-  border-radius: 999px;
-  background: #f1f5ff;
-  color: #5269a9;
-  font-size: 12px;
-  white-space: nowrap;
-}
-.student-form-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-items: start;
-  gap: 19px 20px;
-}
-.student-form-grid label,
-.backup-action label,
-.login-card label {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 8px;
-  min-width: 0;
-  color: #34445e;
-  font-size: 14px;
-  font-weight: 650;
-  line-height: 1.4;
-}
-.student-form-grid input,
-.student-form-grid select,
-.student-form-grid textarea,
-.backup-action input,
-.login-card input,
-.student-form input:not([type="checkbox"]):not([type="radio"]),
-.student-form select,
-.student-form textarea,
-.settings-panel input:not([type="checkbox"]):not([type="file"]),
-.settings-panel select,
-.settings-panel textarea {
-  box-sizing: border-box;
-  width: 100%;
-  min-width: 0;
-  min-height: 48px;
-  padding: 12px 14px;
-  border: 1px solid #d8e0ec;
-  border-radius: 10px;
-  background-color: #fff;
-  color: #26364f;
-  font: inherit;
-  font-size: 15px;
-  font-weight: 450;
-  line-height: 1.4;
-  outline: none;
-  box-shadow: 0 1px 2px rgba(18, 38, 63, .025);
-  transition: border-color .16s ease, box-shadow .16s ease, background-color .16s ease;
-}
-.student-form-grid input::placeholder,
-.student-form input::placeholder,
-.settings-panel input::placeholder,
-.login-card input::placeholder { color: #9aa6b8; opacity: 1; }
-.student-form-grid input:hover,
-.student-form-grid select:hover,
-.student-form-grid textarea:hover,
-.student-form input:not([type="checkbox"]):not([type="radio"]):hover,
-.student-form select:hover,
-.settings-panel input:not([type="checkbox"]):hover,
-.settings-panel select:hover { border-color: #b8c5d8; }
-.student-form-grid input:focus,
-.student-form-grid select:focus,
-.student-form-grid textarea:focus,
-.student-form input:focus,
-.student-form select:focus,
-.student-form textarea:focus,
-.settings-panel input:focus,
-.settings-panel select:focus,
-.settings-panel textarea:focus,
-.login-card input:focus {
-  border-color: #6d8af0;
-  background-color: #fff;
-  box-shadow: 0 0 0 4px rgba(49, 94, 232, .11);
-}
-.student-form-grid select,
-.student-form select,
-.settings-panel select {
-  cursor: pointer;
-}
-.student-form input[type="date"],
-.student-form-grid input[type="date"] { color-scheme: light; }
-.student-form input[type="checkbox"],
-.student-form-grid input[type="checkbox"],
-.settings-panel input[type="checkbox"],
-.settings-checkbox input {
-  width: 18px !important;
-  height: 18px;
-  min-height: 18px;
-  accent-color: #315ee8;
-  cursor: pointer;
-}
-.student-form .settings-checkbox,
-.student-form-grid .settings-checkbox {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 10px;
-  min-height: 48px;
-}
-.form-section-title {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 4px 0 -5px;
-  padding-top: 17px;
-  border-top: 1px solid #e9edf5;
-  color: #263954;
-  font-size: 15px;
-  font-weight: 800;
-  letter-spacing: .1px;
-}
-.form-section-title:first-child { padding-top: 0; border-top: 0; }
-.form-hint {
-  margin: -5px 0 0;
-  padding: 12px 14px;
-  border: 1px solid #e3eafa;
-  border-radius: 10px;
-  background: #f4f7ff;
-  color: #53688f;
-  font-size: 13px;
-  line-height: 1.55;
-}
-.form-error,
-.success-notice {
-  padding: 13px 15px;
-  border-radius: 10px;
-  font-size: 14px;
-  line-height: 1.5;
-}
-.form-error { border: 1px solid #f1d3d3; background: #fff6f6; color: #a83232; }
-.success-notice { border: 1px solid #cfe9dc; background: #f2fbf6; color: #176b49; }
-.form-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 11px;
-  flex-wrap: wrap;
-  padding-top: 17px;
-  margin: 0;
-  border-top: 1px solid #e9edf5;
-}
-.form-actions .primary-button,
-.form-actions .secondary-button {
-  min-width: 148px;
-  min-height: 46px;
-  border-radius: 10px;
-  font-size: 14px;
-}
-.student-form :disabled,
-.settings-panel form :disabled { cursor: not-allowed; }
-.settings-panel > h3 {
-  margin: 24px 0 10px;
-  color: #253751;
-  font-size: 17px;
-}
-.settings-panel > h3:first-of-type { margin-top: 20px; }
-.backup-action {
-  padding: 22px 0;
-  border-bottom: 1px solid #e8edf5;
-}
-.backup-action h3 { color: #263954; font-size: 17px; }
-.backup-action p { max-width: 720px; font-size: 14px; line-height: 1.55; }
-.backup-action input[type="file"] {
-  min-height: 48px;
-  padding: 10px;
-  border: 1px dashed #bdc9dc;
-  border-radius: 10px;
-  background: #fbfcff;
-}
-.login-card { max-width: 440px; padding: 38px; border-radius: 20px; }
-.login-card form { gap: 9px; }
-.login-card label { margin: 8px 0 0; }
-.login-card input { margin: 0 0 8px; }
-.login-card .login-button { min-height: 48px; margin-top: 10px; border-radius: 10px; font-size: 15px; }
-.student-profile-modal .student-form { box-shadow: none; background: #fbfcff; }
-@media (min-width: 1100px) {
-  .student-form-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
-@media (max-width: 760px) {
-  .student-form { padding: 18px; gap: 18px; border-radius: 13px; }
-  .student-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 13px; }
-  .form-actions { justify-content: stretch; }
-  .form-actions .primary-button, .form-actions .secondary-button { flex: 1 1 140px; }
-  .form-heading { align-items: flex-start; }
-}
-@media (max-width: 520px) {
-  .student-form { padding: 15px; margin-inline: -2px; }
-  .student-form-grid { grid-template-columns: 1fr; gap: 14px; }
-  .student-form-grid label { font-size: 14px; }
-  .student-form-grid input, .student-form-grid select,
-  .student-form input, .student-form select { min-height: 48px; }
-  .student-form .form-heading { flex-direction: column; }
-  .student-form .required-note { align-self: flex-start; }
-  .form-actions { flex-direction: column-reverse; }
-  .form-actions .primary-button, .form-actions .secondary-button { width: 100%; }
-  .login-card { padding: 28px 22px; }
-}
-
-
-/* Guided student registration */
-.registration-form { display: grid; gap: 22px; }
-.form-section { padding: 20px; border: 1px solid #e8edf5; border-radius: 13px; background: linear-gradient(180deg,#fff 0%,#fbfcff 100%); }
-.form-section-heading { display: flex; align-items: flex-start; gap: 13px; margin-bottom: 18px; }
-.form-section-number { flex: 0 0 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; background: #edf2ff; color: #315ee8; font-size: 12px; font-weight: 800; }
-.form-section-heading h4 { margin: 1px 0 5px; color: #243550; font-size: 15px; font-weight: 800; }
-.form-section-heading p { margin: 0; color: #8491a6; font-size: 12px; line-height: 1.5; }
-.field-hint { display: block; margin-top: 5px; color: #8290a5; font-size: 11px; font-weight: 400; line-height: 1.45; }
-.field-span-full { grid-column: 1 / -1; }
-.generated-admission { display: grid; gap: 5px; align-content: center; min-height: 82px; padding: 13px 15px; border: 1px dashed #b9c9f5; border-radius: 10px; background: #f5f8ff; }
-.generated-admission strong { color: #34445e; font-size: 12px; }
-.generated-admission span { color: #8290a5; font-size: 11px; }
-.generated-admission b { color: #315ee8; font-size: 18px; letter-spacing: .4px; }
-.registration-actions { position: sticky; bottom: 0; z-index: 2; padding: 14px 0 2px; background: linear-gradient(180deg,#ffffff00,#fff 28%); }
-@media (max-width: 640px) {
-  .form-section { padding: 15px; }
-  .form-section-heading { gap: 10px; }
-  .generated-admission { grid-column: 1 / -1; }
-  .registration-actions { position: static; }
-}
-
-
-/* Class-first student workspace */
-.student-workspace-heading { align-items: center; gap: 16px; }
-.student-class-browser { margin: 18px 0 16px; padding: 17px; border: 1px solid #e7ecf4; border-radius: 13px; background: #fbfcff; }
-.student-class-browser-heading,.student-list-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:13px; }
-.student-class-browser-heading h3,.student-list-heading h3 { margin:0 0 4px; color:#26364f; font-size:15px; font-weight:800; }
-.student-class-browser-heading p,.student-list-heading p { margin:0; color:#7b879b; font-size:12px; }
-.student-class-browser-heading > span { color:#64748b; font-size:12px; font-weight:700; white-space:nowrap; }
-.student-class-tabs { display:flex; flex-wrap:wrap; gap:9px; }
-.student-class-tab { min-height:40px; padding:9px 14px; border:1px solid #dce3ee; border-radius:9px; background:#fff; color:#46556c; font-size:13px; font-weight:700; cursor:pointer; transition:all .18s ease; }
-.student-class-tab:hover { border-color:#8da8f5; background:#f4f7ff; color:#315ee8; }
-.student-class-tab.active { border-color:#315ee8; background:#315ee8; color:#fff; box-shadow:0 3px 9px #315ee826; }
-.student-search-panel { display:flex; align-items:center; gap:14px; margin:0 0 18px; padding:13px 15px; border:1px solid #e7ecf4; border-radius:12px; background:#fff; }
-.student-search-panel .search-box { flex:1; min-width:0; }
-.student-search-panel > span { color:#8290a5; font-size:11px; white-space:nowrap; }
-.student-list-heading { margin: 6px 0 12px; }
-@media(max-width:640px) {
- .student-workspace-heading { align-items:flex-start; flex-direction:column; }
- .student-workspace-heading .add-student-button { width:100%; justify-content:center; }
- .student-class-browser { padding:13px; }
- .student-class-tabs { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
- .student-class-tab { text-align:left; }
- .student-search-panel { align-items:stretch; flex-direction:column; gap:7px; }
- .student-search-panel > span { white-space:normal; }
-}
-
-
-/* Consistent command-to-open pattern for infrequent forms */
-.form-disclosure { margin: 14px 0 18px; border:1px solid #e1e8f2; border-radius:12px; background:#fff; overflow:hidden; }
-.form-disclosure > summary { display:flex; align-items:center; gap:10px; min-height:48px; padding:12px 16px; color:#315ee8; font-size:14px; font-weight:800; cursor:pointer; list-style:none; }
-.form-disclosure > summary::-webkit-details-marker { display:none; }
-.form-disclosure > summary::before { content:"＋"; display:grid; place-items:center; width:24px; height:24px; border-radius:7px; background:#edf2ff; font-size:17px; }
-.form-disclosure[open] > summary { border-bottom:1px solid #e8edf5; background:#f8faff; }
-.form-disclosure[open] > summary::before { content:"−"; }
-.form-disclosure > form { margin:0; padding:16px; }
-.form-disclosure > .student-form { margin:0; }
-
-
-.class-results-print-sheet,.class-reports-print-batch { display:none; }
-.report-template-classic { border-top:6px double #263e70; border-radius:0; box-shadow:none; }
-.report-template-classic .report-school-title > strong { border:1px solid #263e70; border-radius:0; background:#fff; color:#263e70; }
-.report-template-modern { border-top:5px solid #315ee8; }
-.report-template-modern .report-school-emblem { border-radius:14px; background:#edf2ff; }
-.report-template-detailed { border-top:5px solid #16805a; }
-.report-template-detailed .report-school-emblem { border-color:#16805a; color:#16805a; }
-.report-template-detailed .report-school-title > strong { background:#e8f7ef; color:#176b4b; }
-.report-template-toolbar { display:flex; align-items:flex-end; gap:14px; flex-wrap:wrap; margin:14px 0 18px; padding:14px; border:1px solid #e3e9f2; border-radius:11px; background:#f8faff; }
-.report-template-toolbar label { display:grid; gap:7px; min-width:220px; flex:1; color:#43536d; font-size:12px; font-weight:750; }
-.report-template-toolbar .report-student-picker { margin:0; }
-.class-results-print-header { display:flex; justify-content:space-between; align-items:center; gap:20px; padding-bottom:15px; border-bottom:3px solid #263e70; }
-.class-results-print-header span { color:#73829b; font-size:9px; font-weight:850; letter-spacing:1px; }
-.class-results-print-header h1 { margin:5px 0; color:#20365e; font-size:23px; text-transform:uppercase; }
-.class-results-print-header p { margin:0; color:#71809a; font-size:10px; }
-.class-results-print-header > strong { padding:9px 12px; background:#edf2ff; color:#274aab; font-size:12px; letter-spacing:.6px; }
-.class-results-print-meta { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin:16px 0; }
-.class-results-print-meta span,.class-results-print-stats > div { display:grid; gap:5px; padding:9px 11px; border:1px solid #e1e7f0; border-radius:6px; color:#34445e; font-size:10px; }
-.class-results-print-meta b,.class-results-print-stats small { color:#8390a5; font-size:8px; letter-spacing:.5px; }
-.class-results-print-stats { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin-bottom:18px; }
-.class-results-print-stats strong { color:#263e70; font-size:18px; }
-.class-results-print-sheet h2 { margin:17px 0 8px; color:#263b62; font-size:13px; }
-.class-results-print-sheet table { width:100%; border-collapse:collapse; }
-.class-results-print-sheet th { padding:7px 6px; background:#edf2fa; color:#53647e; font-size:8px; text-align:left; }
-.class-results-print-sheet td { padding:7px 6px; border-bottom:1px solid #e5eaf2; color:#35445d; font-size:9px; }
-.class-results-print-sheet footer { margin-top:20px; padding-top:10px; border-top:1px solid #dce3ed; color:#73829b; font-size:9px; }
-.class-reports-print-batch .report-card-sheet { page-break-after:always; break-after:page; }
-.class-reports-print-batch .report-card-sheet:last-child { page-break-after:auto; break-after:auto; }
-@media print {
-  @page { size:A4 portrait; margin:12mm; }
-  @page results { size:A4 landscape; margin:10mm; }
-  @page report { size:A4 portrait; margin:12mm; }
-  body[data-schoolbridge-print="results"] * { visibility:hidden !important; }
-  body[data-schoolbridge-print="results"] .class-results-print-sheet,
-  body[data-schoolbridge-print="results"] .class-results-print-sheet * { visibility:visible !important; }
-  body[data-schoolbridge-print="results"] .class-results-print-sheet { display:block !important; position:absolute !important; inset:0 auto auto 0 !important; width:100% !important; padding:0 !important; page:results; }
-  body[data-schoolbridge-print="report"] * { visibility:hidden !important; }
-  body[data-schoolbridge-print="report"] .academic-report-print .report-card-sheet,
-  body[data-schoolbridge-print="report"] .academic-report-print .report-card-sheet * { visibility:visible !important; }
-  body[data-schoolbridge-print="report"] .academic-report-print > .report-card-sheet { display:block !important; position:absolute !important; inset:0 auto auto 0 !important; width:100% !important; max-width:none !important; margin:0 !important; padding:0 !important; border:0 !important; box-shadow:none !important; page:report; }
-  body[data-schoolbridge-print="class-reports"] * { visibility:hidden !important; }
-  body[data-schoolbridge-print="class-reports"] .class-reports-print-batch,
-  body[data-schoolbridge-print="class-reports"] .class-reports-print-batch * { visibility:visible !important; }
-  body[data-schoolbridge-print="class-reports"] .class-reports-print-batch { display:block !important; position:absolute !important; inset:0 auto auto 0 !important; width:100% !important; }
-  body[data-schoolbridge-print="class-reports"] .report-card-sheet { max-width:none !important; margin:0 !important; padding:0 !important; border:0 !important; border-radius:0 !important; box-shadow:none !important; page:report; }
-  body[data-schoolbridge-print="report"] .report-screen-controls,
-  body[data-schoolbridge-print="class-reports"] .report-screen-controls { display:none !important; }
-  body[data-schoolbridge-print="results"] .academic-results-print,
-  body[data-schoolbridge-print="report"] .academic-report-print,
-  body[data-schoolbridge-print="class-reports"] .academic-report-print { background:#fff !important; box-shadow:none !important; border:0 !important; }
-  body[data-schoolbridge-print="results"] .academic-results-print button,
-  body[data-schoolbridge-print="report"] .academic-report-print button,
-  body[data-schoolbridge-print="class-reports"] .academic-report-print button { display:none !important; }
-  body[data-schoolbridge-print="report"] .class-reports-print-batch,
-  body[data-schoolbridge-print="class-reports"] .academic-report-print > .report-card-sheet { display:none !important; }
-  body[data-schoolbridge-print="results"] .academic-results-print > :not(.class-results-print-sheet) { display:none !important; }
-  body[data-schoolbridge-print="results"] .class-results-print-sheet * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-  body[data-schoolbridge-print="report"] .report-card-sheet *,
-  body[data-schoolbridge-print="class-reports"] .report-card-sheet * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-}
-
-
-/* Multi-select school subject catalogue */
-.subject-catalogue { display:grid; gap:14px; margin:12px 0 18px; }
-.subject-catalogue-group { min-width:0; border:1px solid var(--line); border-radius:10px; padding:14px; margin:0; }
-.subject-catalogue-group legend { padding:0 7px; font-weight:700; color:var(--navy); }
-.subject-catalogue-options { display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:8px 14px; }
-.subject-choice { display:flex !important; align-items:center; gap:9px !important; min-height:38px; padding:7px 9px; border:1px solid var(--line); border-radius:8px; font-weight:500 !important; cursor:pointer; }
-.subject-choice input { width:17px; height:17px; flex:0 0 auto; accent-color:var(--blue); }
-.subject-selection-review { border:1px solid var(--line); border-radius:10px; padding:14px; margin-top:16px; }
-.subject-selection-review > strong { display:block; margin-bottom:9px; color:var(--navy); }
-.subject-selection-tags { display:flex; flex-wrap:wrap; gap:7px; }
-.subject-selection-tags span { border-radius:20px; padding:6px 10px; background:#edf2ff; color:#2447a8; font-size:13px; }
-
-
-/* Fast, accessible register controls and spreadsheet-style class marks entry. */
-.attendance-choice-group { display:flex; flex-wrap:wrap; gap:6px; min-width:260px; }
-.attendance-choice { min-height:34px; padding:7px 11px; border:1px solid #d7deea; border-radius:7px; background:#fff; color:#526078; font-size:12px; font-weight:700; cursor:pointer; transition:background .15s ease,border-color .15s ease,color .15s ease; }
-.attendance-choice:hover { border-color:#8295b8; background:#f7f9fc; }
-.attendance-choice.selected { color:#fff; border-color:#315ee8; background:#315ee8; box-shadow:0 2px 5px #315ee826; }
-.attendance-choice.selected.attendance-absent { border-color:#c24141; background:#c24141; }
-.attendance-choice.selected.attendance-late { border-color:#b7791f; background:#b7791f; }
-.attendance-choice.selected.attendance-excused { border-color:#64748b; background:#64748b; }
-.class-marks-register { max-height:650px; overflow:auto; }
-.class-marks-register table { min-width:900px; }
-.class-marks-register thead th { position:sticky; top:0; z-index:2; background:#f5f7fb; }
-.class-marks-register .marks-student-column { min-width:190px; }
-.class-mark-input { width:78px; min-height:38px; padding:7px 8px; border:1px solid #d8e0ec; border-radius:7px; background:#fff; color:#1f2d43; font:600 13px inherit; text-align:center; }
-.class-mark-input:focus { outline:2px solid #315ee855; border-color:#315ee8; }
-.class-mark-input:disabled { background:#edf1f7; color:#667085; cursor:not-allowed; }
-.mark-locked { display:block; margin-top:3px; color:#64748b; font-size:10px; font-weight:700; }
-@media(max-width:640px) {
-  .attendance-choice-group { min-width:220px; }
-  .attendance-choice { padding:7px 9px; }
-}
-
-.academic-tabs { display:flex; flex-wrap:wrap; gap:7px; margin:18px 0; padding:5px; border:1px solid #e1e7f0; border-radius:11px; background:#f6f8fc; }
-.academic-tab { min-height:40px; padding:9px 15px; border:1px solid transparent; border-radius:8px; background:transparent; color:#5b687d; font-size:13px; font-weight:750; cursor:pointer; }
-.academic-tab:hover { background:#fff; color:#274bb5; }
-.academic-tab.active { border-color:#d8e1f5; background:#fff; color:#244cc2; box-shadow:0 2px 6px #172b4d0d; }
-@media(max-width:640px) { .academic-tabs { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); } .academic-tab { padding:9px 8px; } }
-
-
-/* Global professional dropdown styling — applies across every SchoolBridge module */
-:root { color-scheme: light; }
-select,
-.content select,
-.panel select,
-.modal select,
-.student-profile-modal select,
-.settings-panel select,
-table select,
-form select {
-  appearance: none;
-  -webkit-appearance: none;
-  box-sizing: border-box;
-  width: 100%;
-  min-width: 0;
-  min-height: 44px;
-  padding: 10px 42px 10px 13px;
-  border: 1px solid #d7dfec;
-  border-radius: 9px;
-  background-color: #fff;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7890' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 13px center;
-  color: #293a55;
-  font: inherit;
-  font-size: 14px;
-  line-height: 1.4;
-  cursor: pointer;
-  outline: none;
-  box-shadow: 0 1px 2px rgba(20,38,68,.035);
-  transition: border-color .16s ease, box-shadow .16s ease, background-color .16s ease;
-}
-select:hover { border-color: #aebdd3; background-color: #fcfdff; }
-select:focus,
-select:focus-visible {
-  border-color: #5578e8;
-  box-shadow: 0 0 0 4px rgba(49,94,232,.12);
-}
-select:disabled { opacity: .58; cursor: not-allowed; background-color: #f3f5f9; }
-select option { padding: 10px; color: #293a55; background: #fff; }
-select option:checked { background: #edf2ff; color: #244cc2; }
-@media(max-width:640px) {
-  select, .content select, .panel select, .modal select, form select {
-    min-height: 46px;
-    font-size: 14px;
-  }
-}
-
-
-/* Subject-first marks register */
-.subject-marks-workspace { display:grid; gap:18px; }
-.subject-marks-toolbar { display:flex; align-items:flex-end; gap:14px; flex-wrap:wrap; padding:16px; border:1px solid #e5eaf3; border-radius:12px; background:#f8faff; }
-.subject-marks-toolbar .academic-exam-select { flex:1 1 280px; max-width:460px; }
-.subject-marks-count { display:grid; gap:3px; min-width:115px; padding:7px 12px; color:#6d7b91; font-size:12px; }
-.subject-marks-count strong { color:#253956; font-size:21px; }
-.subject-marks-empty { display:grid; justify-items:center; gap:8px; padding:42px 16px; border:1px dashed #cbd5e5; border-radius:12px; color:#7b879b; text-align:center; }
-.subject-marks-empty strong { color:#34445e; }
-.subject-marks-empty span { font-size:13px; }
-.student-score-list { overflow:hidden; border:1px solid #e3e9f2; border-radius:12px; }
-.student-score-list-heading,.student-score-row { display:grid; grid-template-columns:minmax(220px,1.5fr) minmax(145px,1fr) minmax(140px,.8fr) minmax(110px,.7fr); align-items:center; gap:14px; padding:12px 16px; }
-.student-score-list-heading { background:#f5f7fb; color:#8995a8; font-size:10px; font-weight:800; letter-spacing:.65px; }
-.student-score-row { min-height:65px; border-top:1px solid #edf0f5; color:#526078; font-size:13px; }
-.student-score-name { display:flex; align-items:center; gap:11px; min-width:0; }
-.student-score-name strong { color:#293a55; font-size:13px; }
-.student-score-number { display:grid; place-items:center; flex:0 0 28px; height:28px; border-radius:8px; background:#edf2ff; color:#315ee8; font-size:11px; font-weight:800; }
-.student-score-admission { color:#78869b; font-size:12px; }
-.student-score-input { width:100%; max-width:150px; min-height:40px; padding:8px 11px; border:1px solid #d8e0ec; border-radius:8px; color:#293a55; background:#fff; font:600 14px inherit; }
-.student-score-input:focus { outline:3px solid #315ee81c; border-color:#5578e8; }
-.student-score-input:disabled { background:#f1f4f8; color:#78869b; }
-.student-score-status { font-size:11px; font-weight:700; }
-.student-score-status.verified { color:#16805a; }
-.student-score-status.recorded { color:#315ee8; }
-.student-score-status.pending { color:#9a6b25; }
-.student-score-footer { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; padding:15px 16px; border-top:1px solid #e7ebf2; background:#fafbfe; color:#7b879b; font-size:12px; }
-.recorded-marks-details { border:1px solid #e5eaf2; border-radius:10px; padding:12px 14px; }
-.recorded-marks-details summary { color:#36528a; font-size:13px; font-weight:750; cursor:pointer; }
-.recorded-marks-details .table-wrap { margin-top:12px; }
-@media(max-width:720px) {
- .student-score-list-heading { display:none; }
- .student-score-row { grid-template-columns:minmax(0,1fr) minmax(110px,.65fr); gap:8px 12px; padding:13px; }
- .student-score-name { grid-column:1/-1; }
- .student-score-admission { font-size:11px; }
- .student-score-input { max-width:none; }
- .student-score-status { grid-column:1/-1; }
- .subject-marks-toolbar .primary-button { width:100%; }
-}
-
-/* Formal printable student report card */
-.report-student-picker { display:block; max-width:420px; margin-bottom:18px; }
-.report-card-sheet { max-width:1000px; margin:18px auto; padding:30px; border:1px solid #dce3ed; border-radius:12px; background:#fff; color:#26364f; box-shadow:0 8px 28px rgba(27,45,75,.07); }
-.report-card-header { display:grid; grid-template-columns:70px minmax(0,1fr) 120px; align-items:center; gap:18px; padding-bottom:22px; border-bottom:3px solid #263e70; }
-.report-school-emblem { display:grid; place-items:center; width:66px; height:66px; border:2px solid #315ee8; border-radius:50%; color:#315ee8; font-size:22px; font-weight:900; }
-.report-school-title { text-align:center; }
-.report-school-title > span,.report-card-term span { color:#8190a7; font-size:9px; font-weight:800; letter-spacing:1px; }
-.report-school-title h2 { margin:5px 0; color:#20365e; font-size:23px; font-weight:900; text-transform:uppercase; }
-.report-school-title p { margin:0 0 8px; color:#7b879b; font-size:11px; }
-.report-school-title em { display:block; margin-bottom:7px; color:#687895; font-size:11px; }
-.report-school-title > strong { display:inline-block; padding:7px 13px; border-radius:4px; background:#edf2ff; color:#274aab; font-size:11px; letter-spacing:.8px; }
-.report-card-term { display:grid; gap:5px; text-align:right; }
-.report-card-term strong { margin-bottom:5px; color:#243b66; font-size:15px; }
-.report-student-details { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0; margin:20px 0; border:1px solid #e2e8f1; border-radius:8px; overflow:hidden; }
-.report-student-details > div { display:grid; gap:5px; min-height:60px; padding:11px 14px; border-bottom:1px solid #e9edf4; }
-.report-student-details > div:nth-child(odd) { border-right:1px solid #e9edf4; }
-.report-student-details small,.report-summary-grid small { color:#8995a8; font-size:9px; font-weight:800; letter-spacing:.6px; }
-.report-student-details strong { color:#293a55; font-size:13px; }
-.report-section-heading { display:flex; align-items:center; gap:10px; margin:22px 0 11px; padding-bottom:8px; border-bottom:1px solid #e5eaf2; }
-.report-section-heading > span { display:grid; place-items:center; width:26px; height:26px; border-radius:7px; background:#edf2ff; color:#315ee8; font-size:10px; font-weight:900; }
-.report-section-heading h3 { margin:0; color:#263b62; font-size:14px; font-weight:850; }
-.report-results-table table { white-space:normal; }
-.report-results-table th { background:#f3f6fb; color:#65758e; font-size:9px; letter-spacing:.45px; }
-.report-results-table td { padding:11px 10px; color:#465671; font-size:11px; }
-.report-summary-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-top:14px; }
-.report-summary-grid > div { display:grid; gap:6px; padding:13px; border:1px solid #e4eaf3; border-radius:8px; background:#f8faff; }
-.report-summary-grid strong { color:#263e70; font-size:20px; }
-.report-remarks-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
-.report-remarks-grid label { display:grid; gap:7px; color:#465671; font-size:11px; font-weight:800; }
-.report-remarks-grid textarea { box-sizing:border-box; width:100%; min-height:88px; resize:vertical; padding:10px 11px; border:1px solid #dce4ef; border-radius:7px; color:#293a55; font:400 12px/1.5 inherit; }
-.report-remarks-grid textarea:focus { outline:3px solid #315ee81c; border-color:#5578e8; }
-.report-signatures { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px 24px; margin-top:24px; padding-top:18px; border-top:1px solid #e5eaf2; }
-.report-signatures > div { display:grid; gap:10px; color:#596982; font-size:10px; }
-.report-signatures strong { color:#293e65; font-size:11px; }
-.report-card-footer { margin-top:24px; padding-top:10px; border-top:1px solid #e5eaf2; color:#8995a8; font-size:9px; text-align:center; }
-@media(max-width:640px) {
- .report-card-sheet { padding:16px; }
- .report-card-header { grid-template-columns:44px minmax(0,1fr); gap:10px; }
- .report-school-emblem { width:42px; height:42px; font-size:15px; }
- .report-school-title h2 { font-size:16px; }
- .report-school-title > span { font-size:8px; }
- .report-card-term { grid-column:1/-1; display:flex; align-items:center; justify-content:center; gap:8px; text-align:center; }
- .report-card-term strong { margin:0 8px 0 0; }
- .report-student-details,.report-remarks-grid,.report-signatures { grid-template-columns:1fr; }
- .report-student-details > div:nth-child(odd) { border-right:0; }
- .report-summary-grid { grid-template-columns:1fr; }
-}
-@media print {
- @page { size:A4 portrait; margin:12mm; }
- body[data-schoolbridge-print="report"] .academic-report-print { padding:0 !important; }
- body[data-schoolbridge-print="report"] .report-screen-controls,
- body[data-schoolbridge-print="report"] .report-student-picker { display:none !important; }
- body[data-schoolbridge-print="report"] .report-card-sheet { max-width:none; margin:0; padding:0; border:0; border-radius:0; box-shadow:none; }
- body[data-schoolbridge-print="report"] .report-remarks-grid textarea { min-height:64px; border:1px solid #aab4c3; color:#26364f; }
- body[data-schoolbridge-print="report"] .report-card-sheet * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
- body[data-schoolbridge-print="report"] .report-section-heading { break-after:avoid; }
- body[data-schoolbridge-print="report"] .report-signatures { break-inside:avoid; }
-}
-
-
-/* Daily operations, school-wide timetable and date-picker polish */
-.attendance-help {
-  margin: 10px 0 16px;
-  padding: 11px 14px;
-  border: 1px solid #e1e8f4;
-  border-left: 3px solid #5578df;
-  border-radius: 8px;
-  background: #f7f9fe;
-  color: #61708a;
-  font-size: 12px;
-  line-height: 1.55;
-}
-.staff-category-row td {
-  padding: 10px 13px !important;
-  background: #f1f5fc !important;
-  color: #31476b !important;
-  font-size: 11px;
-  font-weight: 850;
-  letter-spacing: .55px;
-  text-transform: uppercase;
-}
-.staff-category-row td span {
-  display: inline-grid;
-  place-items: center;
-  min-width: 22px;
-  height: 22px;
-  margin-left: 7px;
-  padding: 0 6px;
-  border-radius: 20px;
-  background: #e1e9fb;
-  color: #3157b7;
-  font-size: 10px;
-}
-.attendance-status-pill {
-  display: inline-flex;
-  align-items: center;
-  min-height: 25px;
-  padding: 4px 9px;
-  border-radius: 20px;
-  background: #edf2ff;
-  color: #3157b7;
-  font-size: 11px;
-  font-weight: 800;
-}
-.attendance-status-pill.status-absent { background: #fff0f0; color: #b42323; }
-.attendance-status-pill.status-late { background: #fff6e6; color: #9a650d; }
-.attendance-status-pill.status-excused { background: #eef1f5; color: #5b6678; }
-.timetable-day {
-  margin-top: 17px;
-  padding: 14px;
-  border: 1px solid #e7ebf2;
-  border-radius: 11px;
-  background: #fff;
-}
-.timetable-day > h3 {
-  margin: 0 0 11px;
-  color: #293e65;
-  font-size: 14px;
-  font-weight: 850;
-}
-.timetable-day .table-wrap { margin: 0; }
-.timetable-count {
-  display: inline-flex;
-  align-items: center;
-  white-space: nowrap;
-  padding: 7px 10px;
-  border-radius: 20px;
-  background: #edf2ff;
-  color: #3157b7;
-  font-size: 11px;
-  font-weight: 800;
-}
-.date-field {
-  display: grid;
-  width: min(100%, 320px);
-  gap: 7px;
-  margin: 4px 0 12px;
-  color: #43536d;
-  font-size: 12px;
-  font-weight: 750;
-}
-.content input[type="date"],
-.panel input[type="date"],
-.content input[type="time"],
-.panel input[type="time"] {
-  box-sizing: border-box;
-  min-height: 42px;
-  padding: 9px 12px;
-  border: 1px solid #d8e1ed;
-  border-radius: 9px;
-  background: #fff;
-  color: #26364f;
-  font: 600 13px inherit;
-  color-scheme: light;
-  transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
-}
-.content input[type="date"]:hover,
-.panel input[type="date"]:hover,
-.content input[type="time"]:hover,
-.panel input[type="time"]:hover { border-color: #9aadd0; }
-.content input[type="date"]:focus,
-.panel input[type="date"]:focus,
-.content input[type="time"]:focus,
-.panel input[type="time"]:focus {
-  outline: none;
-  border-color: #5578e8;
-  box-shadow: 0 0 0 3px #315ee81a;
-}
-input[type="date"]::-webkit-calendar-picker-indicator {
-  width: 18px;
-  height: 18px;
-  padding: 3px;
-  border-radius: 5px;
-  cursor: pointer;
-  opacity: .72;
-}
-input[type="date"]::-webkit-calendar-picker-indicator:hover {
-  background: #edf2ff;
-  opacity: 1;
-}
-@media(max-width:640px) {
-  .timetable-day { padding: 10px; }
-  .timetable-day .table-wrap { overflow-x: auto; }
-  .timetable-day table { min-width: 650px; }
-  .date-field { width: 100%; }
-}
-
-.teacher-attendance-identity {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 14px 0;
-  padding: 14px 16px;
-  border: 1px solid #e2e9f4;
-  border-radius: 10px;
-  background: #f8faff;
-}
-.teacher-attendance-identity strong { color: #293e65; font-size: 14px; }
-.teacher-attendance-identity span { color: #72809a; font-size: 12px; font-weight: 750; }
-@media(max-width:640px) {
-  .teacher-attendance-identity { align-items: flex-start; flex-direction: column; }
-}
-
-
-/* Class-first timetable layout and task-focused overview */
-.timetable-class-block {
-  margin-top: 16px;
-  overflow: hidden;
-  border: 1px solid #e2e8f1;
-  border-radius: 12px;
-  background: #fff;
-}
-.timetable-class-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 13px 16px;
-  background: #f3f6fc;
-  border-bottom: 1px solid #e2e8f1;
-}
-.timetable-class-heading h3 {
-  margin: 0;
-  color: #263d65;
-  font-size: 14px;
-  font-weight: 850;
-}
-.timetable-class-heading > span {
-  flex: 0 0 auto;
-  padding: 5px 9px;
-  border-radius: 20px;
-  background: #e3ebfb;
-  color: #3157b7;
-  font-size: 10px;
-  font-weight: 800;
-}
-.class-timetable-table { width: 100%; border-collapse: collapse; }
-.class-timetable-table th {
-  padding: 10px 12px;
-  background: #fbfcfe;
-  color: #71809a;
-  font-size: 10px;
-  font-weight: 850;
-  letter-spacing: .45px;
-  text-align: left;
-  text-transform: uppercase;
-}
-.class-timetable-table td {
-  padding: 11px 12px;
-  border-top: 1px solid #edf0f5;
-  color: #42516a;
-  font-size: 12px;
-  vertical-align: middle;
-}
-.subject-abbreviation {
-  display: inline-flex;
-  min-width: 34px;
-  min-height: 25px;
-  align-items: center;
-  justify-content: center;
-  margin-right: 8px;
-  padding: 3px 7px;
-  border-radius: 6px;
-  background: #edf2ff;
-  color: #3157b7;
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: .35px;
-}
-.subject-full-name { color: #34445e; font-weight: 650; }
-
-.timetable-week-grid { min-width: 760px; table-layout: fixed; }
-.timetable-week-grid th:first-child { width: 126px; }
-.timetable-week-grid td { height: 82px; padding: 7px; vertical-align: top; }
-.timetable-lesson-card {
-  display: flex;
-  min-height: 66px;
-  flex-direction: column;
-  gap: 4px;
-  padding: 9px;
-  border: 1px solid #dbe5f6;
-  border-left: 3px solid #496fbd;
-  border-radius: 8px;
-  background: #f7f9fe;
-}
-.timetable-lesson-card strong { color: #263d65; font-size: 12px; }
-.timetable-lesson-card span { color: #5d6c83; font-size: 11px; }
-.timetable-lesson-card small { color: #3157b7; font-size: 10px; font-weight: 800; }
-.timetable-empty-cell { color: #c0c8d4; }
-.timetable-card-actions { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
-.timetable-card-actions .secondary-button { min-height: 26px; padding: 4px 7px; font-size: 10px; }
-
-.overview-workflow-grid .quick-panel { min-width: 0; }
-.overview-workflow-grid .quick-action { min-height: 68px; }
-.overview-workflow-grid .quick-action small { line-height: 1.45; }
-@media(max-width:700px) {
-  .class-timetable-table { min-width: 690px; }
-  .timetable-class-heading { padding: 11px 12px; }
-  .overview-workflow-grid { grid-template-columns: 1fr !important; }
-}
-
-
-/* Recorded assessment scores grouped by subject and verification state */
-.recorded-subject-groups { display: grid; gap: 16px; padding-top: 14px; }
-.recorded-subject-card {
-  overflow: hidden;
-  border: 1px solid #e3e9f2;
-  border-radius: 12px;
-  background: #fff;
-}
-.recorded-subject-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 15px;
-  background: #f3f6fc;
-  border-bottom: 1px solid #e3e9f2;
-}
-.recorded-subject-heading h3 {
-  margin: 0;
-  color: #293e65;
-  font-size: 14px;
-  font-weight: 850;
-}
-.recorded-subject-heading > span {
-  color: #65748e;
-  font-size: 11px;
-  font-weight: 750;
-}
-.recorded-status-columns {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-  padding: 14px;
-}
-.recorded-status-group {
-  min-width: 0;
-  overflow: hidden;
-  border: 1px solid #e9edf3;
-  border-radius: 9px;
-}
-.recorded-status-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 10px 12px;
-  border-bottom: 1px solid #e9edf3;
-  color: #34445e;
-  font-size: 12px;
-}
-.recorded-count {
-  display: inline-grid;
-  min-width: 23px;
-  height: 23px;
-  place-items: center;
-  padding: 0 6px;
-  border-radius: 20px;
-  font-size: 10px;
-  font-weight: 850;
-}
-.verified-count { background: #e8f7ef; color: #187346; }
-.pending-count { background: #fff4df; color: #94600a; }
-.recorded-status-group .table-wrap { margin: 0; }
-.recorded-status-group table { min-width: 0; }
-.recorded-status-group th,
-.recorded-status-group td { padding: 9px 10px; font-size: 11px; }
-@media(max-width:760px) {
-  .recorded-status-columns { grid-template-columns: 1fr; padding: 10px; }
-}
-
-/* Overview: put the highest-priority academic and finance workspace first. */
-.overview-finance-metrics { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; margin:4px 0 12px; }
-.overview-finance-metrics > div { display:grid; gap:5px; min-width:0; padding:12px; border:1px solid #e2e8f1; border-radius:9px; background:#f8faff; }
-.overview-finance-metrics small { color:#7b879b; font-size:9px; font-weight:850; letter-spacing:.5px; }
-.overview-finance-metrics strong { color:#263e70; font-size:clamp(13px,1.6vw,19px); overflow-wrap:anywhere; }
-@media(max-width:640px) { .overview-finance-metrics { grid-template-columns:1fr; } }
-
-
-/* Report printing, uploaded school identity, and recorded-mark filters */
-.report-school-logo { object-fit:contain; padding:5px; background:#fff; }
-.recorded-marks-filters { display:flex; flex-wrap:wrap; gap:12px; margin:12px 0 4px; }
-.recorded-marks-filters label,.report-customisation-panel label { display:grid; gap:6px; min-width:180px; color:#52617a; font-size:12px; font-weight:750; }
-.recorded-marks-filters select { min-width:190px; }
-.report-customisation-panel { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; padding:16px; margin:14px 0; border:1px solid #e2e8f1; border-radius:11px; background:#f8faff; }
-.report-customisation-panel > div { display:grid; align-content:start; gap:8px; color:#34445e; font-size:13px; }
-.report-customisation-panel p { margin:0; color:#7b879b; font-size:11px; }
-.report-customisation-panel input:not([type=file]) { box-sizing:border-box; width:100%; min-height:42px; padding:9px 11px; border:1px solid #d8e1ed; border-radius:8px; background:#fff; color:#293a55; }
-.report-customisation-panel input[type=file] { max-width:100%; font-size:12px; }
-@media(max-width:640px) { .report-customisation-panel { grid-template-columns:1fr; } }
-@media print {
- body[data-schoolbridge-print="class-reports"] .class-reports-print-batch .report-card-sheet { break-after:page !important; page-break-after:always !important; margin:0 !important; padding:0 !important; border:0 !important; border-radius:0 !important; box-shadow:none !important; }
- body[data-schoolbridge-print="class-reports"] .class-reports-print-batch .report-card-sheet:last-child { break-after:auto !important; page-break-after:auto !important; }
-}
-
-
-/* Phase 4: parent portal, linked accounts and announcements */
-.phase4-workspace { display:grid; gap:18px; }
-.phase4-workspace .panel-heading h2 { display:flex; align-items:center; gap:8px; }
-.phase4-workspace .panel-heading h2 svg { flex:none; color:#315ee8; }
-.phase4-student-picker select { min-height:150px; }
-.phase4-announcement-message { grid-column:1 / -1; }
-.phase4-announcement-message textarea { width:100%; box-sizing:border-box; padding:11px 12px; border:1px solid #d8e1ed; border-radius:8px; font:inherit; resize:vertical; }
-.phase4-child-list { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; }
-.phase4-child-card { display:grid; gap:7px; padding:15px; border:1px solid #e1e8f2; border-radius:11px; background:#fff; color:#293a55; text-align:left; cursor:pointer; }
-.phase4-child-card.active { border-color:#315ee8; background:#f5f8ff; box-shadow:0 0 0 2px #315ee81a; }
-.phase4-child-card strong { font-size:14px; }
-.phase4-child-card span,.phase4-child-card b { color:#71809a; font-size:11px; }
-.phase4-child-card b { color:#315ee8; }
-.phase4-summary-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin:12px 0 18px; }
-.phase4-summary-grid > div { display:grid; gap:5px; padding:13px; border:1px solid #e1e8f2; border-radius:10px; color:#315ee8; }
-.phase4-summary-grid span { color:#7b879b; font-size:11px; }
-.phase4-summary-grid strong { color:#273954; font-size:15px; }
-.phase4-tabs { display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 14px; border-bottom:1px solid #e4eaf2; }
-.phase4-tabs button { padding:10px 13px; border:0; border-bottom:2px solid transparent; background:transparent; color:#71809a; font-weight:750; cursor:pointer; }
-.phase4-tabs button.active { border-bottom-color:#315ee8; color:#315ee8; }
-.phase4-announcement { padding:15px 0; border-bottom:1px solid #edf0f5; }
-.phase4-announcement:last-child { border-bottom:0; }
-.phase4-announcement > div { display:flex; align-items:center; justify-content:space-between; gap:12px; }
-.phase4-announcement strong { color:#273954; font-size:14px; }
-.phase4-announcement span { color:#8792a5; font-size:11px; }
-.phase4-announcement p { margin:9px 0 0; color:#52617a; font-size:13px; white-space:pre-wrap; }
-@media(max-width:650px) { .phase4-summary-grid { grid-template-columns:1fr; } .phase4-announcement > div { align-items:flex-start; flex-direction:column; gap:4px; } }
-
-
-/* School profile logo picker and consistent file upload controls */
-.file-upload-button { display:inline-flex; align-items:center; justify-content:center; width:max-content; max-width:100%; min-height:42px; padding:10px 15px; border:1px solid #cbd7ea; border-radius:9px; background:#eef3ff; color:#3157b7; font-size:12px; font-weight:800; cursor:pointer; transition:background .15s ease,border-color .15s ease,transform .15s ease; }
-.file-upload-button:hover { border-color:#8099d8; background:#e4ecff; }
-.file-upload-button input[type=file] { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; }
-.school-logo-settings-preview { display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-top:12px; }
-.school-logo-settings-preview img { width:86px; height:86px; padding:7px; border:1px solid #e1e8f2; border-radius:10px; object-fit:contain; background:#fff; }
-.report-customisation-panel input[type=file] { max-width:100%; padding:8px; border:1px dashed #cbd6e7; border-radius:8px; background:#fff; color:#43536d; cursor:pointer; }
-.report-customisation-panel input[type=file]::file-selector-button { margin-right:10px; padding:8px 11px; border:0; border-radius:6px; background:#eaf0ff; color:#3157b7; font:700 11px inherit; cursor:pointer; }
-@media print {
-  @page report { size:A4 portrait; margin:7mm; }
-  body[data-schoolbridge-print="report"] .academic-report-print > .report-card-sheet,
-  body[data-schoolbridge-print="class-reports"] .class-reports-print-batch .report-card-sheet {
-    box-sizing:border-box !important; width:133.33% !important; height:376mm !important; max-height:376mm !important;
-    overflow:hidden !important; zoom:.75 !important; padding:0 !important;
-  }
-  body[data-schoolbridge-print="report"] .report-card-header,
-  body[data-schoolbridge-print="class-reports"] .report-card-header { gap:8px !important; padding-bottom:8px !important; border-bottom-width:2px !important; }
-  body[data-schoolbridge-print="report"] .report-school-title h2,
-  body[data-schoolbridge-print="class-reports"] .report-school-title h2 { margin:2px 0 !important; font-size:17px !important; }
-  body[data-schoolbridge-print="report"] .report-student-details,
-  body[data-schoolbridge-print="class-reports"] .report-student-details { margin:8px 0 !important; }
-  body[data-schoolbridge-print="report"] .report-student-details > div,
-  body[data-schoolbridge-print="class-reports"] .report-student-details > div { min-height:0 !important; gap:2px !important; padding:6px 8px !important; }
-  body[data-schoolbridge-print="report"] .report-section-heading,
-  body[data-schoolbridge-print="class-reports"] .report-section-heading { margin:9px 0 5px !important; padding-bottom:4px !important; }
-  body[data-schoolbridge-print="report"] .report-results-table td,
-  body[data-schoolbridge-print="class-reports"] .report-results-table td { padding:5px 6px !important; font-size:9px !important; }
-  body[data-schoolbridge-print="report"] .report-summary-grid,
-  body[data-schoolbridge-print="class-reports"] .report-summary-grid { gap:5px !important; margin-top:7px !important; }
-  body[data-schoolbridge-print="report"] .report-summary-grid > div,
-  body[data-schoolbridge-print="class-reports"] .report-summary-grid > div { gap:3px !important; padding:7px !important; }
-  body[data-schoolbridge-print="report"] .report-summary-grid strong,
-  body[data-schoolbridge-print="class-reports"] .report-summary-grid strong { font-size:15px !important; }
-  body[data-schoolbridge-print="report"] .report-remarks-grid textarea,
-  body[data-schoolbridge-print="class-reports"] .report-remarks-grid textarea { min-height:42px !important; padding:5px !important; font-size:9px !important; }
-  body[data-schoolbridge-print="report"] .report-signatures,
-  body[data-schoolbridge-print="class-reports"] .report-signatures { gap:8px 14px !important; margin-top:10px !important; padding-top:8px !important; }
-  body[data-schoolbridge-print="report"] .report-card-footer,
-  body[data-schoolbridge-print="class-reports"] .report-card-footer { margin-top:10px !important; padding-top:5px !important; }
-}
-
-
-/* Print only the parent credential handover slip when requested. */
-@media print {
-  body[data-schoolbridge-print="handover"] * { visibility:hidden !important; }
-  body[data-schoolbridge-print="handover"] .parent-passcode-handover,
-  body[data-schoolbridge-print="handover"] .parent-passcode-handover * { visibility:visible !important; }
-  body[data-schoolbridge-print="handover"] .parent-passcode-handover button { display:none !important; }
-  body[data-schoolbridge-print="handover"] .parent-passcode-handover { position:absolute !important; inset:0 auto auto 0 !important; width:100% !important; padding:18px !important; border:1px solid #9aa8bd !important; background:#fff !important; color:#17243b !important; }
-}
-
-.student-form input[type=file] { max-width:100%; padding:8px; border:1px dashed #cbd6e7; border-radius:8px; background:#fff; color:#43536d; cursor:pointer; }
-.student-form input[type=file]::file-selector-button { margin-right:10px; padding:8px 11px; border:0; border-radius:6px; background:#eaf0ff; color:#3157b7; font:700 11px inherit; cursor:pointer; }
-.student-form input[type=file]::file-selector-button:hover { background:#dce7ff; }
-
-/* Password recovery and account recovery controls */
-.recovery-link { display: block; margin: 14px auto 0; padding: 4px; border: 0; background: transparent; color: #315ee8; font-size: 11px; font-weight: 700; cursor: pointer; }
-.password-recovery h2 { color: #243550; font: 800 19px Manrope,sans-serif; margin: 0 0 8px; }
-.password-recovery > .muted { margin: 0 0 18px; font-size: 11px; line-height: 1.6; }
-.password-recovery form { display: grid; margin-top: 18px; }
-.password-recovery label { color: #52617a; font-size: 11px; font-weight: 700; margin: 0 0 7px; }
-.password-recovery input { border: 1px solid #e5eaf2; border-radius: 8px; padding: 12px; outline: none; margin-bottom: 17px; font-size: 12px; }
-.password-recovery input:focus { border-color: #7893f3; box-shadow: 0 0 0 3px #315ee812; }
-.recovery-secondary { margin-top: 10px; }
-.recovery-back { display: block; margin: 18px auto 0; border: 0; background: transparent; color: #65748b; font-size: 11px; cursor: pointer; }
-.password-reset-result { display: grid; gap: 9px; margin-top: 12px; }
-.password-reset-result code { display: block; padding: 10px; border-radius: 7px; background: #fff; color: #243550; font-size: 13px; overflow-wrap: anywhere; }
-.password-reset-result small { color: #52617a; line-height: 1.5; }
-
-
-/* Keep teacher attendance and academic selectors interactive above table layers. */
-.academic-workspace select,
-.academic-workspace input,
-.recorded-marks-filters select {
-  pointer-events: auto !important;
-  position: relative;
-  z-index: 2;
-}
-.subject-verification-action { margin: 8px 0 12px; }
-
-.teacher-class-attendance select {
-  pointer-events: auto !important;
-  position: relative;
-  z-index: 2;
-  cursor: pointer;
-}
-.teacher-class-attendance .table-wrap {
-  position: relative;
-  z-index: 1;
-}
-
-
-/* Tabbed account management and clickable teacher attendance. */
-.account-management-tabs { display:flex; flex-wrap:wrap; gap:7px; margin:18px 0 16px; padding:6px; border:1px solid #e3e9f2; border-radius:11px; background:#f7f9fc; }
-.account-management-tabs button { display:inline-flex; align-items:center; gap:7px; min-height:38px; padding:8px 12px; border:1px solid transparent; border-radius:8px; background:transparent; color:#65748b; font-size:12px; font-weight:800; cursor:pointer; }
-.account-management-tabs button.active { border-color:#d8e2f5; background:#fff; color:#294b9b; box-shadow:0 2px 7px #233b6410; }
-.account-management-tabs button span { display:inline-grid; min-width:20px; height:20px; place-items:center; padding:0 5px; border-radius:20px; background:#e9eef8; color:#405b91; font-size:10px; }
-.account-tab-panel { display:grid; gap:13px; min-width:0; }
-.teacher-attendance-controls { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:end; gap:16px; margin:14px 0; }
-.teacher-attendance-controls > div > strong { display:block; margin-bottom:8px; color:#43536d; font-size:12px; }
-.teacher-class-picks { display:flex; flex-wrap:wrap; gap:8px; }
-.teacher-class-pick { min-height:38px; padding:8px 13px; border:1px solid #dce4ef; border-radius:9px; background:#fff; color:#43536d; font-size:12px; font-weight:750; cursor:pointer; }
-.teacher-class-pick.active { border-color:#315ee8; background:#edf2ff; color:#2449a5; box-shadow:0 0 0 2px #315ee814; }
-.teacher-attendance-date { display:grid; gap:6px; min-width:170px; color:#52617a; font-size:12px; font-weight:750; }
-.attendance-choice-group { display:flex; flex-wrap:wrap; gap:5px; min-width:250px; }
-.attendance-choice { min-height:29px; padding:5px 8px; border:1px solid #dce4ef; border-radius:7px; background:#fff; color:#66748a; font-size:10px; font-weight:750; cursor:pointer; }
-.attendance-choice.active { border-color:#315ee8; background:#edf2ff; color:#2449a5; box-shadow:0 0 0 1px #315ee822; }
-.attendance-choice.active.status-absent { border-color:#e4aaaa; background:#fff0f0; color:#a52a2a; }
-.attendance-choice.active.status-late { border-color:#e8cf9b; background:#fff6e6; color:#94600a; }
-.attendance-choice.active.status-excused { border-color:#cbd3df; background:#f0f2f5; color:#586477; }
-@media(max-width:700px) { .teacher-attendance-controls { grid-template-columns:1fr; } .teacher-attendance-date { width:100%; } .attendance-choice-group { min-width:0; } .account-management-tabs { overflow-x:auto; flex-wrap:nowrap; } .account-management-tabs button { white-space:nowrap; } }
-
-
-/* Keep refresh controls aligned on role-specific read-only dashboards. */
-.dashboard-heading-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
-@media (max-width: 640px) {
-  .dashboard-heading-actions { justify-content: flex-start; width: 100%; }
-  .panel-heading:has(.dashboard-heading-actions) { align-items: flex-start; flex-direction: column; }
-}
-
-
-/* Keep the SchoolBridge workspace frame fixed while tabs change; long pages scroll inside it. */
-.main-area { min-width: 0; min-height: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
-.main-area > .topbar { flex: 0 0 76px; }
-.main-area > .content { flex: 1 1 auto; width: 100%; height: calc(100vh - 76px); min-height: 0; overflow-y: auto; overflow-x: hidden; box-sizing: border-box; }
-@media (max-width: 760px) {
-  .main-area { height: 100dvh; }
-  .main-area > .content { height: calc(100dvh - 76px); padding: 22px 16px 18px; }
-}
-
-
-/* Staff directory category filters are direct clickable options, not a dropdown. */
-.staff-category-options { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-.staff-category-option { border:1px solid var(--line); background:#fff; color:#53627a; border-radius:9px; padding:10px 14px; min-height:42px; font-size:13px; font-weight:700; cursor:pointer; }
-.staff-category-option.active { color:var(--blue); border-color:#b9c8ff; background:#edf2ff; }
-.staff-category-option:focus-visible { outline:2px solid var(--blue); outline-offset:2px; }
-.staff-list-count { margin:8px 0 12px; color:var(--muted,#667085); font-size:13px; }
-@media (max-width:760px) { .staff-category-options { width:100%; } .staff-category-option { flex:1 1 auto; } }
-
-
-/* Submitted-result review indicators */
-.academic-tab-count { display:inline-flex; align-items:center; justify-content:center; min-width:19px; height:19px; margin-left:7px; padding:0 5px; border-radius:999px; background:#fff0d7; color:#8a5100; font-size:11px; font-weight:850; }
-.submitted-results-workspace > .recorded-subject-card { margin-top:16px; }
-.submitted-results-workspace .recorded-subject-heading > div { display:grid; gap:4px; }
-.submitted-results-workspace .recorded-subject-heading > div span { color:#718096; font-size:12px; }
-
-
-/* Examination selection: category first, exam second, class third. */
-.exam-selection-flow { display:grid; gap:13px; margin:16px 0; padding:16px; border:1px solid #e2e8f2; border-radius:14px; background:#f9fbff; }
-.exam-flow-step { display:flex; align-items:center; gap:10px; }
-.exam-flow-step > div { display:grid; gap:2px; }
-.exam-flow-step strong { color:#26364f; font-size:13px; }
-.exam-flow-step small { color:#738097; font-size:12px; }
-.exam-type-tabs,.exam-pill-options,.exam-class-choices { display:flex; flex-wrap:wrap; gap:8px; }
-.exam-type-tab,.exam-pill,.exam-choice,.exam-class-choice { border:1px solid #dce3ee; border-radius:9px; background:#fff; color:#53627a; font-size:12px; font-weight:700; cursor:pointer; transition:background .15s,border-color .15s,color .15s; }
-.exam-type-tab,.exam-pill { padding:9px 12px; }
-.exam-type-tab.active,.exam-pill.active,.exam-choice.active,.exam-class-choice.active { border-color:#4569cb; background:#edf3ff; color:#244bb0; box-shadow:0 0 0 1px #4569cb inset; }
-.exam-choice-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:9px; }
-.exam-choice { display:grid; gap:5px; text-align:left; padding:12px; }
-.exam-choice strong { color:#253650; font-size:13px; }
-.exam-choice span,.exam-choice small { color:#718096; font-size:11px; }
-.exam-class-choice { padding:10px 13px; }
-.exam-create-form { margin-top:14px; }
-.exam-create-meta { display:grid; grid-template-columns:1fr 1fr minmax(150px,.6fr); gap:16px; margin:15px 0; }
-.exam-create-meta > div { display:grid; gap:8px; }
-.exam-create-meta strong,.exam-class-picker strong { color:#34445c; font-size:12px; }
-.exam-class-picker { display:grid; gap:10px; padding:14px; border:1px solid #e1e7f0; border-radius:11px; }
-.exam-class-picker > div:first-child { display:grid; gap:3px; }
-.exam-class-picker small { color:#738097; font-size:11px; }
-@media(max-width:700px) { .exam-create-meta { grid-template-columns:1fr; } .exam-choice-grid { grid-template-columns:1fr; } }
-
-/* Submitted results subject navigation and staff attendance check-in calendar */
-.submitted-subject-tabs{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0 22px}
-.submitted-subject-tab{display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:150px;padding:12px 15px;border:1px solid var(--border-color,#d8dee8);border-radius:12px;background:var(--surface,#fff);color:inherit;cursor:pointer;text-align:left}
-.submitted-subject-tab strong{font-size:14px}.submitted-subject-tab span,.submitted-subject-tab small{font-size:12px;color:var(--muted,#687386)}
-.submitted-subject-tab.active{border-color:var(--primary,#3159a6);background:var(--primary-soft,#eef3ff);box-shadow:0 0 0 1px var(--primary,#3159a6) inset}
-.staff-attendance-calendar{margin:16px 0;padding:15px;border:1px solid var(--border-color,#d8dee8);border-radius:14px}
-.staff-attendance-calendar-heading{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
-.staff-attendance-calendar-heading span{font-size:12px;color:var(--muted,#687386)}
-.staff-attendance-calendar-days{display:flex;gap:8px;flex-wrap:wrap}
-.staff-calendar-day{display:flex;flex-direction:column;gap:4px;align-items:flex-start;padding:9px 12px;border:1px solid var(--border-color,#d8dee8);border-radius:10px;background:var(--surface,#fff);color:inherit;cursor:pointer}
-.staff-calendar-day strong{font-size:13px}.staff-calendar-day span{font-size:11px;color:var(--muted,#687386)}
-.staff-calendar-day.active{border-color:var(--primary,#3159a6);background:var(--primary-soft,#eef3ff)}
-.staff-self-checkin-card{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:18px;margin:16px 0;border:1px solid var(--border-color,#d8dee8);border-radius:14px;background:var(--surface,#fff)}
-.staff-self-checkin-card>div{display:flex;flex-direction:column;gap:5px}.staff-self-checkin-card>div>span,.staff-self-checkin-card small{font-size:12px;color:var(--muted,#687386)}.staff-self-checkin-card strong{font-size:20px}
-.teacher-results-progress{margin:16px 0;padding:14px;border:1px solid var(--border-color,#d8dee8);border-radius:12px}
-.teacher-results-progress>div:first-child{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px}.teacher-results-progress span{font-size:12px;color:var(--muted,#687386)}
-.teacher-results-progress-track{height:9px;overflow:hidden;border-radius:20px;background:var(--border-color,#e4e8ef)}.teacher-results-progress-track span{display:block;height:100%;border-radius:20px;background:var(--primary,#3159a6);transition:width .25s ease}
-.teacher-results-complete{display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:24px;border:1px solid var(--border-color,#d8dee8);border-radius:14px;background:var(--surface,#fff)}
-.teacher-results-complete h3,.teacher-results-complete p{margin:0}.teacher-results-complete-icon{display:grid;place-items:center;width:42px;height:42px;border-radius:50%;background:#e8f5ed;color:#18794e;font-size:24px;font-weight:700}
-@media(max-width:700px){.submitted-subject-tab{flex:1 1 140px}.staff-attendance-calendar-heading{align-items:flex-start}.teacher-results-progress>div:first-child{flex-direction:column}}
-
-/* Clickable subject options replace select menus in the examinations workspace. */
-.subject-choice-options{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
-.subject-choice-options .exam-pill{white-space:normal}
-.recorded-marks-filters{display:flex;flex-direction:column;gap:14px}
-.recorded-marks-filters>div{display:flex;flex-direction:column;gap:8px}
-.recorded-marks-filters strong{font-size:13px}
-.exam-create-form .exam-create-meta{align-items:flex-start}
-.exam-create-form .exam-class-picker{margin-top:18px}
-
-
-/* Project-wide checkbox replacements: clear, accessible, clickable selection controls. */
-.choice-toggle{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:9px 14px;border:1px solid #dce3ee;border-radius:9px;background:#fff;color:#53627a;font-size:12px;font-weight:750;cursor:pointer}
-.choice-toggle.active{border-color:#4569cb;background:#edf3ff;color:#244bb0;box-shadow:0 0 0 1px #4569cb inset}
-.permission-choice-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:9px;margin:12px 0}
-.permission-choice{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:46px;padding:10px 12px;border:1px solid #dce3ee;border-radius:9px;background:#fff;color:#53627a;text-align:left;font-size:12px;font-weight:750;cursor:pointer}
-.permission-choice small{color:#8792a5;font-size:10px;white-space:nowrap}
-.permission-choice.active{border-color:#4569cb;background:#edf3ff;color:#244bb0;box-shadow:0 0 0 1px #4569cb inset}
-.subject-choice-button{min-height:38px;padding:9px 12px;border:1px solid #dce3ee;border-radius:9px;background:#fff;color:#53627a;font-size:12px;font-weight:700;cursor:pointer}
-.subject-choice-button.active{border-color:#4569cb;background:#edf3ff;color:#244bb0;box-shadow:0 0 0 1px #4569cb inset}
-.subject-choice-button:focus-visible,.permission-choice:focus-visible,.phase4-student-option:focus-visible,.choice-toggle:focus-visible{outline:2px solid #4569cb;outline-offset:2px}
-.phase4-student-options{display:grid;gap:8px}
-.phase4-student-option{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;padding:12px;border:1px solid #dce3ee;border-radius:10px;background:#fff;color:#35445c;text-align:left;cursor:pointer}
-.phase4-student-option>span{display:grid;gap:5px}
-.phase4-student-option small{display:block;color:#718096;font-size:11px;margin-top:4px}
-.phase4-student-option>b{flex:0 0 auto;padding:6px 9px;border-radius:7px;background:#f1f4f8;color:#66748a;font-size:10px}
-.phase4-student-option.active{border-color:#4569cb;background:#edf3ff;box-shadow:0 0 0 1px #4569cb inset}
-.phase4-student-option.active>b{background:#dce7ff;color:#244bb0}
-.teacher-exam-selection{display:grid;gap:13px;margin:16px 0;padding:16px;border:1px solid #e2e8f2;border-radius:14px;background:#f9fbff}
-
-/* Teacher subject registration picker */
-.staff-subject-picker{padding:16px;border:1px solid #dce5f2;border-radius:13px;background:linear-gradient(145deg,#f8faff,#ffffff)}
-.staff-subject-picker-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;color:#26364f;font-size:13px}
-.staff-subject-picker-heading>span{flex:0 0 auto;padding:5px 9px;border-radius:999px;background:#e9efff;color:#3158b8;font-size:11px;font-weight:800}
-.staff-subject-choice-grid{grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;margin:13px 0 2px}
-.staff-subject-choice-grid .permission-choice{min-height:52px;padding:11px 12px;border-radius:10px}
-.staff-subject-choice-grid .permission-choice>span{font-size:12px}
-.staff-subject-choice-grid .permission-choice.active{background:#edf4ff;border-color:#5276d5}
-.staff-subject-picker .field-error{display:block;margin-top:9px;color:#b42318;font-size:11px;font-weight:650}
-
-.staff-shift-note{display:block;margin-top:5px;color:#66758b;font-size:11px;font-weight:600;line-height:1.4}
-
-
-/* Hybrid role-specific staff dashboards */
-.hybrid-role-dashboard { display: grid; gap: 18px; }
-.hybrid-role-heading { margin-bottom: 0; }
-.hybrid-role-heading h2 { margin-bottom: 7px; color: #172b4d; font: 800 23px Manrope,sans-serif; letter-spacing: -.5px; }
-.hybrid-role-heading p:not(.eyebrow) { max-width: 760px; color: #8793a8; font-size: 12px; line-height: 1.6; margin-bottom: 0; }
-.hybrid-dashboard-summary { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 14px; }
-.hybrid-summary-card { display: flex; align-items: center; gap: 13px; min-width: 0; padding: 18px; background: #fff; border: 1px solid var(--line); border-radius: 12px; }
-.hybrid-summary-icon { width: 40px; height: 40px; flex: 0 0 40px; display: grid; place-items: center; color: #315ee8; background: #edf2ff; border-radius: 11px; }
-.hybrid-summary-card div { display: grid; gap: 3px; min-width: 0; }
-.hybrid-summary-card small { color: #98a3b5; font-size: 9px; font-weight: 800; letter-spacing: .8px; }
-.hybrid-summary-card strong { color: #172b4d; font-size: 21px; line-height: 1.25; }
-.hybrid-summary-card span:not(.hybrid-summary-icon) { color: #8793a8; font-size: 10px; }
-.hybrid-summary-card .hybrid-role-value { overflow: hidden; font-size: 15px; text-overflow: ellipsis; white-space: nowrap; }
-.hybrid-dashboard-grid { display: grid; grid-template-columns: minmax(0,1.05fr) minmax(320px,.95fr); gap: 18px; align-items: start; }
-.hybrid-main-panel,.hybrid-workspaces-panel { min-width: 0; }
-.hybrid-main-panel h4 { margin: 21px 0 11px; color: #33435d; font-size: 12px; }
-.hybrid-workspace-list { display: grid; gap: 8px; }
-.hybrid-workspace-link { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px; border: 1px solid #edf0f5; border-radius: 10px; background: #fff; color: #33435d; text-align: left; cursor: pointer; transition: .18s ease; }
-.hybrid-workspace-link:hover { border-color: #cdd8ff; background: #f8faff; transform: translateY(-1px); }
-.hybrid-workspace-icon { width: 36px; height: 36px; flex: 0 0 36px; display: grid; place-items: center; border-radius: 10px; background: #edf2ff; color: #315ee8; }
-.hybrid-workspace-icon svg { width: 17px; height: 17px; }
-.hybrid-workspace-link > span:nth-child(2) { display: grid; gap: 4px; min-width: 0; flex: 1; }
-.hybrid-workspace-link strong { color: #253752; font-size: 12px; }
-.hybrid-workspace-link small { color: #8793a8; font-size: 10px; line-height: 1.45; }
-.hybrid-workspace-link > svg { flex: 0 0 auto; color: #98a5b8; }
-@media (max-width: 900px) {
-  .hybrid-dashboard-grid { grid-template-columns: 1fr; }
-}
-@media (max-width: 620px) {
-  .hybrid-dashboard-summary { grid-template-columns: 1fr; gap: 9px; }
-  .hybrid-summary-card { padding: 14px; }
-  .hybrid-role-heading { align-items: flex-start; flex-direction: column; gap: 13px; }
-  .hybrid-role-heading .dashboard-heading-actions { width: 100%; justify-content: space-between; }
-}
-
-
-/* Dedicated Director of Studies academic control centre */
-.dos-dashboard{display:flex;flex-direction:column;gap:20px}
-.dos-hero{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;padding:28px 30px;border-radius:18px;background:linear-gradient(120deg,#172554,#1e40af 58%,#2563eb);color:#fff;box-shadow:0 12px 30px rgba(30,64,175,.13)}
-.dos-hero .eyebrow{color:#bfdbfe;letter-spacing:.13em;font-size:10px;font-weight:800;margin:0 0 10px}
-.dos-hero h2{font-size:28px;line-height:1.15;margin:0 0 9px;color:#fff}
-.dos-hero-copy>p:last-child{margin:0;color:#dbeafe;max-width:720px;line-height:1.55;font-size:13px}
-.dos-hero-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:flex-end}
-.dos-live-indicator{display:flex;align-items:center;gap:8px;font-size:11px;color:#dbeafe;white-space:nowrap}
-.dos-live-indicator>span{width:8px;height:8px;border-radius:50%;background:#4ade80;box-shadow:0 0 0 4px rgba(74,222,128,.15)}
-.dos-hero .secondary-button{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.28);color:#fff}
-.dos-metric-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
-.dos-metric{display:flex;align-items:center;gap:13px;padding:17px 18px;background:var(--surface,#fff);border:1px solid var(--border,#e5e7eb);border-radius:14px;min-width:0}
-.dos-metric-icon{width:42px;height:42px;border-radius:12px;background:#eff6ff;color:#1d4ed8;display:grid;place-items:center;flex:none}
-.dos-metric>div{display:flex;flex-direction:column;min-width:0;gap:2px}
-.dos-metric small{font-size:9px;letter-spacing:.1em;font-weight:800;color:var(--muted,#64748b)}
-.dos-metric strong{font-size:23px;line-height:1.2;color:var(--text,#111827)}
-.dos-metric>div>span{font-size:10px;color:var(--muted,#64748b)}
-.dos-content-grid{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(280px,.9fr);gap:18px;align-items:start}
-.dos-workstreams,.dos-schedule-panel,.dos-duty-panel{padding:20px}
-.dos-section-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:16px}
-.dos-section-heading .eyebrow,.dos-duty-panel>.eyebrow{font-size:9px;font-weight:800;letter-spacing:.12em;color:#64748b;margin:0 0 6px}
-.dos-section-heading h3,.dos-duty-panel h3{font-size:17px;margin:0 0 5px}
-.dos-section-heading p:not(.eyebrow){font-size:11px;color:var(--muted,#64748b);margin:0}
-.dos-workstream-list{display:flex;flex-direction:column}
-.dos-workstream{display:flex;align-items:center;gap:13px;text-align:left;padding:15px 2px;border:0;border-top:1px solid var(--border,#e5e7eb);background:transparent;color:inherit;cursor:pointer;width:100%}
-.dos-workstream:hover .dos-workstream-action{color:#1d4ed8}
-.dos-workstream-icon{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;flex:none}
-.dos-workstream-icon.violet{background:#f3e8ff;color:#7e22ce}.dos-workstream-icon.blue{background:#dbeafe;color:#1d4ed8}.dos-workstream-icon.green{background:#dcfce7;color:#15803d}.dos-workstream-icon.amber{background:#fef3c7;color:#b45309}.dos-workstream-icon.slate{background:#e2e8f0;color:#334155}.dos-workstream-icon.rose{background:#ffe4e6;color:#be123c}
-.dos-workstream-copy{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
-.dos-workstream-copy>small{font-size:8px;letter-spacing:.1em;font-weight:800;color:#64748b}
-.dos-workstream-copy>strong{font-size:13px}
-.dos-workstream-copy>span{font-size:10px;color:var(--muted,#64748b);line-height:1.45}
-.dos-workstream-action{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;color:#475569;white-space:nowrap}
-.dos-side-column{display:flex;flex-direction:column;gap:18px}
-.dos-lesson-list{display:flex;flex-direction:column}
-.dos-lesson{display:flex;gap:13px;padding:12px 0;border-top:1px solid var(--border,#e5e7eb)}
-.dos-lesson-time{width:56px;flex:none;font-size:12px;font-weight:800;color:#1d4ed8}
-.dos-lesson-time small{display:block;font-size:10px;color:#64748b;font-weight:500;margin-top:3px}
-.dos-lesson>span:last-child{display:flex;flex-direction:column;gap:3px;font-size:12px}
-.dos-lesson>span:last-child small{font-size:10px;color:#64748b}
-.dos-empty-note{padding:16px 10px;text-align:center;color:#64748b;display:flex;align-items:center;flex-direction:column;gap:7px}
-.dos-empty-note p{font-size:12px;font-weight:700;color:var(--text,#334155);margin:0}
-.dos-empty-note small{font-size:10px;line-height:1.5}
-.dos-duty-panel h3{margin-bottom:12px}
-.dos-duty-panel>.muted{font-size:11px;line-height:1.5}
-.dos-duty-note{display:flex;gap:10px;align-items:flex-start;padding:12px;border-radius:10px;background:#f5f3ff;color:#5b21b6;font-size:12px;line-height:1.5}
-.dos-class-tags{margin-top:14px}.dos-class-tags>strong{font-size:10px}.dos-class-tags>div{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.dos-class-tags span{padding:5px 9px;border-radius:20px;background:#eff6ff;color:#1e40af;font-size:10px;font-weight:700}
-.dos-dashboard .text-action{display:inline-flex;align-items:center;gap:5px;border:0;background:none;color:#1d4ed8;font-size:11px;font-weight:700;padding:8px 0 0;cursor:pointer}
-@media(max-width:900px){.dos-metric-strip{grid-template-columns:repeat(2,minmax(0,1fr))}.dos-content-grid{grid-template-columns:1fr}}
-@media(max-width:600px){.dos-hero{align-items:flex-start;flex-direction:column;padding:22px}.dos-hero h2{font-size:23px}.dos-hero-actions{justify-content:flex-start}.dos-metric-strip{grid-template-columns:1fr 1fr}.dos-metric{padding:13px 11px;gap:9px}.dos-metric-icon{width:36px;height:36px}.dos-metric strong{font-size:20px}.dos-workstream{align-items:flex-start}.dos-workstream-action{font-size:0}.dos-workstream-action svg{width:18px;height:18px}}
-
-
-/* DOS school-level academic governance dashboard */
-.dos-management-grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:18px;align-items:start}
-.dos-results-panel,.dos-priority-panel{padding:21px}
-.dos-result-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin:12px 0 14px}
-.dos-result-stats>div{padding:13px;border-radius:11px;background:var(--surface-subtle,#f8fafc);display:flex;flex-direction:column;gap:4px}
-.dos-result-stats strong{font-size:23px;color:var(--text,#0f172a)}
-.dos-result-stats span{font-size:10px;color:var(--muted,#64748b)}
-.dos-exam-list{display:flex;flex-direction:column}
-.dos-exam-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 0;border-top:1px solid var(--border,#e5e7eb)}
-.dos-exam-row>div{display:flex;flex-direction:column;gap:4px;min-width:0}
-.dos-exam-row strong{font-size:12px}
-.dos-exam-row small{font-size:10px;color:var(--muted,#64748b)}
-.dos-status-pending,.dos-status-verified{font-size:10px;font-weight:800;white-space:nowrap;padding:6px 9px;border-radius:20px}
-.dos-status-pending{background:#fff7ed;color:#c2410c}.dos-status-verified{background:#dcfce7;color:#166534}
-.dos-oversight-list{display:flex;flex-direction:column}
-.dos-oversight-item{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:13px 0;border:0;border-top:1px solid var(--border,#e5e7eb);background:transparent;color:inherit;cursor:pointer}
-.dos-oversight-item>span:nth-child(2){display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
-.dos-oversight-item small{font-size:8px;font-weight:800;letter-spacing:.1em;color:#64748b}
-.dos-oversight-item strong{font-size:12px}
-.dos-oversight-item em{font-size:10px;font-style:normal;line-height:1.45;color:var(--muted,#64748b)}
-.dos-oversight-item>svg{color:#64748b;flex:none}
-.dos-footer-note{display:flex;align-items:flex-start;gap:10px;padding:13px 16px;border:1px solid var(--border,#e5e7eb);border-radius:12px;color:var(--muted,#64748b);font-size:11px;line-height:1.5}
-.dos-footer-note svg{flex:none;color:#1d4ed8}
-@media(max-width:900px){.dos-management-grid{grid-template-columns:1fr}}
-@media(max-width:600px){.dos-result-stats{grid-template-columns:1fr 1fr}.dos-result-stats>div:last-child{grid-column:span 2}.dos-exam-row{align-items:flex-start;flex-direction:column}}
-
-
-/* Role-specific command dashboards */
-.command-dashboard{display:flex;flex-direction:column;gap:20px}
-.command-hero{display:flex;align-items:flex-start;justify-content:space-between;gap:22px;padding:28px;border:1px solid var(--border-color,#e5e7eb);border-radius:18px;background:linear-gradient(120deg,#f8fbff 0%,#eef4ff 55%,#f8faff 100%)}
-.command-hero h2{font-size:clamp(1.45rem,2.3vw,2rem);margin:5px 0 8px;color:#172b4d}
-.command-hero p:not(.eyebrow){max-width:760px;margin:0;color:#5d6b82;line-height:1.6}
-.command-role-chip{display:inline-flex;align-items:center;gap:8px;white-space:nowrap;padding:9px 13px;border:1px solid #d7e2f2;border-radius:999px;background:#fff;color:#344b6b;font-size:.82rem;font-weight:650}
-.command-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
-.command-finance-strip{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) auto;align-items:center;gap:15px;padding:17px 20px;border:1px solid var(--border-color,#e5e7eb);border-radius:14px;background:#fff}
-.command-finance-strip>div{display:flex;flex-direction:column;gap:5px}
-.command-finance-strip small{font-size:.68rem;letter-spacing:.07em;color:#77849a;font-weight:700}
-.command-finance-strip strong{font-size:1.12rem;color:#1d3557}
-.command-content{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(260px,.8fr);gap:18px;align-items:start}
-.command-main-panel,.command-side-panel{padding:20px;border:1px solid var(--border-color,#e5e7eb);border-radius:16px;background:#fff;min-width:0}
-.command-action-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-.command-action-card{display:flex;align-items:center;gap:12px;text-align:left;padding:15px;border:1px solid #e4e9f1;border-radius:12px;background:#fff;color:inherit;cursor:pointer;transition:border-color .16s,transform .16s,box-shadow .16s}
-.command-action-card:hover{border-color:#9db7dc;transform:translateY(-1px);box-shadow:0 5px 16px rgba(24,55,95,.07)}
-.command-action-card>span:nth-child(2){display:flex;flex:1;flex-direction:column;gap:4px;min-width:0}
-.command-action-card strong{font-size:.9rem;color:#243b5a}
-.command-action-card small{font-size:.77rem;line-height:1.45;color:#718096}
-.command-action-icon{display:grid;place-items:center;flex:0 0 40px;width:40px;height:40px;border-radius:11px}
-.command-action-icon svg{width:19px;height:19px}
-.command-action-icon.blue{background:#eaf2ff;color:#3567a8}
-.command-action-icon.purple{background:#f1edff;color:#7054b8}
-.command-action-icon.green{background:#e8f7ef;color:#278052}
-.command-action-icon.amber{background:#fff4df;color:#a36b16}
-.command-brief-item{display:flex;flex-direction:column;gap:5px;padding:14px 0;border-bottom:1px solid #edf0f4}
-.command-brief-item:last-child{border-bottom:0}
-.command-brief-item strong{font-size:.87rem;color:#263d5c}
-.command-brief-item span{font-size:.8rem;line-height:1.5;color:#718096}
-.headteacher-dashboard .command-hero{border-color:#d6e1f1;background:linear-gradient(115deg,#edf4ff,#f7faff 65%,#eef7f5)}
-.secretary-dashboard .command-hero{background:linear-gradient(115deg,#f4f2ff,#faf9ff 65%,#f2f7ff)}
-.attendance-officer-dashboard .command-hero{background:linear-gradient(115deg,#edf8f3,#f8fcfa 65%,#eef5ff)}
-@media(max-width:1050px){.command-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.command-content{grid-template-columns:1fr}.command-finance-strip{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:640px){.command-hero{flex-direction:column;padding:20px}.command-role-chip{white-space:normal}.command-metrics{grid-template-columns:1fr 1fr}.command-action-grid{grid-template-columns:1fr}.command-finance-strip{grid-template-columns:1fr}.command-main-panel,.command-side-panel{padding:15px}}
-
-/* Teacher workspace dashboard */
-.teacher-workspace-dashboard{display:flex;flex-direction:column;gap:18px}
-.teacher-workspace-hero{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:25px;border-radius:17px;background:linear-gradient(115deg,#edf4ff,#f8fbff 65%,#f0f7ff);border:1px solid #dce7f6}
-.teacher-workspace-hero h2{margin:5px 0 8px;color:#1d3557;font-size:1.8rem}
-.teacher-workspace-hero p:not(.eyebrow){margin:0;color:#64748b;line-height:1.55}
-.teacher-workspace-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px}
-.teacher-workspace-metrics>div{display:flex;flex-direction:column;gap:5px;padding:17px 19px;border:1px solid #e3eaf3;border-radius:14px;background:#fff}
-.teacher-workspace-metrics small{font-size:.68rem;letter-spacing:.07em;font-weight:750;color:#718096}
-.teacher-workspace-metrics strong{font-size:1.7rem;color:#234a79}
-.teacher-workspace-metrics span{font-size:.77rem;color:#7a8798}
-.teacher-workspace-layout{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(280px,.85fr);gap:17px;align-items:start}
-.teacher-workspace-main{display:flex;flex-direction:column;gap:17px;min-width:0}
-.teacher-workspace-main>.panel,.teacher-tools-panel{padding:19px;min-width:0}
-.teacher-class-responsibilities{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-.teacher-class-card{display:flex;flex-direction:column;align-items:flex-start;gap:7px;padding:15px;border:1px solid #e2eaf4;border-radius:12px;background:#f9fbfe;text-align:left;color:#2a4263;cursor:pointer}
-.teacher-class-card svg{color:#4778b6}
-.teacher-class-card strong{font-size:.92rem}
-.teacher-class-card span{font-size:.75rem;color:#758399}
-.teacher-tool-list{display:flex;flex-direction:column}
-.teacher-tool-link{display:flex;align-items:center;gap:11px;padding:13px 0;border:0;border-bottom:1px solid #edf0f4;background:transparent;text-align:left;color:inherit;cursor:pointer}
-.teacher-tool-link:last-child{border-bottom:0}
-.teacher-tool-link>span:nth-child(2){display:flex;flex:1;flex-direction:column;gap:4px;min-width:0}
-.teacher-tool-link strong{font-size:.84rem;color:#263d5c}
-.teacher-tool-link small{font-size:.74rem;line-height:1.45;color:#718096}
-.teacher-tool-icon{display:grid;place-items:center;flex:0 0 38px;width:38px;height:38px;border-radius:10px}
-.teacher-tool-icon svg{width:18px;height:18px}
-.teacher-tool-icon.blue{background:#eaf2ff;color:#3567a8}
-.teacher-tool-icon.purple{background:#f1edff;color:#7054b8}
-.teacher-tool-icon.green{background:#e8f7ef;color:#278052}
-.teacher-tool-icon.amber{background:#fff4df;color:#a36b16}
-@media(max-width:900px){.teacher-workspace-layout{grid-template-columns:1fr}}
-@media(max-width:620px){.teacher-workspace-hero{align-items:flex-start;flex-direction:column;padding:19px}.teacher-workspace-metrics{grid-template-columns:1fr}.teacher-class-responsibilities{grid-template-columns:1fr}.teacher-workspace-main>.panel,.teacher-tools-panel{padding:14px}}
-
-
-/* Administrator — Design 1: executive command centre */
-.administrator-command-dashboard{display:flex;flex-direction:column;gap:18px;color:#203451}
-.admin-command-hero{display:flex;align-items:center;justify-content:space-between;gap:22px;padding:27px 30px;border:1px solid #dce6f4;border-radius:18px;background:linear-gradient(112deg,#102b52 0%,#174477 58%,#286b83 100%);color:#fff;box-shadow:0 12px 30px rgba(21,54,91,.12)}
-.admin-command-hero h2{margin:9px 0 7px;color:#fff;font-size:1.75rem;letter-spacing:-.6px}
-.admin-command-hero p{max-width:690px;margin:0;color:#d5e3f3;font-size:.88rem;line-height:1.6}
-.admin-live-label{display:inline-flex;align-items:center;gap:8px;color:#b9d8ed;font-size:.66rem;font-weight:800;letter-spacing:1.3px}
-.admin-live-label i{width:7px;height:7px;border-radius:50%;background:#56d69a;box-shadow:0 0 0 4px #56d69a25}
-.admin-hero-actions{display:flex;flex-direction:column;align-items:flex-end;gap:12px;flex-shrink:0}
-.admin-role-pill{display:inline-flex;align-items:center;gap:7px;padding:8px 11px;border:1px solid #ffffff38;border-radius:999px;background:#ffffff12;color:#edf6ff;font-size:.76rem;font-weight:700}
-.admin-command-hero .secondary-button{border-color:#ffffff55;background:#ffffff12;color:#fff}
-.admin-command-hero .secondary-button:hover{background:#ffffff20}
-.admin-kpi-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:13px}
-.admin-kpi-card{display:flex;align-items:center;gap:13px;min-width:0;padding:17px 16px;border:1px solid #e3eaf3;border-radius:14px;background:#fff;box-shadow:0 3px 12px rgba(26,48,78,.035)}
-.admin-kpi-icon{display:grid;place-items:center;flex:0 0 43px;width:43px;height:43px;border-radius:12px}
-.admin-kpi-icon svg{width:20px;height:20px}
-.admin-kpi-icon.blue{background:#eaf2ff;color:#3569b4}.admin-kpi-icon.violet{background:#f1edff;color:#7357b8}.admin-kpi-icon.green{background:#e7f7ef;color:#25845b}.admin-kpi-icon.amber{background:#fff4df;color:#a56c18}
-.admin-kpi-card>div{display:flex;flex-direction:column;gap:3px;min-width:0}
-.admin-kpi-card small{color:#8491a4;font-size:.62rem;font-weight:800;letter-spacing:.8px}
-.admin-kpi-card strong{color:#1d3555;font-size:1.55rem;line-height:1.2}
-.admin-kpi-card span:last-child{color:#8491a4;font-size:.72rem}
-.admin-dashboard-main-grid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(290px,.9fr);gap:16px;align-items:start}
-.admin-dashboard-primary,.admin-dashboard-side{display:flex;flex-direction:column;gap:16px;min-width:0}
-.admin-dashboard-panel{min-width:0;padding:19px 20px;border:1px solid #e5ebf3;border-radius:15px;background:#fff;box-shadow:0 3px 12px rgba(26,48,78,.035)}
-.admin-panel-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:17px}
-.admin-panel-heading h3{margin:4px 0 0;color:#203957;font-size:1.02rem}
-.admin-panel-heading p{margin:5px 0 0;color:#8995a7;font-size:.75rem}
-.admin-section-kicker{color:#8998ac;font-size:.61rem;font-weight:850;letter-spacing:1px}
-.admin-text-link{display:inline-flex;align-items:center;gap:4px;padding:5px 0;border:0;background:transparent;color:#3268b0;font-size:.75rem;font-weight:750;white-space:nowrap;cursor:pointer}
-.admin-attendance-content{display:flex;align-items:center;gap:34px;padding:3px 4px 4px}
-.admin-attendance-ring{display:grid;place-items:center;flex:0 0 138px;width:138px;height:138px;border-radius:50%;background:conic-gradient(#2c9a70 var(--attendance-rate),#e9eef5 0);position:relative}
-.admin-attendance-ring:before{content:"";position:absolute;inset:10px;border-radius:50%;background:#fff}
-.admin-attendance-ring>div{position:relative;display:flex;flex-direction:column;align-items:center;gap:2px}
-.admin-attendance-ring strong{color:#203957;font-size:1.75rem;line-height:1.1}
-.admin-attendance-ring small{color:#8794a7;font-size:.72rem}
-.admin-attendance-breakdown{display:flex;flex:1;flex-direction:column;gap:13px}
-.admin-attendance-breakdown>div{display:flex;align-items:center;justify-content:space-between;gap:15px;padding-bottom:10px;border-bottom:1px solid #eff2f6}
-.admin-attendance-breakdown>div:last-child{padding-bottom:0;border:0}
-.admin-attendance-breakdown span{display:flex;align-items:center;gap:8px;color:#64748b;font-size:.78rem}
-.admin-attendance-breakdown strong{color:#263d5c;font-size:.95rem}
-.admin-attendance-breakdown i{width:8px;height:8px;border-radius:50%}
-.present-dot{background:#2c9a70}.absent-dot{background:#d69a43}.class-dot{background:#6f88ae}
-.admin-performance-chart{display:flex;align-items:flex-end;gap:14px;min-height:185px;padding:7px 5px 0;border-bottom:1px solid #e9eef4}
-.admin-performance-column{display:flex;flex:1;flex-direction:column;align-items:center;gap:9px;min-width:0;height:180px;justify-content:flex-end}
-.admin-performance-bar-track{position:relative;display:flex;align-items:flex-end;justify-content:center;width:min(54px,80%);height:145px;border-radius:8px 8px 3px 3px;background:#f1f5fa}
-.admin-performance-bar{width:100%;min-height:4px;border-radius:8px 8px 3px 3px;background:linear-gradient(180deg,#72a5df,#356db7)}
-.admin-performance-bar-track strong{position:absolute;top:-23px;color:#526783;font-size:.7rem}
-.admin-performance-column>span{max-width:100%;overflow:hidden;color:#8491a4;font-size:.67rem;text-align:center;text-overflow:ellipsis;white-space:nowrap}
-.admin-muted-state{padding:22px 8px;color:#8491a4;font-size:.8rem;text-align:center}
-.admin-finance-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
-.admin-finance-grid>div{display:flex;flex-direction:column;gap:6px;min-width:0;padding:12px;border:1px solid #edf1f6;border-radius:10px;background:#fafbfd}
-.admin-finance-grid small{color:#8794a7;font-size:.58rem;font-weight:800;letter-spacing:.55px}
-.admin-finance-grid strong{overflow-wrap:anywhere;color:#203957;font-size:.9rem}
-.admin-finance-progress{height:8px;margin-top:16px;overflow:hidden;border-radius:999px;background:#edf1f6}
-.admin-finance-progress span{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,#2d9b71,#70c5a1)}
-.admin-finance-caption{display:block;margin-top:7px;color:#8794a7;font-size:.68rem}
-.admin-alert-count{display:grid;place-items:center;min-width:25px;height:25px;padding:0 7px;border-radius:999px;background:#fff2dc;color:#a56c18;font-size:.72rem;font-weight:800}
-.admin-alert-item{display:flex;align-items:center;gap:10px;width:100%;padding:12px 0;border:0;border-bottom:1px solid #edf1f5;background:transparent;text-align:left;cursor:pointer}
-.admin-alert-item:last-child{border-bottom:0}
-.admin-alert-item:disabled{cursor:default}
-.admin-alert-symbol{display:grid;place-items:center;flex:0 0 35px;width:35px;height:35px;border-radius:10px}
-.admin-alert-symbol.amber{background:#fff4df;color:#a56c18}.admin-alert-symbol.blue{background:#eaf2ff;color:#3569b4}.admin-alert-symbol.slate{background:#f0f3f7;color:#68788f}
-.admin-alert-item>span:nth-child(2){display:flex;flex:1;flex-direction:column;gap:4px;min-width:0}
-.admin-alert-item strong{color:#30445f;font-size:.77rem}
-.admin-alert-item small{color:#8794a7;font-size:.69rem;line-height:1.45}
-.admin-alert-item>svg{flex-shrink:0;color:#8a9ab0}
-.admin-clear-state{display:flex;flex-direction:column;align-items:center;gap:6px;padding:20px 8px;color:#2e9870;text-align:center}
-.admin-clear-state strong{color:#30445f;font-size:.85rem}
-.admin-clear-state span{color:#8794a7;font-size:.72rem}
-.admin-priority-list{display:flex;flex-direction:column}
-.admin-priority-list button{display:flex;align-items:center;gap:10px;width:100%;padding:11px 0;border:0;border-bottom:1px solid #edf1f5;background:transparent;text-align:left;cursor:pointer}
-.admin-priority-list button:last-child{border-bottom:0}
-.admin-priority-list button>span:first-child{display:grid;place-items:center;flex:0 0 34px;width:34px;height:34px;border-radius:9px;background:#eef4fc;color:#4777b3}
-.admin-priority-list button>span:first-child svg{width:17px;height:17px}
-.admin-priority-list button>span:nth-child(2){display:flex;flex:1;flex-direction:column;gap:3px;min-width:0}
-.admin-priority-list strong{color:#30445f;font-size:.76rem}
-.admin-priority-list small{color:#8794a7;font-size:.66rem;line-height:1.4}
-.admin-priority-list button>svg{color:#8a9ab0;flex-shrink:0}
-.admin-results-status{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.admin-results-status>div{display:flex;flex-direction:column;gap:5px;padding:14px;border:1px solid #e5ebf3;border-radius:12px;background:#f9fbfd}
-.admin-results-status span{color:#8491a4;font-size:.57rem;font-weight:800;letter-spacing:.6px}
-.admin-results-status strong{color:#203957;font-size:1.35rem}
-@media(max-width:1080px){.admin-dashboard-main-grid{grid-template-columns:1fr}.admin-dashboard-side{display:grid;grid-template-columns:1fr 1fr;align-items:start}.admin-results-status{grid-column:1/-1}}
-@media(max-width:760px){.admin-kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-command-hero{align-items:flex-start;flex-direction:column;padding:22px}.admin-hero-actions{align-items:flex-start;flex-direction:row;flex-wrap:wrap}.admin-dashboard-side{display:flex}.admin-attendance-content{gap:20px}}
-@media(max-width:480px){.admin-kpi-grid{grid-template-columns:1fr 1fr;gap:8px}.admin-kpi-card{align-items:flex-start;flex-direction:column;padding:13px}.admin-kpi-card strong{font-size:1.3rem}.admin-dashboard-panel{padding:15px}.admin-finance-grid{grid-template-columns:1fr}.admin-attendance-content{align-items:flex-start;flex-direction:column}.admin-attendance-ring{align-self:center}}
-
-
-/* Secretary — Design 4: office administration and records */
-.secretary-office-dashboard{display:flex;flex-direction:column;gap:17px}
-.secretary-office-hero{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:25px 28px;border:1px solid #e6e0f4;border-radius:17px;background:linear-gradient(115deg,#f1efff,#fbfaff 62%,#f0f5ff)}
-.secretary-office-hero>div:first-child>span,.secretary-office-heading>div>span,.secretary-office-side>span{color:#8574b8;font-size:.64rem;font-weight:850;letter-spacing:1.1px}
-.secretary-office-hero h2{margin:7px 0;color:#332b58;font-size:1.65rem}
-.secretary-office-hero p{max-width:660px;margin:0;color:#77728e;font-size:.84rem;line-height:1.55}
-.secretary-hero-mark{display:flex;flex-direction:column;align-items:center;gap:7px;padding:15px 18px;border:1px solid #ded7f1;border-radius:14px;background:#ffffffa8;color:#7761b3}
-.secretary-hero-mark small{font-size:.58rem;font-weight:850;letter-spacing:.8px}
-.secretary-stat-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
-.secretary-stat-grid>div{display:flex;flex-direction:column;gap:5px;padding:16px;border:1px solid #e7eaf1;border-radius:13px;background:#fff}
-.secretary-stat-grid>div>svg{width:20px;height:20px;margin-bottom:5px;color:#7662b0}
-.secretary-stat-grid small{color:#9290a5;font-size:.61rem;font-weight:850;letter-spacing:.7px}
-.secretary-stat-grid strong{color:#342d57;font-size:1.55rem}
-.secretary-stat-grid span{color:#8b899d;font-size:.7rem}
-.secretary-office-layout{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(260px,.8fr);gap:15px;align-items:start}
-.secretary-office-main,.secretary-office-side{padding:19px;border:1px solid #e7eaf1;border-radius:14px;background:#fff}
-.secretary-office-heading{display:flex;justify-content:space-between;gap:12px;align-items:flex-end;margin-bottom:15px}
-.secretary-office-heading h3,.secretary-office-side h3{margin:5px 0 0;color:#342d57;font-size:1rem}
-.secretary-office-heading>small{color:#89879b;font-size:.68rem}
-.secretary-office-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-.secretary-office-actions button{display:flex;align-items:center;gap:10px;min-width:0;padding:13px;border:1px solid #eceaf3;border-radius:11px;background:#fcfbff;text-align:left;cursor:pointer}
-.secretary-office-actions button:hover{border-color:#c9bee8;background:#f8f6ff}
-.secretary-action-icon{display:grid;place-items:center;flex:0 0 37px;width:37px;height:37px;border-radius:10px}
-.secretary-action-icon svg{width:18px;height:18px}
-.secretary-action-icon.tone-0{background:#eeeaff;color:#755db4}.secretary-action-icon.tone-1{background:#eaf2ff;color:#4778b5}.secretary-action-icon.tone-2{background:#e8f6ef;color:#398563}.secretary-action-icon.tone-3{background:#fff3e5;color:#a97836}
-.secretary-office-actions button>span:nth-child(2){display:flex;flex:1;flex-direction:column;gap:4px;min-width:0}
-.secretary-office-actions strong{color:#40385f;font-size:.78rem}
-.secretary-office-actions small{color:#8a879b;font-size:.67rem;line-height:1.4}
-.secretary-office-actions button>svg{flex-shrink:0;color:#9993b1}
-.secretary-office-side{background:linear-gradient(150deg,#faf9ff,#fff)}
-.secretary-office-side>p{margin:8px 0 13px;color:#858197;font-size:.75rem;line-height:1.55}
-.secretary-check-item{display:flex;align-items:flex-start;gap:10px;padding:12px 0;border-top:1px solid #efedf5}
-.secretary-check-item>svg{width:18px;height:18px;flex-shrink:0;color:#7764b3}
-.secretary-check-item>span{display:flex;flex-direction:column;gap:4px}
-.secretary-check-item strong{color:#433b61;font-size:.76rem}
-.secretary-check-item small{color:#89869a;font-size:.68rem;line-height:1.4}
-
-/* Attendance Officer — Design 5: daily attendance control room */
-.attendance-control-dashboard{display:flex;flex-direction:column;gap:17px}
-.attendance-control-hero{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:25px 28px;border:1px solid #d9ebe3;border-radius:17px;background:linear-gradient(115deg,#eaf7f0,#f9fcfa 65%,#edf5ff)}
-.attendance-control-hero>div:first-child>span,.attendance-control-panel>span,.attendance-followup-panel>span{color:#568c76;font-size:.63rem;font-weight:850;letter-spacing:1px}
-.attendance-control-hero h2{margin:7px 0;color:#234b3b;font-size:1.65rem}
-.attendance-control-hero p{max-width:660px;margin:0;color:#6e897c;font-size:.84rem;line-height:1.55}
-.attendance-today-badge{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:88px;padding:13px;border:1px solid #d3e7dc;border-radius:13px;background:#ffffffa8;color:#36815f}
-.attendance-today-badge strong{color:#315c49;font-size:.86rem}
-.attendance-today-badge small{font-size:.58rem;font-weight:850;letter-spacing:.8px}
-.attendance-overview-grid{display:grid;grid-template-columns:1.45fr repeat(3,minmax(0,1fr));gap:12px}
-.attendance-rate-card,.attendance-count-card{padding:16px;border:1px solid #e2ece7;border-radius:13px;background:#fff}
-.attendance-rate-card>div:first-child>span,.attendance-count-card>small{color:#82958c;font-size:.61rem;font-weight:850;letter-spacing:.75px}
-.attendance-rate-card h3{margin:5px 0 0;color:#287653;font-size:1.8rem}
-.attendance-rate-card p{margin:2px 0 13px;color:#87958e;font-size:.69rem}
-.attendance-rate-track{height:9px;overflow:hidden;border-radius:999px;background:#edf3ef}
-.attendance-rate-track span{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,#27845b,#7dc5a2)}
-.attendance-rate-legend{display:flex;justify-content:space-between;gap:10px;margin-top:12px}
-.attendance-rate-legend span{display:flex;align-items:center;gap:5px;color:#87958e;font-size:.65rem}
-.attendance-rate-legend i{width:7px;height:7px;border-radius:50%;background:#31966b}
-.attendance-rate-legend span:nth-child(2) i{background:#d5a45b}
-.attendance-rate-legend strong{color:#3b594a}
-.attendance-count-card{display:flex;flex-direction:column;align-items:flex-start;gap:5px}
-.attendance-count-icon{display:grid;place-items:center;width:35px;height:35px;margin-bottom:4px;border-radius:10px}
-.attendance-count-icon svg{width:18px;height:18px}
-.attendance-count-icon.green{background:#e8f6ef;color:#36815f}.attendance-count-icon.amber{background:#fff4e2;color:#a87528}.attendance-count-icon.blue{background:#eaf2ff;color:#4778b5}
-.attendance-count-card strong{color:#294d3d;font-size:1.55rem}
-.attendance-count-card>span:last-child{color:#87958e;font-size:.68rem}
-.attendance-control-lower{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(260px,.8fr);gap:14px;align-items:start}
-.attendance-control-panel,.attendance-followup-panel{padding:19px;border:1px solid #e2ece7;border-radius:14px;background:#fff}
-.attendance-control-panel h3,.attendance-followup-panel h3{margin:5px 0 14px;color:#294d3d;font-size:1rem}
-.attendance-control-links{display:flex;flex-direction:column}
-.attendance-control-links button{display:flex;align-items:center;gap:11px;padding:12px 0;border:0;border-bottom:1px solid #edf2ef;background:transparent;text-align:left;cursor:pointer}
-.attendance-control-links button:last-child{border-bottom:0}
-.attendance-control-links button>span:first-child{display:grid;place-items:center;flex:0 0 36px;width:36px;height:36px;border-radius:10px;background:#eaf6ef;color:#38815f}
-.attendance-control-links button>span:first-child svg{width:18px;height:18px}
-.attendance-control-links button>span:nth-child(2){display:flex;flex:1;flex-direction:column;gap:4px}
-.attendance-control-links strong{color:#345746;font-size:.78rem}
-.attendance-control-links small{color:#87958e;font-size:.68rem;line-height:1.4}
-.attendance-control-links button>svg{color:#8da197}
-.attendance-followup-panel{background:linear-gradient(150deg,#f5fbf7,#fff)}
-.attendance-followup-panel>div{padding:13px 0;border-top:1px solid #e8f0eb}
-.attendance-followup-panel>div strong{color:#2d7b56;font-size:1.45rem}
-.attendance-followup-panel>div p{margin:4px 0 0;color:#7e9187;font-size:.72rem;line-height:1.5}
-@media(max-width:1050px){.attendance-overview-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.attendance-rate-card{grid-column:1/-1}.secretary-office-layout,.attendance-control-lower{grid-template-columns:1fr}}
-@media(max-width:760px){.secretary-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.secretary-office-hero,.attendance-control-hero{align-items:flex-start;flex-direction:column}.secretary-office-actions{grid-template-columns:1fr}.attendance-overview-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.attendance-rate-card{grid-column:1/-1}}
-@media(max-width:460px){.secretary-stat-grid{gap:8px}.secretary-stat-grid>div{padding:12px}.attendance-overview-grid{grid-template-columns:1fr}.attendance-rate-card{grid-column:auto}.attendance-rate-legend{flex-direction:column}}
-
-
-/* Director of Studies: academic staffing and programme coordination */
-.dos-responsibility-strip{background:linear-gradient(120deg,#102f4f 0%,#164e63 58%,#0f766e 100%);color:#fff;border-radius:20px;padding:22px 24px;margin:18px 0;overflow:hidden;position:relative}
-.dos-responsibility-heading{display:flex;align-items:center;justify-content:space-between;gap:20px}
-.dos-responsibility-heading .eyebrow{color:#a5f3fc!important;margin:0 0 7px;font-size:10px;font-weight:800;letter-spacing:.13em}
-.dos-responsibility-heading h3{color:#fff;margin:0;font-size:20px}
-.dos-responsibility-heading p:not(.eyebrow){color:#dbeafe;margin:7px 0 0;max-width:650px;font-size:13px}
-.dos-academic-illustration{display:flex;align-items:center;gap:9px;transform:rotate(-5deg);padding:8px 10px;border:1px solid #ffffff35;border-radius:16px;background:#ffffff12}
-.dos-academic-illustration span{width:46px;height:46px;border-radius:13px;background:#ffffff20;display:grid;place-items:center;color:#cffafe}
-.dos-responsibility-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:20px}
-.dos-responsibility-card{display:flex;align-items:center;gap:12px;text-align:left;padding:14px;border:1px solid #ffffff35;border-radius:14px;background:#ffffff12;color:#fff;cursor:pointer;min-width:0;transition:background .18s,transform .18s}
-.dos-responsibility-card:hover{background:#ffffff22;transform:translateY(-2px)}
-.dos-responsibility-card>span:nth-child(2){display:grid;gap:5px;flex:1;min-width:0}
-.dos-responsibility-card strong{font-size:13px;color:#fff}
-.dos-responsibility-card small{font-size:11px;line-height:1.45;color:#dbeafe}
-.dos-responsibility-icon{width:42px;height:42px;flex:0 0 42px;border-radius:12px;display:grid;place-items:center}
-.dos-responsibility-icon.staff{background:#dbeafe;color:#1d4ed8}
-.dos-responsibility-icon.assignment{background:#ede9fe;color:#6d28d9}
-.dos-responsibility-icon.timetable{background:#ccfbf1;color:#0f766e}
-@media(max-width:760px){.dos-responsibility-heading{align-items:flex-start}.dos-academic-illustration{display:none}.dos-responsibility-actions{grid-template-columns:1fr}}
-
-
-/* Six selected SchoolBridge role templates: role colour, sidebar and photographic hero */
-.role-theme-admin{--role-primary:#0752a0;--role-deep:#073b7a;--role-soft:#e8f2ff;--role-accent:#1684e8}
-.role-theme-dos{--role-primary:#07815e;--role-deep:#075b45;--role-soft:#e7f7f0;--role-accent:#13a879}
-.role-theme-finance{--role-primary:#b42345;--role-deep:#7d102d;--role-soft:#fff0f3;--role-accent:#e34c35}
-.role-theme-secretary{--role-primary:#087eaf;--role-deep:#075477;--role-soft:#e7f6fc;--role-accent:#16a6d7}
-.role-theme-attendance{--role-primary:#718400;--role-deep:#4c5b00;--role-soft:#f3f7d9;--role-accent:#a3b817}
-.role-theme-teacher{--role-primary:#7136ad;--role-deep:#4b237e;--role-soft:#f2eaff;--role-accent:#9253d2}
-.role-theme-admin .sidebar,.role-theme-dos .sidebar,.role-theme-finance .sidebar,.role-theme-secretary .sidebar,.role-theme-attendance .sidebar,.role-theme-teacher .sidebar{background:var(--role-deep);border-right:0;color:#fff}
-.role-theme-admin .sidebar .nav-item.active,.role-theme-dos .sidebar .nav-item.active,.role-theme-finance .sidebar .nav-item.active,.role-theme-secretary .sidebar .nav-item.active,.role-theme-attendance .sidebar .nav-item.active,.role-theme-teacher .sidebar .nav-item.active{background:var(--role-primary);color:#fff;box-shadow:inset 3px 0 #fff}
-.role-theme-admin .sidebar .brand-mark,.role-theme-dos .sidebar .brand-mark,.role-theme-finance .sidebar .brand-mark,.role-theme-secretary .sidebar .brand-mark,.role-theme-attendance .sidebar .brand-mark,.role-theme-teacher .sidebar .brand-mark{background:#ffffff1c;color:#fff}
-.role-theme-admin .sidebar .school-label,.role-theme-dos .sidebar .school-label,.role-theme-finance .sidebar .school-label,.role-theme-secretary .sidebar .school-label,.role-theme-attendance .sidebar .school-label,.role-theme-teacher .sidebar .school-label{color:#ffffffa8}
-.role-theme-admin .sidebar .nav-item,.role-theme-dos .sidebar .nav-item,.role-theme-finance .sidebar .nav-item,.role-theme-secretary .sidebar .nav-item,.role-theme-attendance .sidebar .nav-item,.role-theme-teacher .sidebar .nav-item{color:#ffffffdf}
-.role-theme-admin .sidebar .profile-card,.role-theme-dos .sidebar .profile-card,.role-theme-finance .sidebar .profile-card,.role-theme-secretary .sidebar .profile-card,.role-theme-attendance .sidebar .profile-card,.role-theme-teacher .sidebar .profile-card{border-color:#ffffff30}
-.role-theme-admin .admin-command-hero{background-image:linear-gradient(90deg,rgba(7,59,122,.94) 0%,rgba(7,59,122,.72) 48%,rgba(7,59,122,.18) 100%),url('/role-backgrounds/admin.svg');background-size:cover,auto 100%;background-position:center right;border-color:#0a4b8f;min-height:190px}
-.role-theme-dos .dos-hero{background-image:linear-gradient(90deg,rgba(5,91,69,.94) 0%,rgba(5,91,69,.7) 48%,rgba(5,91,69,.18) 100%),url('/role-backgrounds/dos.svg');background-size:cover,auto 100%;background-position:center right;border-color:#087454;min-height:190px}
-.role-theme-dos .dos-responsibility-strip{background:linear-gradient(115deg,#075b45 0%,#087e5a 70%,#0b6b5c 100%)}
-.role-theme-finance .finance-account-dashboard .dashboard-role-heading{background-image:linear-gradient(90deg,rgba(125,16,45,.94) 0%,rgba(125,16,45,.7) 48%,rgba(125,16,45,.18) 100%),url('/role-backgrounds/finance.svg');background-size:cover,auto 100%;background-position:center right;border:0;border-radius:17px;padding:25px 28px;color:#fff;min-height:190px}
-.role-theme-finance .dashboard-role-heading h2,.role-theme-finance .dashboard-role-heading p,.role-theme-finance .dashboard-role-heading .eyebrow{color:#fff}
-.role-theme-finance .dashboard-role-heading .count-pill{background:#ffffff20;border-color:#ffffff55;color:#fff}
-.role-theme-finance .dashboard-role-heading .secondary-button{background:#ffffff18;border-color:#ffffff70;color:#fff}
-.role-theme-secretary .secretary-office-hero{background-image:linear-gradient(90deg,rgba(7,84,119,.92) 0%,rgba(7,84,119,.68) 48%,rgba(7,84,119,.18) 100%),url('/role-backgrounds/secretary.svg');background-size:cover,auto 100%;background-position:center right;border-color:#087eaf;min-height:190px}
-.role-theme-secretary .secretary-office-hero h2,.role-theme-secretary .secretary-office-hero p,.role-theme-secretary .secretary-office-hero>div:first-child>span{color:#fff}
-.role-theme-secretary .secretary-hero-mark{background:#ffffff20;border-color:#ffffff55;color:#fff}
-.role-theme-secretary .secretary-stat-grid>div>svg{color:#087eaf}
-.role-theme-secretary .secretary-stat-grid strong,.role-theme-secretary .secretary-office-heading h3,.role-theme-secretary .secretary-office-side h3{color:#075477}
-.role-theme-attendance .attendance-control-hero{background-image:linear-gradient(90deg,rgba(76,91,0,.92) 0%,rgba(76,91,0,.68) 48%,rgba(76,91,0,.16) 100%),url('/role-backgrounds/attendance.svg');background-size:cover,auto 100%;background-position:center right;border-color:#718400;min-height:190px}
-.role-theme-attendance .attendance-control-hero h2,.role-theme-attendance .attendance-control-hero p,.role-theme-attendance .attendance-control-hero>div:first-child>span{color:#fff}
-.role-theme-attendance .attendance-today-badge{background:#ffffff20;border-color:#ffffff55;color:#fff}
-.role-theme-attendance .attendance-today-badge strong{color:#fff}
-.role-theme-attendance .attendance-rate-card h3{color:#718400}
-.role-theme-attendance .attendance-rate-track span{background:linear-gradient(90deg,#718400,#b4c83c)}
-.role-theme-teacher .teacher-workspace-hero{background-image:linear-gradient(90deg,rgba(75,35,126,.92) 0%,rgba(75,35,126,.87) 48%,rgba(75,35,126,.16) 100%),url('/role-backgrounds/teacher.svg');background-size:cover,auto 100%;background-position:center right;border-color:#7136ad;min-height:190px;color:#fff}
-.role-theme-teacher .teacher-workspace-hero h2,.role-theme-teacher .teacher-workspace-hero p:not(.eyebrow),.role-theme-teacher .teacher-workspace-hero .eyebrow{color:#fff}
-.role-theme-teacher .teacher-workspace-metrics strong,.role-theme-teacher .teacher-class-card svg{color:#7136ad}
-.role-theme-teacher .teacher-class-card{border-color:#e6d9f4;background:#fbf8ff}
-.role-theme-teacher .teacher-tool-icon.blue{background:#f0e8fb;color:#7136ad}
-.role-theme-teacher .teacher-tool-icon.purple{background:#7136ad;color:#fff}
-.role-theme-admin .admin-kpi-icon.blue{background:#e8f2ff;color:#0752a0}
-.role-theme-admin .admin-kpi-icon.violet{background:#f0eaff;color:#7136ad}
-.role-theme-admin .admin-kpi-icon.green{background:#e7f7f0;color:#07815e}
-.role-theme-admin .admin-kpi-icon.orange{background:#fff0e8;color:#e34c35}
-@media(max-width:760px){.role-theme-admin .admin-command-hero,.role-theme-dos .dos-hero,.role-theme-finance .finance-account-dashboard .dashboard-role-heading,.role-theme-secretary .secretary-office-hero,.role-theme-attendance .attendance-control-hero,.role-theme-teacher .teacher-workspace-hero{background-position:center;background-size:cover}}
-
-/* Role artwork: keep the locally bundled illustration visible on every dashboard hero. */
-.role-theme-admin .admin-command-hero,.role-theme-dos .dos-hero,.role-theme-finance .finance-account-dashboard .dashboard-role-heading,.role-theme-secretary .secretary-office-hero,.role-theme-attendance .attendance-control-hero,.role-theme-teacher .teacher-workspace-hero{background-repeat:no-repeat;background-position:center right;background-size:cover,auto 100%;min-height:190px;}
-@media(max-width:760px){.role-theme-admin .admin-command-hero,.role-theme-dos .dos-hero,.role-theme-finance .finance-account-dashboard .dashboard-role-heading,.role-theme-secretary .secretary-office-hero,.role-theme-attendance .attendance-control-hero,.role-theme-teacher .teacher-workspace-hero{background-size:cover,auto 82%;background-position:center right;}}
-
-
-/* SchoolBridge role identity system: colour is carried through the complete workspace. */
-.role-theme-admin{--role-primary:#0752a0;--role-deep:#073b7a;--role-soft:#e8f2ff;--role-accent:#1684e8;--role-page:#f1f6fc}
-.role-theme-dos{--role-primary:#07815e;--role-deep:#075b45;--role-soft:#e7f7f0;--role-accent:#13a879;--role-page:#eff8f4}
-.role-theme-finance{--role-primary:#b42345;--role-deep:#7d102d;--role-soft:#fff0f3;--role-accent:#e34c35;--role-page:#fff5f6}
-.role-theme-secretary{--role-primary:#087eaf;--role-deep:#075477;--role-soft:#e7f6fc;--role-accent:#16a6d7;--role-page:#f0f8fc}
-.role-theme-attendance{--role-primary:#718400;--role-deep:#4c5b00;--role-soft:#f3f7d9;--role-accent:#a3b817;--role-page:#f7f9ed}
-.role-theme-teacher{--role-primary:#7136ad;--role-deep:#4b237e;--role-soft:#f2eaff;--role-accent:#9253d2;--role-page:#f7f3fc}
-.role-theme-admin .main-area,.role-theme-dos .main-area,.role-theme-finance .main-area,.role-theme-secretary .main-area,.role-theme-attendance .main-area,.role-theme-teacher .main-area{background:var(--role-page)}
-.role-theme-admin .topbar,.role-theme-dos .topbar,.role-theme-finance .topbar,.role-theme-secretary .topbar,.role-theme-attendance .topbar,.role-theme-teacher .topbar{background:var(--role-deep);border-bottom:1px solid #ffffff20;color:#fff;box-shadow:0 3px 14px #14233b12}
-.role-theme-admin .breadcrumb,.role-theme-dos .breadcrumb,.role-theme-finance .breadcrumb,.role-theme-secretary .breadcrumb,.role-theme-attendance .breadcrumb,.role-theme-teacher .breadcrumb{color:#ffffffa8}
-.role-theme-admin .breadcrumb span,.role-theme-dos .breadcrumb span,.role-theme-finance .breadcrumb span,.role-theme-secretary .breadcrumb span,.role-theme-attendance .breadcrumb span,.role-theme-teacher .breadcrumb span{color:#ffffff70}
-.role-theme-admin .breadcrumb strong,.role-theme-dos .breadcrumb strong,.role-theme-finance .breadcrumb strong,.role-theme-secretary .breadcrumb strong,.role-theme-attendance .breadcrumb strong,.role-theme-teacher .breadcrumb strong{color:#fff}
-.role-theme-admin .online-status,.role-theme-dos .online-status,.role-theme-finance .online-status,.role-theme-secretary .online-status,.role-theme-attendance .online-status,.role-theme-teacher .online-status{color:#ffffffc7}
-.role-theme-admin .top-avatar,.role-theme-dos .top-avatar,.role-theme-finance .top-avatar,.role-theme-secretary .top-avatar,.role-theme-attendance .top-avatar,.role-theme-teacher .top-avatar{background:#ffffff20;color:#fff;border:1px solid #ffffff38}
-.role-theme-admin .icon-button,.role-theme-dos .icon-button,.role-theme-finance .icon-button,.role-theme-secretary .icon-button,.role-theme-attendance .icon-button,.role-theme-teacher .icon-button,.role-theme-admin .mobile-menu-button,.role-theme-dos .mobile-menu-button,.role-theme-finance .mobile-menu-button,.role-theme-secretary .mobile-menu-button,.role-theme-attendance .mobile-menu-button,.role-theme-teacher .mobile-menu-button{color:#fff}
-.role-theme-admin .sidebar .brand-name,.role-theme-dos .sidebar .brand-name,.role-theme-finance .sidebar .brand-name,.role-theme-secretary .sidebar .brand-name,.role-theme-attendance .sidebar .brand-name,.role-theme-teacher .sidebar .brand-name{color:#fff}
-.role-theme-admin .sidebar .brand-name span,.role-theme-dos .sidebar .brand-name span,.role-theme-finance .sidebar .brand-name span,.role-theme-secretary .sidebar .brand-name span,.role-theme-attendance .sidebar .brand-name span,.role-theme-teacher .sidebar .brand-name span{color:#ffffffb8}
-.role-theme-admin .sidebar .nav-item:hover,.role-theme-dos .sidebar .nav-item:hover,.role-theme-finance .sidebar .nav-item:hover,.role-theme-secretary .sidebar .nav-item:hover,.role-theme-attendance .sidebar .nav-item:hover,.role-theme-teacher .sidebar .nav-item:hover{background:#ffffff16;color:#fff}
-.role-theme-admin .sidebar .active-dot,.role-theme-dos .sidebar .active-dot,.role-theme-finance .sidebar .active-dot,.role-theme-secretary .sidebar .active-dot,.role-theme-attendance .sidebar .active-dot,.role-theme-teacher .sidebar .active-dot{background:#fff}
-.role-theme-admin .stat-card,.role-theme-admin .panel,.role-theme-dos .stat-card,.role-theme-dos .panel,.role-theme-finance .stat-card,.role-theme-finance .panel,.role-theme-secretary .stat-card,.role-theme-secretary .panel,.role-theme-attendance .stat-card,.role-theme-attendance .panel,.role-theme-teacher .stat-card,.role-theme-teacher .panel{border-color:color-mix(in srgb,var(--role-primary) 13%,white);box-shadow:0 5px 18px color-mix(in srgb,var(--role-deep) 7%,transparent)}
-.role-theme-admin .stat-icon,.role-theme-dos .stat-icon,.role-theme-finance .stat-icon,.role-theme-secretary .stat-icon,.role-theme-attendance .stat-icon,.role-theme-teacher .stat-icon{background:var(--role-soft);color:var(--role-primary)}
-.role-theme-admin .text-button,.role-theme-dos .text-button,.role-theme-finance .text-button,.role-theme-secretary .text-button,.role-theme-attendance .text-button,.role-theme-teacher .text-button{color:var(--role-primary)}
-.role-theme-admin .primary-button,.role-theme-dos .primary-button,.role-theme-finance .primary-button,.role-theme-secretary .primary-button,.role-theme-attendance .primary-button,.role-theme-teacher .primary-button{background:var(--role-primary)}
-.role-theme-admin .content .welcome-row h1,.role-theme-dos .content .welcome-row h1,.role-theme-finance .content .welcome-row h1,.role-theme-secretary .content .welcome-row h1,.role-theme-attendance .content .welcome-row h1,.role-theme-teacher .content .welcome-row h1{color:var(--role-deep)}
-.role-theme-admin .date-chip,.role-theme-dos .date-chip,.role-theme-finance .date-chip,.role-theme-secretary .date-chip,.role-theme-attendance .date-chip,.role-theme-teacher .date-chip{border-color:color-mix(in srgb,var(--role-primary) 22%,white)}
-@media(max-width:700px){.role-theme-admin .topbar,.role-theme-dos .topbar,.role-theme-finance .topbar,.role-theme-secretary .topbar,.role-theme-attendance .topbar,.role-theme-teacher .topbar{background:var(--role-deep)}}
-
-
-/* Reference-led role dashboards: compact branded shell, photographic-style hero panels,
-   colour-coded KPI cards and role-specific lower workspaces. */
-.content{max-width:none;padding:18px 20px 22px}
-.sidebar{width:180px;padding:15px 11px 14px}
-.sidebar-brand{gap:8px;padding:0 6px 20px}
-.sidebar-brand .brand-mark{width:36px;height:36px;border-radius:10px}
-.sidebar-brand .brand-name{font-size:17px}
-.school-label{font-size:9px;padding:0 9px 10px}
-.sidebar nav{gap:4px}
-.nav-item{min-height:38px;padding:9px 10px;gap:9px;font-size:12px;border-radius:8px}
-.nav-item svg{width:16px;height:16px}
-.profile-card{padding-top:13px;gap:8px}
-.avatar{width:30px;height:30px}
-.profile-info strong{font-size:11px}
-.profile-info small{font-size:10px}
-.topbar{height:58px;padding:0 20px}
-.top-actions{gap:12px}
-.topbar .secondary-button{min-height:34px;padding:7px 10px;font-size:11px}
-.content>.welcome-row{margin-bottom:16px}
-.role-theme-admin .content,.role-theme-dos .content,.role-theme-finance .content,.role-theme-secretary .content,.role-theme-attendance .content,.role-theme-teacher .content{background:var(--role-page)}
-.role-theme-admin .panel,.role-theme-dos .panel,.role-theme-finance .panel,.role-theme-secretary .panel,.role-theme-attendance .panel,.role-theme-teacher .panel{border-radius:11px}
-
-/* Shared hero proportions and readable copy. */
-.role-theme-admin .admin-command-hero,.role-theme-dos .dos-hero,
-.role-theme-finance .finance-account-dashboard .dashboard-role-heading,
-.role-theme-secretary .secretary-office-hero,.role-theme-attendance .attendance-control-hero,
-.role-theme-teacher .teacher-workspace-hero{
- min-height:122px!important;height:auto;padding:17px 20px;border-radius:12px;
- display:flex;align-items:center;justify-content:space-between;gap:16px;
- background-repeat:no-repeat;background-position:center right;background-size:cover,auto 100%;
- box-shadow:0 4px 13px rgba(16,35,65,.08);overflow:hidden
-}
-.role-theme-admin .admin-command-hero h2,.role-theme-dos .dos-hero h2,
-.role-theme-finance .dashboard-role-heading h2,.role-theme-secretary .secretary-office-hero h2,
-.role-theme-attendance .attendance-control-hero h2,.role-theme-teacher .teacher-workspace-hero h2{
- font-size:22px;line-height:1.2;letter-spacing:-.45px;margin:3px 0 6px
-}
-.role-theme-admin .admin-command-hero p:not(.eyebrow),.role-theme-dos .dos-hero p:not(.eyebrow),
-.role-theme-finance .dashboard-role-heading p:not(.eyebrow),.role-theme-secretary .secretary-office-hero p,
-.role-theme-attendance .attendance-control-hero p,.role-theme-teacher .teacher-workspace-hero p:not(.eyebrow){
- font-size:13px;line-height:1.45;max-width:620px;margin:0
-}
-.role-theme-admin .admin-live-label,.role-theme-dos .dos-hero .eyebrow,
-.role-theme-finance .dashboard-role-heading .eyebrow,.role-theme-secretary .secretary-office-hero>div:first-child>span,
-.role-theme-attendance .attendance-control-hero>div:first-child>span,.role-theme-teacher .teacher-workspace-hero .eyebrow{
- font-size:9px;letter-spacing:.12em;font-weight:800
-}
-.role-theme-admin .admin-hero-actions,.role-theme-dos .dos-hero-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
-.role-theme-admin .admin-hero-actions .secondary-button,.role-theme-dos .dos-hero-actions .secondary-button,
-.role-theme-finance .dashboard-role-heading .secondary-button,.role-theme-teacher .teacher-workspace-hero .secondary-button{
- background:#ffffffed;color:var(--role-deep);border-color:#ffffffb0
-}
-
-/* Administrator: executive metrics followed by an analytical two-column workspace. */
-.role-theme-admin .admin-kpi-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:12px 0}
-.role-theme-admin .admin-kpi-card{min-height:68px;padding:12px 13px;border-radius:10px;border-color:#dce8f8;box-shadow:0 3px 10px #0b39750b}
-.role-theme-admin .admin-kpi-icon{width:36px;height:36px;border-radius:9px}
-.role-theme-admin .admin-kpi-card small{font-size:9px;letter-spacing:.04em}
-.role-theme-admin .admin-kpi-card strong{font-size:21px}
-.role-theme-admin .admin-dashboard-main-grid{grid-template-columns:minmax(0,1.55fr) minmax(250px,.9fr);gap:12px}
-.role-theme-admin .admin-dashboard-primary,.role-theme-admin .admin-dashboard-side{gap:12px}
-.role-theme-admin .admin-dashboard-panel{padding:15px;border-radius:11px}
-.role-theme-admin .admin-panel-heading{margin-bottom:12px}
-.role-theme-admin .admin-panel-heading h3{font-size:15px}
-.role-theme-admin .admin-section-kicker{font-size:9px}
-.role-theme-admin .admin-priority-list button{padding:9px 7px;gap:9px}
-.role-theme-admin .admin-priority-list button strong{font-size:11px}
-.role-theme-admin .admin-priority-list button small{font-size:10px}
-
-/* Director of Studies: three prominent academic control actions below the hero. */
-.role-theme-dos .dos-responsibility-strip{margin:12px 0;background:transparent!important;border:0;box-shadow:none;padding:0}
-.role-theme-dos .dos-responsibility-heading{display:none}
-.role-theme-dos .dos-responsibility-actions{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:0}
-.role-theme-dos .dos-responsibility-card{min-height:68px;padding:13px;border:0;border-radius:10px;box-shadow:0 4px 12px #064e3b14}
-.role-theme-dos .dos-responsibility-card:nth-child(1){background:#079b5a}
-.role-theme-dos .dos-responsibility-card:nth-child(2){background:#0865e8}
-.role-theme-dos .dos-responsibility-card:nth-child(3){background:#792bda}
-.role-theme-dos .dos-responsibility-card strong{color:#fff;font-size:13px}
-.role-theme-dos .dos-responsibility-card small{color:#ffffffd9;font-size:10px}
-.role-theme-dos .dos-responsibility-card>svg{color:#fff}
-.role-theme-dos .dos-responsibility-icon{background:#ffffff20!important;color:#fff!important}
-.role-theme-dos .dos-metric-strip{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:12px 0}
-.role-theme-dos .dos-metric{padding:12px;border-radius:10px}
-.role-theme-dos .dos-management-grid{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:12px}
-.role-theme-dos .dos-results-panel,.role-theme-dos .dos-priority-panel{padding:15px;border-radius:11px}
-.role-theme-dos .dos-oversight-list{gap:7px}
-.role-theme-dos .dos-oversight-item{padding:9px;border-radius:9px}
-
-/* Bursar: burgundy finance identity with clear monetary cards and finance shortcuts. */
-.role-theme-finance .role-dashboard-stats{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:12px 0}
-.role-theme-finance .role-dashboard-stats .stat-card{padding:13px;border-radius:10px}
-.role-theme-finance .role-dashboard-stats .stat-value{font-size:19px;overflow-wrap:anywhere}
-.role-theme-finance .role-dashboard-stats .stat-top{font-size:10px}
-.role-theme-finance .role-dashboard-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-.role-theme-finance .role-dashboard-actions .quick-action{border:1px solid #f1d9df;border-radius:10px;background:#fff;padding:13px}
-.role-theme-finance .role-dashboard-actions .quick-action strong{color:#7d102d}
-.role-theme-finance .role-dashboard-actions .quick-action small{font-size:11px}
-
-/* Secretary: blue records office with compact indicators and correspondence-like action rows. */
-.role-theme-secretary .secretary-stat-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:12px 0}
-.role-theme-secretary .secretary-stat-grid>div{padding:13px;border-radius:10px;min-height:70px}
-.role-theme-secretary .secretary-stat-grid>div>svg{width:22px;height:22px}
-.role-theme-secretary .secretary-stat-grid strong{font-size:20px}
-.role-theme-secretary .secretary-office-layout{grid-template-columns:minmax(0,1.5fr) minmax(230px,.85fr);gap:12px}
-.role-theme-secretary .secretary-office-main,.role-theme-secretary .secretary-office-side{padding:15px;border-radius:11px}
-.role-theme-secretary .secretary-office-actions{gap:7px}
-.role-theme-secretary .secretary-office-actions>button{padding:10px;border-radius:9px}
-.role-theme-secretary .secretary-office-actions>button strong{font-size:12px}
-.role-theme-secretary .secretary-office-actions>button small{font-size:10px}
-
-/* Attendance: olive control room with four readable attendance indicators and trend/follow-up panels. */
-.role-theme-attendance .attendance-overview-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:12px 0}
-.role-theme-attendance .attendance-rate-card,.role-theme-attendance .attendance-count-card{min-height:88px;padding:13px;border-radius:10px}
-.role-theme-attendance .attendance-rate-card h3{font-size:25px}
-.role-theme-attendance .attendance-count-card strong{font-size:22px}
-.role-theme-attendance .attendance-control-lower{grid-template-columns:minmax(0,1.4fr) minmax(230px,.9fr);gap:12px}
-.role-theme-attendance .attendance-control-panel,.role-theme-attendance .attendance-followup-panel{padding:15px;border-radius:11px}
-.role-theme-attendance .attendance-control-links{gap:7px}
-.role-theme-attendance .attendance-control-links button{padding:10px;border-radius:9px}
-.role-theme-attendance .attendance-control-links button strong{font-size:12px}
-.role-theme-attendance .attendance-control-links button small{font-size:10px}
-
-/* Teacher and Headteacher: purple teaching workspace, class list and teaching tools. */
-.role-theme-teacher .teacher-workspace-metrics{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0}
-.role-theme-teacher .teacher-workspace-metrics>div{padding:13px;border-radius:10px}
-.role-theme-teacher .teacher-workspace-metrics strong{font-size:22px}
-.role-theme-teacher .teacher-workspace-layout{grid-template-columns:minmax(0,1.35fr) minmax(240px,.9fr);gap:12px}
-.role-theme-teacher .teacher-workspace-layout>.panel,.role-theme-teacher .teacher-tools-panel{padding:15px;border-radius:11px}
-.role-theme-teacher .teacher-class-card{padding:10px;border-radius:9px}
-.role-theme-teacher .teacher-tool-link{padding:10px;border-radius:9px}
-.role-theme-teacher .teacher-tool-link strong{font-size:12px}
-.role-theme-teacher .teacher-tool-link small{font-size:10px;line-height:1.4}
-
-/* Responsive layout keeps the same role hierarchy without horizontal overflow. */
-@media(max-width:1050px){
- .sidebar{width:190px}
- .role-theme-admin .admin-dashboard-main-grid,.role-theme-dos .dos-management-grid,
- .role-theme-secretary .secretary-office-layout,.role-theme-attendance .attendance-control-lower,
- .role-theme-teacher .teacher-workspace-layout{grid-template-columns:1fr}
-}
-@media(max-width:760px){
- .content{padding:14px 12px}
- .sidebar{width:270px}
- .role-theme-admin .admin-kpi-grid,.role-theme-dos .dos-metric-strip,
- .role-theme-finance .role-dashboard-stats,.role-theme-secretary .secretary-stat-grid,
- .role-theme-attendance .attendance-overview-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
- .role-theme-dos .dos-responsibility-actions{grid-template-columns:1fr}
- .role-theme-admin .admin-command-hero,.role-theme-dos .dos-hero,
- .role-theme-finance .finance-account-dashboard .dashboard-role-heading,
- .role-theme-secretary .secretary-office-hero,.role-theme-attendance .attendance-control-hero,
- .role-theme-teacher .teacher-workspace-hero{min-height:112px!important;padding:14px}
- .role-theme-admin .admin-command-hero h2,.role-theme-dos .dos-hero h2,
- .role-theme-finance .dashboard-role-heading h2,.role-theme-secretary .secretary-office-hero h2,
- .role-theme-attendance .attendance-control-hero h2,.role-theme-teacher .teacher-workspace-hero h2{font-size:19px}
- .role-theme-teacher .teacher-workspace-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
-}
-@media(max-width:480px){
- .role-theme-finance .role-dashboard-actions{grid-template-columns:1fr}
- .role-theme-attendance .attendance-overview-grid{grid-template-columns:1fr 1fr}
- .role-theme-teacher .teacher-workspace-metrics{grid-template-columns:1fr 1fr}
-}
-
-
-/* Bring DOS-style colourful, icon-led shortcut cards to every other role dashboard.
-   Each dashboard keeps its own actions and role identity; only the shortcut presentation is shared. */
-.admin-priority-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
-.admin-priority-list button{min-width:0;padding:12px;border:1px solid #e5ebf4;border-radius:12px;background:#fbfdff;transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}
-.admin-priority-list button:hover{transform:translateY(-2px);border-color:#b8cce5;box-shadow:0 8px 18px #173b6412}
-.admin-priority-list button>span:first-child{width:40px;height:40px;flex-basis:40px;border-radius:11px;background:#e6f0ff;color:#1755a0}
-.admin-priority-list button:nth-child(4n+2)>span:first-child{background:#f0eaff;color:#7044a8}
-.admin-priority-list button:nth-child(4n+3)>span:first-child{background:#e4f7ef;color:#16845c}
-.admin-priority-list button:nth-child(4n)>span:first-child{background:#fff2df;color:#a66a16}
-.admin-priority-list strong{font-size:.78rem}
-.secretary-office-actions button{min-height:76px;background:#fff;border-color:#e5eaf2;box-shadow:0 2px 7px #263d5c08;transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}
-.secretary-office-actions button:hover{transform:translateY(-2px);border-color:#b9d6e8;box-shadow:0 8px 18px #15547712;background:#fafdff}
-.secretary-action-icon{width:42px;height:42px;flex-basis:42px;border-radius:12px}
-.attendance-control-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
-.attendance-control-links button{min-width:0;padding:12px;border:1px solid #e2eee7;border-radius:12px;background:#fbfefc;transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}
-.attendance-control-links button:hover{transform:translateY(-2px);border-color:#b9d9c8;box-shadow:0 8px 18px #245c4012}
-.attendance-control-links button>span:first-child{width:42px;height:42px;flex-basis:42px;border-radius:12px;background:#e5f5eb;color:#26764e}
-.attendance-control-links button:nth-child(4n+2)>span:first-child{background:#edf1ff;color:#4b61b5}
-.attendance-control-links button:nth-child(4n+3)>span:first-child{background:#fff2df;color:#a66a16}
-.attendance-control-links button:nth-child(4n)>span:first-child{background:#f2eaff;color:#7446a8}
-.teacher-tool-link{min-height:70px;padding:10px;border:1px solid #e7eaf1;border-radius:12px;background:#fff}
-.teacher-tool-link:hover{border-color:#c8b5e4;background:#fcfaff}
-.teacher-tool-icon{width:42px;height:42px;flex-basis:42px;border-radius:12px}
-.teacher-tool-list{display:grid;gap:9px}
-.leadership-shortcut{min-height:76px;background:#fff;box-shadow:0 2px 8px #20345108;transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}
-.leadership-shortcut:hover{transform:translateY(-2px);box-shadow:0 8px 18px #20345112}
-.leadership-shortcut .quick-icon{width:42px;height:42px;border-radius:12px}
-.role-dashboard-actions .quick-action{min-height:72px;padding:12px;border:1px solid #e5eaf2;border-radius:12px;background:#fff;transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}
-.role-dashboard-actions .quick-action:hover{transform:translateY(-2px);border-color:#c7d5e8;box-shadow:0 8px 18px #20345112}
-.role-dashboard-actions .quick-icon{width:42px;height:42px;border-radius:12px}
-.command-action-card{min-height:82px;box-shadow:0 2px 8px #20345108}
-.command-action-card:hover{transform:translateY(-2px);box-shadow:0 8px 18px #20345112}
-.command-action-icon{width:44px;height:44px;flex-basis:44px;border-radius:12px}
-@media(max-width:640px){
- .admin-priority-list,.attendance-control-links{grid-template-columns:1fr}
-}
-
-
-/* Personal Overview shortcuts: added by holding a sidebar destination for five seconds. */
-.overview-custom-shortcuts{margin-top:16px;padding:17px;border:1px solid #e4eaf2;border-radius:13px;background:#fff}
-.overview-custom-shortcuts .panel-heading{margin-bottom:13px}
-.overview-custom-shortcuts .panel-heading h2{font-size:16px;margin:0 0 4px}
-.overview-custom-shortcuts .panel-heading p{font-size:11px;color:#718096;margin:0}
-.shortcut-count{font-size:11px;font-weight:700;color:#52647a;background:#f0f4f8;padding:6px 10px;border-radius:20px;white-space:nowrap}
-.overview-shortcut-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:10px}
-.overview-shortcut-card{position:relative;min-width:0;border:1px solid #e7edf4;border-radius:11px;background:#fbfdff;transition:transform .18s ease,box-shadow .18s ease}
-.overview-shortcut-card:hover{transform:translateY(-2px);box-shadow:0 7px 17px #20345112}
-.overview-shortcut-open{width:100%;min-height:68px;display:flex;align-items:center;gap:10px;padding:11px 34px 11px 11px;border:0;background:transparent;text-align:left;color:#26364b;cursor:pointer}
-.overview-shortcut-open strong{font-size:12px;flex:1}
-.overview-shortcut-icon{width:38px;height:38px;flex:0 0 38px;display:grid;place-items:center;border-radius:10px;background:#e8f1ff;color:#245a9b}
-.overview-shortcut-icon.tone-1{background:#f0eaff;color:#7044a8}
-.overview-shortcut-icon.tone-2{background:#e4f7ef;color:#16845c}
-.overview-shortcut-icon.tone-3{background:#fff2df;color:#a66a16}
-.overview-shortcut-remove{position:absolute;right:7px;top:7px;width:22px;height:22px;display:grid;place-items:center;border:0;border-radius:6px;background:#f1f4f8;color:#718096;cursor:pointer}
-.overview-shortcut-remove:hover{background:#fee8e8;color:#b42318}
-.overview-shortcut-empty{display:flex;align-items:center;gap:9px;padding:13px;border:1px dashed #d6e0eb;border-radius:10px;color:#758398;font-size:12px}
-@media(max-width:640px){.overview-shortcut-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.overview-custom-shortcuts{padding:13px}}
+import os
+import json
+import re
+import secrets
+import smtplib
+from email.message import EmailMessage
+from datetime import date, datetime, time
+from zoneinfo import ZoneInfo
+from uuid import uuid4
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from starlette.background import BackgroundTask
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy import update, func, or_
+
+from .database import DATABASE_URL, Base, engine, get_db, SessionLocal
+from .migrations import upgrade_database
+from . import models
+
+from dotenv import load_dotenv
+import jwt
+from datetime import timedelta, timezone
+from pwdlib import PasswordHash
+from jwt.exceptions import InvalidTokenError
+from fastapi import Request
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+
+load_dotenv()
+password_hash = PasswordHash.recommended()
+JWT_SECRET = os.environ["SCHOOLBRIDGE_SECRET_KEY"]
+JWT_ALGORITHM = "HS256"
+TOKEN_HOURS = 8
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+
+
+def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
+):
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        user_id = int(payload["sub"])
+    except (InvalidTokenError, ValueError, KeyError, TypeError):
+        raise HTTPException(401, "Invalid or expired login token.")
+    user = db.get(models.User, user_id)
+    if not user or not user.is_active:
+        raise HTTPException(401, "Account is unavailable.")
+    return user
+
+
+PERMISSION_SECTIONS = {
+    "Overview", "Students", "Staff", "Fees & Finance", "Examinations",
+    "Attendance", "Staff Attendance", "Timetable", "Leadership & Duty",
+    "Parent Access", "Parent Liaison", "Announcements", "Reports", "Settings",
+    "My Classes", "My Attendance", "My Results",
+}
+PERMISSION_ACTIONS = {"view", "add", "edit", "delete", "approve", "print"}
+ADMIN_ONLY_PATHS = {
+    "/api/auth/users", "/api/auth/teachers", "/api/auth/permissions",
+    "/api/backups/restore",
+}
+
+
+def user_permissions(user):
+    if user.role == "admin":
+        return {section: set(PERMISSION_ACTIONS) for section in PERMISSION_SECTIONS}
+    try:
+        raw = json.loads(user.permissions_json or "{}")
+    except (TypeError, ValueError):
+        raw = {}
+    clean = {}
+    if isinstance(raw, dict):
+        for section, actions in raw.items():
+            if section in PERMISSION_SECTIONS and isinstance(actions, list):
+                clean[section] = set(actions) & PERMISSION_ACTIONS
+    if user.role == "teacher" and not clean:
+        clean = {
+            "Overview": {"view"}, "My Classes": {"view"},
+            "My Attendance": {"view"}, "My Results": {"view", "add", "edit"},
+            "Announcements": {"view"}, "Parent Liaison": {"view", "add", "edit"},
+        }
+    # DOS and designated academic officers manage the school-wide timetable.
+    if (user.role_label or "").strip().lower() in {
+        "academic administrator", "academics administrator", "academics officer",
+        "director of studies", "dos", "deputy director of studies",
+    }:
+        clean.setdefault("Timetable", set()).update({"view", "add", "edit", "delete"})
+    # Academic officers are responsible for reviewing and approving submitted marks.
+    if (user.role_label or "").strip().lower() in {
+        "academic administrator", "academics administrator", "academics officer",
+        "director of studies", "dos", "deputy director of studies",
+    }:
+        clean.setdefault("Examinations", set()).update({"view", "approve"})
+    return clean
+
+
+def permission_for_path(path: str):
+    if path.startswith(("/api/teacher/my-assignments", "/api/teacher/my-class-teacher-assignments", "/api/teacher/students")): return "My Classes"
+    if path.startswith("/api/teacher/my-staff-attendance"): return "My Attendance"
+    if path.startswith("/api/teacher/attendance"): return "Attendance"
+    if path.startswith(("/api/teacher/marks", "/api/teacher/exams", "/api/teacher/result-status")): return "My Results"
+    if path.startswith("/api/students"): return "Students"
+    if path.startswith(("/api/staff", "/api/teacher-assignments", "/api/class-teacher-assignments")): return "Staff"
+    if path.startswith(("/api/finance", "/api/fees", "/api/salary", "/api/expenses")): return "Fees & Finance"
+    if path.startswith(("/api/exams", "/api/marks", "/api/grades", "/api/subjects", "/api/grading-scale")): return "Examinations"
+    if path.startswith("/api/attendance"): return "Attendance"
+    if path.startswith("/api/staff-attendance"): return "Staff Attendance"
+    if path.startswith("/api/timetable"): return "Timetable"
+    if path.startswith(("/api/leadership", "/api/prefects", "/api/teacher-duties")): return "Leadership & Duty"
+    if path.startswith("/api/parent-accounts"): return "Parent Access"
+    if path.startswith("/api/parent-liaison"): return "Parent Liaison"
+    if path.startswith("/api/announcements"): return "Announcements"
+    if path.startswith("/api/reports"): return "Reports"
+    if path.startswith(("/api/settings", "/api/backups", "/api/audit-logs")): return "Settings"
+    if path.startswith("/api/dashboard"): return "Overview"
+    if path.startswith("/api/classes"): return "Students"
+    return None
+
+
+def is_assigned_class_teacher(db: Session, teacher_id: int, class_id: int) -> bool:
+    return db.query(models.ClassTeacherAssignment.id).filter_by(
+        teacher_id=teacher_id, class_id=class_id
+    ).first() is not None
+
+
+def require_class_attendance_access(db: Session, user, class_id: int, action: str = "view"):
+    if user.role == "admin":
+        return
+    if user.role == "teacher":
+        if not is_assigned_class_teacher(db, user.id, class_id):
+            raise HTTPException(403, "Only the teacher assigned as this class teacher may manage its attendance.")
+        return
+    if action not in user_permissions(user).get("Attendance", set()):
+        raise HTTPException(403, "You do not have permission to access class attendance.")
+
+
+def action_for_method(method: str, path: str = ""):
+    if path.endswith("/archive") and method == "POST":
+        return "delete"
+    if method in {"PATCH", "PUT"} and (path.endswith("/verification") or "/approve" in path):
+        return "approve"
+    return {"GET": "view", "POST": "add", "PUT": "edit", "PATCH": "edit", "DELETE": "delete"}.get(method, "view")
+
+
+def require_admin(request: Request, user=Depends(get_current_user)):
+    path = request.url.path
+    if user.role == "admin":
+        return user
+    if path in ADMIN_ONLY_PATHS or path.startswith("/api/auth/"):
+        raise HTTPException(403, "Administrator permission required.")
+    section = permission_for_path(path)
+    action = action_for_method(request.method, path)
+    if not section or action not in user_permissions(user).get(section, set()):
+        raise HTTPException(403, "You do not have permission to perform this action.")
+    return user
+
+
+def is_academic_officer(user) -> bool:
+    label = (user.role_label or "").strip().lower()
+    return user.role == "admin" or label in {
+        "academic administrator", "academics administrator", "academics officer",
+        "director of studies", "dos", "deputy director of studies",
+    }
+
+
+def require_timetable_editor(request: Request, user=Depends(get_current_user)):
+    if user.role == "admin":
+        return user
+    action = action_for_method(request.method, request.url.path)
+    if not is_academic_officer(user) or action not in user_permissions(user).get("Timetable", set()):
+        raise HTTPException(403, "Only the Academics Administrator or a designated academic officer may change the timetable.")
+    return user
+
+
+def apply_pending_database_restore():
+    """Apply a validated restore before SQLAlchemy opens the database at startup."""
+    import os, sqlite3
+    if engine.dialect.name != "sqlite":
+        return
+    db_path = engine.url.database
+    if not db_path or db_path == ":memory:":
+        return
+    absolute_path = os.path.abspath(db_path)
+    pending_path = absolute_path + ".restore_pending"
+    if not os.path.exists(pending_path):
+        return
+    if os.path.exists(absolute_path):
+        safety_path = absolute_path + ".before_restore_" + str(int(datetime.now().timestamp())) + ".bak"
+        current = sqlite3.connect(absolute_path)
+        safety = sqlite3.connect(safety_path)
+        try:
+            current.backup(safety)
+        finally:
+            safety.close()
+            current.close()
+    os.replace(pending_path, absolute_path)
+
+
+apply_pending_database_restore()
+upgrade_database(DATABASE_URL)
+
+
+def seed_demo_data_if_empty():
+    """Populate a fresh preview database with clearly labelled demo records."""
+    if os.getenv("SCHOOLBRIDGE_SEED_DEMO_DATA", "true").lower() not in {"1", "true", "yes"}:
+        return
+    db = SessionLocal()
+    try:
+        profile = db.get(models.SchoolProfile, 1)
+        if profile is None:
+            profile = models.SchoolProfile(id=1, name="SchoolBridge Demo School", school_type="Secondary")
+            db.add(profile)
+            db.flush()
+        school_type = profile.school_type or "Secondary"
+
+        classes = db.query(models.SchoolClass).all()
+        if not classes:
+            class_names = [f"S{i}" for i in range(1, 7)] if school_type == "Secondary" else [f"P{i}" for i in range(1, 8)]
+            classes = [models.SchoolClass(name=name, section="") for name in class_names]
+            db.add_all(classes)
+            db.flush()
+
+        existing_subjects = {
+            item.name.lower()
+            for item in db.query(models.Subject).filter(models.Subject.school_type == school_type).all()
+        }
+        subject_names = (
+            ["Mathematics", "English", "Biology", "Chemistry", "Physics", "Geography", "History", "Christian Religious Education"]
+            if school_type == "Secondary"
+            else ["English", "Mathematics", "Science", "Social Studies", "Literacy", "Religious Education"]
+        )
+        for name in subject_names:
+            if name.lower() not in existing_subjects:
+                db.add(models.Subject(name=name, school_type=school_type))
+
+        class_by_name = {item.name.upper(): item for item in classes}
+        existing_demo_admissions = {
+            row.admission_number for row in db.query(models.Student.admission_number).filter(
+                models.Student.admission_number.like(f"DEMO-{date.today().year}-%")
+            ).all()
+        }
+        first_names = [
+            "Amina", "Brian", "Carol", "Daniel", "Esther", "Farid", "Grace", "Henry",
+            "Irene", "James", "Kevin", "Lydia", "Moses", "Nadia", "Oscar", "Patricia",
+            "Quincy", "Ruth", "Samuel", "Tina", "Umar", "Vanessa", "William", "Xavier",
+            "Yasmin", "Zach", "Andrew", "Bella", "Charles", "Diana"
+        ]
+        last_names = [
+            "Demo", "Sample", "Test", "Preview", "Nabirye", "Okello", "Namutebi", "Kato",
+            "Akena", "Atim", "Mugisha", "Nansubuga", "Ssemanda", "Auma", "Tumusiime"
+        ]
+        class_names = (
+            [f"S{i}" for i in range(1, 7)] if school_type == "Secondary"
+            else [f"P{i}" for i in range(1, 8)]
+        )
+        for index in range(1, 31):
+            admission_number = f"DEMO-{date.today().year}-{index:03d}"
+            if admission_number in existing_demo_admissions:
+                continue
+            class_name = class_names[(index - 1) % len(class_names)]
+            selected = class_by_name.get(class_name.upper())
+            if not selected:
+                continue
+            level = None
+            combination = None
+            if school_type == "Secondary":
+                level = "A-Level" if class_name in {"S5", "S6"} else "O-Level"
+                if level == "A-Level":
+                    combination = "Sciences — PCB"
+            first = first_names[index - 1]
+            last = last_names[(index - 1) % len(last_names)]
+            gender = "Female" if index % 2 else "Male"
+            db.add(models.Student(
+                admission_number=admission_number,
+                first_name=first,
+                last_name=last,
+                gender=gender,
+                guardian_name=f"{first} Demo Guardian",
+                guardian_relationship="Parent",
+                guardian_phone="0000000000",
+                previous_school="Demo Primary School",
+                admission_date=date.today(),
+                class_id=selected.id,
+                academic_level=level,
+                combination=combination,
+            ))
+
+        if db.query(models.StaffMember).count() == 0:
+            db.add_all([
+                models.StaffMember(staff_number="DEMO-ST-001", first_name="Peter", last_name="Teacher", category="Teaching", position="Class Teacher", department="Academics", status="active"),
+                models.StaffMember(staff_number="DEMO-ST-002", first_name="Sarah", last_name="Instructor", category="Teaching", position="Subject Teacher", department="Sciences", status="active"),
+                models.StaffMember(staff_number="DEMO-ST-003", first_name="David", last_name="Accounts", category="Non-Teaching", position="Accounts Assistant", department="Finance", status="active"),
+            ])
+        db.flush()
+
+        demo_students = db.query(models.Student).filter(
+            models.Student.admission_number.like("DEMO-%")
+        ).all()
+        demo_classes = db.query(models.SchoolClass).all()
+        current_year = date.today().year
+        active_term = "Term 1"
+
+
+        # Demo class fees and student charges (UGX), without touching real records.
+        demo_class_ids = {student.class_id for student in demo_students if student.class_id is not None}
+        # A realistic Monday-Friday demo timetable for classes containing demo learners.
+        demo_teachers = db.query(models.StaffMember).filter(
+            models.StaffMember.category == "Teaching",
+            models.StaffMember.status == "active"
+        ).order_by(models.StaffMember.id).all()
+        timetable_subjects = demo_subjects_for_school = db.query(models.Subject).filter(
+            models.Subject.school_type == school_type
+        ).order_by(models.Subject.id).all()
+        lesson_slots = [
+            ("08:00", "08:40"), ("08:40", "09:20"),
+            ("09:40", "10:20"), ("10:20", "11:00"),
+            ("11:40", "12:20"),
+        ]
+        for school_class in demo_classes:
+            if school_class.id not in demo_class_ids:
+                continue
+            for day in range(1, 6):
+                for period, (start_time, end_time) in enumerate(lesson_slots):
+                    exists = db.query(models.TimetableEntry).filter_by(
+                        class_id=school_class.id,
+                        day_of_week=day,
+                        start_time=start_time,
+                    ).first()
+                    if exists:
+                        continue
+                    subject = timetable_subjects[(day * 2 + period) % len(timetable_subjects)] if timetable_subjects else None
+                    teacher = demo_teachers[(day + period) % len(demo_teachers)] if demo_teachers else None
+                    db.add(models.TimetableEntry(
+                        class_id=school_class.id,
+                        subject_id=subject.id if subject else None,
+                        staff_id=teacher.id if teacher else None,
+                        day_of_week=day,
+                        start_time=start_time,
+                        end_time=end_time,
+                        room="Room " + str(((school_class.id + period) % 6) + 1),
+                    ))
+        db.flush()
+        for school_class in demo_classes:
+            if school_class.id not in demo_class_ids:
+                continue
+            class_fee = db.query(models.ClassFee).filter_by(
+                class_id=school_class.id, term=active_term, year=current_year
+            ).first()
+            if class_fee is None:
+                class_fee = models.ClassFee(
+                    class_id=school_class.id, term=active_term,
+                    year=current_year, amount=650000
+                )
+                db.add(class_fee)
+        db.flush()
+
+        for index, student in enumerate(demo_students, start=1):
+            charge = db.query(models.FeeCharge).filter_by(
+                student_id=student.id, term=active_term, year=current_year
+            ).first()
+            if charge is None:
+                charge = models.FeeCharge(
+                    student_id=student.id, term=active_term,
+                    year=current_year, amount=650000,
+                    description="DEMO tuition fees"
+                )
+                db.add(charge)
+                db.flush()
+            if index % 2 == 1 and not db.query(models.FeePayment).filter_by(charge_id=charge.id).first():
+                db.add(models.FeePayment(
+                    charge_id=charge.id,
+                    amount=250000,
+                    payment_date=date.today(),
+                    method="Cash",
+                    reference=f"DEMO-PAY-{index:03d}",
+                    received_by="Demo Accounts",
+                    receipt_number=f"DEMO-RCPT-{current_year}-{index:03d}",
+                ))
+
+        # Demo attendance for today, one record per sample learner.
+        for index, student in enumerate(demo_students):
+            if not db.query(models.Attendance).filter_by(
+                student_id=student.id, attendance_date=date.today()
+            ).first():
+                db.add(models.Attendance(
+                    student_id=student.id,
+                    attendance_date=date.today(),
+                    status="Absent" if index % 7 == 6 else ("Late" if index % 5 == 4 else "Present"),
+                ))
+
+        # Demo exams, marks and a usable grading scale.
+        demo_subjects = db.query(models.Subject).filter(
+            models.Subject.school_type == school_type
+        ).order_by(models.Subject.id).all()
+        for school_class in demo_classes:
+            exam = db.query(models.Exam).filter_by(
+                name="DEMO End of Term Assessment",
+                term=active_term, year=current_year,
+                class_id=school_class.id
+            ).first()
+            if exam is None:
+                exam = models.Exam(
+                    name="DEMO End of Term Assessment",
+                    term=active_term, year=current_year,
+                    class_id=school_class.id
+                )
+                db.add(exam)
+                db.flush()
+            class_students = [s for s in demo_students if s.class_id == school_class.id]
+            for student in class_students:
+                for subject_index, subject in enumerate(demo_subjects[:4]):
+                    if db.query(models.Mark).filter_by(
+                        student_id=student.id, subject_id=subject.id, exam_id=exam.id
+                    ).first():
+                        continue
+                    db.add(models.Mark(
+                        student_id=student.id,
+                        subject_id=subject.id,
+                        exam_id=exam.id,
+                        score=float(55 + ((student.id * 7 + subject_index * 9) % 41)),
+                        verified=True,
+                    ))
+
+        if db.query(models.GradeBand).count() == 0:
+            db.add_all([
+                models.GradeBand(grade="A", min_score=80, max_score=100, remark="Excellent"),
+                models.GradeBand(grade="B", min_score=70, max_score=79.99, remark="Very good"),
+                models.GradeBand(grade="C", min_score=60, max_score=69.99, remark="Good"),
+                models.GradeBand(grade="D", min_score=50, max_score=59.99, remark="Fair"),
+                models.GradeBand(grade="E", min_score=0, max_score=49.99, remark="Needs improvement"),
+            ])
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
+seed_demo_data_if_empty()
+
+app = FastAPI(
+    title="SchoolBridge API",
+    description="Offline-first school management system API.",
+    version="0.2.0",
+)
+
+cors_origins = [origin.strip() for origin in os.getenv("SCHOOLBRIDGE_CORS_ORIGINS", "*").split(",") if origin.strip()]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+    allow_headers=["*"],
+)
+
+
+class ClassCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    section: str = Field(default="", max_length=40)
+
+
+class SubjectCreate(BaseModel):
+    name: str
+    code: str | None = None
+
+
+class StudentCreate(BaseModel):
+    admission_number: str | None = None
+    first_name: str
+    middle_name: str | None = None
+    last_name: str
+    gender: str | None = None
+    date_of_birth: date | None = None
+    religion: str | None = None
+    nationality: str | None = None
+    phone: str | None = None
+    address: str | None = None
+    guardian_name: str | None = None
+    guardian_relationship: str | None = None
+    guardian_phone: str | None = None
+    previous_school: str | None = None
+    admission_date: date | None = None
+    class_id: int | None = None
+    fee_amount: int | None = Field(default=None, ge=0)
+    academic_level: str | None = Field(default=None, pattern="^(O-Level|A-Level)$")
+    combination: str | None = None
+    optional_subjects: str | None = None
+    subsidiary_subjects: str | None = None
+
+
+class StudentUpdate(BaseModel):
+    first_name: str | None = None
+    middle_name: str | None = None
+    last_name: str | None = None
+    gender: str | None = None
+    date_of_birth: date | None = None
+    religion: str | None = None
+    nationality: str | None = None
+    phone: str | None = None
+    address: str | None = None
+    guardian_name: str | None = None
+    guardian_relationship: str | None = None
+    guardian_phone: str | None = None
+    previous_school: str | None = None
+    admission_date: date | None = None
+    class_id: int | None = None
+    status: str | None = Field(default=None, pattern="^(active|transferred|dismissed|inactive)$")
+    academic_level: str | None = Field(default=None, pattern="^(O-Level|A-Level)$")
+    combination: str | None = None
+    optional_subjects: str | None = None
+    subsidiary_subjects: str | None = None
+
+
+class AdmissionSettingsUpdate(BaseModel):
+    admission_prefix: str = Field(default="SB", max_length=20)
+    include_year: bool = True
+    admission_separator: str = Field(default="-", max_length=5)
+    admission_padding: int = Field(default=4, ge=1, le=8)
+    next_admission_number: int = Field(default=1, ge=1)
+
+
+def get_or_create_school_settings(db: Session):
+    settings = db.get(models.SchoolSettings, 1)
+    if settings is None:
+        settings = models.SchoolSettings(id=1)
+        db.add(settings)
+        db.commit()
+        db.refresh(settings)
+    return settings
+
+
+class AttendanceCreate(BaseModel):
+    student_id: int
+    attendance_date: date = Field(default_factory=date.today)
+    status: str = Field(pattern="^(Present|Absent|Late|Excused)$")
+
+class AttendanceRegisterEntry(BaseModel):
+    student_id: int
+    status: str = Field(pattern="^(Present|Absent|Late|Excused)$")
+
+
+class AttendanceRegisterUpdate(BaseModel):
+    class_id: int
+    attendance_date: date = Field(default_factory=date.today)
+    records: list[AttendanceRegisterEntry] = Field(min_length=1, max_length=500)
+
+class StaffAttendanceEntry(BaseModel):
+    staff_id: int
+    status: str = Field(pattern="^(Present|Absent|Late|Excused)$")
+    notes: str | None = Field(default=None, max_length=255)
+    check_in_time: str | None = Field(default=None, pattern="^([01][0-9]|2[0-3]):[0-5][0-9]$")
+    check_out_time: str | None = Field(default=None, pattern="^([01][0-9]|2[0-3]):[0-5][0-9]$")
+
+
+class StaffAttendanceRegisterUpdate(BaseModel):
+    attendance_date: date = Field(default_factory=date.today)
+    records: list[StaffAttendanceEntry] = Field(min_length=1, max_length=300)
+
+
+class TimetableEntryCreate(BaseModel):
+    class_id: int
+    subject_id: int | None = None
+    staff_id: int | None = None
+    day_of_week: int = Field(ge=1, le=5)
+    start_time: str = Field(pattern="^([01][0-9]|2[0-3]):[0-5][0-9]$")
+    end_time: str = Field(pattern="^([01][0-9]|2[0-3]):[0-5][0-9]$")
+    room: str | None = Field(default=None, max_length=60)
+
+
+class ExamCreate(BaseModel):
+    name: str = Field(min_length=2, max_length=100)
+    exam_type: str = Field(default="Other", min_length=2, max_length=40)
+    term: str = Field(pattern="^(Term 1|Term 2|Term 3)$")
+    year: int = Field(ge=2000, le=2100)
+    class_id: int
+
+
+class MarkCreate(BaseModel):
+    student_id: int
+    subject_id: int
+    exam_id: int
+    score: float = Field(ge=0, le=100)
+
+
+class MarkUpdate(BaseModel):
+    score: float = Field(ge=0, le=100)
+
+
+
+class GradeBandInput(BaseModel):
+    grade: str = Field(min_length=1, max_length=20)
+    min_score: float = Field(ge=0, le=100)
+    max_score: float = Field(gt=0, le=100)
+    remark: str = Field(default="", max_length=100)
+
+
+class GradingScaleUpdate(BaseModel):
+    bands: list[GradeBandInput] = Field(min_length=1, max_length=20)
+
+
+class ClassOut(ClassCreate):
+    id: int
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SubjectOut(SubjectCreate):
+    id: int
+    model_config = ConfigDict(from_attributes=True)
+
+
+class StudentOut(StudentCreate):
+    id: int
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AttendanceOut(AttendanceCreate):
+    id: int
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ExamOut(BaseModel):
+    id: int
+    name: str
+    exam_type: str = "Other"
+    term: str
+    year: int
+    class_id: int | None = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MarkOut(MarkCreate):
+    id: int
+    verified: bool = False
+    model_config = ConfigDict(from_attributes=True)
+
+
+
+@app.get("/api/settings/admission-number", tags=["School Settings"])
+def read_admission_settings(db: Session = Depends(get_db)):
+    settings = get_or_create_school_settings(db)
+    return {
+        "admission_prefix": settings.admission_prefix,
+        "include_year": settings.include_year,
+        "admission_separator": settings.admission_separator,
+        "admission_padding": settings.admission_padding,
+        "next_admission_number": settings.next_admission_number,
+        "academic_year": settings.academic_year,
+        "active_term": settings.active_term,
+    }
+
+
+@app.put("/api/settings/admission-number", tags=["School Settings"])
+def update_admission_settings(
+    data: AdmissionSettingsUpdate,
+    db: Session = Depends(get_db),
+):
+    settings = get_or_create_school_settings(db)
+    settings.admission_prefix = data.admission_prefix.strip()
+    settings.include_year = data.include_year
+    settings.admission_separator = data.admission_separator
+    settings.admission_padding = data.admission_padding
+    settings.next_admission_number = data.next_admission_number
+    db.commit()
+    db.refresh(settings)
+    return {
+        "message": "Admission numbering settings saved.",
+        "admission_prefix": settings.admission_prefix,
+        "include_year": settings.include_year,
+        "admission_separator": settings.admission_separator,
+        "admission_padding": settings.admission_padding,
+        "next_admission_number": settings.next_admission_number,
+        "academic_year": settings.academic_year,
+        "active_term": settings.active_term,
+    }
+
+
+@app.get("/", include_in_schema=False)
+def root():
+    return {"message": "SchoolBridge API is running. Visit /docs for API documentation."}
+
+
+@app.get("/api/health", tags=["System"])
+def health_check():
+    return {"status": "ok", "application": "SchoolBridge", "version": "0.2.0"}
+
+
+@app.post("/api/classes", response_model=ClassOut, tags=["Classes"])
+def create_class(data: ClassCreate, db: Session = Depends(get_db)):
+    if not data.name.strip():
+        raise HTTPException(422, "Enter a class name.")
+    item = models.SchoolClass(name=data.name.strip(), section=(data.section or "").strip())
+    db.add(item)
+    try:
+        db.commit()
+        db.refresh(item)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "That class and stream combination already exists.")
+    return item
+
+
+@app.delete("/api/classes/{class_id}", tags=["Classes"])
+def delete_class(class_id: int, db: Session = Depends(get_db)):
+    item = db.get(models.SchoolClass, class_id)
+    if not item:
+        raise HTTPException(404, "Class not found.")
+
+    linked_students = db.query(models.Student).filter(models.Student.class_id == class_id).count()
+    linked_fees = db.query(models.ClassFee).filter(models.ClassFee.class_id == class_id).count()
+    linked_assignments = db.query(models.TeacherAssignment).filter(models.TeacherAssignment.class_id == class_id).count()
+    linked_class_teacher = db.query(models.ClassTeacherAssignment).filter(models.ClassTeacherAssignment.class_id == class_id).count()
+    if linked_students or linked_fees or linked_assignments or linked_class_teacher:
+        raise HTTPException(
+            409,
+            "This class cannot be removed because it has linked students, class fee records or teacher assignments. Remove or reassign those records first."
+        )
+
+    db.delete(item)
+    db.commit()
+    return {"message": "Class removed successfully."}
+
+
+@app.get("/api/classes", response_model=list[ClassOut], tags=["Classes"])
+def list_classes(db: Session = Depends(get_db)):
+    return db.query(models.SchoolClass).order_by(models.SchoolClass.name, models.SchoolClass.section).all()
+
+
+@app.post("/api/subjects", response_model=SubjectOut, tags=["Subjects"])
+def create_subject(data: SubjectCreate, db: Session = Depends(get_db)):
+    profile = db.get(models.SchoolProfile, 1)
+    school_type = profile.school_type if profile else "Secondary"
+    existing = db.query(models.Subject).filter(
+        models.Subject.school_type == school_type,
+        func.lower(models.Subject.name) == data.name.strip().lower(),
+    ).first()
+    if existing:
+        raise HTTPException(409, "That subject already exists for this school type.")
+    item = models.Subject(**{**data.model_dump(), "name": data.name.strip()}, school_type=school_type)
+    db.add(item)
+    try:
+        db.commit()
+        db.refresh(item)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "That subject already exists.")
+    return item
+
+
+@app.get("/api/subjects", response_model=list[SubjectOut], tags=["Subjects"])
+def list_subjects(db: Session = Depends(get_db)):
+    profile = db.get(models.SchoolProfile, 1)
+    school_type = profile.school_type if profile else "Secondary"
+    return db.query(models.Subject).filter(
+        models.Subject.school_type == school_type
+    ).order_by(models.Subject.name).all()
+
+
+@app.post("/api/students", response_model=StudentOut, tags=["Students"])
+def create_student(data: StudentCreate, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    if not data.first_name.strip() or not data.last_name.strip():
+        raise HTTPException(422, "Enter the student's first and last names before registering.")
+    if not data.gender or not data.gender.strip():
+        raise HTTPException(422, "Select the student's gender before registering.")
+    if not data.guardian_name or not data.guardian_name.strip():
+        raise HTTPException(422, "Enter a parent or guardian name before registering.")
+    if not data.guardian_phone or not data.guardian_phone.strip():
+        raise HTTPException(422, "Enter a parent or guardian phone number before registering.")
+    if data.class_id is None:
+        raise HTTPException(422, "Select a class before registering the student.")
+    selected_class = db.get(models.SchoolClass, data.class_id)
+    if not selected_class:
+        raise HTTPException(404, "Choose a valid class.")
+    profile = db.get(models.SchoolProfile, 1)
+    school_type = profile.school_type if profile else "Secondary"
+    class_label = re.sub(r"[\s._-]+", "", selected_class.name.lower())
+    level_match = re.search(r"(?:senior|s)?([1-6])$", class_label)
+    if school_type == "Secondary" and level_match:
+        grade = int(level_match.group(1))
+        derived_level = "A-Level" if grade in (5, 6) else "O-Level"
+        if data.academic_level and data.academic_level != derived_level:
+            raise HTTPException(422, f"{selected_class.name} is {derived_level}; the level is determined by the selected class.")
+        if derived_level == "A-Level":
+            if not data.combination or not data.combination.strip():
+                raise HTTPException(422, "Choose an Arts or Sciences combination for this A-Level class.")
+            if not (data.combination.startswith("Arts — ") or data.combination.startswith("Sciences — ")):
+                raise HTTPException(422, "Choose the A-Level stream and a combination.")
+        student_academic_level = derived_level
+    else:
+        student_academic_level = None
+    student_data = data.model_dump()
+    student_data.pop("fee_amount", None)
+    student_data["academic_level"] = student_academic_level
+    if student_academic_level != "A-Level":
+        student_data["combination"] = None
+        student_data["subsidiary_subjects"] = None
+    if student_academic_level != "O-Level":
+        student_data["optional_subjects"] = None
+    supplied_number = (student_data.pop("admission_number") or "").strip()
+    settings = get_or_create_school_settings(db)
+    item = models.Student(
+        **student_data,
+        admission_number=supplied_number or f"PENDING-{uuid4().hex}",
+    )
+    db.add(item)
+    try:
+        db.flush()
+        if not supplied_number:
+            next_value = db.execute(
+                update(models.SchoolSettings)
+                .where(models.SchoolSettings.id == 1)
+                .values(next_admission_number=models.SchoolSettings.next_admission_number + 1)
+                .returning(models.SchoolSettings.next_admission_number)
+            ).scalar_one() - 1
+            parts = []
+            if settings.admission_prefix.strip():
+                parts.append(settings.admission_prefix.strip())
+            if settings.include_year:
+                parts.append(str(date.today().year))
+            parts.append(str(next_value).zfill(settings.admission_padding))
+            item.admission_number = settings.admission_separator.join(parts)
+        db.flush()
+        if item.class_id is not None:
+            school_settings = get_or_create_school_settings(db)
+            active_term = school_settings.active_term
+            active_year = school_settings.academic_year or date.today().year
+            class_fee = db.query(models.ClassFee).filter_by(
+                class_id=item.class_id, term=active_term, year=active_year
+            ).first()
+            selected_fee = data.fee_amount if data.fee_amount is not None else (class_fee.amount if class_fee else 0)
+            if selected_fee > 0:
+                db.add(models.FeeCharge(
+                    student_id=item.id, term=active_term,
+                    year=active_year, amount=selected_fee
+                ))
+        db.commit()
+        db.refresh(item)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "That admission number is already registered. Check the school's numbering sequence.")
+    return item
+
+@app.get("/api/students", response_model=list[StudentOut], tags=["Students"])
+def list_students(db: Session = Depends(get_db)):
+    return db.query(models.Student).order_by(models.Student.last_name).all()
+
+
+def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
+):
+    try:
+        payload = jwt.decode(
+            token, JWT_SECRET, algorithms=[JWT_ALGORITHM]
+        )
+        user_id = int(payload["sub"])
+    except (InvalidTokenError, ValueError, KeyError):
+        raise HTTPException(401, "Invalid or expired login token.")
+
+    user = db.get(models.User, user_id)
+    if not user or not user.is_active:
+        raise HTTPException(401, "Account is unavailable.")
+    return user
+
+
+@app.get("/api/attendance/options", tags=["Attendance"])
+def attendance_options(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    if user.role == "teacher":
+        class_ids = [row.class_id for row in db.query(models.ClassTeacherAssignment.class_id).filter_by(teacher_id=user.id).all()]
+        classes = db.query(models.SchoolClass).filter(models.SchoolClass.id.in_(class_ids or [-1])).order_by(
+            models.SchoolClass.name, models.SchoolClass.section
+        ).all()
+    else:
+        classes = db.query(models.SchoolClass).order_by(models.SchoolClass.name, models.SchoolClass.section).all()
+    return [{"id": row.id, "name": row.name, "section": row.section} for row in classes]
+
+
+@app.get("/api/attendance/students", tags=["Attendance"])
+def attendance_students(class_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    require_class_attendance_access(db, user, class_id, "view")
+    return db.query(models.Student).filter(
+        models.Student.class_id == class_id, models.Student.status == "active"
+    ).order_by(models.Student.last_name, models.Student.first_name).all()
+
+
+@app.post("/api/attendance", response_model=AttendanceOut, tags=["Attendance"])
+def record_attendance(data: AttendanceCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    student = db.get(models.Student, data.student_id)
+    if not student:
+        raise HTTPException(404, "Student not found.")
+    require_class_attendance_access(db, user, student.class_id, "add")
+    item = models.Attendance(**data.model_dump())
+    db.add(item)
+    try:
+        db.commit()
+        db.refresh(item)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "Attendance has already been recorded for this student on that date.")
+    return item
+
+
+
+@app.get("/api/attendance", response_model=list[AttendanceOut], tags=["Attendance"])
+def list_attendance(
+    attendance_date: date | None = None,
+    class_id: int | None = None,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    if not class_id:
+        raise HTTPException(422, "Choose a class to view its attendance register.")
+    require_class_attendance_access(db, user, class_id, "view")
+    query = db.query(models.Attendance).join(
+        models.Student, models.Student.id == models.Attendance.student_id
+    )
+    if attendance_date:
+        query = query.filter(models.Attendance.attendance_date == attendance_date)
+    if class_id:
+        query = query.filter(models.Student.class_id == class_id)
+    return query.order_by(
+        models.Attendance.attendance_date.desc(), models.Attendance.id.desc()
+    ).all()
+
+
+@app.get("/api/attendance/summary", tags=["Attendance"])
+def attendance_summary(
+    attendance_date: date | None = None,
+    class_id: int | None = None,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    attendance_date = attendance_date or date.today()
+    if not class_id:
+        raise HTTPException(422, "Choose a class to view its attendance summary.")
+    require_class_attendance_access(db, user, class_id, "view")
+    students_query = db.query(models.Student).filter(models.Student.status == "active")
+    if class_id:
+        students_query = students_query.filter(models.Student.class_id == class_id)
+    students = students_query.all()
+    student_ids = [student.id for student in students]
+    rows = db.query(models.Attendance).filter(
+        models.Attendance.attendance_date == attendance_date,
+        models.Attendance.student_id.in_(student_ids or [-1]),
+    ).all()
+    counts = {status: sum(1 for row in rows if row.status == status)
+              for status in ("Present", "Absent", "Late", "Excused")}
+    return {
+        "attendance_date": attendance_date,
+        "class_id": class_id,
+        "total_students": len(students),
+        "marked": len(rows),
+        "unmarked": max(0, len(students) - len(rows)),
+        "present": counts["Present"],
+        "absent": counts["Absent"],
+        "late": counts["Late"],
+        "excused": counts["Excused"],
+        "attendance_rate": round(
+            (counts["Present"] + counts["Late"] + counts["Excused"]) / len(students) * 100, 2
+        ) if students else 0,
+    }
+
+
+@app.post("/api/exams", response_model=ExamOut, tags=["Exams"])
+def create_exam(data: ExamCreate, db: Session = Depends(get_db)):
+    if not db.get(models.SchoolClass, data.class_id):
+        raise HTTPException(404, "Select a valid class for this examination.")
+    duplicate = db.query(models.Exam).filter_by(
+        name=data.name.strip(), term=data.term, year=data.year, class_id=data.class_id
+    ).first()
+    if duplicate:
+        raise HTTPException(409, "This examination already exists for the selected class, term and year.")
+    item = models.Exam(**{**data.model_dump(), "name": data.name.strip()})
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@app.get("/api/exams", response_model=list[ExamOut], tags=["Exams"])
+def list_exams(class_id: int | None = None, year: int | None = None, db: Session = Depends(get_db)):
+    query = db.query(models.Exam)
+    if class_id is not None:
+        query = query.filter(models.Exam.class_id == class_id)
+    if year is not None:
+        query = query.filter(models.Exam.year == year)
+    return query.order_by(models.Exam.year.desc(), models.Exam.term, models.Exam.name).all()
+
+
+@app.post("/api/marks", response_model=MarkOut, tags=["Marks"])
+def record_mark(data: MarkCreate, db: Session = Depends(get_db)):
+    student = db.get(models.Student, data.student_id)
+    subject = db.get(models.Subject, data.subject_id)
+    exam = db.get(models.Exam, data.exam_id)
+    if not student:
+        raise HTTPException(404, "Student not found.")
+    if not subject:
+        raise HTTPException(404, "Subject not found.")
+    if not exam:
+        raise HTTPException(404, "Exam not found.")
+    if exam.class_id is not None and student.class_id != exam.class_id:
+        raise HTTPException(422, "The selected student does not belong to this examination's class.")
+    item = models.Mark(**data.model_dump())
+    db.add(item)
+    try:
+        db.commit()
+        db.refresh(item)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "A mark already exists for this student, subject and exam.")
+    return item
+
+
+@app.get("/api/marks", response_model=list[MarkOut], tags=["Marks"])
+def list_marks(exam_id: int | None = None, student_id: int | None = None, db: Session = Depends(get_db)):
+    query = db.query(models.Mark)
+    if exam_id is not None:
+        query = query.filter(models.Mark.exam_id == exam_id)
+    if student_id is not None:
+        query = query.filter(models.Mark.student_id == student_id)
+    return query.order_by(models.Mark.student_id, models.Mark.subject_id).all()
+
+
+@app.patch("/api/marks/{mark_id}", response_model=MarkOut, tags=["Marks"])
+def update_mark(mark_id: int, data: MarkUpdate, db: Session = Depends(get_db)):
+    item = db.get(models.Mark, mark_id)
+    if not item:
+        raise HTTPException(404, "Mark record not found.")
+    exam = db.get(models.Exam, item.exam_id)
+    student = db.get(models.Student, item.student_id)
+    if exam and exam.class_id is not None and student and student.class_id != exam.class_id:
+        raise HTTPException(409, "This mark no longer matches the examination class.")
+    item.score = data.score
+    item.verified = False
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@app.patch("/api/marks/{mark_id}/verification", tags=["Marks"])
+def verify_mark(mark_id: int, verified: bool, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    item = db.get(models.Mark, mark_id)
+    if not item:
+        raise HTTPException(404, "Mark record not found.")
+    item.verified = verified
+    write_audit(
+        db, admin, "mark_verified" if verified else "mark_unlocked",
+        "mark", item.id,
+        f"exam={item.exam_id}; student={item.student_id}; subject={item.subject_id}",
+    )
+    db.commit()
+    db.refresh(item)
+    return item
+
+@app.patch("/api/subjects/{subject_id}/marks/verification", tags=["Marks"])
+def verify_subject_marks_batch(
+    subject_id: int,
+    exam_id: int,
+    verified: bool = True,
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+):
+    exam = db.get(models.Exam, exam_id)
+    subject = db.get(models.Subject, subject_id)
+    if not exam or not subject:
+        raise HTTPException(404, "Examination or subject not found.")
+    query = db.query(models.Mark).filter(
+        models.Mark.exam_id == exam_id,
+        models.Mark.subject_id == subject_id,
+    )
+    if exam.class_id is not None:
+        query = query.join(models.Student, models.Student.id == models.Mark.student_id).filter(
+            models.Student.class_id == exam.class_id
+        )
+    rows = query.all()
+    if not rows:
+        raise HTTPException(404, "There are no recorded scores for this subject and examination to update.")
+    changed = 0
+    for mark in rows:
+        if mark.verified != verified:
+            mark.verified = verified
+            changed += 1
+    write_audit(
+        db, admin, "subject_marks_verified" if verified else "subject_marks_unlocked",
+        "subject_marks", subject_id,
+        f"exam={exam_id}; subject={subject.name}; records={len(rows)}; changed={changed}",
+    )
+    db.commit()
+    return {"exam_id": exam_id, "subject_id": subject_id, "verified": verified, "records": len(rows), "changed": changed}
+
+
+@app.patch("/api/exams/{exam_id}/results/verification", tags=["Marks"])
+def verify_exam_results_batch(
+    exam_id: int,
+    verified: bool = True,
+    db: Session = Depends(get_db),
+    approver=Depends(require_admin),
+):
+    exam = db.get(models.Exam, exam_id)
+    if not exam:
+        raise HTTPException(404, "Examination not found.")
+    query = db.query(models.Mark).filter(models.Mark.exam_id == exam_id)
+    if exam.class_id is not None:
+        query = query.join(models.Student, models.Student.id == models.Mark.student_id).filter(
+            models.Student.class_id == exam.class_id
+        )
+    rows = query.all()
+    if not rows:
+        raise HTTPException(404, "There are no submitted results for this examination.")
+    changed = 0
+    for mark in rows:
+        if mark.verified != verified:
+            mark.verified = verified
+            changed += 1
+    write_audit(
+        db, approver, "exam_results_verified" if verified else "exam_results_unlocked",
+        "exam", exam.id,
+        f"records={len(rows)}; changed={changed}; class={exam.class_id}",
+    )
+    db.commit()
+    return {"exam_id": exam.id, "verified": verified, "records": len(rows), "changed": changed}
+
+
+@app.get("/api/grading-scale", tags=["Grading"])
+def get_grading_scale(db: Session = Depends(get_db)):
+    return db.query(models.GradeBand).order_by(
+        models.GradeBand.min_score, models.GradeBand.grade
+    ).all()
+
+
+@app.put("/api/grading-scale", tags=["Grading"])
+def update_grading_scale(data: GradingScaleUpdate, db: Session = Depends(get_db)):
+    bands = sorted(data.bands, key=lambda band: band.min_score)
+    grades = [band.grade.strip().upper() for band in bands]
+    if any(not grade for grade in grades) or len(set(grades)) != len(grades):
+        raise HTTPException(422, "Each grading band must have a unique grade label.")
+    if any(band.min_score >= band.max_score for band in bands):
+        raise HTTPException(422, "Each grading band minimum must be lower than its maximum.")
+    if bands[0].min_score != 0 or bands[-1].max_score != 100:
+        raise HTTPException(422, "The grading scale must start at 0 and end at 100.")
+    for previous, current in zip(bands, bands[1:]):
+        if current.min_score != previous.max_score:
+            raise HTTPException(422, "Grading bands must meet exactly without gaps or overlaps.")
+    db.query(models.GradeBand).delete(synchronize_session=False)
+    db.add_all([
+        models.GradeBand(
+            grade=band.grade.strip().upper(),
+            min_score=band.min_score,
+            max_score=band.max_score,
+            remark=band.remark.strip(),
+        ) for band in bands
+    ])
+    db.commit()
+    return get_grading_scale(db)
+
+
+# ========== AUTHENTICATION AND USER MANAGEMENT ==========
+
+def bootstrap_initial_admin():
+    """Create the first administrator only when explicitly configured by environment."""
+    username = os.getenv("SCHOOLBRIDGE_INITIAL_ADMIN_USERNAME", "").strip()
+    email = os.getenv("SCHOOLBRIDGE_INITIAL_ADMIN_EMAIL", "").strip()
+    initial_password = os.getenv("SCHOOLBRIDGE_INITIAL_ADMIN_PASSWORD", "")
+
+    supplied = [bool(username), bool(email), bool(initial_password)]
+    if any(supplied) and not all(supplied):
+        raise RuntimeError(
+            "Set all three SCHOOLBRIDGE_INITIAL_ADMIN_* variables to bootstrap "
+            "the first administrator."
+        )
+    if not all(supplied):
+        return
+
+    if len(initial_password) < 12:
+        raise RuntimeError("SCHOOLBRIDGE_INITIAL_ADMIN_PASSWORD must be at least 12 characters.")
+
+    db = SessionLocal()
+    try:
+        if db.query(models.User).count() == 0:
+            admin = models.User(
+                username=username,
+                email=email,
+                hashed_password=password_hash.hash(initial_password),
+                role="admin",
+                is_active=True,
+            )
+            db.add(admin)
+            try:
+                db.commit()
+            except IntegrityError:
+                db.rollback()
+                raise
+    finally:
+        db.close()
+
+
+bootstrap_initial_admin()
+
+class LoginInput(BaseModel):
+    username: str
+    password: str
+
+
+class TeacherCreate(BaseModel):
+    staff_id: int
+    username: str = Field(min_length=3, max_length=80)
+    email: str = Field(min_length=5, max_length=150)
+    password: str = Field(min_length=12)
+
+
+class AssignmentCreate(BaseModel):
+    teacher_id: int
+    class_id: int
+    subject_id: int
+
+class ClassTeacherAssignmentCreate(BaseModel):
+    teacher_id: int
+    class_id: int
+
+
+class BulkMarkEntry(BaseModel):
+    student_id: int
+    score: float = Field(ge=0, le=100)
+
+
+class BulkMarkCreate(BaseModel):
+    exam_id: int
+    subject_id: int
+    records: list[BulkMarkEntry] = Field(min_length=1, max_length=500)
+
+
+class ParentAccountCreate(BaseModel):
+    username: str = Field(min_length=3, max_length=80)
+    email: str = Field(min_length=5, max_length=150)
+    student_ids: list[int] = Field(min_length=1, max_length=10)
+
+
+
+
+class ParentLiaisonThreadCreate(BaseModel):
+    student_id: int
+    parent_user_id: int
+    subject: str = Field(min_length=3, max_length=160)
+    category: str = Field(default="General enquiry", pattern="^(Academic performance|Attendance|Behaviour and discipline|Fees and payments|Meeting request|General enquiry)$")
+    message: str = Field(min_length=2, max_length=5000)
+
+
+class ParentLiaisonMessageCreate(BaseModel):
+    message: str = Field(min_length=2, max_length=5000)
+
+
+class AnnouncementCreate(BaseModel):
+    title: str = Field(min_length=3, max_length=160)
+    message: str = Field(min_length=3, max_length=5000)
+    audience: str = Field(default="All", pattern="^(All|Parents|Teachers)$")
+    published: bool = True
+
+
+def require_parent(user=Depends(get_current_user)):
+    if user.role != "parent":
+        raise HTTPException(403, "Parent account required.")
+    return user
+
+
+def linked_parent_student(db: Session, parent, student_id: int):
+    link = db.query(models.ParentStudentLink).filter_by(
+        user_id=parent.id, student_id=student_id
+    ).first()
+    if not link:
+        raise HTTPException(404, "This student is not linked to your parent account.")
+    student = db.get(models.Student, student_id)
+    if not student:
+        raise HTTPException(404, "Student record not found.")
+    return student
+
+
+def create_access_token(user):
+    expires = datetime.now(timezone.utc) + timedelta(hours=TOKEN_HOURS)
+    payload = {
+        "sub": str(user.id),
+        "role": user.role,
+        "exp": expires,
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+
+
+@app.put("/api/attendance/register", tags=["Attendance"])
+def save_attendance_register(
+    data: AttendanceRegisterUpdate,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    selected_class = db.get(models.SchoolClass, data.class_id)
+    if not selected_class:
+        raise HTTPException(404, "Class not found.")
+    require_class_attendance_access(db, user, data.class_id, "add")
+    student_ids = [entry.student_id for entry in data.records]
+    if len(student_ids) != len(set(student_ids)):
+        raise HTTPException(422, "A student can appear only once in a class register.")
+    students = db.query(models.Student).filter(
+        models.Student.id.in_(student_ids),
+        models.Student.class_id == data.class_id,
+        models.Student.status == "active",
+    ).all()
+    if len(students) != len(student_ids):
+        raise HTTPException(422, "Every selected student must be active and belong to the chosen class.")
+    saved = 0
+    for entry in data.records:
+        record = db.query(models.Attendance).filter_by(
+            student_id=entry.student_id, attendance_date=data.attendance_date
+        ).first()
+        if record:
+            record.status = entry.status
+        else:
+            db.add(models.Attendance(
+                student_id=entry.student_id,
+                attendance_date=data.attendance_date,
+                status=entry.status,
+            ))
+        saved += 1
+    write_audit(db, user, "attendance_register_saved", "class", data.class_id,
+                f"{saved} student records; {data.attendance_date}")
+    db.commit()
+    return {
+        "message": "Class attendance register saved.",
+        "class_id": data.class_id,
+        "attendance_date": data.attendance_date,
+        "saved": saved,
+    }
+
+
+
+
+@app.get("/api/staff-attendance/roster", tags=["Attendance"])
+def staff_attendance_roster(db: Session = Depends(get_db), admin=Depends(require_admin)):
+    rows = db.query(models.StaffMember).filter_by(status="active").order_by(
+        models.StaffMember.category, models.StaffMember.first_name, models.StaffMember.last_name
+    ).all()
+    return [{
+        "id": row.id, "first_name": row.first_name, "last_name": row.last_name,
+        "staff_number": row.staff_number, "category": row.category, "status": row.status,
+    } for row in rows]
+
+
+@app.get("/api/staff-attendance", tags=["Attendance"])
+def list_staff_attendance(
+    attendance_date: date | None = None,
+    month: str | None = None,
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+):
+    query = db.query(models.StaffAttendance)
+    if attendance_date:
+        query = query.filter(models.StaffAttendance.attendance_date == attendance_date)
+    elif month:
+        try:
+            month_start = datetime.strptime(month, "%Y-%m").date()
+        except ValueError:
+            raise HTTPException(422, "Month must use YYYY-MM format.")
+        next_month = date(month_start.year + (month_start.month == 12), 1 if month_start.month == 12 else month_start.month + 1, 1)
+        query = query.filter(
+            models.StaffAttendance.attendance_date >= month_start,
+            models.StaffAttendance.attendance_date < next_month,
+        )
+    rows = query.order_by(models.StaffAttendance.attendance_date.desc(), models.StaffAttendance.id.desc()).all()
+    return [{
+        "id": row.id, "staff_id": row.staff_id, "attendance_date": row.attendance_date,
+        "status": row.status, "notes": row.notes,
+        "check_in_at": row.check_in_at, "check_out_at": row.check_out_at,
+    } for row in rows]
+
+
+@app.get("/api/staff-attendance/summary", tags=["Attendance"])
+def staff_attendance_summary(
+    attendance_date: date | None = None,
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+):
+    selected_date = attendance_date or date.today()
+    active_staff = db.query(models.StaffMember).filter(models.StaffMember.status == "active").all()
+    active_ids = [person.id for person in active_staff]
+    rows = db.query(models.StaffAttendance).filter(
+        models.StaffAttendance.attendance_date == selected_date,
+        models.StaffAttendance.staff_id.in_(active_ids or [-1]),
+    ).all()
+    counts = {status: sum(1 for row in rows if row.status == status)
+              for status in ("Present", "Absent", "Late", "Excused")}
+    return {
+        "attendance_date": selected_date,
+        "total_staff": len(active_staff),
+        "marked": len(rows),
+        "unmarked": max(0, len(active_staff) - len(rows)),
+        "present": counts["Present"],
+        "absent": counts["Absent"],
+        "late": counts["Late"],
+        "excused": counts["Excused"],
+    }
+
+
+@app.put("/api/staff-attendance/register", tags=["Attendance"])
+def save_staff_attendance_register(
+    data: StaffAttendanceRegisterUpdate,
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+):
+    staff_ids = [entry.staff_id for entry in data.records]
+    if len(staff_ids) != len(set(staff_ids)):
+        raise HTTPException(422, "A staff member can appear only once in a daily register.")
+    staff_rows = db.query(models.StaffMember).filter(
+        models.StaffMember.id.in_(staff_ids),
+        models.StaffMember.status == "active",
+    ).all()
+    if len(staff_rows) != len(staff_ids):
+        raise HTTPException(422, "Every selected staff member must be active.")
+    for entry in data.records:
+        record = db.query(models.StaffAttendance).filter_by(
+            staff_id=entry.staff_id, attendance_date=data.attendance_date
+        ).first()
+        if record:
+            record.status = entry.status
+            record.notes = entry.notes
+            if "check_in_time" in entry.model_fields_set:
+                record.check_in_at = datetime.combine(data.attendance_date, time.fromisoformat(entry.check_in_time)) if entry.check_in_time else None
+            if "check_out_time" in entry.model_fields_set:
+                record.check_out_at = datetime.combine(data.attendance_date, time.fromisoformat(entry.check_out_time)) if entry.check_out_time else None
+        else:
+            db.add(models.StaffAttendance(
+                staff_id=entry.staff_id,
+                attendance_date=data.attendance_date,
+                status=entry.status,
+                notes=entry.notes,
+                check_in_at=datetime.combine(data.attendance_date, time.fromisoformat(entry.check_in_time)) if entry.check_in_time else None,
+                check_out_at=datetime.combine(data.attendance_date, time.fromisoformat(entry.check_out_time)) if entry.check_out_time else None,
+            ))
+    write_audit(db, admin, "staff_attendance_register_saved", "staff_attendance", 0,
+                f"{len(staff_ids)} staff records; {data.attendance_date}")
+    db.commit()
+    return {"message": "Staff attendance register saved.", "attendance_date": data.attendance_date, "saved": len(staff_ids)}
+
+
+@app.get("/api/timetable", tags=["Timetable"])
+def list_timetable(
+    class_id: int | None = None,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    # Fetch lesson details in one joined query instead of issuing three extra
+    # database lookups for every timetable row.
+    query = (
+        db.query(
+            models.TimetableEntry,
+            models.SchoolClass,
+            models.Subject,
+            models.StaffMember,
+        )
+        .join(models.SchoolClass, models.TimetableEntry.class_id == models.SchoolClass.id)
+        .outerjoin(models.Subject, models.TimetableEntry.subject_id == models.Subject.id)
+        .outerjoin(models.StaffMember, models.TimetableEntry.staff_id == models.StaffMember.id)
+    )
+    # Timetable view permission grants access to the complete class timetable,
+    # not only the lessons personally taught by the signed-in teacher. This lets
+    # teachers and read-only staff see every subject, teacher and period in a class.
+    if user.role != "admin" and "view" not in user_permissions(user).get("Timetable", set()):
+        raise HTTPException(403, "You do not have permission to view the timetable.")
+    if class_id:
+        query = query.filter(models.TimetableEntry.class_id == class_id)
+    rows = query.order_by(
+        models.TimetableEntry.day_of_week,
+        models.TimetableEntry.start_time,
+        models.TimetableEntry.id,
+    ).all()
+    return [
+        {
+            "id": entry.id,
+            "class_id": entry.class_id,
+            "class_name": school_class.name,
+            "class_section": school_class.section or "",
+            "subject_id": entry.subject_id,
+            "subject_name": subject.name if subject else "Lesson",
+            "staff_id": entry.staff_id,
+            "teacher_name": (staff.first_name + " " + staff.last_name) if staff else "Unassigned",
+            "day_of_week": entry.day_of_week,
+            "start_time": entry.start_time,
+            "end_time": entry.end_time,
+        }
+        for entry, school_class, subject, staff in rows
+    ]
+
+@app.get("/api/timetable/options", tags=["Timetable"])
+def timetable_options(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    # Any account with Timetable:view can browse the complete class timetable.
+    # The edit form and write endpoints remain restricted to academic officers.
+    if user.role != "admin" and "view" not in user_permissions(user).get("Timetable", set()):
+        raise HTTPException(403, "You do not have permission to view timetable options.")
+    classes_query = db.query(models.SchoolClass)
+    subjects_query = db.query(models.Subject)
+    staff = []
+    if user.role == "admin" or is_academic_officer(user):
+        staff = db.query(models.StaffMember).filter_by(category="Teaching", status="active").order_by(
+            models.StaffMember.first_name, models.StaffMember.last_name
+        ).all()
+    classes = classes_query.order_by(models.SchoolClass.name, models.SchoolClass.section).all()
+    subjects = subjects_query.order_by(models.Subject.name).all()
+    return {
+        "classes": [{"id": row.id, "name": row.name, "section": row.section} for row in classes],
+        "subjects": [{"id": row.id, "name": row.name, "code": row.code} for row in subjects],
+        "staff": [{"id": row.id, "first_name": row.first_name, "last_name": row.last_name,
+                   "staff_number": row.staff_number, "category": row.category, "status": row.status} for row in staff],
+    }
+
+
+@app.post("/api/timetable", tags=["Timetable"])
+def create_timetable_entry(
+    data: TimetableEntryCreate,
+    db: Session = Depends(get_db),
+    admin=Depends(require_timetable_editor),
+):
+    if data.end_time <= data.start_time:
+        raise HTTPException(422, "Lesson end time must be later than its start time.")
+    if not db.get(models.SchoolClass, data.class_id):
+        raise HTTPException(404, "Class not found.")
+    if data.subject_id is not None and not db.get(models.Subject, data.subject_id):
+        raise HTTPException(404, "Subject not found.")
+    if data.staff_id is not None:
+        staff = db.get(models.StaffMember, data.staff_id)
+        if not staff or staff.status != "active":
+            raise HTTPException(404, "Active staff member not found.")
+    overlaps = db.query(models.TimetableEntry).filter(
+        models.TimetableEntry.class_id == data.class_id,
+        models.TimetableEntry.day_of_week == data.day_of_week,
+        models.TimetableEntry.start_time < data.end_time,
+        models.TimetableEntry.end_time > data.start_time,
+    ).first()
+    if overlaps:
+        raise HTTPException(409, "This lesson overlaps another lesson for the selected class.")
+    if data.staff_id is not None:
+        staff_overlap = db.query(models.TimetableEntry).filter(
+            models.TimetableEntry.staff_id == data.staff_id,
+            models.TimetableEntry.day_of_week == data.day_of_week,
+            models.TimetableEntry.start_time < data.end_time,
+            models.TimetableEntry.end_time > data.start_time,
+        ).first()
+        if staff_overlap:
+            raise HTTPException(409, "This staff member already has a lesson scheduled at that time.")
+    item = models.TimetableEntry(**data.model_dump())
+    db.add(item)
+    try:
+        db.flush()
+        write_audit(db, admin, "timetable_entry_created", "timetable_entry", item.id,
+                    f"Class {data.class_id}; day {data.day_of_week}; {data.start_time}-{data.end_time}")
+        db.commit()
+        db.refresh(item)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "A timetable entry already exists for this class and start time.")
+    return item
+
+
+@app.put("/api/timetable/{entry_id}", tags=["Timetable"])
+def update_timetable_entry(entry_id: int, data: TimetableEntryCreate, db: Session = Depends(get_db),
+                           academic=Depends(require_timetable_editor)):
+    item = db.get(models.TimetableEntry, entry_id)
+    if not item:
+        raise HTTPException(404, "Timetable entry not found.")
+    if data.end_time <= data.start_time:
+        raise HTTPException(422, "Lesson end time must be later than its start time.")
+    if not db.get(models.SchoolClass, data.class_id):
+        raise HTTPException(404, "Class not found.")
+    if data.subject_id is not None and not db.get(models.Subject, data.subject_id):
+        raise HTTPException(404, "Subject not found.")
+    if data.staff_id is not None:
+        staff = db.get(models.StaffMember, data.staff_id)
+        if not staff or staff.status != "active" or staff.category != "Teaching":
+            raise HTTPException(404, "Select an active teaching staff member.")
+    overlaps = db.query(models.TimetableEntry).filter(
+        models.TimetableEntry.class_id == data.class_id,
+        models.TimetableEntry.day_of_week == data.day_of_week,
+        models.TimetableEntry.id != entry_id,
+        models.TimetableEntry.start_time < data.end_time,
+        models.TimetableEntry.end_time > data.start_time,
+    ).first()
+    if overlaps:
+        raise HTTPException(409, "This lesson overlaps another lesson for the same class.")
+    for key, value in data.model_dump().items():
+        setattr(item, key, value)
+    write_audit(db, academic, "timetable_entry_updated", "timetable_entry", item.id,
+                f"Class {data.class_id}; day {data.day_of_week}; {data.start_time}-{data.end_time}")
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@app.delete("/api/timetable/{entry_id}", tags=["Timetable"])
+def delete_timetable_entry(
+    entry_id: int,
+    db: Session = Depends(get_db),
+    admin=Depends(require_timetable_editor),
+):
+    item = db.get(models.TimetableEntry, entry_id)
+    if not item:
+        raise HTTPException(404, "Timetable entry not found.")
+    write_audit(db, admin, "timetable_entry_removed", "timetable_entry", item.id,
+                f"Class {item.class_id}; day {item.day_of_week}; {item.start_time}-{item.end_time}")
+    db.delete(item)
+    db.commit()
+    return {"message": "Timetable entry removed."}
+
+
+
+
+@app.middleware("http")
+async def protect_school_data(request: Request, call_next):
+    path = request.url.path
+    public_paths = {"/api/health", "/api/auth/login"}
+
+    # Browser CORS preflight requests must reach CORSMiddleware without auth.
+    if request.method == "OPTIONS":
+        return await call_next(request)
+
+    if not path.startswith("/api/") or path in public_paths or path in {"/api/auth/password-reset/request", "/api/auth/password-reset/confirm"}:
+        return await call_next(request)
+
+    from starlette.responses import JSONResponse
+
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        return JSONResponse({"detail": "Login required."}, status_code=401)
+
+    db = SessionLocal()
+    try:
+        try:
+            payload = jwt.decode(
+                auth[7:], JWT_SECRET, algorithms=[JWT_ALGORITHM]
+            )
+            user_id = int(payload["sub"])
+        except (InvalidTokenError, ValueError, KeyError, TypeError):
+            return JSONResponse(
+                {"detail": "Invalid or expired login token."},
+                status_code=401,
+            )
+
+        # Always load the current account from the database. Never trust a
+        # role stored in a token: account deactivation and role changes must
+        # take effect immediately, even for tokens issued earlier.
+        user = db.get(models.User, user_id)
+        if not user or not user.is_active:
+            return JSONResponse(
+                {"detail": "Account is unavailable."}, status_code=401
+            )
+
+        if user.must_change_password and path not in {"/api/auth/me", "/api/me/password"}:
+            return JSONResponse({"detail": "Password change required. Set a new password before continuing."}, status_code=403)
+
+        if path == "/api/auth/me" or path.startswith("/api/me/") or path == "/api/dashboard/my-work":
+            # Self-service profile, password and personal dashboard endpoints
+            # are scoped to the authenticated account.
+            pass
+        elif path.startswith("/api/teacher/"):
+            if user.role != "teacher":
+                return JSONResponse({"detail": "Teacher account required."}, status_code=403)
+            section = permission_for_path(path)
+            action = action_for_method(request.method, path)
+            class_teacher_attendance = path == "/api/teacher/attendance" and request.method == "POST"
+            if class_teacher_attendance:
+                # The route validates the submitted student's class against
+                # the distinct class-teacher assignment before writing.
+                pass
+            elif not section or action not in user_permissions(user).get(section, set()):
+                return JSONResponse({"detail": "Your teacher account is not permitted to perform this action."}, status_code=403)
+        elif path.startswith("/api/parent/"):
+            if user.role != "parent":
+                return JSONResponse({"detail": "Parent account required."}, status_code=403)
+        elif path == "/api/announcements" and user.role == "parent":
+            pass
+        elif user.role != "admin":
+            if path in ADMIN_ONLY_PATHS or path.startswith("/api/auth/"):
+                return JSONResponse({"detail": "Administrator permission required."}, status_code=403)
+            section = permission_for_path(path)
+            # Finance staff need student lookup for payment processing, without
+            # granting them access to the wider Students workspace.
+            if path == "/api/students/search" and "view" in user_permissions(user).get("Fees & Finance", set()):
+                section = "Fees & Finance"
+            action = action_for_method(request.method, path)
+            class_teacher_register = path in {"/api/attendance", "/api/attendance/summary", "/api/attendance/options", "/api/attendance/students"} and user.role == "teacher"
+            if class_teacher_register:
+                if path == "/api/attendance/options":
+                    allowed = db.query(models.ClassTeacherAssignment.id).filter_by(teacher_id=user.id).first() is not None
+                else:
+                    class_id = request.query_params.get("class_id")
+                    allowed = bool(class_id and is_assigned_class_teacher(db, user.id, int(class_id)))
+                if not allowed:
+                    return JSONResponse({"detail": "Only the assigned class teacher may access this register."}, status_code=403)
+            elif not section or action not in user_permissions(user).get(section, set()):
+                return JSONResponse({"detail": "You do not have permission to access this section or perform this action."}, status_code=403)
+
+        return await call_next(request)
+    finally:
+        db.close()
+
+
+@app.post("/api/auth/login", tags=["Authentication"])
+def login(
+    data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db)
+):
+    login_name = data.username.strip()
+    user = db.query(models.User).filter(
+        models.User.username == login_name
+    ).first()
+    if user is None:
+        surname_matches = db.query(models.User).join(
+            models.StaffMember, models.User.staff_id == models.StaffMember.id
+        ).filter(or_(
+            func.lower(models.StaffMember.last_name) == login_name.lower(),
+            func.lower(models.StaffMember.staff_number) == login_name.lower(),
+        )).all()
+        if len(surname_matches) == 1:
+            user = surname_matches[0]
+        elif len(surname_matches) > 1:
+            raise HTTPException(401, "More than one staff member has that surname. Please sign in using your staff number.")
+
+    if not user or not user.is_active:
+        raise HTTPException(401, "Incorrect username or password.")
+
+    if not password_hash.verify(data.password, user.hashed_password):
+        raise HTTPException(401, "Incorrect username or password.")
+
+    return {
+        "access_token": create_access_token(user),
+        "token_type": "bearer",
+        "role": user.role,
+        "username": user.username,
+        "must_change_password": bool(user.must_change_password),
+    }
+
+
+class PasswordResetRequest(BaseModel):
+    identifier: str = Field(min_length=1, max_length=160)
+
+
+class PasswordResetConfirm(BaseModel):
+    identifier: str = Field(min_length=1, max_length=160)
+    code: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+def find_password_recovery_account(db: Session, identifier: str):
+    value = identifier.strip().lower()
+    matches = db.query(models.User).filter(or_(
+        func.lower(models.User.username) == value,
+        func.lower(models.User.email) == value,
+    )).all()
+    staff_matches = db.query(models.User).join(
+        models.StaffMember, models.User.staff_id == models.StaffMember.id
+    ).filter(or_(
+        func.lower(models.StaffMember.last_name) == value,
+        func.lower(models.StaffMember.staff_number) == value,
+    )).all()
+    unique = {item.id: item for item in matches + staff_matches}
+    return next(iter(unique.values())) if len(unique) == 1 else None
+
+
+def send_password_recovery_email(user, code: str) -> bool:
+    smtp_host = os.getenv("SCHOOLBRIDGE_SMTP_HOST", "smtp.gmail.com").strip()
+    smtp_user = os.getenv("SCHOOLBRIDGE_SMTP_USERNAME", "").strip()
+    smtp_password = os.getenv("SCHOOLBRIDGE_SMTP_PASSWORD", "")
+    smtp_from = os.getenv("SCHOOLBRIDGE_SMTP_FROM", smtp_user).strip()
+    recipient = (user.email or "").strip()
+    if not (smtp_host and smtp_user and smtp_password and smtp_from and recipient and not recipient.endswith(".schoolbridge.local")):
+        return False
+    message = EmailMessage()
+    message["Subject"] = "SchoolBridge password recovery code"
+    message["From"] = smtp_from
+    message["To"] = recipient
+    message.set_content(
+        "A password reset was requested for your SchoolBridge account.\n\n"
+        f"Your verification code is: {code}\n"
+        "This code expires in 15 minutes and can only be used once. "
+        "If you did not request this, you can ignore this email.\n"
+    )
+    port = int(os.getenv("SCHOOLBRIDGE_SMTP_PORT", "587"))
+    with smtplib.SMTP(smtp_host, port, timeout=15) as server:
+        server.ehlo()
+        if os.getenv("SCHOOLBRIDGE_SMTP_USE_TLS", "true").lower() not in ("0", "false", "no"):
+            server.starttls()
+            server.ehlo()
+        server.login(smtp_user, smtp_password)
+        server.send_message(message)
+    return True
+
+
+@app.post("/api/auth/password-reset/request", tags=["Authentication"])
+def request_password_reset(data: PasswordResetRequest, db: Session = Depends(get_db)):
+    # Always return the same response so account names and email addresses cannot be enumerated.
+    user = find_password_recovery_account(db, data.identifier)
+    now = datetime.utcnow()
+    if user and user.is_active and user.email and not user.email.endswith(".schoolbridge.local"):
+        if not user.reset_requested_at or (now - user.reset_requested_at).total_seconds() >= 60:
+            code = f"{secrets.randbelow(1000000):06d}"
+            user.reset_code_hash = password_hash.hash(code)
+            user.reset_expires_at = now + timedelta(minutes=15)
+            user.reset_requested_at = now
+            user.reset_attempts = 0
+            db.commit()
+            try:
+                delivered = send_password_recovery_email(user, code)
+            except Exception:
+                delivered = False
+            if not delivered:
+                user.reset_code_hash = None
+                user.reset_expires_at = None
+                db.commit()
+    return {"message": "If the account exists and has a registered email address, a verification code will be sent."}
+
+
+@app.post("/api/auth/password-reset/confirm", tags=["Authentication"])
+def confirm_password_reset(data: PasswordResetConfirm, db: Session = Depends(get_db)):
+    user = find_password_recovery_account(db, data.identifier)
+    now = datetime.utcnow()
+    if not user or not user.is_active or not user.reset_code_hash or not user.reset_expires_at or user.reset_expires_at < now or user.reset_attempts >= 5:
+        raise HTTPException(400, "The verification code is invalid or has expired. Request a new code.")
+    if not password_hash.verify(data.code, user.reset_code_hash):
+        user.reset_attempts += 1
+        db.commit()
+        raise HTTPException(400, "The verification code is invalid or has expired. Request a new code.")
+    if password_hash.verify(data.new_password, user.hashed_password):
+        raise HTTPException(400, "Choose a password different from your current password.")
+    user.hashed_password = password_hash.hash(data.new_password)
+    user.reset_code_hash = None
+    user.reset_expires_at = None
+    user.reset_attempts = 0
+    user.must_change_password = False
+    db.commit()
+    return {"message": "Password reset successfully. You can now sign in with your new password."}
+
+
+@app.get("/api/auth/me", tags=["Authentication"])
+def current_account(user=Depends(get_current_user)):
+    return {
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "role": user.role,
+        "role_label": user.role_label or user.role.title(),
+        "permissions": {k: sorted(v) for k, v in user_permissions(user).items()},
+        "active": user.is_active,
+        "must_change_password": bool(user.must_change_password),
+    }
+
+
+@app.post("/api/auth/users/{user_id}/reset-password", tags=["User Management"])
+def admin_reset_user_password(user_id: int, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    target = db.get(models.User, user_id)
+    if not target or target.role not in {"teacher", "staff"}:
+        raise HTTPException(404, "Staff login account not found.")
+    temporary_password = secrets.token_urlsafe(10)
+    target.hashed_password = password_hash.hash(temporary_password)
+    target.must_change_password = True
+    target.reset_code_hash = None
+    target.reset_expires_at = None
+    target.reset_requested_at = None
+    target.reset_attempts = 0
+    write_audit(db, admin, "staff_password_reset", "user", target.id, "Administrator issued a one-time temporary passcode.")
+    db.commit()
+    return {"message": "Temporary passcode generated. It is shown only once; the staff member must change it after signing in.", "username": target.username, "temporary_password": temporary_password}
+
+
+@app.post("/api/auth/teachers", tags=["User Management"])
+def create_teacher(
+    data: TeacherCreate,
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+):
+    staff = db.get(models.StaffMember, data.staff_id)
+    if not staff or staff.status != "active":
+        raise HTTPException(404, "Select an existing active staff member.")
+    if db.query(models.User).filter(models.User.staff_id == staff.id).first():
+        raise HTTPException(409, "This staff member already has a login account.")
+    role_type = "teacher" if staff.category == "Teaching" else "staff"
+    teacher = models.User(
+        username=data.username.strip(),
+        email=data.email.strip().lower(),
+        hashed_password=password_hash.hash(data.password),
+        role=role_type,
+        role_label=(staff.position or ("Teacher" if role_type == "teacher" else "Staff"))[:80],
+        staff_id=staff.id,
+    )
+    db.add(teacher)
+
+    try:
+        db.commit()
+        db.refresh(teacher)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            409, "Username or email is already registered."
+        )
+
+    return {
+        "id": teacher.id,
+        "username": teacher.username,
+        "email": teacher.email,
+        "role": teacher.role,
+    }
+
+
+class UserPermissionsUpdate(BaseModel):
+    role: str = Field(pattern="^(teacher|staff)$")
+    role_label: str = Field(min_length=2, max_length=80)
+    permissions: dict[str, list[str]]
+
+
+@app.get("/api/auth/permissions", tags=["User Management"])
+def permission_catalog(admin=Depends(require_admin)):
+    presets = {
+        "Headteacher": ["Overview", "Students", "Staff", "Fees & Finance", "Examinations", "Attendance", "Staff Attendance", "Timetable", "Leadership & Duty", "Parent Access", "Announcements", "Reports"],
+        "Deputy Headteacher": ["Overview", "Students", "Staff", "Examinations", "Attendance", "Timetable", "Leadership & Duty", "Announcements", "Reports"],
+        "DOS": ["Overview", "Staff", "Examinations", "Attendance", "Timetable", "Students", "Reports", "Announcements"],
+        "Academic Administrator": ["Overview", "Examinations", "Timetable", "Students", "Reports", "Announcements"],
+        "Academics Officer": ["Overview", "Examinations", "Timetable", "Students", "Reports"],
+        "Bursar": ["Overview", "Fees & Finance", "Students", "Reports"],
+        "Accountant": ["Overview", "Fees & Finance", "Staff", "Reports"],
+        "Secretary": ["Overview", "Students", "Staff", "Parent Access", "Announcements", "Reports"],
+        "Attendance Officer": ["Overview", "Attendance", "Staff Attendance", "Reports"],
+        "Teacher": ["My Classes", "My Attendance", "My Results", "Announcements", "Timetable"],
+        "Class Teacher": ["My Classes", "Students", "Attendance", "My Attendance", "My Results", "Announcements", "Timetable"],
+    }
+    return {"sections": sorted(PERMISSION_SECTIONS), "actions": sorted(PERMISSION_ACTIONS), "presets": presets}
+
+
+@app.put("/api/auth/users/{user_id}/permissions", tags=["User Management"])
+def update_user_permissions(user_id: int, data: UserPermissionsUpdate, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    target = db.get(models.User, user_id)
+    if not target or target.role in {"admin", "parent"}:
+        raise HTTPException(404, "Staff login account not found.")
+    cleaned = {}
+    for section, actions in data.permissions.items():
+        if section not in PERMISSION_SECTIONS or not isinstance(actions, list):
+            raise HTTPException(422, "Invalid permission section.")
+        invalid = set(actions) - PERMISSION_ACTIONS
+        if invalid:
+            raise HTTPException(422, "Invalid permission action.")
+        if actions:
+            cleaned[section] = sorted(set(actions))
+    if data.role == "teacher" and not any(k in cleaned for k in ("My Classes", "Attendance", "My Results")):
+        raise HTTPException(422, "Teacher accounts must retain at least one teaching permission.")
+    target.role = data.role
+    target.role_label = data.role_label.strip()
+    target.permissions_json = json.dumps(cleaned)
+    db.commit()
+    return {"id": target.id, "role": target.role, "role_label": target.role_label, "permissions": cleaned}
+
+
+@app.get("/api/auth/users", tags=["User Management"])
+def list_users(
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+):
+    users = db.query(models.User).order_by(models.User.username).all()
+    return [
+        {
+            "id": u.id,
+            "username": u.username,
+            "email": u.email,
+            "role": u.role,
+            "role_label": u.role_label or u.role.title(),
+            "permissions": {k: sorted(v) for k, v in user_permissions(u).items()},
+            "active": u.is_active,
+            "staff_id": u.staff_id,
+        }
+        for u in users
+    ]
+
+
+
+
+@app.post("/api/parent-accounts", tags=["Parent Access"])
+def create_parent_account(data: ParentAccountCreate, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    temporary_password = secrets.token_urlsafe(12)
+    student_ids = list(dict.fromkeys(data.student_ids))
+    students = db.query(models.Student).filter(models.Student.id.in_(student_ids)).all()
+    if len(students) != len(student_ids):
+        raise HTTPException(404, "One or more selected students could not be found.")
+    parent = models.User(
+        username=data.username.strip(),
+        email=data.email.strip().lower(),
+        hashed_password=password_hash.hash(temporary_password),
+        role="parent",
+    )
+    db.add(parent)
+    try:
+        db.flush()
+        db.add_all([models.ParentStudentLink(user_id=parent.id, student_id=student_id) for student_id in student_ids])
+        write_audit(db, admin, "parent_account_created", "user", parent.id, f"Linked student IDs: {', '.join(map(str, student_ids))}")
+        db.commit()
+        db.refresh(parent)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "That username or email is already registered, or a parent link already exists.")
+    email_sent = False
+    email_error = None
+    smtp_host = os.getenv("SCHOOLBRIDGE_SMTP_HOST", "smtp.gmail.com").strip()
+    smtp_user = os.getenv("SCHOOLBRIDGE_SMTP_USERNAME", "").strip()
+    smtp_password = os.getenv("SCHOOLBRIDGE_SMTP_PASSWORD", "")
+    smtp_from = os.getenv("SCHOOLBRIDGE_SMTP_FROM", smtp_user).strip()
+    if smtp_host and smtp_user and smtp_password and smtp_from:
+        try:
+            message = EmailMessage()
+            message["Subject"] = "Your SchoolBridge parent account"
+            message["From"] = smtp_from
+            message["To"] = parent.email
+            message.set_content(
+                f"Hello,\n\nYour SchoolBridge parent account has been created.\n"
+                f"Username: {parent.username}\nTemporary passcode: {temporary_password}\n\n"
+                "Sign in using the SchoolBridge portal and change your passcode after signing in. Keep these details private.\n"
+            )
+            smtp_port = int(os.getenv("SCHOOLBRIDGE_SMTP_PORT", "587"))
+            with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as server:
+                server.ehlo()
+                if os.getenv("SCHOOLBRIDGE_SMTP_USE_TLS", "true").lower() not in ("0", "false", "no"):
+                    server.starttls()
+                    server.ehlo()
+                if smtp_user:
+                    server.login(smtp_user, smtp_password)
+                server.send_message(message)
+            email_sent = True
+        except Exception:
+            email_error = "Email delivery could not be completed. Use the displayed local handover details."
+    else:
+        email_error = "Email delivery needs the school's SMTP username and app password in server settings."
+    return {"id": parent.id, "username": parent.username, "email": parent.email, "role": parent.role, "linked_students": len(student_ids), "temporary_password": temporary_password, "email_sent": email_sent, "email_error": email_error}
+
+
+@app.get("/api/parent-accounts", tags=["Parent Access"])
+def list_parent_accounts(db: Session = Depends(get_db), admin=Depends(require_admin)):
+    parents = db.query(models.User).filter_by(role="parent").order_by(models.User.username).all()
+    output = []
+    for parent in parents:
+        links = db.query(models.ParentStudentLink).filter_by(user_id=parent.id).all()
+        children = []
+        for link in links:
+            student = db.get(models.Student, link.student_id)
+            if student:
+                children.append({"id": student.id, "name": " ".join(x for x in [student.first_name, student.middle_name, student.last_name] if x), "admission_number": student.admission_number})
+        output.append({"id": parent.id, "username": parent.username, "email": parent.email, "active": parent.is_active, "children": children})
+    return output
+
+
+@app.delete("/api/parent-accounts/{parent_id}", tags=["Parent Access"])
+def remove_parent_account(parent_id: int, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    parent = db.query(models.User).filter_by(id=parent_id, role="parent").first()
+    if not parent:
+        raise HTTPException(404, "Parent account not found.")
+    links = db.query(models.ParentStudentLink).filter_by(user_id=parent.id).all()
+    linked_student_ids = [str(link.student_id) for link in links]
+    for link in links:
+        db.delete(link)
+    write_audit(
+        db, admin, "parent_account_removed", "user", parent.id,
+        f"username={parent.username}; unlinked_student_ids={','.join(linked_student_ids)}",
+    )
+    db.delete(parent)
+    db.commit()
+    return {"removed": True, "parent_id": parent_id, "unlinked_students": len(links)}
+
+
+@app.get("/api/parent/children", tags=["Parent Portal"])
+def parent_children(db: Session = Depends(get_db), parent=Depends(require_parent)):
+    links = db.query(models.ParentStudentLink).filter_by(user_id=parent.id).all()
+    output = []
+    for link in links:
+        student = db.get(models.Student, link.student_id)
+        if not student:
+            continue
+        school_class = db.get(models.SchoolClass, student.class_id) if student.class_id else None
+        charges = db.query(models.FeeCharge).filter_by(student_id=student.id).all()
+        total_charged = sum(row.amount for row in charges)
+        total_paid = sum(db.query(func.coalesce(func.sum(models.FeePayment.amount), 0)).filter_by(charge_id=row.id).scalar() or 0 for row in charges)
+        output.append({"id": student.id, "name": " ".join(x for x in [student.first_name, student.middle_name, student.last_name] if x), "admission_number": student.admission_number, "status": student.status, "class_name": school_class.name if school_class else "Unassigned", "stream": school_class.section if school_class else "", "fees_charged": total_charged, "fees_paid": total_paid, "balance": total_charged-total_paid})
+    return output
+
+
+@app.get("/api/parent/children/{student_id}/results", tags=["Parent Portal"])
+def parent_child_results(student_id: int, db: Session = Depends(get_db), parent=Depends(require_parent)):
+    student = linked_parent_student(db, parent, student_id)
+    rows = db.query(models.Mark, models.Exam, models.Subject).join(
+        models.Exam, models.Exam.id == models.Mark.exam_id
+    ).join(models.Subject, models.Subject.id == models.Mark.subject_id).filter(
+        models.Mark.student_id == student.id, models.Mark.verified.is_(True)
+    ).order_by(models.Exam.year.desc(), models.Exam.term, models.Exam.name, models.Subject.name).all()
+    return [{"exam": exam.name, "term": exam.term, "year": exam.year, "subject": subject.name, "score": mark.score} for mark, exam, subject in rows]
+
+
+@app.get("/api/parent/children/{student_id}/attendance", tags=["Parent Portal"])
+def parent_child_attendance(student_id: int, db: Session = Depends(get_db), parent=Depends(require_parent)):
+    student = linked_parent_student(db, parent, student_id)
+    rows = db.query(models.Attendance).filter_by(student_id=student.id).order_by(
+        models.Attendance.attendance_date.desc(), models.Attendance.id.desc()
+    ).limit(120).all()
+    return [{"date": row.attendance_date, "status": row.status} for row in rows]
+
+
+@app.get("/api/parent/children/{student_id}/fees", tags=["Parent Portal"])
+def parent_child_fees(student_id: int, db: Session = Depends(get_db), parent=Depends(require_parent)):
+    student = linked_parent_student(db, parent, student_id)
+    charges = db.query(models.FeeCharge).filter_by(student_id=student.id).order_by(
+        models.FeeCharge.year.desc(), models.FeeCharge.term
+    ).all()
+    output = []
+    for charge in charges:
+        payments = db.query(models.FeePayment).filter_by(charge_id=charge.id).order_by(
+            models.FeePayment.payment_date.desc(), models.FeePayment.id.desc()
+        ).all()
+        paid = sum(row.amount for row in payments)
+        output.append({"term": charge.term, "year": charge.year, "charged": charge.amount, "paid": paid, "balance": charge.amount-paid, "payments": [{"date": row.payment_date, "amount": row.amount, "receipt_number": row.receipt_number} for row in payments]})
+    return output
+
+
+
+
+def _parent_liaison_staff_access(user, action: str = "view"):
+    if user.role == "admin":
+        return
+    if user.role not in {"teacher", "staff"}:
+        raise HTTPException(403, "Authorised staff account required.")
+    if action not in user_permissions(user).get("Parent Liaison", set()):
+        raise HTTPException(403, "You do not have permission to use Parent Liaison.")
+
+
+def _staff_can_contact_student(db: Session, user, student):
+    if user.role == "admin":
+        return True
+    if user.role == "teacher":
+        if is_assigned_class_teacher(db, user.id, student.class_id or -1):
+            return True
+        return db.query(models.TeacherAssignment.id).filter_by(
+            teacher_id=user.id, class_id=student.class_id
+        ).first() is not None
+    return "add" in user_permissions(user).get("Parent Liaison", set())
+
+
+def _liaison_thread_access(db: Session, user, thread):
+    if user.role == "parent":
+        if thread.parent_user_id != user.id:
+            raise HTTPException(404, "Communication record not found.")
+        linked_parent_student(db, user, thread.student_id)
+        return "parent"
+    _parent_liaison_staff_access(user, "view")
+    if user.role == "admin" or thread.initiated_by == user.id:
+        return "staff"
+    student = db.get(models.Student, thread.student_id)
+    if student and _staff_can_contact_student(db, user, student):
+        return "staff"
+    raise HTTPException(404, "Communication record not found.")
+
+
+@app.get("/api/parent-liaison/recipients", tags=["Parent Liaison"])
+def parent_liaison_recipients(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    _parent_liaison_staff_access(user, "add")
+    students = db.query(models.Student).filter(models.Student.status == "active").order_by(
+        models.Student.last_name, models.Student.first_name
+    ).all()
+    output = []
+    for student in students:
+        if not _staff_can_contact_student(db, user, student):
+            continue
+        links = db.query(models.ParentStudentLink, models.User).join(
+            models.User, models.User.id == models.ParentStudentLink.user_id
+        ).filter(models.ParentStudentLink.student_id == student.id, models.User.is_active.is_(True)).all()
+        if not links:
+            continue
+        school_class = db.get(models.SchoolClass, student.class_id) if student.class_id else None
+        output.append({
+            "student_id": student.id,
+            "student_name": " ".join(part for part in [student.first_name, student.middle_name, student.last_name] if part),
+            "admission_number": student.admission_number,
+            "class_name": school_class.name if school_class else "Unassigned",
+            "parents": [{"id": parent.id, "username": parent.username, "email": parent.email} for _, parent in links],
+        })
+    return output
+
+
+@app.post("/api/parent-liaison/threads", tags=["Parent Liaison"])
+def create_parent_liaison_thread(data: ParentLiaisonThreadCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    _parent_liaison_staff_access(user, "add")
+    student = db.get(models.Student, data.student_id)
+    if not student or student.status != "active":
+        raise HTTPException(404, "Active student record not found.")
+    if not _staff_can_contact_student(db, user, student):
+        raise HTTPException(403, "You are not authorised to contact parents for this student.")
+    parent = db.query(models.User).filter_by(id=data.parent_user_id, role="parent", is_active=True).first()
+    link = db.query(models.ParentStudentLink.id).filter_by(
+        user_id=data.parent_user_id, student_id=data.student_id
+    ).first()
+    if not parent or not link:
+        raise HTTPException(422, "The selected parent account is not linked to this student.")
+    thread = models.ParentLiaisonThread(
+        student_id=student.id, parent_user_id=parent.id, initiated_by=user.id,
+        subject=data.subject.strip(), category=data.category,
+    )
+    db.add(thread)
+    db.flush()
+    first_message = models.ParentLiaisonMessage(thread_id=thread.id, sender_id=user.id, message=data.message.strip())
+    db.add(first_message)
+    write_audit(db, user, "parent_liaison_initiated", "parent_liaison_thread", thread.id,
+                f"student_id={student.id}; parent_user_id={parent.id}; category={data.category}")
+    db.commit()
+    db.refresh(thread)
+    return {"id": thread.id, "subject": thread.subject, "status": thread.status, "created_at": thread.created_at}
+
+
+@app.get("/api/parent-liaison/threads", tags=["Parent Liaison"])
+def list_parent_liaison_threads(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    if user.role == "parent":
+        query = db.query(models.ParentLiaisonThread).filter_by(parent_user_id=user.id)
+    else:
+        _parent_liaison_staff_access(user, "view")
+        if user.role == "admin":
+            query = db.query(models.ParentLiaisonThread)
+        else:
+            query = db.query(models.ParentLiaisonThread).filter(
+                models.ParentLiaisonThread.initiated_by == user.id
+            )
+    rows = query.order_by(models.ParentLiaisonThread.updated_at.desc(), models.ParentLiaisonThread.id.desc()).limit(200).all()
+    output = []
+    for thread in rows:
+        student = db.get(models.Student, thread.student_id)
+        parent = db.get(models.User, thread.parent_user_id)
+        last = db.query(models.ParentLiaisonMessage).filter_by(thread_id=thread.id).order_by(
+            models.ParentLiaisonMessage.id.desc()
+        ).first()
+        output.append({
+            "id": thread.id, "student_id": thread.student_id,
+            "student_name": " ".join(part for part in [student.first_name, student.middle_name, student.last_name] if part) if student else "Student",
+            "parent_name": parent.username if parent else "Parent",
+            "subject": thread.subject, "category": thread.category, "status": thread.status,
+            "created_at": thread.created_at, "updated_at": thread.updated_at,
+            "last_message": last.message[:180] if last else "",
+            "last_sender_id": last.sender_id if last else None,
+        })
+    return output
+
+
+@app.get("/api/parent-liaison/threads/{thread_id}", tags=["Parent Liaison"])
+def get_parent_liaison_thread(thread_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    thread = db.get(models.ParentLiaisonThread, thread_id)
+    if not thread:
+        raise HTTPException(404, "Communication record not found.")
+    _liaison_thread_access(db, user, thread)
+    messages = db.query(models.ParentLiaisonMessage).filter_by(thread_id=thread.id).order_by(
+        models.ParentLiaisonMessage.id
+    ).all()
+    for item in messages:
+        if item.sender_id != user.id and item.read_at is None:
+            item.read_at = datetime.utcnow()
+    db.commit()
+    return {
+        "id": thread.id, "student_id": thread.student_id, "subject": thread.subject,
+        "category": thread.category, "status": thread.status,
+        "student_name": " ".join(part for part in [
+            db.get(models.Student, thread.student_id).first_name,
+            db.get(models.Student, thread.student_id).middle_name,
+            db.get(models.Student, thread.student_id).last_name,
+        ] if part),
+        "messages": [{
+            "id": item.id, "sender_id": item.sender_id,
+            "sender_name": (db.get(models.User, item.sender_id).username if db.get(models.User, item.sender_id) else "User"),
+            "message": item.message, "created_at": item.created_at,
+            "read_at": item.read_at,
+        } for item in messages],
+    }
+
+
+@app.post("/api/parent-liaison/threads/{thread_id}/messages", tags=["Parent Liaison"])
+def reply_parent_liaison_thread(thread_id: int, data: ParentLiaisonMessageCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    thread = db.get(models.ParentLiaisonThread, thread_id)
+    if not thread:
+        raise HTTPException(404, "Communication record not found.")
+    side = _liaison_thread_access(db, user, thread)
+    if thread.status != "Open":
+        raise HTTPException(409, "This communication record is closed.")
+    item = models.ParentLiaisonMessage(thread_id=thread.id, sender_id=user.id, message=data.message.strip())
+    thread.updated_at = datetime.utcnow()
+    db.add(item)
+    write_audit(db, user, "parent_liaison_reply_sent", "parent_liaison_thread", thread.id,
+                f"sender_role={side}")
+    db.commit()
+    db.refresh(item)
+    return {"id": item.id, "created_at": item.created_at, "message": item.message}
+
+
+@app.patch("/api/parent-liaison/threads/{thread_id}/status", tags=["Parent Liaison"])
+def update_parent_liaison_status(thread_id: int, status: str, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    _parent_liaison_staff_access(user, "edit")
+    thread = db.get(models.ParentLiaisonThread, thread_id)
+    if not thread:
+        raise HTTPException(404, "Communication record not found.")
+    if user.role != "admin" and thread.initiated_by != user.id:
+        raise HTTPException(404, "Communication record not found.")
+    if status not in {"Open", "Closed"}:
+        raise HTTPException(422, "Status must be Open or Closed.")
+    thread.status = status
+    thread.updated_at = datetime.utcnow()
+    write_audit(db, user, "parent_liaison_status_changed", "parent_liaison_thread", thread.id, status)
+    db.commit()
+    return {"id": thread.id, "status": thread.status}
+
+
+@app.post("/api/announcements", tags=["School Announcements"])
+def create_announcement(data: AnnouncementCreate, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    item = models.SchoolAnnouncement(**data.model_dump(), created_by=admin.id)
+    db.add(item)
+    db.flush()
+    write_audit(db, admin, "announcement_created", "announcement", item.id, item.title)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@app.get("/api/announcements", tags=["School Announcements"])
+def list_announcements(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    if user.role == "admin":
+        query = db.query(models.SchoolAnnouncement)
+    elif user.role == "parent":
+        query = db.query(models.SchoolAnnouncement).filter(models.SchoolAnnouncement.published.is_(True), models.SchoolAnnouncement.audience.in_(["All", "Parents"]))
+    elif user.role == "teacher":
+        query = db.query(models.SchoolAnnouncement).filter(models.SchoolAnnouncement.published.is_(True), models.SchoolAnnouncement.audience.in_(["All", "Teachers"]))
+    else:
+        raise HTTPException(403, "This account cannot view school announcements.")
+    return query.order_by(models.SchoolAnnouncement.created_at.desc(), models.SchoolAnnouncement.id.desc()).limit(100).all()
+
+@app.post("/api/teacher-assignments", tags=["Teacher Management"])
+def assign_teacher(
+    data: AssignmentCreate,
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+):
+    teacher = db.get(models.User, data.teacher_id)
+
+    if not teacher or teacher.role != "teacher":
+        raise HTTPException(404, "Teacher account not found.")
+
+    if not db.get(models.SchoolClass, data.class_id):
+        raise HTTPException(404, "Class not found.")
+
+    subject = db.get(models.Subject, data.subject_id)
+    if not subject:
+        raise HTTPException(404, "Subject not found.")
+
+    if not teacher.staff_id:
+        raise HTTPException(422, "This teacher login is not linked to a staff registration profile.")
+    staff_profile = db.get(models.StaffMember, teacher.staff_id)
+    registered_subjects = {
+        name.strip().casefold()
+        for name in (staff_profile.subjects or "").split(",")
+        if name.strip()
+    } if staff_profile else set()
+    if subject.name.strip().casefold() not in registered_subjects:
+        raise HTTPException(422, "This subject was not registered under the selected teacher. Update the teacher's registered subjects first.")
+
+    assignment = models.TeacherAssignment(**data.model_dump())
+    db.add(assignment)
+
+    try:
+        db.commit()
+        db.refresh(assignment)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "This assignment already exists.")
+
+    return {"message": "Teacher assigned successfully.", "id": assignment.id}
+
+
+@app.get("/api/class-teacher-assignments", tags=["Teacher Management"])
+def list_class_teacher_assignments(db: Session = Depends(get_db), admin=Depends(require_admin)):
+    rows = db.query(models.ClassTeacherAssignment, models.User, models.SchoolClass).join(
+        models.User, models.User.id == models.ClassTeacherAssignment.teacher_id
+    ).join(models.SchoolClass, models.SchoolClass.id == models.ClassTeacherAssignment.class_id).order_by(
+        models.SchoolClass.name, models.SchoolClass.section
+    ).all()
+    return [{
+        "id": assignment.id, "teacher_id": teacher.id, "class_id": school_class.id,
+        "teacher_name": teacher.username, "class_name": school_class.name,
+        "section": school_class.section,
+    } for assignment, teacher, school_class in rows]
+
+
+@app.post("/api/class-teacher-assignments", tags=["Teacher Management"])
+def assign_class_teacher(data: ClassTeacherAssignmentCreate, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    teacher = db.get(models.User, data.teacher_id)
+    if not teacher or teacher.role != "teacher":
+        raise HTTPException(404, "Select a valid teacher login account.")
+    if not db.get(models.SchoolClass, data.class_id):
+        raise HTTPException(404, "Class not found.")
+    existing = db.query(models.ClassTeacherAssignment).filter_by(class_id=data.class_id).first()
+    if existing:
+        previous_teacher_id = existing.teacher_id
+        existing.teacher_id = data.teacher_id
+        assignment = existing
+        if previous_teacher_id != data.teacher_id:
+            previous_teacher = db.get(models.User, previous_teacher_id)
+            remaining = db.query(models.ClassTeacherAssignment.id).filter(
+                models.ClassTeacherAssignment.teacher_id == previous_teacher_id,
+                models.ClassTeacherAssignment.id != existing.id,
+            ).first()
+            if previous_teacher and not remaining:
+                previous_permissions = user_permissions(previous_teacher)
+                previous_permissions.pop("Attendance", None)
+                previous_teacher.permissions_json = json.dumps({key: sorted(value) for key, value in previous_permissions.items()})
+    else:
+        assignment = models.ClassTeacherAssignment(**data.model_dump())
+        db.add(assignment)
+    permissions = user_permissions(teacher)
+    permissions["Attendance"] = {"view", "add", "edit"}
+    teacher.permissions_json = json.dumps({key: sorted(value) for key, value in permissions.items()})
+    write_audit(db, admin, "class_teacher_assigned", "class", data.class_id, f"Teacher account {teacher.username}")
+    db.commit()
+    db.refresh(assignment)
+    return {"id": assignment.id, "message": "Class teacher assigned successfully."}
+
+
+@app.delete("/api/class-teacher-assignments/{assignment_id}", tags=["Teacher Management"])
+def remove_class_teacher(assignment_id: int, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    assignment = db.get(models.ClassTeacherAssignment, assignment_id)
+    if not assignment:
+        raise HTTPException(404, "Class teacher assignment not found.")
+    teacher = db.get(models.User, assignment.teacher_id)
+    class_id = assignment.class_id
+    write_audit(db, admin, "class_teacher_removed", "class", class_id, f"Assignment {assignment.id}")
+    db.delete(assignment)
+    db.flush()
+    if teacher and not db.query(models.ClassTeacherAssignment.id).filter_by(teacher_id=teacher.id).first():
+        permissions = user_permissions(teacher)
+        permissions.pop("Attendance", None)
+        teacher.permissions_json = json.dumps({key: sorted(value) for key, value in permissions.items()})
+    db.commit()
+    return {"message": "Class teacher assignment removed."}
+
+
+@app.get("/api/teacher/my-class-teacher-assignments", tags=["Teacher Workspace"])
+def my_class_teacher_assignments(db: Session = Depends(get_db), teacher=Depends(get_current_user)):
+    if teacher.role != "teacher":
+        raise HTTPException(403, "Teacher account required.")
+    rows = db.query(models.ClassTeacherAssignment, models.SchoolClass).join(
+        models.SchoolClass, models.SchoolClass.id == models.ClassTeacherAssignment.class_id
+    ).filter(models.ClassTeacherAssignment.teacher_id == teacher.id).all()
+    return [{
+        "assignment_id": assignment.id, "class_id": school_class.id,
+        "class": school_class.name + (" — " + school_class.section if school_class.section else ""),
+    } for assignment, school_class in rows]
+
+
+def get_linked_staff_member(db: Session, user):
+    staff_member = db.get(models.StaffMember, user.staff_id) if user.staff_id else None
+    if staff_member is None:
+        staff_member = db.query(models.StaffMember).filter(
+            func.lower(models.StaffMember.email) == (user.email or "").lower()
+        ).first()
+    if staff_member is None and user.username:
+        staff_member = db.query(models.StaffMember).filter(
+            func.lower(models.StaffMember.staff_number) == user.username.lower()
+        ).first()
+    return staff_member
+
+
+@app.get("/api/me/staff-attendance", tags=["Staff Attendance"])
+def my_staff_attendance(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    staff_member = get_linked_staff_member(db, user)
+    if not staff_member:
+        raise HTTPException(404, "Your login is not linked to a staff profile. Ask the administrator to link your staff account.")
+    records = db.query(models.StaffAttendance).filter(
+        models.StaffAttendance.staff_id == staff_member.id
+    ).order_by(models.StaffAttendance.attendance_date.desc(), models.StaffAttendance.id.desc()).limit(90).all()
+    today_local = datetime.now(ZoneInfo("Africa/Kampala")).date()
+    today_record = next((row for row in records if row.attendance_date == today_local), None)
+    return {
+        "staff_name": f"{staff_member.first_name} {staff_member.last_name}",
+        "staff_number": staff_member.staff_number,
+        "today": {
+            "attendance_date": today_local,
+            "status": today_record.status if today_record else "Not checked in",
+            "check_in_at": today_record.check_in_at if today_record else None,
+            "check_out_at": today_record.check_out_at if today_record else None,
+        },
+        "records": [{
+            "id": row.id, "attendance_date": row.attendance_date, "status": row.status,
+            "notes": row.notes, "check_in_at": row.check_in_at, "check_out_at": row.check_out_at,
+        } for row in records],
+    }
+
+
+@app.get("/api/me/staff-attendance", tags=["Staff Attendance"])
+def get_my_staff_attendance(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    staff_member = get_linked_staff_member(db, user)
+    if not staff_member:
+        raise HTTPException(404, "Your login is not linked to a staff profile.")
+    records = db.query(models.StaffAttendance).filter(
+        models.StaffAttendance.staff_id == staff_member.id
+    ).order_by(models.StaffAttendance.attendance_date.desc(), models.StaffAttendance.id.desc()).limit(60).all()
+    return {"records": [{
+        "id": row.id, "attendance_date": row.attendance_date, "status": row.status,
+        "notes": row.notes, "check_in_at": row.check_in_at, "check_out_at": row.check_out_at,
+    } for row in records]}
+
+
+@app.post("/api/me/staff-attendance/check-in", tags=["Staff Attendance"])
+def staff_self_check_in(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    staff_member = get_linked_staff_member(db, user)
+    if not staff_member or staff_member.status != "active":
+        raise HTTPException(404, "Your active staff profile could not be found.")
+    local_now = datetime.now(ZoneInfo("Africa/Kampala")).replace(tzinfo=None, microsecond=0)
+    record = db.query(models.StaffAttendance).filter_by(
+        staff_id=staff_member.id, attendance_date=local_now.date()
+    ).first()
+    if record and record.check_in_at:
+        raise HTTPException(409, "You have already checked in today.")
+    if record is None:
+        record = models.StaffAttendance(
+            staff_id=staff_member.id, attendance_date=local_now.date(),
+            status="Present", notes="On shift",
+        )
+        db.add(record)
+    record.check_in_at = local_now
+    # Keep the shift note in sync even when today's attendance row already existed.
+    record.notes = "On shift"
+    # A successful self check-in confirms presence; authorised attendance staff
+    # may later revise the status to Late, Excused or another valid value.
+    record.status = "Present"
+    write_audit(db, user, "staff_self_check_in", "staff_attendance", staff_member.id,
+                f"Checked in at {local_now.strftime('%H:%M')} on {local_now.date()}.")
+    db.commit()
+    db.refresh(record)
+    return {"message": "Check-in recorded and sent to the attendance office.", "check_in_at": record.check_in_at, "status": record.status}
+
+
+@app.post("/api/me/staff-attendance/check-out", tags=["Staff Attendance"])
+def staff_self_check_out(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    staff_member = get_linked_staff_member(db, user)
+    if not staff_member or staff_member.status != "active":
+        raise HTTPException(404, "Your active staff profile could not be found.")
+    local_now = datetime.now(ZoneInfo("Africa/Kampala")).replace(tzinfo=None, microsecond=0)
+    record = db.query(models.StaffAttendance).filter_by(
+        staff_id=staff_member.id, attendance_date=local_now.date()
+    ).first()
+    if not record or not record.check_in_at:
+        raise HTTPException(409, "Check in before recording your check-out.")
+    if record.check_out_at:
+        raise HTTPException(409, "You have already checked out today.")
+    record.check_out_at = local_now
+    record.notes = "Shift ended"
+    write_audit(db, user, "staff_self_check_out", "staff_attendance", staff_member.id,
+                f"Checked out at {local_now.strftime('%H:%M')} on {local_now.date()}.")
+    db.commit()
+    return {"message": "Check-out time recorded.", "check_out_at": record.check_out_at, "status": record.status}
+
+
+@app.get("/api/teacher/my-staff-attendance", tags=["Teacher Workspace"])
+def teacher_my_staff_attendance(
+    db: Session = Depends(get_db),
+    teacher=Depends(get_current_user),
+):
+    if teacher.role != "teacher":
+        raise HTTPException(403, "Teacher account required.")
+    staff_member = get_linked_staff_member(db, teacher)
+    if not staff_member:
+        raise HTTPException(
+            404,
+            "Your login email is not linked to a staff profile. Ask the administrator to use the same email on your staff record."
+        )
+    records = db.query(models.StaffAttendance).filter(
+        models.StaffAttendance.staff_id == staff_member.id
+    ).order_by(
+        models.StaffAttendance.attendance_date.desc(),
+        models.StaffAttendance.id.desc(),
+    ).limit(60).all()
+    return {
+        "staff_name": f"{staff_member.first_name} {staff_member.last_name}",
+        "staff_number": staff_member.staff_number,
+        "records": [
+            {
+                "id": row.id,
+                "attendance_date": row.attendance_date,
+                "status": row.status,
+                "notes": row.notes,
+                "check_in_at": row.check_in_at,
+                "check_out_at": row.check_out_at,
+            }
+            for row in records
+        ],
+    }
+
+
+@app.get("/api/teacher/my-assignments", tags=["Teacher Management"])
+def my_assignments(
+    db: Session = Depends(get_db),
+    teacher=Depends(get_current_user),
+):
+    if teacher.role != "teacher":
+        raise HTTPException(403, "Teacher account required.")
+
+    assignments = db.query(models.TeacherAssignment).filter(
+        models.TeacherAssignment.teacher_id == teacher.id
+    ).all()
+
+    return [
+        {
+            "assignment_id": a.id,
+            "class_id": a.class_id,
+            "class": db.get(models.SchoolClass, a.class_id).name + " — " + db.get(models.SchoolClass, a.class_id).section,
+            "subject_id": a.subject_id,
+            "subject": db.get(models.Subject, a.subject_id).name,
+        }
+        for a in assignments
+    ]
+
+
+@app.get("/api/teacher/exams", tags=["Teacher Workspace"])
+def teacher_exams(db: Session = Depends(get_db), teacher=Depends(get_current_user)):
+    if teacher.role != "teacher":
+        raise HTTPException(403, "Teacher account required.")
+    assigned_pairs = {
+        (row.class_id, row.subject_id) for row in db.query(models.TeacherAssignment).filter_by(teacher_id=teacher.id).all()
+    }
+    class_ids = sorted({class_id for class_id, _ in assigned_pairs})
+    if not class_ids:
+        return []
+    exams = db.query(models.Exam).filter(models.Exam.class_id.in_(class_ids)).order_by(
+        models.Exam.year.desc(), models.Exam.term, models.Exam.name
+    ).all()
+    output = []
+    for exam in exams:
+        subject_ids = [subject_id for class_id, subject_id in assigned_pairs if class_id == exam.class_id]
+        subjects = db.query(models.Subject).filter(models.Subject.id.in_(subject_ids or [-1])).order_by(models.Subject.name).all()
+        if subjects:
+            output.append({**{key: getattr(exam, key) for key in ("id", "name", "term", "year", "class_id")},
+                           "assigned_subjects": [{"id": subject.id, "name": subject.name} for subject in subjects]})
+    return output
+
+
+@app.get("/api/teacher/marks", tags=["Teacher Workspace"])
+def teacher_marks(exam_id: int | None = None, db: Session = Depends(get_db),
+                  teacher=Depends(get_current_user)):
+    if teacher.role != "teacher":
+        raise HTTPException(403, "Teacher account required.")
+    assignments = db.query(models.TeacherAssignment).filter_by(
+        teacher_id=teacher.id
+    ).all()
+    allowed = {(row.class_id, row.subject_id) for row in assignments}
+    if not allowed:
+        return []
+    query = db.query(models.Mark, models.Student, models.Exam).join(
+        models.Student, models.Student.id == models.Mark.student_id
+    ).join(models.Exam, models.Exam.id == models.Mark.exam_id)
+    if exam_id is not None:
+        query = query.filter(models.Mark.exam_id == exam_id)
+    rows = []
+    for mark, student, exam in query.order_by(
+        models.Mark.exam_id, models.Student.last_name, models.Mark.subject_id
+    ).all():
+        if (student.class_id, mark.subject_id) not in allowed:
+            continue
+        if mark.verified:
+            continue
+        rows.append({
+            "id": mark.id, "student_id": mark.student_id,
+            "subject_id": mark.subject_id, "exam_id": mark.exam_id,
+            "score": mark.score, "verified": False, "student_name": " ".join(
+                part for part in [student.first_name, student.middle_name, student.last_name] if part
+            ), "admission_number": student.admission_number,
+            "class_id": student.class_id,
+        })
+    return rows
+
+
+@app.get("/api/teacher/result-status", tags=["Teacher Workspace"])
+def teacher_result_status(exam_id: int, db: Session = Depends(get_db),
+                          teacher=Depends(get_current_user)):
+    if teacher.role != "teacher":
+        raise HTTPException(403, "Teacher account required.")
+    exam = db.get(models.Exam, exam_id)
+    if not exam:
+        raise HTTPException(404, "Examination not found.")
+    assignments = db.query(models.TeacherAssignment).filter_by(
+        teacher_id=teacher.id, class_id=exam.class_id
+    ).all()
+    if not assignments:
+        raise HTTPException(403, "You are not assigned to this examination's class.")
+    subject_ids = {row.subject_id for row in assignments}
+    marks = db.query(models.Mark).filter(
+        models.Mark.exam_id == exam.id,
+        models.Mark.subject_id.in_(subject_ids or {-1})
+    ).all()
+    output = []
+    for subject_id in sorted(subject_ids):
+        subject_marks = [mark for mark in marks if mark.subject_id == subject_id]
+        submitted = len(subject_marks)
+        pending = sum(1 for mark in subject_marks if not mark.verified)
+        verified = sum(1 for mark in subject_marks if mark.verified)
+        status = "Not submitted" if not submitted else ("Verified" if pending == 0 else "Not verified")
+        output.append({
+            "subject_id": subject_id,
+            "submitted_count": submitted,
+            "pending_count": pending,
+            "verified_count": verified,
+            "status": status,
+        })
+    return output
+
+
+@app.post("/api/teacher/marks/bulk", tags=["Teacher Workspace"])
+def save_teacher_marks_bulk(data: BulkMarkCreate, db: Session = Depends(get_db), teacher=Depends(get_current_user)):
+    if teacher.role != "teacher":
+        raise HTTPException(403, "Teacher account required.")
+    exam = db.get(models.Exam, data.exam_id)
+    subject = db.get(models.Subject, data.subject_id)
+    if not exam or not subject or exam.class_id is None:
+        raise HTTPException(404, "Class examination or subject not found.")
+    assigned = db.query(models.TeacherAssignment).filter_by(
+        teacher_id=teacher.id, class_id=exam.class_id, subject_id=subject.id
+    ).first()
+    if not assigned:
+        raise HTTPException(403, "You are not assigned to teach this subject in this class.")
+    student_ids = [row.student_id for row in data.records]
+    if len(student_ids) != len(set(student_ids)):
+        raise HTTPException(422, "Each student may appear only once in this class submission.")
+    students = db.query(models.Student).filter(
+        models.Student.id.in_(student_ids), models.Student.class_id == exam.class_id,
+        models.Student.status == "active"
+    ).all()
+    if len(students) != len(student_ids):
+        raise HTTPException(422, "Every submitted student must be active and belong to this examination's class.")
+    existing = db.query(models.Mark).filter(
+        models.Mark.exam_id == exam.id, models.Mark.subject_id == subject.id
+    ).all()
+    if any(row.verified for row in existing):
+        raise HTTPException(409, "These results have been verified and locked. Teachers can no longer submit or change this subject's results.")
+    existing = [row for row in existing if row.student_id in set(student_ids)]
+    by_student = {row.student_id: row for row in existing}
+    verified = {row.student_id: row for row in existing if row.verified}
+    changed_verified = [entry.student_id for entry in data.records
+                        if entry.student_id in verified and verified[entry.student_id].score != entry.score]
+    if changed_verified:
+        raise HTTPException(409, "Some submitted marks have already been verified. Ask the administrator to unlock them before changing those scores.")
+    saved = 0
+    for entry in data.records:
+        mark = by_student.get(entry.student_id)
+        if mark:
+            if not mark.verified:
+                mark.score = entry.score
+                saved += 1
+        else:
+            db.add(models.Mark(student_id=entry.student_id, subject_id=subject.id, exam_id=exam.id, score=entry.score))
+            saved += 1
+    no_score_count = sum(1 for entry in data.records if entry.score == 0)
+    # Create explicit zero-score rows for active learners omitted from the submission.
+    # This records "No score" and lets academic officers verify the complete class.
+    missing_students = db.query(models.Student).filter(
+        models.Student.class_id == exam.class_id,
+        models.Student.status == "active",
+        ~models.Student.id.in_(student_ids),
+    ).all()
+    for student in missing_students:
+        db.add(models.Mark(
+            student_id=student.id, subject_id=subject.id, exam_id=exam.id, score=0
+        ))
+        no_score_count += 1
+        saved += 1
+    write_audit(db, teacher, "teacher_class_marks_submitted", "exam", exam.id,
+                f"{saved} marks including {no_score_count} No score entries; class {exam.class_id}; subject {subject.name}")
+    db.commit()
+    return {"message": "Class results submitted successfully.", "saved": saved, "no_score": no_score_count, "exam_id": exam.id,
+            "class_id": exam.class_id, "subject_id": subject.id}
+
+
+@app.put("/api/teacher/marks", tags=["Teacher Workspace"])
+def save_teacher_mark(data: MarkCreate, db: Session = Depends(get_db),
+                      teacher=Depends(get_current_user)):
+    if teacher.role != "teacher":
+        raise HTTPException(403, "Teacher account required.")
+    student = db.get(models.Student, data.student_id)
+    subject = db.get(models.Subject, data.subject_id)
+    exam = db.get(models.Exam, data.exam_id)
+    if not student or not subject or not exam:
+        raise HTTPException(404, "Student, subject or examination not found.")
+    if exam.class_id is None or student.class_id != exam.class_id:
+        raise HTTPException(422, "The student does not belong to this class examination.")
+    assignment = db.query(models.TeacherAssignment).filter_by(
+        teacher_id=teacher.id, class_id=exam.class_id, subject_id=subject.id
+    ).first()
+    if not assignment:
+        raise HTTPException(403, "You are not assigned to teach this subject in this class.")
+    item = db.query(models.Mark).filter_by(
+        student_id=student.id, subject_id=subject.id, exam_id=exam.id
+    ).first()
+    if item is not None and item.verified:
+        raise HTTPException(409, "This mark has been verified by the administrator. Contact the administrator to unlock it before editing.")
+    if item is None:
+        item = models.Mark(**data.model_dump())
+        db.add(item)
+    else:
+        item.score = data.score
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+class StaffCreate(BaseModel):
+    first_name: str
+    last_name: str
+    subjects: str | None = None
+    category: str = Field(default="Teaching", pattern="^(Teaching|Non-teaching)$")
+    position: str | None = None
+    department: str | None = None
+    phone: str | None = None
+    email: str | None = None
+    salary_amount: int | None = Field(default=None, ge=0)
+    salary_frequency: str = Field(default="Monthly", pattern="^(Monthly|Termly|Weekly|Daily)$")
+
+def write_audit(db: Session, actor, action: str, entity_type: str, entity_id: int, details: str = ""):
+    db.add(models.AuditLog(
+        actor_id=actor.id if actor else None,
+        actor_username=actor.username if actor else "system",
+        action=action, entity_type=entity_type, entity_id=entity_id, details=details
+    ))
+
+
+class FeePaymentCreate(BaseModel):
+    charge_id: int
+    amount: int = Field(gt=0)
+    payment_date: date = Field(default_factory=date.today)
+    method: str = Field(default="Cash", max_length=30)
+    reference: str | None = Field(default=None, max_length=80)
+
+def upgrade_existing_database():
+    from sqlalchemy import inspect, text
+    inspector = inspect(engine)
+    if "students" not in inspector.get_table_names(): return
+    existing = {column["name"] for column in inspector.get_columns("students")}
+    additions = {
+        "middle_name": "VARCHAR(80)", "religion": "VARCHAR(60)", "nationality": "VARCHAR(60)",
+        "phone": "VARCHAR(30)", "address": "VARCHAR(255)", "guardian_name": "VARCHAR(160)",
+        "guardian_relationship": "VARCHAR(60)", "guardian_phone": "VARCHAR(30)",
+        "previous_school": "VARCHAR(160)", "admission_date": "DATE",
+        "status": "VARCHAR(20) NOT NULL DEFAULT 'active'",
+        "academic_level": "VARCHAR(20)", "combination": "VARCHAR(100)", "optional_subjects": "TEXT", "subsidiary_subjects": "TEXT",
+    }
+    settings_columns = {c["name"] for c in inspector.get_columns("school_settings")} if "school_settings" in inspector.get_table_names() else set()
+    staff_columns = {c["name"] for c in inspector.get_columns("staff_members")} if "staff_members" in inspector.get_table_names() else set()
+    payment_columns = {c["name"] for c in inspector.get_columns("fee_payments")} if "fee_payments" in inspector.get_table_names() else set()
+    with engine.begin() as connection:
+        for name, sql_type in additions.items():
+            if name not in existing: connection.execute(text("ALTER TABLE students ADD COLUMN " + name + " " + sql_type))
+        if "staff_members" in inspector.get_table_names():
+            if "subjects" not in staff_columns: connection.execute(text("ALTER TABLE staff_members ADD COLUMN subjects TEXT"))
+            if "salary_amount" not in staff_columns: connection.execute(text("ALTER TABLE staff_members ADD COLUMN salary_amount INTEGER"))
+            if "salary_frequency" not in staff_columns: connection.execute(text("ALTER TABLE staff_members ADD COLUMN salary_frequency VARCHAR(20) NOT NULL DEFAULT 'Monthly'"))
+        if "fee_payments" in inspector.get_table_names() and "receipt_number" not in payment_columns:
+            connection.execute(text("ALTER TABLE fee_payments ADD COLUMN receipt_number VARCHAR(50)"))
+        if "fee_payments" in inspector.get_table_names():
+            connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_fee_payments_receipt_number ON fee_payments (receipt_number)"))
+        if "school_profile" in inspector.get_table_names():
+            profile_columns = {c["name"] for c in inspector.get_columns("school_profile")}
+            profile_additions = {"school_type": "VARCHAR(20) NOT NULL DEFAULT 'Secondary'", "a_level_combinations": "TEXT", "o_level_optional_subjects": "TEXT", "a_level_subsidiary_subjects": "TEXT"}
+            for name, sql_type in profile_additions.items():
+                if name not in profile_columns: connection.execute(text("ALTER TABLE school_profile ADD COLUMN " + name + " " + sql_type))
+        if "school_settings" in inspector.get_table_names():
+            if "academic_year" not in settings_columns:
+                connection.execute(text("ALTER TABLE school_settings ADD COLUMN academic_year INTEGER"))
+            if "active_term" not in settings_columns:
+                connection.execute(text("ALTER TABLE school_settings ADD COLUMN active_term VARCHAR(20) NOT NULL DEFAULT 'Term 1'"))
+
+upgrade_existing_database()
+
+def upgrade_class_stream_uniqueness():
+    """Allow multiple streams per grade while preserving existing class IDs and foreign keys."""
+    from sqlalchemy import inspect, text
+    import os, shutil, sqlite3
+    inspector = inspect(engine)
+    if "classes" not in inspector.get_table_names():
+        return
+    uniques = inspector.get_unique_constraints("classes")
+    unique_indexes = [i for i in inspector.get_indexes("classes") if i.get("unique")]
+    name_only = (any(u.get("column_names") == ["name"] for u in uniques)
+                 or any(i.get("column_names") == ["name"] for i in unique_indexes))
+    if not name_only:
+        return
+    if engine.dialect.name == "sqlite":
+        db_path = engine.url.database
+        if not db_path or db_path == ":memory:":
+            raise RuntimeError("Cannot safely migrate an in-memory classes database.")
+        absolute_path = os.path.abspath(db_path)
+        backup_path = absolute_path + ".pre_stream_migration.bak"
+        if not os.path.exists(backup_path):
+            shutil.copy2(absolute_path, backup_path)
+        raw = sqlite3.connect(absolute_path)
+        try:
+            raw.execute("PRAGMA foreign_keys=OFF")
+            raw.execute("BEGIN")
+            raw.execute("""CREATE TABLE classes_new (
+                id INTEGER NOT NULL PRIMARY KEY,
+                name VARCHAR(80) NOT NULL,
+                section VARCHAR(40) NOT NULL DEFAULT 'General',
+                CONSTRAINT uq_classes_name_section UNIQUE (name, section)
+            )""")
+            raw.execute("INSERT INTO classes_new (id,name,section) SELECT id,name,COALESCE(section,'General') FROM classes")
+            raw.execute("DROP TABLE classes")
+            raw.execute("ALTER TABLE classes_new RENAME TO classes")
+            raw.execute("CREATE INDEX ix_classes_name ON classes (name)")
+            raw.commit()
+            raw.execute("PRAGMA foreign_keys=ON")
+            violations = raw.execute("PRAGMA foreign_key_check").fetchall()
+            if violations:
+                raise RuntimeError("Class stream migration found foreign-key violations; restore the automatic backup.")
+        except Exception:
+            raw.rollback()
+            raise
+        finally:
+            raw.close()
+    elif engine.dialect.name == "postgresql":
+        with engine.begin() as connection:
+            connection.execute(text("UPDATE classes SET section='General' WHERE section IS NULL"))
+            for unique in uniques:
+                if unique.get("column_names") == ["name"] and unique.get("name"):
+                    connection.execute(text('ALTER TABLE classes DROP CONSTRAINT "' + unique["name"] + '"'))
+            for index in unique_indexes:
+                if index.get("column_names") == ["name"] and index.get("name"):
+                    connection.execute(text('DROP INDEX IF EXISTS "' + index["name"] + '"'))
+            connection.execute(text("ALTER TABLE classes ALTER COLUMN section SET DEFAULT 'General'"))
+            connection.execute(text("ALTER TABLE classes ALTER COLUMN section SET NOT NULL"))
+            connection.execute(text("ALTER TABLE classes ADD CONSTRAINT uq_classes_name_section UNIQUE (name, section)"))
+
+upgrade_class_stream_uniqueness()
+
+@app.get("/api/students/search", tags=["Students"])
+def search_students(page: int = 1, page_size: int = 25, search: str = "", class_id: int | None = None, db: Session = Depends(get_db)):
+    page_size = min(max(page_size, 1), 100)
+    query = db.query(models.Student)
+    if search.strip():
+        term = "%" + search.strip() + "%"
+        query = query.filter(or_(models.Student.admission_number.ilike(term), models.Student.first_name.ilike(term), models.Student.middle_name.ilike(term), models.Student.last_name.ilike(term)))
+    if class_id is not None:
+        query = query.filter(models.Student.class_id == class_id)
+    total = query.count()
+    rows = query.order_by(models.Student.last_name, models.Student.first_name).offset((page - 1) * page_size).limit(page_size).all()
+    return {"items": rows, "total": total, "page": page, "page_size": page_size, "pages": (total + page_size - 1) // page_size}
+
+
+@app.get("/api/dashboard/my-work", tags=["Dashboard"])
+def my_dashboard_work(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    today = date.today()
+    staff_id = user.staff_id
+    staff = db.get(models.StaffMember, staff_id) if staff_id else None
+    if staff is None and user.email:
+        staff = db.query(models.StaffMember).filter(func.lower(models.StaffMember.email) == user.email.lower()).first()
+    permissions = user_permissions(user)
+    today_lessons = []
+    class_teacher_classes = []
+    today_duty = None
+    if staff:
+        lessons = db.query(models.TimetableEntry, models.SchoolClass, models.Subject).outerjoin(
+            models.SchoolClass, models.SchoolClass.id == models.TimetableEntry.class_id
+        ).outerjoin(models.Subject, models.Subject.id == models.TimetableEntry.subject_id).filter(
+            models.TimetableEntry.staff_id == staff.id,
+            models.TimetableEntry.day_of_week == today.weekday() + 1,
+        ).order_by(models.TimetableEntry.start_time).all()
+        today_lessons = [{
+            "class_id": cls.id if cls else None,
+            "class_name": (cls.name + (" — " + cls.section if cls.section else "")) if cls else "Class",
+            "subject": subject.name if subject else "Lesson",
+            "start_time": entry.start_time, "end_time": entry.end_time,
+        } for entry, cls, subject in lessons]
+        duty = db.query(models.TeacherDuty).filter_by(staff_id=staff.id, duty_date=today).first()
+        if duty:
+            today_duty = {"date": duty.duty_date, "notes": duty.notes or "Assigned duty"}
+    if user.role == "teacher":
+        rows = db.query(models.ClassTeacherAssignment, models.SchoolClass).join(
+            models.SchoolClass, models.SchoolClass.id == models.ClassTeacherAssignment.class_id
+        ).filter(models.ClassTeacherAssignment.teacher_id == user.id).all()
+        class_teacher_classes = [{
+            "class_id": assignment.class_id,
+            "class_name": cls.name + (" — " + cls.section if cls.section else ""),
+        } for assignment, cls in rows]
+    available_sections = sorted(
+        section for section, actions in permissions.items() if "view" in actions
+    )
+    if user.role == "admin":
+        available_sections = sorted(PERMISSION_SECTIONS)
+    return {
+        "staff_name": f"{staff.first_name} {staff.last_name}" if staff else user.username,
+        "role_label": user.role_label or user.role.title(),
+        "available_sections": available_sections,
+        "today_lessons": today_lessons,
+        "class_teacher_classes": class_teacher_classes,
+        "today_duty": today_duty,
+    }
+
+
+@app.get("/api/dashboard/summary", tags=["Dashboard"])
+def dashboard_summary(attendance_date: date | None = None, db: Session = Depends(get_db)):
+    selected_attendance_date = attendance_date or date.today()
+    settings = get_or_create_school_settings(db)
+    academic_year = settings.academic_year or date.today().year
+    year_start = date(academic_year, 1, 1)
+    year_end = date(academic_year, 12, 31)
+    students_present_today = db.query(models.Attendance).join(
+        models.Student, models.Student.id == models.Attendance.student_id
+    ).filter(
+        models.Attendance.attendance_date == selected_attendance_date,
+        models.Attendance.status == "Present",
+        models.Student.status == "active",
+    ).count()
+    return {
+        "active_students": db.query(models.Student).filter(models.Student.status == "active").count(),
+        "new_admissions_this_year": db.query(models.Student).filter(
+            models.Student.admission_date >= year_start,
+            models.Student.admission_date <= year_end,
+        ).count(),
+        "students_present_today": students_present_today,
+        "active_staff": db.query(models.StaffMember).filter(models.StaffMember.status == "active").count(),
+        "total_classes": db.query(models.SchoolClass).count(),
+        "academic_year": academic_year,
+    }
+
+
+
+class PrefectAssignmentCreate(BaseModel):
+    student_id: int
+    position: str = Field(min_length=2, max_length=100)
+    start_date: date = Field(default_factory=date.today)
+    end_date: date | None = None
+
+
+class TeacherDutyCreate(BaseModel):
+    staff_id: int
+    duty_date: date
+    notes: str | None = Field(default=None, max_length=255)
+
+
+@app.get("/api/leadership/prefects", tags=["Leadership"])
+def list_prefects(active_only: bool = True, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    query = db.query(models.PrefectAssignment, models.Student, models.SchoolClass).join(
+        models.Student, models.Student.id == models.PrefectAssignment.student_id
+    ).outerjoin(models.SchoolClass, models.SchoolClass.id == models.Student.class_id)
+    if active_only:
+        query = query.filter(models.PrefectAssignment.active.is_(True))
+    rows = query.order_by(models.PrefectAssignment.active.desc(), models.PrefectAssignment.position).all()
+    return [{
+        "id": assignment.id, "student_id": student.id,
+        "student_name": f"{student.first_name} {student.last_name}",
+        "admission_number": student.admission_number,
+        "class_name": school_class.name if school_class else "Unassigned",
+        "stream": school_class.section if school_class else None,
+        "position": assignment.position, "start_date": assignment.start_date,
+        "end_date": assignment.end_date, "active": assignment.active,
+    } for assignment, student, school_class in rows]
+
+
+@app.post("/api/leadership/prefects", tags=["Leadership"])
+def appoint_prefect(data: PrefectAssignmentCreate, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    student = db.get(models.Student, data.student_id)
+    if not student or student.status != "active":
+        raise HTTPException(404, "Select an active student.")
+    if data.end_date and data.end_date < data.start_date:
+        raise HTTPException(422, "End date cannot be earlier than start date.")
+    if db.query(models.PrefectAssignment).filter_by(student_id=student.id, active=True).first():
+        raise HTTPException(409, "This student already has an active prefect appointment.")
+    if db.query(models.PrefectAssignment).filter_by(position=data.position, active=True).first():
+        raise HTTPException(409, "This prefect position already has an active appointment. End the previous term first.")
+    assignment = models.PrefectAssignment(**data.model_dump())
+    db.add(assignment)
+    db.flush()
+    write_audit(db, admin, "prefect_appointed", "prefect_assignment", assignment.id,
+                f"{student.admission_number}; {data.position}")
+    db.commit()
+    db.refresh(assignment)
+    return {"id": assignment.id, "message": "Prefect appointed successfully."}
+
+
+@app.patch("/api/leadership/prefects/{assignment_id}/end", tags=["Leadership"])
+def end_prefect_term(assignment_id: int, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    assignment = db.get(models.PrefectAssignment, assignment_id)
+    if not assignment:
+        raise HTTPException(404, "Prefect appointment not found.")
+    assignment.active = False
+    assignment.end_date = date.today()
+    write_audit(db, admin, "prefect_term_ended", "prefect_assignment", assignment.id, assignment.position)
+    db.commit()
+    return {"message": "Prefect appointment ended."}
+
+
+@app.get("/api/leadership/teacher-duties", tags=["Leadership"])
+def list_teacher_duties(from_date: date | None = None, to_date: date | None = None,
+                        db: Session = Depends(get_db), admin=Depends(require_admin)):
+    query = db.query(models.TeacherDuty, models.StaffMember).join(
+        models.StaffMember, models.StaffMember.id == models.TeacherDuty.staff_id
+    )
+    if from_date:
+        query = query.filter(models.TeacherDuty.duty_date >= from_date)
+    if to_date:
+        query = query.filter(models.TeacherDuty.duty_date <= to_date)
+    rows = query.order_by(models.TeacherDuty.duty_date.desc()).limit(150).all()
+    return [{
+        "id": duty.id, "staff_id": staff.id,
+        "teacher_name": f"{staff.first_name} {staff.last_name}",
+        "staff_number": staff.staff_number, "duty_date": duty.duty_date,
+        "notes": duty.notes,
+    } for duty, staff in rows]
+
+
+@app.post("/api/leadership/teacher-duties", tags=["Leadership"])
+def assign_teacher_duty(data: TeacherDutyCreate, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    staff = db.get(models.StaffMember, data.staff_id)
+    if not staff or staff.status != "active" or staff.category != "Teaching":
+        raise HTTPException(404, "Select an active teaching staff member.")
+    if db.query(models.TeacherDuty).filter_by(duty_date=data.duty_date).first():
+        raise HTTPException(409, "A teacher is already assigned to this duty date.")
+    duty = models.TeacherDuty(**data.model_dump())
+    db.add(duty)
+    db.flush()
+    write_audit(db, admin, "teacher_duty_assigned", "teacher_duty", duty.id,
+                f"{staff.staff_number}; {data.duty_date}")
+    db.commit()
+    db.refresh(duty)
+    return {"id": duty.id, "message": "Teacher duty assigned successfully."}
+
+
+@app.delete("/api/leadership/teacher-duties/{duty_id}", tags=["Leadership"])
+def remove_teacher_duty(duty_id: int, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    duty = db.get(models.TeacherDuty, duty_id)
+    if not duty:
+        raise HTTPException(404, "Duty assignment not found.")
+    write_audit(db, admin, "teacher_duty_removed", "teacher_duty", duty.id, str(duty.duty_date))
+    db.delete(duty)
+    db.commit()
+    return {"message": "Duty assignment removed."}
+
+
+@app.post("/api/staff", tags=["Staff"])
+def create_staff(data: StaffCreate, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    if not data.first_name.strip() or not data.last_name.strip():
+        raise HTTPException(422, "Enter the staff member's first and last names before saving.")
+    if not data.category:
+        raise HTTPException(422, "Select a staff category before saving.")
+    if not data.position or not data.position.strip():
+        raise HTTPException(422, "Enter the staff member's job title or position.")
+    if not data.department or not data.department.strip():
+        raise HTTPException(422, "Enter the staff member's department.")
+    if data.category == "Teaching" and (not data.subjects or not data.subjects.strip()):
+        raise HTTPException(422, "Enter at least one subject taught by this teacher.")
+    # Generate a fresh staff number and login ID; never reject a new employee
+    # merely because their contact email is already used by another account.
+    staff_number = ""
+    username = ""
+    for _ in range(8):
+        candidate = "STF-" + str(date.today().year) + "-" + uuid4().hex[:8].upper()
+        candidate_username = candidate.lower()
+        if not db.query(models.StaffMember.id).filter_by(staff_number=candidate).first() and not db.query(models.User.id).filter_by(username=candidate_username).first():
+            staff_number, username = candidate, candidate_username
+            break
+    if not staff_number:
+        raise HTTPException(503, "A unique staff login could not be generated. Please try again.")
+    item = models.StaffMember(staff_number=staff_number, **data.model_dump())
+    # Create the staff profile and login together so registration is one step.
+    temporary_passcode = secrets.token_urlsafe(9)
+    account_role = "teacher" if data.category == "Teaching" else "staff"
+    requested_email = (data.email or "").strip().lower()
+    email_in_use = bool(requested_email and db.query(models.User.id).filter_by(email=requested_email).first())
+    account_email = f"{username}@accounts.schoolbridge.local" if email_in_use or not requested_email else requested_email
+    if account_role == "teacher":
+        default_permissions = {
+            "Overview": ["view"], "My Classes": ["view"],
+            "My Attendance": ["view"], "My Results": ["view", "add", "edit"],
+            "Announcements": ["view"],
+        }
+    else:
+        title = (data.position or "").strip().lower()
+        if "bursar" in title or "account" in title:
+            sections = ["Overview", "Fees & Finance"]
+        elif "secretary" in title or "admin" in title:
+            sections = ["Overview", "Students", "Staff", "Parent Access", "Announcements", "Reports"]
+        elif "head" in title or title == "dos" or "director of studies" in title:
+            sections = ["Overview", "Students", "Staff", "Examinations", "Attendance", "Timetable", "Leadership & Duty", "Announcements", "Reports"]
+        else:
+            sections = ["Overview"]
+        default_permissions = {section: ["view"] for section in sections}
+    item_user = models.User(
+        username=username,
+        email=account_email,
+        hashed_password=password_hash.hash(temporary_passcode),
+        role=account_role,
+        role_label=(data.position or ("Teacher" if account_role == "teacher" else "Staff"))[:80],
+        permissions_json=json.dumps(default_permissions),
+    )
+    db.add(item)
+    try:
+        db.flush()
+        item_user.staff_id = item.id
+        db.add(item_user)
+        db.commit()
+        db.refresh(item)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "The staff member was not saved because a unique staff number, username or login email conflicts with an existing account. The form is safe to retry; check whether this email is already assigned to another login.")
+    # Keep the original staff fields at the top level for existing API clients,
+    # while also returning the grouped staff/login objects used by the new UI.
+    staff_data = {column.name: getattr(item, column.name) for column in item.__table__.columns}
+    return {
+        **staff_data,
+        "staff": staff_data,
+        "login": {
+            "username": item_user.username,
+            "email": item_user.email,
+            "temporary_passcode": temporary_passcode,
+            "role": item_user.role,
+            "role_label": item_user.role_label,
+        },
+    }
+
+
+@app.get("/api/staff", tags=["Staff"])
+def list_staff(search: str = "", category: str | None = None, page: int = 1, page_size: int = 25, db: Session = Depends(get_db)):
+    page_size = min(max(page_size, 1), 100)
+    query = db.query(models.StaffMember)
+    if search.strip():
+        term = "%" + search.strip() + "%"
+        query = query.filter(or_(models.StaffMember.staff_number.ilike(term), models.StaffMember.first_name.ilike(term), models.StaffMember.last_name.ilike(term), models.StaffMember.position.ilike(term), models.StaffMember.department.ilike(term), models.StaffMember.email.ilike(term), models.StaffMember.phone.ilike(term)))
+    if category:
+        query = query.filter(models.StaffMember.category == category)
+    total = query.count()
+    rows = query.order_by(models.StaffMember.last_name).offset((page - 1) * page_size).limit(page_size).all()
+    return {"items": rows, "total": total, "page": page, "page_size": page_size, "pages": (total + page_size - 1) // page_size}
+
+
+@app.get("/api/finance/summary", tags=["Finance"])
+def finance_summary(db: Session = Depends(get_db)):
+    charged = db.query(func.coalesce(func.sum(models.FeeCharge.amount), 0)).scalar() or 0
+    paid = db.query(func.coalesce(func.sum(models.FeePayment.amount), 0)).scalar() or 0
+    salary_expenses = db.query(func.coalesce(func.sum(models.SalaryPayment.amount), 0)).scalar() or 0
+    other_expenses = db.query(func.coalesce(func.sum(models.OtherExpense.amount), 0)).scalar() or 0
+    return {"fees_expected": float(charged), "fees_collected": float(paid),
+            "outstanding": float(charged - paid),
+            "salary_expenses": int(salary_expenses),
+            "other_expenses": int(other_expenses),
+            "total_expenses": int(salary_expenses + other_expenses),
+            "net_cash_position": int(paid - salary_expenses - other_expenses)}
+
+
+@app.get("/api/finance/charges", tags=["Finance"])
+def list_fee_charges(search: str = "", class_id: int | None = None, stream: str | None = None, outstanding_only: bool = False, db: Session = Depends(get_db)):
+    payment_totals = db.query(
+        models.FeePayment.charge_id.label("charge_id"),
+        func.sum(models.FeePayment.amount).label("paid")
+    ).group_by(models.FeePayment.charge_id).subquery()
+    query = db.query(
+        models.FeeCharge, models.Student, models.SchoolClass,
+        func.coalesce(payment_totals.c.paid, 0)
+    ).join(
+        models.Student, models.Student.id == models.FeeCharge.student_id
+    ).outerjoin(
+        models.SchoolClass, models.SchoolClass.id == models.Student.class_id
+    ).outerjoin(
+        payment_totals, payment_totals.c.charge_id == models.FeeCharge.id
+    )
+    if class_id is not None:
+        query = query.filter(models.Student.class_id == class_id)
+    if stream:
+        query = query.filter(models.SchoolClass.section == stream)
+    if search.strip():
+        term = "%" + search.strip() + "%"
+        query = query.filter(or_(
+            models.Student.admission_number.ilike(term),
+            models.Student.first_name.ilike(term),
+            models.Student.middle_name.ilike(term),
+            models.Student.last_name.ilike(term)
+        ))
+    results = []
+    for charge, student, school_class, paid in query.order_by(
+        models.FeeCharge.year.desc(), models.FeeCharge.term,
+        models.Student.last_name, models.Student.first_name
+    ).all():
+        balance = charge.amount - int(paid or 0)
+        if outstanding_only and balance <= 0:
+            continue
+        results.append({
+            "id": charge.id, "student_id": student.id,
+            "student_name": " ".join(x for x in [student.first_name, student.middle_name, student.last_name] if x),
+            "admission_number": student.admission_number,
+            "class_id": student.class_id,
+            "class_name": school_class.name if school_class else "",
+            "stream": school_class.section if school_class else "",
+            "term": charge.term, "year": charge.year,
+            "amount": charge.amount, "paid": int(paid or 0),
+            "balance": balance
+        })
+    return results
+
+@app.post("/api/finance/payments", tags=["Finance"])
+def record_fee_payment(data: FeePaymentCreate, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    charge = db.get(models.FeeCharge, data.charge_id)
+    if not charge:
+        raise HTTPException(404, "Fee charge not found.")
+    paid = db.query(func.coalesce(func.sum(models.FeePayment.amount), 0)).filter(models.FeePayment.charge_id == charge.id).scalar() or 0
+    if data.amount > charge.amount - paid:
+        raise HTTPException(400, "Payment exceeds the outstanding balance.")
+    item = models.FeePayment(**data.model_dump(), receipt_number="RCPT-" + str(date.today().year) + "-" + uuid4().hex[:8].upper())
+    db.add(item)
+    db.flush()
+    write_audit(db, admin, "payment_received", "fee_payment", item.id,
+                f"Receipt {item.receipt_number}; amount {item.amount}; charge {item.charge_id}")
+    db.commit()
+    db.refresh(item)
+    return {"id": item.id, "charge_id": item.charge_id, "amount": item.amount, "payment_date": item.payment_date, "method": item.method, "reference": item.reference, "receipt_number": item.receipt_number}
+
+
+class ClassFeeUpdate(BaseModel):
+    term: str = Field(pattern="^(Term 1|Term 2|Term 3)$")
+    year: int = Field(ge=2000, le=2100)
+    amount: int = Field(ge=0)
+
+
+class AcademicSettingsUpdate(BaseModel):
+    academic_year: int = Field(ge=2000, le=2100)
+    active_term: str = Field(pattern="^(Term 1|Term 2|Term 3)$")
+
+
+@app.get("/api/settings/academic", tags=["School Settings"])
+def read_academic_settings(db: Session = Depends(get_db)):
+    settings = get_or_create_school_settings(db)
+    if settings.academic_year is None:
+        settings.academic_year = date.today().year
+        db.commit()
+    return {"academic_year": settings.academic_year, "active_term": settings.active_term}
+
+
+@app.put("/api/settings/academic", tags=["School Settings"])
+def update_academic_settings(data: AcademicSettingsUpdate, db: Session = Depends(get_db)):
+    settings = get_or_create_school_settings(db)
+    settings.academic_year = data.academic_year
+    settings.active_term = data.active_term
+    db.flush()
+    created = 0
+    active_students = db.query(models.Student).filter(
+        models.Student.status == "active",
+        models.Student.class_id.is_not(None)
+    ).all()
+    for student in active_students:
+        class_fee = db.query(models.ClassFee).filter_by(
+            class_id=student.class_id, term=data.active_term, year=data.academic_year
+        ).first()
+        if not class_fee or class_fee.amount <= 0:
+            continue
+        existing = db.query(models.FeeCharge).filter_by(
+            student_id=student.id, term=data.active_term, year=data.academic_year
+        ).first()
+        if existing is None:
+            db.add(models.FeeCharge(
+                student_id=student.id, term=data.active_term,
+                year=data.academic_year, amount=class_fee.amount
+            ))
+            created += 1
+    db.commit()
+    return {"message": "Academic settings saved and class fees assigned to active students.",
+            **data.model_dump(), "charges_created": created}
+
+
+@app.get("/api/classes/{class_id}/fees", tags=["Classes"])
+def get_class_fees(class_id: int, year: int | None = None, db: Session = Depends(get_db)):
+    if not db.get(models.SchoolClass, class_id):
+        raise HTTPException(404, "Class not found.")
+    settings = get_or_create_school_settings(db)
+    selected_year = year or settings.academic_year or date.today().year
+    rows = db.query(models.ClassFee).filter_by(class_id=class_id, year=selected_year).all()
+    by_term = {row.term: row.amount for row in rows}
+    return {"class_id": class_id, "year": selected_year,
+            "fees": [{"term": term, "amount": by_term.get(term, 0)}
+                     for term in ("Term 1", "Term 2", "Term 3")]}
+
+
+@app.put("/api/classes/{class_id}/fees", tags=["Classes"])
+def save_class_fee(class_id: int, data: ClassFeeUpdate, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    selected_class = db.get(models.SchoolClass, class_id)
+    if not selected_class:
+        raise HTTPException(404, "Class not found.")
+    # Streams under the same grade share one standard term fee.
+    grade_classes = db.query(models.SchoolClass).filter(
+        models.SchoolClass.name == selected_class.name
+    ).all()
+    created = 0
+    settings = get_or_create_school_settings(db)
+    for grade_class in grade_classes:
+        row = db.query(models.ClassFee).filter_by(
+            class_id=grade_class.id, term=data.term, year=data.year
+        ).first()
+        if row is None:
+            row = models.ClassFee(class_id=grade_class.id, **data.model_dump())
+            db.add(row)
+            db.flush()
+        else:
+            row.amount = data.amount
+        if settings.active_term == data.term and (settings.academic_year or date.today().year) == data.year:
+            active_students = db.query(models.Student).filter_by(
+                class_id=grade_class.id, status="active"
+            ).all()
+            for student in active_students:
+                existing = db.query(models.FeeCharge).filter_by(
+                    student_id=student.id, term=data.term, year=data.year
+                ).first()
+                if existing is None and data.amount > 0:
+                    db.add(models.FeeCharge(
+                        student_id=student.id, term=data.term,
+                        year=data.year, amount=data.amount
+                    ))
+                    created += 1
+    db.flush()
+    write_audit(db, admin, "class_fee_updated", "class_fee", class_id,
+                f"Grade {selected_class.name}; {data.term} {data.year}; UGX {data.amount}")
+    db.commit()
+    return {"message": "Class fee saved for all streams. Existing charges were not changed.",
+            "class_id": class_id, "term": data.term, "year": data.year,
+            "amount": data.amount, "streams_updated": len(grade_classes),
+            "charges_created": created}
+
+@app.get("/api/students/{student_id}/profile", tags=["Students"])
+def student_profile(student_id: int, db: Session = Depends(get_db)):
+    student = db.get(models.Student, student_id)
+    if not student:
+        raise HTTPException(404, "Student not found.")
+    charges = db.query(models.FeeCharge).filter_by(student_id=student_id).order_by(
+        models.FeeCharge.year.desc(), models.FeeCharge.term
+    ).all()
+    fee_history = []
+    for charge in charges:
+        payments = db.query(models.FeePayment).filter_by(charge_id=charge.id).order_by(
+            models.FeePayment.payment_date.desc(), models.FeePayment.id.desc()
+        ).all()
+        paid = sum(p.amount for p in payments)
+        fee_history.append({
+            "charge_id": charge.id, "term": charge.term, "year": charge.year,
+            "amount": charge.amount, "paid": paid, "balance": charge.amount-paid,
+            "payments": [{
+                "id": p.id, "amount": p.amount, "date": p.payment_date,
+                "method": p.method, "reference": p.reference, "receipt_number": p.receipt_number
+            } for p in payments]
+        })
+    school_class = db.get(models.SchoolClass, student.class_id) if student.class_id else None
+    return {
+        "student": student,
+        "class": school_class.name if school_class else None,
+        "stream": school_class.section if school_class else None,
+        "fees": fee_history,
+        "total_charged": sum(x["amount"] for x in fee_history),
+        "total_paid": sum(x["paid"] for x in fee_history),
+        "total_balance": sum(x["balance"] for x in fee_history),
+    }
+
+
+@app.patch("/api/students/{student_id}", tags=["Students"])
+def update_student(student_id: int, data: StudentUpdate, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    student = db.get(models.Student, student_id)
+    if not student:
+        raise HTTPException(404, "Student not found.")
+    changes = data.model_dump(exclude_unset=True)
+    if "class_id" in changes and changes["class_id"] is not None and not db.get(models.SchoolClass, changes["class_id"]):
+        raise HTTPException(404, "Class not found.")
+    for key, value in changes.items():
+        setattr(student, key, value)
+    write_audit(db, admin, "student_updated", "student", student.id, ", ".join(changes.keys()))
+    db.commit()
+    db.refresh(student)
+    return {"message": "Student profile updated.", "student": student}
+
+
+@app.patch("/api/students/{student_id}/status", tags=["Students"])
+def change_student_status(student_id: int, status: str, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    if status not in {"active", "transferred", "dismissed", "inactive"}:
+        raise HTTPException(422, "Status must be active, transferred, dismissed or inactive.")
+    student = db.get(models.Student, student_id)
+    if not student:
+        raise HTTPException(404, "Student not found.")
+    student.status = status
+    write_audit(db, admin, "student_status_changed", "student", student.id, status)
+    db.commit()
+    return {"message": "Student status updated. Historical academic and financial records were retained.", "status": status}
+
+
+class StaffUpdate(BaseModel):
+    first_name: str | None = None
+    last_name: str | None = None
+    subjects: str | None = None
+    category: str | None = Field(default=None, pattern="^(Teaching|Non-teaching)$")
+    position: str | None = None
+    department: str | None = None
+    phone: str | None = None
+    email: str | None = None
+    salary_amount: int | None = Field(default=None, ge=0)
+    salary_frequency: str | None = Field(default=None, pattern="^(Monthly|Termly|Weekly|Daily)$")
+    status: str | None = Field(default=None, pattern="^(active|archived|inactive)$")
+
+
+class SalaryPaymentCreate(BaseModel):
+    staff_id: int
+    amount: int = Field(gt=0)
+    payment_date: date = Field(default_factory=date.today)
+    period: str = Field(min_length=2, max_length=40)
+    reference: str | None = Field(default=None, max_length=80)
+
+
+class OtherExpenseCreate(BaseModel):
+    description: str = Field(min_length=2, max_length=160)
+    category: str = Field(default="General", max_length=60)
+    amount: int = Field(gt=0)
+    expense_date: date = Field(default_factory=date.today)
+    reference: str | None = Field(default=None, max_length=80)
+
+
+class MyStaffProfileUpdate(BaseModel):
+    first_name: str = Field(min_length=1, max_length=80)
+    phone: str | None = Field(default=None, max_length=30)
+    email: str | None = Field(default=None, max_length=150)
+
+
+class MyPasswordUpdate(BaseModel):
+    current_password: str = Field(min_length=1)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+@app.get("/api/me/staff-profile", tags=["Staff"])
+def get_my_staff_profile(user=Depends(get_current_user), db: Session = Depends(get_db)):
+    if not user.staff_id:
+        raise HTTPException(404, "This account is not linked to a staff profile.")
+    staff = db.get(models.StaffMember, user.staff_id)
+    if not staff:
+        raise HTTPException(404, "Staff profile not found.")
+    return {
+        "id": staff.id, "first_name": staff.first_name, "last_name": staff.last_name,
+        "staff_number": staff.staff_number, "phone": staff.phone, "email": staff.email,
+        "position": staff.position, "department": staff.department, "category": staff.category,
+        "username": user.username,
+    }
+
+
+@app.patch("/api/me/staff-profile", tags=["Staff"])
+def update_my_staff_profile(data: MyStaffProfileUpdate, user=Depends(get_current_user), db: Session = Depends(get_db)):
+    if not user.staff_id:
+        raise HTTPException(404, "This account is not linked to a staff profile.")
+    staff = db.get(models.StaffMember, user.staff_id)
+    if not staff:
+        raise HTTPException(404, "Staff profile not found.")
+    email = data.email.strip().lower() if data.email and data.email.strip() else user.email
+    if email:
+        duplicate = db.query(models.User).filter(models.User.email == email, models.User.id != user.id).first()
+        if duplicate:
+            raise HTTPException(409, "That email address is already used by another account.")
+        user.email = email
+    staff.first_name = data.first_name.strip()
+    staff.phone = data.phone.strip() if data.phone and data.phone.strip() else None
+    staff.email = email
+    db.commit()
+    db.refresh(staff)
+    return {"message": "Profile updated. Your surname, staff number, position, department and subject assignments remain unchanged.", "profile": {
+        "id": staff.id, "first_name": staff.first_name, "last_name": staff.last_name,
+        "staff_number": staff.staff_number, "phone": staff.phone, "email": staff.email,
+        "position": staff.position, "department": staff.department, "category": staff.category,
+        "username": user.username,
+    }}
+
+
+@app.put("/api/me/password", tags=["Authentication"])
+def update_my_password(data: MyPasswordUpdate, user=Depends(get_current_user), db: Session = Depends(get_db)):
+    if not password_hash.verify(data.current_password, user.hashed_password):
+        raise HTTPException(400, "Your current password is incorrect.")
+    if password_hash.verify(data.new_password, user.hashed_password):
+        raise HTTPException(400, "Choose a password different from your current password.")
+    user.hashed_password = password_hash.hash(data.new_password)
+    user.must_change_password = False
+    user.reset_code_hash = None
+    user.reset_expires_at = None
+    user.reset_attempts = 0
+    db.commit()
+    return {"message": "Password updated successfully."}
+
+
+@app.patch("/api/staff/{staff_id}", tags=["Staff"])
+def update_staff(staff_id: int, data: StaffUpdate, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    staff = db.get(models.StaffMember, staff_id)
+    if not staff:
+        raise HTTPException(404, "Staff member not found.")
+    changes = data.model_dump(exclude_unset=True)
+    for key, value in changes.items():
+        setattr(staff, key, value)
+    write_audit(db, admin, "staff_updated", "staff", staff.id, ", ".join(changes.keys()))
+    db.commit()
+    db.refresh(staff)
+    return {"message": "Staff profile updated.", "staff": staff}
+
+
+@app.post("/api/staff/{staff_id}/archive", tags=["Staff"])
+def archive_staff(staff_id: int, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    staff = db.get(models.StaffMember, staff_id)
+    if not staff:
+        raise HTTPException(404, "Staff member not found.")
+    staff.status = "archived"
+    write_audit(db, admin, "staff_archived", "staff", staff.id, "Staff archived; history retained.")
+    db.commit()
+    return {"message": "Staff member archived. Historical salary records were retained."}
+
+
+@app.post("/api/finance/salary-payments", tags=["Finance"])
+def record_salary_payment(data: SalaryPaymentCreate, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    staff = db.get(models.StaffMember, data.staff_id)
+    if not staff:
+        raise HTTPException(404, "Staff member not found.")
+    payment = models.SalaryPayment(**data.model_dump())
+    db.add(payment)
+    db.flush()
+    write_audit(db, admin, "salary_paid", "salary_payment", payment.id,
+                f"Staff {staff.staff_number}; amount {payment.amount}; period {payment.period}")
+    db.commit()
+    db.refresh(payment)
+    return {"id": payment.id, "staff_id": payment.staff_id, "amount": payment.amount, "payment_date": payment.payment_date, "period": payment.period}
+
+
+@app.post("/api/finance/other-expenses", tags=["Finance"])
+def record_other_expense(data: OtherExpenseCreate, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    expense = models.OtherExpense(**data.model_dump())
+    db.add(expense)
+    db.flush()
+    write_audit(db, admin, "expense_recorded", "other_expense", expense.id,
+                f"{expense.category}; amount {expense.amount}; {expense.description}")
+    db.commit()
+    db.refresh(expense)
+    return expense
+
+
+@app.get("/api/finance/expenses", tags=["Finance"])
+def finance_expenses(db: Session = Depends(get_db)):
+    salary_total = db.query(func.coalesce(func.sum(models.SalaryPayment.amount), 0)).scalar() or 0
+    other_total = db.query(func.coalesce(func.sum(models.OtherExpense.amount), 0)).scalar() or 0
+    return {"salary_expenses": int(salary_total), "other_expenses": int(other_total), "total_expenses": int(salary_total + other_total)}
+
+
+@app.get("/api/teacher/students", tags=["Teacher Workspace"])
+def teacher_students(class_id: int, db: Session = Depends(get_db), teacher=Depends(get_current_user)):
+    if teacher.role != "teacher":
+        raise HTTPException(403, "Teacher account required.")
+    assigned = db.query(models.TeacherAssignment).filter_by(
+        teacher_id=teacher.id, class_id=class_id
+    ).first()
+    class_teacher = is_assigned_class_teacher(db, teacher.id, class_id)
+    if not assigned and not class_teacher:
+        raise HTTPException(403, "This class is not assigned to your teaching or class-teacher responsibilities.")
+    return db.query(models.Student).filter(
+        models.Student.class_id == class_id, models.Student.status == "active"
+    ).order_by(models.Student.last_name, models.Student.first_name).all()
+
+
+@app.post("/api/teacher/attendance", tags=["Teacher Workspace"])
+def teacher_record_attendance(data: AttendanceCreate, db: Session = Depends(get_db), teacher=Depends(get_current_user)):
+    if teacher.role != "teacher":
+        raise HTTPException(403, "Teacher account required.")
+    student = db.get(models.Student, data.student_id)
+    if not student:
+        raise HTTPException(404, "Student not found.")
+    require_class_attendance_access(db, teacher, student.class_id, "add")
+    item = models.Attendance(**data.model_dump())
+    db.add(item)
+    try:
+        db.commit()
+        db.refresh(item)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "Attendance already recorded for this student on this date.")
+    return item
+
+
+@app.get("/api/audit-logs", tags=["System Audit"])
+def list_audit_logs(page: int = 1, page_size: int = 50, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    page_size = min(max(page_size, 1), 100)
+    query = db.query(models.AuditLog)
+    total = query.count()
+    rows = query.order_by(models.AuditLog.created_at.desc(), models.AuditLog.id.desc()).offset((page-1)*page_size).limit(page_size).all()
+    return {"items": rows, "total": total, "page": page, "page_size": page_size}
+
+
+class SchoolProfileUpdate(BaseModel):
+    name: str = Field(min_length=2, max_length=160)
+    address: str | None = Field(default=None, max_length=255)
+    phone: str | None = Field(default=None, max_length=40)
+    email: str | None = Field(default=None, max_length=150)
+    motto: str | None = Field(default=None, max_length=200)
+    school_type: str = Field(default="Secondary", pattern="^(Primary|Secondary)$")
+    a_level_combinations: str | None = None
+    o_level_optional_subjects: str | None = None
+    a_level_subsidiary_subjects: str | None = None
+    report_logo: str | None = Field(default=None, max_length=2_000_000)
+    report_template: str | None = Field(default=None, max_length=100_000)
+
+
+@app.get("/api/settings/school-profile", tags=["School Settings"])
+def get_school_profile(db: Session = Depends(get_db)):
+    profile = db.get(models.SchoolProfile, 1)
+    if profile is None:
+        profile = models.SchoolProfile(id=1)
+        db.add(profile)
+        db.commit()
+        db.refresh(profile)
+    return profile
+
+
+@app.put("/api/settings/school-profile", tags=["School Settings"])
+def save_school_profile(data: SchoolProfileUpdate, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    profile = db.get(models.SchoolProfile, 1)
+    if profile is None:
+        profile = models.SchoolProfile(id=1)
+        db.add(profile)
+    for key, value in data.model_dump(exclude_unset=True).items():
+        setattr(profile, key, value)
+    db.flush()
+    write_audit(db, admin, "school_profile_updated", "school_profile", profile.id, "School profile and report branding updated.")
+    db.commit()
+    db.refresh(profile)
+    return {"message": "School profile saved.", "profile": profile}
+
+
+@app.post("/api/backups/create", tags=["Backups"])
+def create_database_backup(admin=Depends(require_admin)):
+    import os, sqlite3, tempfile
+    if engine.dialect.name != "sqlite":
+        raise HTTPException(501, "Direct file backups are currently supported for the local SQLite installation.")
+    db_path = engine.url.database
+    if not db_path or db_path == ":memory:":
+        raise HTTPException(400, "A file-based school database is required.")
+    fd, backup_path = tempfile.mkstemp(prefix="schoolbridge-backup-", suffix=".sqlite3")
+    os.close(fd)
+    try:
+        source = sqlite3.connect(os.path.abspath(db_path))
+        destination = sqlite3.connect(backup_path)
+        try:
+            source.backup(destination)
+        finally:
+            destination.close()
+            source.close()
+    except Exception:
+        if os.path.exists(backup_path):
+            os.unlink(backup_path)
+        raise HTTPException(500, "Could not create a database backup.")
+    filename = "schoolbridge-backup-" + date.today().isoformat() + ".sqlite3"
+    return FileResponse(
+        backup_path, media_type="application/vnd.sqlite3", filename=filename,
+        background=BackgroundTask(lambda: os.path.exists(backup_path) and os.unlink(backup_path))
+    )
+
+
+@app.post("/api/backups/restore", tags=["Backups"])
+async def restore_database_backup(file: UploadFile = File(...), admin=Depends(require_admin)):
+    import os, sqlite3, tempfile
+    if engine.dialect.name != "sqlite":
+        raise HTTPException(501, "Direct file restore is currently supported for the local SQLite installation.")
+    db_path = engine.url.database
+    if not db_path or db_path == ":memory:":
+        raise HTTPException(400, "A file-based school database is required.")
+    payload = await file.read(512 * 1024 * 1024 + 1)
+    if len(payload) > 512 * 1024 * 1024:
+        raise HTTPException(413, "Backup file is larger than 512 MB.")
+    absolute_path = os.path.abspath(db_path)
+    directory = os.path.dirname(absolute_path)
+    fd, uploaded_path = tempfile.mkstemp(prefix="schoolbridge-restore-", suffix=".sqlite3", dir=directory)
+    os.close(fd)
+    pending_path = absolute_path + ".restore_pending"
+    try:
+        with open(uploaded_path, "wb") as output:
+            output.write(payload)
+        candidate = sqlite3.connect(uploaded_path)
+        try:
+            integrity = candidate.execute("PRAGMA integrity_check").fetchone()
+            foreign_key_errors = candidate.execute("PRAGMA foreign_key_check").fetchall()
+            tables = {row[0] for row in candidate.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+            required = {"users", "students", "classes", "school_settings"}
+            if not integrity or integrity[0] != "ok" or foreign_key_errors or not required.issubset(tables):
+                raise HTTPException(400, "This file is not a valid SchoolBridge database backup.")
+        finally:
+            candidate.close()
+        os.replace(uploaded_path, pending_path)
+        return {"message": "Backup validated and staged. Restart the SchoolBridge backend to apply it. The current database will be copied to a safety backup before replacement."}
+    except HTTPException:
+        raise
+    except sqlite3.DatabaseError as exc:
+        raise HTTPException(400, "The uploaded file is not a readable SQLite database backup.") from exc
+    except Exception as exc:
+        raise HTTPException(500, "Could not stage the database restore.") from exc
+    finally:
+        if os.path.exists(uploaded_path):
+            os.unlink(uploaded_path)
+
+
+class FeeChargeUpdate(BaseModel):
+    amount: int = Field(ge=0)
+    reason: str = Field(min_length=3, max_length=255)
+
+
+@app.patch("/api/finance/charges/{charge_id}", tags=["Finance"])
+def adjust_fee_charge(charge_id: int, data: FeeChargeUpdate, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    charge = db.get(models.FeeCharge, charge_id)
+    if not charge:
+        raise HTTPException(404, "Fee charge not found.")
+    paid = db.query(func.coalesce(func.sum(models.FeePayment.amount), 0)).filter(
+        models.FeePayment.charge_id == charge.id
+    ).scalar() or 0
+    if data.amount < paid:
+        raise HTTPException(400, "The revised charge cannot be less than payments already received.")
+    previous = charge.amount
+    charge.amount = data.amount
+    write_audit(db, admin, "fee_charge_adjusted", "fee_charge", charge.id,
+                f"Previous UGX {previous}; new UGX {data.amount}; reason: {data.reason}")
+    db.commit()
+    return {"message": "Fee charge adjusted and recorded in the audit log.", "charge_id": charge.id, "amount": charge.amount, "paid": paid, "balance": charge.amount-paid}
