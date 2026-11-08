@@ -722,3 +722,75 @@ def test_verified_marks_are_locked_for_teachers_until_admin_unlocks():
         assert corrected.status_code == 200, corrected.text
         assert corrected.json()["score"] == 88
         assert corrected.json()["verified"] is False
+
+
+def test_parent_portal_only_exposes_linked_child_records_and_audience_announcements():
+    reset_database()
+    admin = create_admin()
+    admin_headers = {"Authorization": f"Bearer {create_access_token(admin)}"}
+    teacher = create_teacher()
+    teacher_headers = {"Authorization": f"Bearer {create_access_token(teacher)}"}
+
+    db = SessionLocal()
+    try:
+        school_class = models.SchoolClass(name="Primary 4", section="Blue")
+        subject = models.Subject(name="English")
+        db.add_all([school_class, subject])
+        db.flush()
+        child = models.Student(admission_number="SB-PARENT-001", first_name="Amina", last_name="Learner", class_id=school_class.id)
+        unrelated = models.Student(admission_number="SB-PARENT-002", first_name="Brian", last_name="Learner", class_id=school_class.id)
+        db.add_all([child, unrelated])
+        db.flush()
+        charge = models.FeeCharge(student_id=child.id, term="Term 1", year=2026, amount=1000)
+        exam = models.Exam(name="Mid-Term", term="Term 1", year=2026, class_id=school_class.id)
+        db.add_all([charge, exam])
+        db.flush()
+        db.add(models.FeePayment(charge_id=charge.id, amount=300, payment_date=date(2026, 2, 10)))
+        db.add(models.Mark(student_id=child.id, subject_id=subject.id, exam_id=exam.id, score=82, verified=True))
+        db.add(models.Attendance(student_id=child.id, attendance_date=date(2026, 2, 11), status="Present"))
+        db.commit()
+        child_id, unrelated_id = child.id, unrelated.id
+    finally:
+        db.close()
+
+    with TestClient(app) as client:
+        created = client.post("/api/parent-accounts", headers=admin_headers, json={
+            "username": "amina-parent", "email": "parent@example.invalid",
+            "password": "ParentPassword123!", "student_ids": [child_id],
+        })
+        assert created.status_code == 200, created.text
+        parent_login = client.post("/api/auth/login", data={
+            "username": "amina-parent", "password": "ParentPassword123!",
+        })
+        assert parent_login.status_code == 200
+        parent_headers = {"Authorization": f"Bearer {parent_login.json()['access_token']}"}
+
+        children = client.get("/api/parent/children", headers=parent_headers)
+        assert children.status_code == 200
+        assert [row["id"] for row in children.json()] == [child_id]
+        assert children.json()[0]["balance"] == 700
+
+        results = client.get(f"/api/parent/children/{child_id}/results", headers=parent_headers)
+        assert results.status_code == 200, results.text
+        assert len(results.json()) == 1
+        assert results.json()[0]["score"] == 82
+
+        attendance = client.get(f"/api/parent/children/{child_id}/attendance", headers=parent_headers)
+        assert attendance.status_code == 200
+        assert attendance.json()[0]["status"] == "Present"
+
+        hidden_child = client.get(f"/api/parent/children/{unrelated_id}/fees", headers=parent_headers)
+        assert hidden_child.status_code == 404
+        parent_forbidden = client.get("/api/parent/children", headers=teacher_headers)
+        assert parent_forbidden.status_code == 403
+
+        for audience, title in [("Parents", "Parent Update"), ("Teachers", "Teacher Update"), ("All", "Whole School Update")]:
+            published = client.post("/api/announcements", headers=admin_headers, json={
+                "title": title, "message": "Important school information.", "audience": audience, "published": True,
+            })
+            assert published.status_code == 200, published.text
+
+        parent_announcements = client.get("/api/announcements", headers=parent_headers)
+        teacher_announcements = client.get("/api/announcements", headers=teacher_headers)
+        assert {row["title"] for row in parent_announcements.json()} == {"Parent Update", "Whole School Update"}
+        assert {row["title"] for row in teacher_announcements.json()} == {"Teacher Update", "Whole School Update"}
