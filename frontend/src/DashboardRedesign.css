@@ -313,3 +313,71 @@
     padding:20px 14px 24px;
   }
 }
+
+
+/* Restore the original single, continuous sidebar layout: no separate brand
+   and management cards. Keep the role's established sidebar colour. */
+.redesigned-app-shell>.sidebar{
+  display:flex!important;
+  flex-direction:column!important;
+  gap:0!important;
+  padding:25px 17px 18px!important;
+  overflow-y:auto!important;
+  overflow-x:hidden!important;
+  background:linear-gradient(180deg,var(--role-deep,#172b4d) 0%,var(--role-primary,#315ee8) 100%)!important;
+  scrollbar-width:none!important;
+  -ms-overflow-style:none!important;
+}
+.redesigned-app-shell>.sidebar::-webkit-scrollbar,
+.redesigned-app-shell>.sidebar *::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}
+.redesigned-app-shell>.sidebar .sidebar-brand{
+  flex:0 0 auto!important;
+  min-height:0!important;
+  margin:0 0 28px!important;
+  padding:0 9px 24px!important;
+  border:0!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+  background:transparent!important;
+  color:#fff!important;
+}
+.redesigned-app-shell>.sidebar .sidebar-brand .brand-mark{
+  background:#ffffff20!important;
+  color:#fff!important;
+  box-shadow:none!important;
+}
+.redesigned-app-shell>.sidebar .sidebar-brand .brand-name,
+.redesigned-app-shell>.sidebar .sidebar-brand .brand-name span{
+  color:#fff!important;
+}
+.redesigned-app-shell>.sidebar .sidebar-brand .mobile-close{color:#fff!important}
+.redesigned-app-shell>.sidebar>.school-label{
+  padding:0 12px 13px!important;
+  color:#ffffffad!important;
+  font-size:10px!important;
+  font-weight:800!important;
+  letter-spacing:1.3px!important;
+}
+.redesigned-app-shell>.sidebar>nav{flex:0 0 auto}
+.redesigned-app-shell>.sidebar .nav-item{
+  color:#ffffffd1!important;
+  background:transparent!important;
+}
+.redesigned-app-shell>.sidebar .nav-item:hover,
+.redesigned-app-shell>.sidebar .nav-item.active{
+  color:#fff!important;
+  background:#ffffff20!important;
+}
+.redesigned-app-shell>.sidebar .active-dot{background:#fff!important}
+.redesigned-app-shell>.sidebar .sidebar-bottom{margin-top:auto;padding-top:18px}
+.redesigned-app-shell>.sidebar .profile-card{border-top:1px solid #ffffff35!important}
+.redesigned-app-shell>.sidebar .profile-info strong,
+.redesigned-app-shell>.sidebar .profile-info small,
+.redesigned-app-shell>.sidebar .logout-button{color:#fff!important}
+.redesigned-app-shell>.sidebar .avatar{
+  color:var(--role-deep)!important;
+  background:#fff!important;
+}
+@media(max-width:760px){
+  .redesigned-app-shell>.sidebar{padding:25px 17px 18px!important}
+}
