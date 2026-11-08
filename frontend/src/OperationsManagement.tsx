@@ -116,6 +116,19 @@ export default function OperationsManagement({ token, active, permissions = {}, 
     finally { setSaving(false) }
   }
 
+  function beginEdit(entry: TimetableEntry) {
+    setEditingEntryId(entry.id)
+    setDraft({
+      class_id: String(entry.class_id),
+      subject_id: entry.subject_id ? String(entry.subject_id) : '',
+      staff_id: entry.staff_id ? String(entry.staff_id) : '',
+      day_of_week: String(entry.day_of_week),
+      start_time: entry.start_time,
+      end_time: entry.end_time,
+    })
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   async function removeEntry(id: number) {
     if (!window.confirm('Remove this lesson from the timetable?')) return
     setSaving(true); setError('')
@@ -181,7 +194,7 @@ export default function OperationsManagement({ token, active, permissions = {}, 
             <div className="table-wrap"><table className="class-timetable-table timetable-week-grid"><thead><tr><th>Period</th>{days.map(day=><th key={day}>{day}</th>)}</tr></thead><tbody>
               {slots.map(slot => <tr key={slot}><th>{slot}</th>{days.map((day,index) => {
                 const entry = classEntries.find(row => row.day_of_week === index + 1 && row.start_time + '–' + row.end_time === slot)
-                return <td key={day}>{entry ? <div className="timetable-lesson-card"><strong>{entry.subject_name || 'Lesson'}</strong><span>{entry.teacher_name || 'Teacher not assigned'}</span><small>{entry.start_time}–{entry.end_time}</small>{canEditTimetable && <div className="timetable-card-actions"><button type="button" className="secondary-button" disabled={saving} onClick={() => {setEditingEntryId(entry.id);setDraft({class_id:String(entry.class_id),subject_id:entry.subject_id?String(entry.subject_id):'',staff_id:entry.staff_id?String(entry.staff_id):'',day_of_week:String(entry.day_of_week),start_time:entry.start_time,end_time:entry.end_time});window.scrollTo({top:0,behavior:'smooth'})}}>Edit</button><button type="button" className="secondary-button" disabled={saving} onClick={() => void removeEntry(entry.id)}><Trash2 size={13}/> Remove</button></div>}</div> : <span className="timetable-empty-cell">—</span>}</td>
+                return <td key={day}>{entry ? <div className="timetable-lesson-card"><strong>{entry.subject_name || 'Lesson'}</strong><span>{entry.teacher_name || 'Teacher not assigned'}</span><small>{entry.start_time}–{entry.end_time}</small>{canEditTimetable && <div className="timetable-card-actions"><button type="button" className="secondary-button" disabled={saving} onClick={() => beginEdit(entry)}>Edit</button><button type="button" className="secondary-button" disabled={saving} onClick={() => void removeEntry(entry.id)}><Trash2 size={13}/> Remove</button></div>}</div> : <span className="timetable-empty-cell">—</span>}</td>
               })}</tr>)}
               {!slots.length && <tr><td colSpan={6}>No lessons scheduled for this class.</td></tr>}
             </tbody></table></div>
