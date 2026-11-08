@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 type Profile = {
-  first_name: string; last_name: string; staff_number: string; phone?: string | null;
+  first_name: string; last_name: string; staff_number: string; position?: string | null; department?: string | null; subjects?: string | null; phone?: string | null;
   email?: string | null; position?: string | null; department?: string | null;
   category: string; username: string
 }
@@ -18,6 +18,9 @@ async function request<T>(path: string, token: string, options: RequestInit = {}
 export default function MyStaffProfile({ token }: { token: string }) {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [firstName, setFirstName] = useState('')
+  const [position, setPosition] = useState('')
+  const [department, setDepartment] = useState('')
+  const [subjects, setSubjects] = useState('')
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
   const [currentPassword, setCurrentPassword] = useState('')
@@ -31,7 +34,7 @@ export default function MyStaffProfile({ token }: { token: string }) {
     setLoading(true); setError('')
     try {
       const data = await request<Profile>('me/staff-profile', token)
-      setProfile(data); setFirstName(data.first_name); setPhone(data.phone || ''); setEmail(data.email || '')
+      setProfile(data); setFirstName(data.first_name); setPosition(data.position || ''); setDepartment(data.department || ''); setSubjects(data.subjects || ''); setPhone(data.phone || ''); setEmail(data.email || '')
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to load your profile.') }
     finally { setLoading(false) }
   }
@@ -39,7 +42,7 @@ export default function MyStaffProfile({ token }: { token: string }) {
   async function saveProfile(event: React.FormEvent) {
     event.preventDefault(); setSaving(true); setError(''); setMessage('')
     try {
-      const result = await request<{message:string;profile:Profile}>('me/staff-profile', token, { method: 'PATCH', body: JSON.stringify({ first_name: firstName, phone, email }) })
+      const result = await request<{message:string;profile:Profile}>('me/staff-profile', token, { method: 'PATCH', body: JSON.stringify({ first_name: firstName, position, department, subjects, phone, email }) })
       setProfile(result.profile); setMessage(result.message)
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to update your profile.') }
     finally { setSaving(false) }
@@ -65,10 +68,11 @@ export default function MyStaffProfile({ token }: { token: string }) {
             <label>Surname (locked)<input value={profile.last_name} readOnly disabled /></label>
             <label>Staff number (locked)<input value={profile.staff_number} readOnly disabled /></label>
             <label>Login username<input value={profile.username} readOnly disabled /></label>
+            <label>Position<input value={position} onChange={e=>setPosition(e.target.value)} maxLength={100} /></label>
+            <label>Department<input value={department} onChange={e=>setDepartment(e.target.value)} maxLength={100} /></label>
+            <label>Subjects taught<input value={subjects} onChange={e=>setSubjects(e.target.value)} maxLength={500} /></label>
             <label>Phone number<input type="tel" value={phone} onChange={e=>setPhone(e.target.value)} /></label>
             <label>Email address<input type="email" value={email} onChange={e=>setEmail(e.target.value)} /></label>
-            <label>Position<input value={profile.position || '—'} readOnly disabled /></label>
-            <label>Department<input value={profile.department || '—'} readOnly disabled /></label>
           </div>
           <div className="form-actions"><button className="primary-button" disabled={saving}>Save profile changes</button></div>
         </form>
