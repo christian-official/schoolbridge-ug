@@ -2434,15 +2434,52 @@ def teacher_marks(exam_id: int | None = None, db: Session = Depends(get_db),
     ).all():
         if (student.class_id, mark.subject_id) not in allowed:
             continue
+        if mark.verified:
+            continue
         rows.append({
             "id": mark.id, "student_id": mark.student_id,
             "subject_id": mark.subject_id, "exam_id": mark.exam_id,
-            "score": mark.score, "verified": mark.verified, "student_name": " ".join(
+            "score": mark.score, "verified": False, "student_name": " ".join(
                 part for part in [student.first_name, student.middle_name, student.last_name] if part
             ), "admission_number": student.admission_number,
             "class_id": student.class_id,
         })
     return rows
+
+
+@app.get("/api/teacher/result-status", tags=["Teacher Workspace"])
+def teacher_result_status(exam_id: int, db: Session = Depends(get_db),
+                          teacher=Depends(get_current_user)):
+    if teacher.role != "teacher":
+        raise HTTPException(403, "Teacher account required.")
+    exam = db.get(models.Exam, exam_id)
+    if not exam:
+        raise HTTPException(404, "Examination not found.")
+    assignments = db.query(models.TeacherAssignment).filter_by(
+        teacher_id=teacher.id, class_id=exam.class_id
+    ).all()
+    if not assignments:
+        raise HTTPException(403, "You are not assigned to this examination's class.")
+    subject_ids = {row.subject_id for row in assignments}
+    marks = db.query(models.Mark).filter(
+        models.Mark.exam_id == exam.id,
+        models.Mark.subject_id.in_(subject_ids or {-1})
+    ).all()
+    output = []
+    for subject_id in sorted(subject_ids):
+        subject_marks = [mark for mark in marks if mark.subject_id == subject_id]
+        submitted = len(subject_marks)
+        pending = sum(1 for mark in subject_marks if not mark.verified)
+        verified = sum(1 for mark in subject_marks if mark.verified)
+        status = "Not submitted" if not submitted else ("Verified" if pending == 0 else "Not verified")
+        output.append({
+            "subject_id": subject_id,
+            "submitted_count": submitted,
+            "pending_count": pending,
+            "verified_count": verified,
+            "status": status,
+        })
+    return output
 
 
 @app.post("/api/teacher/marks/bulk", tags=["Teacher Workspace"])
