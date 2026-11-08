@@ -29,6 +29,8 @@ export default function Phase4Workspace({ token, role, active, permissions }: { 
   const [account, setAccount] = useState({ username: '', email: '' })
   const [issuedPasscode, setIssuedPasscode] = useState<{ username: string; email: string; password: string; emailSent: boolean; emailError?: string; phone: string } | null>(null)
   const [savingAccount, setSavingAccount] = useState(false)
+  const [parentTab, setParentTab] = useState<'overview' | 'add' | 'manage'>('overview')
+  const [removingParentId, setRemovingParentId] = useState<number | null>(null)
   const [children, setChildren] = useState<ParentChild[]>([])
   const [selectedChildId, setSelectedChildId] = useState<number | null>(null)
   const [childTab, setChildTab] = useState<'results' | 'attendance' | 'fees'>('results')
@@ -110,9 +112,21 @@ export default function Phase4Workspace({ token, role, active, permissions }: { 
       setIssuedPasscode({ username: created.username, email: created.email, password: created.temporary_password, emailSent: !!created.email_sent, emailError: created.email_error, phone: guardianPhones.join(', ') })
       setAccount({ username: '', email: '' }); setSelectedStudentIds([]); setStudentSearch('')
       await loadAdminParents()
+      setParentTab('manage')
       setMessage('Parent account created. Copy the temporary passcode and give it securely to the parent.')
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to create parent account.') }
     finally { setSavingAccount(false) }
+  }
+
+  async function removeParentAccount(parent: any) {
+    if (!window.confirm(`Remove parent account "${parent.username}" and unlink all associated students? This cannot be undone.`)) return
+    setRemovingParentId(parent.id); setError(''); setMessage('')
+    try {
+      await api(`parent-accounts/${parent.id}`, token, { method: 'DELETE' })
+      await loadAdminParents()
+      setMessage(`Parent account "${parent.username}" was removed and its student links were cleared.`)
+    } catch (e) { setError(e instanceof Error ? e.message : 'Unable to remove parent account.') }
+    finally { setRemovingParentId(null) }
   }
 
   async function publishAnnouncement(event: React.FormEvent<HTMLFormElement>) {
@@ -129,13 +143,16 @@ export default function Phase4Workspace({ token, role, active, permissions }: { 
 
   if (role !== 'parent' && active === 'Parent Access') return <div className="phase4-workspace">
     <section className="panel">
-      <div className="panel-heading"><div><h2><Users size={20}/> Parent account management</h2><p>Create secure parent logins and link each account to one or more registered students.</p></div></div>
+      <div className="panel-heading"><div><h2><Users size={20}/> Parent Access</h2><p>Manage parent logins, student links and account access from one workspace.</p></div><span className="count-pill">{parents.length} parent accounts</span></div>
       {error && <div className="form-error" role="alert">{error}</div>}{message && <div className="success-notice" role="status">{message}</div>}
+      <nav className="phase4-tabs parent-access-tabs" aria-label="Parent access sections">
+        <button type="button" className={parentTab === 'overview' ? 'active' : ''} onClick={() => setParentTab('overview')}>Overview</button>
+        <button type="button" className={parentTab === 'add' ? 'active' : ''} onClick={() => setParentTab('add')}><PlusCircle size={15}/> Add parent</button>
+        <button type="button" className={parentTab === 'manage' ? 'active' : ''} onClick={() => setParentTab('manage')}>Manage parents <span>{parents.length}</span></button>
+      </nav>
       {issuedPasscode && <div className="success-notice parent-passcode-handover" role="status">
-        <strong>Parent login passcode — show this to the parent now</strong>
-        <p>Username: <strong>{issuedPasscode.username}</strong></p>
-        <p>Email: {issuedPasscode.email}</p>
-        <p>Temporary passcode: <strong>{issuedPasscode.password}</strong></p>
+        <strong>New parent login — hand over securely</strong>
+        <p>Username: <strong>{issuedPasscode.username}</strong></p><p>Email: {issuedPasscode.email}</p><p>Temporary passcode: <strong>{issuedPasscode.password}</strong></p>
         <p><strong>Email delivery:</strong> {issuedPasscode.emailSent ? 'Sent successfully.' : 'Not sent automatically.'}</p>
         {!issuedPasscode.emailSent && <small>{issuedPasscode.emailError || 'Configure SMTP on the school server to send email automatically.'}</small>}
         <p><strong>Registered guardian phone:</strong> {issuedPasscode.phone || 'No phone number was saved for the selected guardian.'}</p>
@@ -143,21 +160,30 @@ export default function Phase4Workspace({ token, role, active, permissions }: { 
           <button type="button" className="secondary-button" onClick={() => void navigator.clipboard?.writeText('SchoolBridge parent login\nUsername: '+issuedPasscode.username+'\nTemporary passcode: '+issuedPasscode.password)}>Copy login details</button>
           {issuedPasscode.phone && <button type="button" className="secondary-button" onClick={() => void navigator.clipboard?.writeText('Your SchoolBridge parent account is ready. Username: '+issuedPasscode.username+'. Temporary passcode: '+issuedPasscode.password+'. Sign in to the school portal and change your passcode.')}>Copy SMS message</button>}
           <button type="button" className="secondary-button" onClick={() => { const cleanup = () => { delete document.body.dataset.schoolbridgePrint }; document.body.dataset.schoolbridgePrint = "handover"; window.addEventListener("afterprint", cleanup, { once: true }); window.print() }}>Print handover details</button>
+          <button type="button" className="secondary-button" onClick={() => setIssuedPasscode(null)}>Dismiss passcode</button>
         </div>
-        <small>This passcode is shown only once. Share it securely and ask the parent to change it after signing in. SMS sending requires a configured provider; copying or printing is available without SMS charges.</small>
+        <small>This passcode is shown once. Ask the parent to change it after signing in.</small>
       </div>}
-      <form className="student-form" onSubmit={createParentAccount}>
+      {parentTab === 'overview' && <div className="phase4-summary-grid parent-access-summary">
+        <div><Users size={19}/><span>Parent accounts</span><strong>{parents.length}</strong></div>
+        <div><span>Active accounts</span><strong>{parents.filter(parent => parent.active).length}</strong></div>
+        <div><span>Linked students</span><strong>{parents.reduce((total, parent) => total + (parent.children?.length || 0), 0)}</strong></div>
+        <div><span>Accounts needing links</span><strong>{parents.filter(parent => !parent.children?.length).length}</strong></div>
+        <p className="attendance-help">Use <strong>Add parent</strong> to create a login and connect one or more students. Use <strong>Manage parents</strong> to review or remove an account. Parents only receive verified examination results.</p>
+        <div className="form-actions"><button type="button" className="primary-button" onClick={() => setParentTab('add')}><PlusCircle size={15}/> Add a parent account</button><button type="button" className="secondary-button" onClick={() => setParentTab('manage')}>Open parent directory</button></div>
+      </div>}
+      {parentTab === 'add' && <form className="student-form" onSubmit={createParentAccount}>
+        <div className="panel-heading"><div><h3>Create parent login</h3><p>Search by student name or admission number, then link every child belonging to this parent.</p></div></div>
         <div className="student-form-grid">
-          <label>Find student by name or admission number<input type="search" value={studentSearch} onChange={e => setStudentSearch(e.target.value)} placeholder="Search registered students"/></label>
-          <label>Parent / guardian name<input readOnly value={[...new Set(students.filter(student => selectedStudentIds.includes(student.id)).map(student => student.guardian_name).filter(Boolean))].join(', ')} placeholder="Automatically taken from student registration"/><small>Loaded from the selected student's registration record.</small></label>
+          <label>Find student<input type="search" value={studentSearch} onChange={e => setStudentSearch(e.target.value)} placeholder="Student name or admission number"/></label>
+          <label>Parent / guardian name<input readOnly value={[...new Set(students.filter(student => selectedStudentIds.includes(student.id)).map(student => student.guardian_name).filter(Boolean))].join(', ')} placeholder="Taken from student registration"/><small>Guardian details come from the selected students.</small></label>
           <label>Parent username *<input required minLength={3} value={account.username} onChange={e => setAccount({ ...account, username: e.target.value })}/></label>
           <label>Parent email *<input required type="email" value={account.email} onChange={e => setAccount({ ...account, email: e.target.value })}/></label>
         </div>
         <div className="phase4-student-picker">
-          <strong>Choose registered student(s) to link *</strong>
-          <small>Student and guardian details are already stored in registration. Tick the student(s) belonging to this parent.</small>
+          <strong>Link student(s) to this parent *</strong><small>Choose one or more registered students.</small>
           <div className="phase4-student-options">
-            {!studentSearch.trim() && <p className="form-hint">Type a student name or admission number to find and select a student.</p>}
+            {!studentSearch.trim() && <p className="form-hint">Type a student name or admission number to search.</p>}
             {studentSearch.trim() && students.filter(student => (student.first_name + ' ' + (student.middle_name || '') + ' ' + student.last_name + ' ' + student.admission_number).toLowerCase().includes(studentSearch.trim().toLowerCase())).map(student => <label className="subject-choice" key={student.id}>
               <input type="checkbox" checked={selectedStudentIds.includes(student.id)} onChange={e => {
                 setSelectedStudentIds(current => e.target.checked ? [...current, student.id] : current.filter(id => id !== student.id))
@@ -170,15 +196,15 @@ export default function Phase4Workspace({ token, role, active, permissions }: { 
           </div>
           <small>{selectedStudentIds.length} student(s) selected.</small>
         </div>
-        <div className="form-actions"><button className="primary-button" disabled={savingAccount}>{savingAccount ? 'Creating account...' : 'Create parent account'}</button></div>
-      </form>
-    </section>
-    <section className="panel">
-      <div className="panel-heading"><div><h2>Registered parent accounts</h2><p>Review which students are linked to each parent login.</p></div><span className="count-pill">{parents.length} accounts</span></div>
-      <div className="table-wrap"><table><thead><tr><th>Username</th><th>Email</th><th>Linked students</th><th>Account status</th></tr></thead><tbody>
-        {parents.map(parent => <tr key={parent.id}><td>{parent.username}</td><td>{parent.email}</td><td>{parent.children?.map((child: any) => child.name + ' (' + child.admission_number + ')').join(', ') || 'No linked students'}</td><td>{parent.active ? 'Active' : 'Disabled'}</td></tr>)}
-        {!parents.length && <tr><td colSpan={4}>{busy ? 'Loading parent accounts...' : 'No parent accounts have been created yet.'}</td></tr>}
-      </tbody></table></div>
+        <div className="form-actions"><button className="primary-button" disabled={savingAccount || !selectedStudentIds.length}>{savingAccount ? 'Creating account...' : 'Create parent account'}</button><button type="button" className="secondary-button" onClick={() => setParentTab('overview')}>Cancel</button></div>
+      </form>}
+      {parentTab === 'manage' && <div>
+        <div className="panel-heading"><div><h3>Parent directory</h3><p>Review linked students and remove parent accounts that should no longer have portal access.</p></div><button type="button" className="secondary-button" onClick={() => void loadAdminParents()}>Refresh list</button></div>
+        <div className="table-wrap"><table><thead><tr><th>Parent account</th><th>Linked students</th><th>Status</th><th>Action</th></tr></thead><tbody>
+          {parents.map(parent => <tr key={parent.id}><td><strong>{parent.username}</strong><small>{parent.email}</small></td><td>{parent.children?.map((child: any) => child.name + ' (' + child.admission_number + ')').join(', ') || 'No linked students'}</td><td><span className={parent.active ? 'attendance-status-pill status-present' : 'attendance-status-pill'}>{parent.active ? 'Active' : 'Disabled'}</span></td><td><button type="button" className="danger-button" disabled={removingParentId === parent.id} onClick={() => void removeParentAccount(parent)}>{removingParentId === parent.id ? 'Removing…' : 'Remove parent'}</button></td></tr>)}
+          {!parents.length && <tr><td colSpan={4}>{busy ? 'Loading parent accounts...' : 'No parent accounts have been created yet.'}</td></tr>}
+        </tbody></table></div>
+      </div>}
     </section>
   </div>
 
