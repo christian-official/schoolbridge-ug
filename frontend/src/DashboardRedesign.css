@@ -447,3 +447,21 @@
   flex:0 0 auto!important;
   margin-top:0!important;
 }
+
+
+/* Keep the top bar neutral across all role themes and identify the signed-in user. */
+.redesigned-app-shell>.main-area>.topbar{
+  background:#fff!important;
+  color:#243247!important;
+  border-bottom:1px solid #e7ebf2!important;
+  box-shadow:0 3px 16px #192b4508!important;
+}
+.redesigned-app-shell>.main-area>.topbar .top-user-name{
+  color:#344258!important;
+  font-size:12px;
+  font-weight:700;
+  line-height:1;
+}
+@media(max-width:700px){
+  .redesigned-app-shell>.main-area>.topbar .top-user-name{font-size:11px}
+}

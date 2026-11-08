@@ -1002,7 +1002,7 @@ function App() {
               {isRefreshing ? <LoaderCircle className="spin" size={15} /> : <RefreshCw size={15} />}
               {isRefreshing ? 'Refreshing...' : 'Refresh'}
             </button>
-            <span className="online-status"><i /> System online</span>
+            <span className="top-user-name">{user.username}</span>
             <div className="top-avatar">{user.username.slice(0, 1).toUpperCase()}</div>
           </div>
         </header>
