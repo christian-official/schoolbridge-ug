@@ -230,6 +230,28 @@ class SchoolProfile(Base):
     report_template: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
+class ParentStudentLink(Base):
+    __tablename__ = "parent_student_links"
+    __table_args__ = (UniqueConstraint("user_id", "student_id", name="uq_parent_student_link"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    student_id: Mapped[int] = mapped_column(ForeignKey("students.id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class SchoolAnnouncement(Base):
+    __tablename__ = "school_announcements"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    title: Mapped[str] = mapped_column(String(160))
+    message: Mapped[str] = mapped_column(Text)
+    audience: Mapped[str] = mapped_column(String(20), default="All")
+    published: Mapped[bool] = mapped_column(default=True)
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class PrefectAssignment(Base):
     __tablename__ = "prefect_assignments"
 
