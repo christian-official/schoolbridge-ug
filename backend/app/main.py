@@ -2833,6 +2833,9 @@ class OtherExpenseCreate(BaseModel):
 
 class MyStaffProfileUpdate(BaseModel):
     first_name: str = Field(min_length=1, max_length=80)
+    position: str | None = Field(default=None, max_length=100)
+    department: str | None = Field(default=None, max_length=100)
+    subjects: str | None = Field(default=None, max_length=500)
     phone: str | None = Field(default=None, max_length=30)
     email: str | None = Field(default=None, max_length=150)
 
@@ -2871,6 +2874,9 @@ def update_my_staff_profile(data: MyStaffProfileUpdate, user=Depends(get_current
             raise HTTPException(409, "That email address is already used by another account.")
         user.email = email
     staff.first_name = data.first_name.strip()
+    staff.position = data.position.strip() if data.position else None
+    staff.department = data.department.strip() if data.department else None
+    staff.subjects = data.subjects.strip() if data.subjects else None
     staff.phone = data.phone.strip() if data.phone else None
     staff.email = email
     db.commit()
