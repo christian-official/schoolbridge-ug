@@ -1038,6 +1038,42 @@ def verify_mark(mark_id: int, verified: bool, db: Session = Depends(get_db), adm
     db.refresh(item)
     return item
 
+@app.patch("/api/marks/verification/batch", tags=["Marks"])
+def verify_subject_marks_batch(
+    exam_id: int,
+    subject_id: int,
+    verified: bool = True,
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+):
+    exam = db.get(models.Exam, exam_id)
+    subject = db.get(models.Subject, subject_id)
+    if not exam or not subject:
+        raise HTTPException(404, "Examination or subject not found.")
+    query = db.query(models.Mark).filter(
+        models.Mark.exam_id == exam_id,
+        models.Mark.subject_id == subject_id,
+    )
+    if exam.class_id is not None:
+        query = query.join(models.Student, models.Student.id == models.Mark.student_id).filter(
+            models.Student.class_id == exam.class_id
+        )
+    rows = query.all()
+    if not rows:
+        raise HTTPException(404, "There are no recorded scores for this subject and examination to update.")
+    changed = 0
+    for mark in rows:
+        if mark.verified != verified:
+            mark.verified = verified
+            changed += 1
+    write_audit(
+        db, admin, "subject_marks_verified" if verified else "subject_marks_unlocked",
+        "subject_marks", subject_id,
+        f"exam={exam_id}; subject={subject.name}; records={len(rows)}; changed={changed}",
+    )
+    db.commit()
+    return {"exam_id": exam_id, "subject_id": subject_id, "verified": verified, "records": len(rows), "changed": changed}
+
 
 @app.get("/api/grading-scale", tags=["Grading"])
 def get_grading_scale(db: Session = Depends(get_db)):
@@ -2632,15 +2668,25 @@ def create_staff(data: StaffCreate, db: Session = Depends(get_db)):
         raise HTTPException(422, "Enter the staff member's department.")
     if data.category == "Teaching" and (not data.subjects or not data.subjects.strip()):
         raise HTTPException(422, "Enter at least one subject taught by this teacher.")
-    staff_number = "STF-" + str(date.today().year) + "-" + uuid4().hex[:6].upper()
+    # Generate a fresh staff number and login ID; never reject a new employee
+    # merely because their contact email is already used by another account.
+    staff_number = ""
+    username = ""
+    for _ in range(8):
+        candidate = "STF-" + str(date.today().year) + "-" + uuid4().hex[:8].upper()
+        candidate_username = candidate.lower()
+        if not db.query(models.StaffMember.id).filter_by(staff_number=candidate).first() and not db.query(models.User.id).filter_by(username=candidate_username).first():
+            staff_number, username = candidate, candidate_username
+            break
+    if not staff_number:
+        raise HTTPException(503, "A unique staff login could not be generated. Please try again.")
     item = models.StaffMember(staff_number=staff_number, **data.model_dump())
     # Create the staff profile and login together so registration is one step.
     temporary_passcode = secrets.token_urlsafe(9)
-    username = staff_number.lower()
-    account_email = (data.email or "").strip().lower() or f"{username}@accounts.schoolbridge.local"
     account_role = "teacher" if data.category == "Teaching" else "staff"
-    if db.query(models.User).filter(or_(models.User.username == username, models.User.email == account_email)).first():
-        raise HTTPException(409, "A login already exists with this staff username or email. Check the staff details.")
+    requested_email = (data.email or "").strip().lower()
+    email_in_use = bool(requested_email and db.query(models.User.id).filter_by(email=requested_email).first())
+    account_email = f"{username}@accounts.schoolbridge.local" if email_in_use or not requested_email else requested_email
     if account_role == "teacher":
         default_permissions = {
             "Overview": ["view"], "My Classes": ["view"],
@@ -2675,7 +2721,7 @@ def create_staff(data: StaffCreate, db: Session = Depends(get_db)):
         db.refresh(item)
     except IntegrityError:
         db.rollback()
-        raise HTTPException(409, "The staff profile or login could not be created because the username or email is already in use.")
+        raise HTTPException(409, "The staff member was not saved because a unique staff number, username or login email conflicts with an existing account. The form is safe to retry; check whether this email is already assigned to another login.")
     # Keep the original staff fields at the top level for existing API clients,
     # while also returning the grouped staff/login objects used by the new UI.
     staff_data = {column.name: getattr(item, column.name) for column in item.__table__.columns}
