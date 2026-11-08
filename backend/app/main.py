@@ -1659,6 +1659,7 @@ def permission_catalog(admin=Depends(require_admin)):
         "Bursar": ["Overview", "Fees & Finance", "Students", "Reports"],
         "Accountant": ["Overview", "Fees & Finance", "Staff", "Reports"],
         "Secretary": ["Overview", "Students", "Staff", "Parent Access", "Announcements", "Reports"],
+        "Attendance Officer": ["Overview", "Attendance", "Staff Attendance", "Reports"],
         "Teacher": ["My Classes", "My Attendance", "My Results", "Announcements", "Timetable"],
         "Class Teacher": ["My Classes", "Students", "Attendance", "My Attendance", "My Results", "Announcements", "Timetable"],
     }
