@@ -2200,6 +2200,7 @@ def parent_liaison_recipients(class_id: int | None = None, search: str = "", db:
             "admission_number": student.admission_number,
             "class_name": school_class.name if school_class else "Unassigned",
             "parent_account": primary_parent.username,
+            "parents": [{"id": primary_parent.id, "username": primary_parent.username, "email": primary_parent.email}],
         })
     return output
 
@@ -3348,8 +3349,9 @@ def record_fee_payment(data: FeePaymentCreate, db: Session = Depends(get_db), ad
 class ClassFeeUpdate(BaseModel):
     term: str = Field(pattern="^(Term 1|Term 2|Term 3)$")
     year: int = Field(ge=2000, le=2100)
-    boarding_amount: int = Field(ge=0)
-    day_amount: int = Field(ge=0)
+    amount: int | None = Field(default=None, ge=0)
+    boarding_amount: int | None = Field(default=None, ge=0)
+    day_amount: int | None = Field(default=None, ge=0)
 
 
 class AcademicSettingsUpdate(BaseModel):
@@ -3423,6 +3425,8 @@ def save_class_fee(class_id: int, data: ClassFeeUpdate, db: Session = Depends(ge
     grade_classes = db.query(models.SchoolClass).filter(
         models.SchoolClass.name == selected_class.name
     ).all()
+    boarding_amount = data.boarding_amount if data.boarding_amount is not None else (data.amount or 0)
+    day_amount = data.day_amount if data.day_amount is not None else (data.amount or 0)
     created = 0
     settings = get_or_create_school_settings(db)
     for grade_class in grade_classes:
@@ -3430,13 +3434,13 @@ def save_class_fee(class_id: int, data: ClassFeeUpdate, db: Session = Depends(ge
             class_id=grade_class.id, term=data.term, year=data.year
         ).first()
         if row is None:
-            row = models.ClassFee(class_id=grade_class.id, amount=max(data.boarding_amount, data.day_amount), **data.model_dump())
+            row = models.ClassFee(class_id=grade_class.id, amount=max(boarding_amount, day_amount), boarding_amount=boarding_amount, day_amount=day_amount, term=data.term, year=data.year)
             db.add(row)
             db.flush()
         else:
-            row.boarding_amount = data.boarding_amount
-            row.day_amount = data.day_amount
-            row.amount = max(data.boarding_amount, data.day_amount)
+            row.boarding_amount = boarding_amount
+            row.day_amount = day_amount
+            row.amount = max(boarding_amount, day_amount)
         if settings.active_term == data.term and (settings.academic_year or date.today().year) == data.year:
             active_students = db.query(models.Student).filter_by(
                 class_id=grade_class.id, status="active"
@@ -3445,17 +3449,17 @@ def save_class_fee(class_id: int, data: ClassFeeUpdate, db: Session = Depends(ge
                 existing = db.query(models.FeeCharge).filter_by(
                     student_id=student.id, term=data.term, year=data.year
                 ).first()
-                selected_amount = data.boarding_amount if student.study_mode == "Boarding" else data.day_amount
+                selected_amount = boarding_amount if student.study_mode == "Boarding" else day_amount
                 if existing is None and selected_amount > 0:
                     db.add(models.FeeCharge(student_id=student.id, term=data.term, year=data.year, amount=selected_amount))
                     created += 1
     db.flush()
     write_audit(db, admin, "class_fee_updated", "class_fee", class_id,
-                f"Grade {selected_class.name}; {data.term} {data.year}; boarding UGX {data.boarding_amount}; day UGX {data.day_amount}")
+                f"Grade {selected_class.name}; {data.term} {data.year}; boarding UGX {boarding_amount}; day UGX {day_amount}")
     db.commit()
     return {"message": "Boarding and day fee structures saved for all streams. Existing charges were not changed.",
             "class_id": class_id, "term": data.term, "year": data.year,
-            "amount": data.amount, "streams_updated": len(grade_classes),
+            "amount": max(boarding_amount, day_amount), "boarding_amount": boarding_amount, "day_amount": day_amount, "streams_updated": len(grade_classes),
             "charges_created": created}
 
 @app.get("/api/students/{student_id}/profile", tags=["Students"])
