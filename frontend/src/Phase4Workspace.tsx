@@ -184,13 +184,11 @@ export default function Phase4Workspace({ token, role, active, permissions }: { 
           <strong>Link student(s) to this parent *</strong><small>Choose one or more registered students.</small>
           <div className="phase4-student-options">
             {!studentSearch.trim() && <p className="form-hint">Type a student name or admission number to search.</p>}
-            {studentSearch.trim() && students.filter(student => (student.first_name + ' ' + (student.middle_name || '') + ' ' + student.last_name + ' ' + student.admission_number).toLowerCase().includes(studentSearch.trim().toLowerCase())).map(student => <label className="subject-choice" key={student.id}>
-              <input type="checkbox" checked={selectedStudentIds.includes(student.id)} onChange={e => {
-                setSelectedStudentIds(current => e.target.checked ? [...current, student.id] : current.filter(id => id !== student.id))
-                if (e.target.checked && student.guardian_name && !account.username.trim()) setAccount(current => ({ ...current, username: student.guardian_name!.trim().toLowerCase().replace(/[^a-z0-9]+/g, '.') }))
-              }}/>
-              <span><strong>{student.first_name} {student.middle_name || ''} {student.last_name}</strong> · {student.admission_number}<small>Guardian: {student.guardian_name || 'Not recorded'}{student.guardian_relationship ? ' · ' + student.guardian_relationship : ''}{student.guardian_phone ? ' · ' + student.guardian_phone : ''}</small></span>
-            </label>)}
+            {studentSearch.trim() && students.filter(student => (student.first_name + ' ' + (student.middle_name || '') + ' ' + student.last_name + ' ' + student.admission_number).toLowerCase().includes(studentSearch.trim().toLowerCase())).map(student => <button type="button" className={selectedStudentIds.includes(student.id) ? "phase4-student-option active" : "phase4-student-option"} key={student.id} aria-pressed={selectedStudentIds.includes(student.id)} onClick={() => {
+                 const chosen = !selectedStudentIds.includes(student.id)
+                 setSelectedStudentIds(current => chosen ? [...current, student.id] : current.filter(id => id !== student.id))
+                 if (chosen && student.guardian_name && !account.username.trim()) setAccount(current => ({ ...current, username: student.guardian_name!.trim().toLowerCase().replace(/[^a-z0-9]+/g, '.') }))
+               }}><span><strong>{student.first_name} {student.middle_name || ''} {student.last_name}</strong> · {student.admission_number}<small>Guardian: {student.guardian_name || 'Not recorded'}{student.guardian_relationship ? ' · ' + student.guardian_relationship : ''}{student.guardian_phone ? ' · ' + student.guardian_phone : ''}</small></span><b>{selectedStudentIds.includes(student.id) ? "Selected" : "Select"}</b></button>)}
             {studentSearch.trim() && students.length > 0 && !students.some(student => (student.first_name + ' ' + (student.middle_name || '') + ' ' + student.last_name + ' ' + student.admission_number).toLowerCase().includes(studentSearch.trim().toLowerCase())) && <p className="form-hint">No students match that search.</p>}
             {!students.length && <p className="form-hint">No registered students are available.</p>}
           </div>
