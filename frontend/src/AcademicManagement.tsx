@@ -317,6 +317,22 @@ export default function AcademicManagement({ token, classes, canVerify = false }
     } finally { setSaving(false) }
   }
 
+  async function verifyAllExamResults() {
+    if (!selectedExam) { setError('Choose an examination first.'); return }
+    const pending = marks.filter(mark => !mark.verified).length
+    if (!pending) { setMessage('There are no submitted results awaiting verification.'); return }
+    if (!window.confirm(`Verify and lock all ${pending} submitted scores for ${selectedExam.name}?`)) return
+    setSaving(true); setError(''); setMessage('')
+    try {
+      const result = await request<{records:number;changed:number}>(`exams/${selectedExam.id}/results/verification?verified=true`, token, { method: 'PATCH' })
+      const next = await request<Mark[]>(`marks?exam_id=${selectedExam.id}`, token)
+      setMarks(next)
+      setMessage(`Verified and locked all ${result.records} submitted results for ${selectedExam.name}.`)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to verify examination results.')
+    } finally { setSaving(false) }
+  }
+
   async function saveGradingScale(event: FormEvent) {
     event.preventDefault()
     setSaving(true); setError(''); setMessage('')
@@ -524,7 +540,7 @@ export default function AcademicManagement({ token, classes, canVerify = false }
         <section className="panel submitted-results-workspace">
           <div className="panel-heading">
             <div><h2>Submitted results awaiting verification</h2><p>Teacher submissions for the selected examination appear here. Review the scores, then verify the whole subject at once.</p></div>
-            <span className="count-pill">{marks.filter(mark => !mark.verified).length} pending scores</span>
+            <div className="dashboard-heading-actions"><span className="count-pill">{marks.filter(mark => !mark.verified).length} pending scores</span>{canVerify && marks.some(mark => !mark.verified) && <button type="button" className="primary-button" disabled={saving} onClick={() => void verifyAllExamResults()}>Verify all submitted results</button>}</div>
           </div>
           {!selectedExam && <p className="form-hint">Select an examination to review submitted results.</p>}
           {selectedExam && subjects.filter(subject => marks.some(mark => mark.subject_id === subject.id && !mark.verified)).map(subject => {
