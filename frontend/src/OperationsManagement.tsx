@@ -31,6 +31,7 @@ export default function OperationsManagement({ token, active, permissions = {}, 
   const [staffSummary, setStaffSummary] = useState<StaffAttendanceSummary | null>(null)
   const [entries, setEntries] = useState<TimetableEntry[]>([])
   const [selectedTimetableClass, setSelectedTimetableClass] = useState('')
+  const [editingEntryId, setEditingEntryId] = useState<number | null>(null)
   const [draft, setDraft] = useState({ class_id: '', subject_id: '', staff_id: '', day_of_week: '1', start_time: '08:00', end_time: '08:40' })
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
@@ -100,14 +101,15 @@ export default function OperationsManagement({ token, active, permissions = {}, 
   async function addTimetableEntry(event: React.FormEvent) {
     event.preventDefault(); setSaving(true); setError(''); setMessage('')
     try {
-      await request<TimetableEntry>('timetable', token, {
-        method: 'POST',
+      await request<TimetableEntry>(editingEntryId ? 'timetable/' + editingEntryId : 'timetable', token, {
+        method: editingEntryId ? 'PUT' : 'POST',
         body: JSON.stringify({
           ...draft, class_id: Number(draft.class_id), subject_id: draft.subject_id ? Number(draft.subject_id) : null,
           staff_id: draft.staff_id ? Number(draft.staff_id) : null, day_of_week: Number(draft.day_of_week),
         }),
       })
-      setMessage('Lesson added to the class timetable.')
+      setMessage(editingEntryId ? 'Timetable lesson updated.' : 'Lesson added to the class timetable.')
+      setEditingEntryId(null)
       setDraft(old => ({ ...old, subject_id: '', staff_id: '' }))
       await loadTimetable()
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to add timetable entry.') }
@@ -153,7 +155,7 @@ export default function OperationsManagement({ token, active, permissions = {}, 
         <div className="table-wrap"><table><thead><tr><th>Staff member</th><th>Category</th><th>Recorded status</th><th>Notes</th></tr></thead><tbody>{staffRows.map(row => { const person = staff.find(item => item.id === row.staff_id); return <tr key={row.id}><td>{person ? person.first_name + ' ' + person.last_name : 'Staff #' + row.staff_id}</td><td>{person?.category || '—'}</td><td><span className={'attendance-status-pill status-' + row.status.toLowerCase()}>{row.status}</span></td><td>{row.notes || '—'}</td></tr> })}{!staffRows.length && <tr><td colSpan={4}>No saved staff attendance yet for this date.</td></tr>}</tbody></table></div>
       </> : <>
         <p className="attendance-help">A weekly class timetable. Choose a class to see its lessons arranged by weekday and period. Lesson cards show the subject, teacher and time.</p>
-        {canEditTimetable && <details className="form-disclosure"><summary><Plus size={15}/> Add a lesson</summary>
+        {canEditTimetable && <details className="form-disclosure" open={editingEntryId !== null}><summary><Plus size={15}/> {editingEntryId ? "Edit lesson" : "Add a lesson"}</summary>
           <form className="student-form" onSubmit={addTimetableEntry}>
             <div className="student-form-grid">
               <label>Class *<select required value={draft.class_id} onChange={event => setDraft({ ...draft, class_id: event.target.value })}><option value="">Choose class</option>{classes.map(item => <option key={item.id} value={item.id}>{item.name}{item.section ? ' — ' + item.section : ''}</option>)}</select></label>
@@ -163,7 +165,7 @@ export default function OperationsManagement({ token, active, permissions = {}, 
               <label>Start time<input required type="time" value={draft.start_time} onChange={event => setDraft({ ...draft, start_time: event.target.value })}/></label>
               <label>End time<input required type="time" value={draft.end_time} onChange={event => setDraft({ ...draft, end_time: event.target.value })}/></label>
             </div>
-            <div className="form-actions"><button className="primary-button" disabled={saving || !classes.length}>{saving ? 'Saving...' : 'Add lesson'}</button></div>
+            <div className="form-actions"><button className="primary-button" disabled={saving || !classes.length}>{saving ? 'Saving...' : editingEntryId ? 'Save lesson changes' : 'Add lesson'}</button>{editingEntryId && <button type="button" className="secondary-button" onClick={() => {setEditingEntryId(null);setDraft({class_id:draft.class_id,subject_id:'',staff_id:'',day_of_week:'1',start_time:'08:00',end_time:'08:40'})}}>Cancel edit</button>}</div>
           </form>
         </details>}
         <div className="panel-heading"><div><h3>Weekly timetable</h3><p>Displayed as a weekday grid, with no room column.</p></div><span className="timetable-count">{entries.length} lessons</span></div>
@@ -179,7 +181,7 @@ export default function OperationsManagement({ token, active, permissions = {}, 
             <div className="table-wrap"><table className="class-timetable-table timetable-week-grid"><thead><tr><th>Period</th>{days.map(day=><th key={day}>{day}</th>)}</tr></thead><tbody>
               {slots.map(slot => <tr key={slot}><th>{slot}</th>{days.map((day,index) => {
                 const entry = classEntries.find(row => row.day_of_week === index + 1 && row.start_time + '–' + row.end_time === slot)
-                return <td key={day}>{entry ? <div className="timetable-lesson-card"><strong>{entry.subject_name || 'Lesson'}</strong><span>{entry.teacher_name || 'Teacher not assigned'}</span><small>{entry.start_time}–{entry.end_time}</small>{canEditTimetable && <button type="button" className="secondary-button" disabled={saving} onClick={() => void removeEntry(entry.id)}><Trash2 size={13}/> Remove</button>}</div> : <span className="timetable-empty-cell">—</span>}</td>
+                return <td key={day}>{entry ? <div className="timetable-lesson-card"><strong>{entry.subject_name || 'Lesson'}</strong><span>{entry.teacher_name || 'Teacher not assigned'}</span><small>{entry.start_time}–{entry.end_time}</small>{canEditTimetable && <div className="timetable-card-actions"><button type="button" className="secondary-button" disabled={saving} onClick={() => {setEditingEntryId(entry.id);setDraft({class_id:String(entry.class_id),subject_id:entry.subject_id?String(entry.subject_id):'',staff_id:entry.staff_id?String(entry.staff_id):'',day_of_week:String(entry.day_of_week),start_time:entry.start_time,end_time:entry.end_time});window.scrollTo({top:0,behavior:'smooth'})}}>Edit</button><button type="button" className="secondary-button" disabled={saving} onClick={() => void removeEntry(entry.id)}><Trash2 size={13}/> Remove</button></div>}</div> : <span className="timetable-empty-cell">—</span>}</td>
               })}</tr>)}
               {!slots.length && <tr><td colSpan={6}>No lessons scheduled for this class.</td></tr>}
             </tbody></table></div>
