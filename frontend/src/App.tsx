@@ -90,7 +90,7 @@ function isFinanceAccount(user:User) {
   const permissions = user.permissions || {}
   const financeRole = /bursar|accountant|finance|accounts/.test(label)
   const financeOnlyAccess = (permissions['Fees & Finance'] || []).includes('view') &&
-    !['My Classes','My Results','My Attendance','Attendance','Examinations','Timetable','Leadership & Duty'].some(section => (permissions[section] || []).includes('view'))
+    !['My Classes','My Results','My Attendance','Attendance','Staff Attendance','Examinations','Timetable','Leadership & Duty','Students','Staff','Parent Access','Announcements'].some(section => (permissions[section] || []).includes('view'))
   return financeRole || financeOnlyAccess
 }
 
@@ -259,7 +259,7 @@ function PersonalDashboard({token,username,onNavigate}:{token:string;username:st
   </div>
 }
 
-function RoleSpecificDashboard({token,username,onNavigate}:{token:string;username:string;onNavigate:(section:string)=>void}) {
+function RoleSpecificDashboard({token,username,onNavigate,summary,summaryAvailable}:{token:string;username:string;onNavigate:(section:string)=>void;summary:DashboardSummary;summaryAvailable:boolean}) {
   const [data,setData]=useState<PersonalDashboardData|null>(null)
   const [error,setError]=useState('')
   const [loading,setLoading]=useState(true)
@@ -327,6 +327,25 @@ function RoleSpecificDashboard({token,username,onNavigate}:{token:string;usernam
     {loading&&<p className="form-hint">Loading your assigned work...</p>}
     {error&&<div className="form-error" role="alert">{error}</div>}
     {data&&!loading&&<>
+      {summaryAvailable&&<section className="stats-grid hybrid-role-metrics">
+        {/secretary|office administrator/.test(role)?<>
+          <StatCard title="Active students" value={summary.active_students} icon={<GraduationCap/>} note="Current student records"/>
+          <StatCard title="New admissions" value={summary.new_admissions_this_year} icon={<UserPlus/>} note={`Academic year ${summary.academic_year}`}/>
+          <StatCard title="Active staff" value={summary.active_staff} icon={<Users/>} note="Teaching and non-teaching"/>
+        </>:/attendance/.test(role)?<>
+          <StatCard title="Students present" value={summary.students_present_today} icon={<CalendarCheck/>} note="Marked present today"/>
+          <StatCard title="Active students" value={summary.active_students} icon={<GraduationCap/>} note="Current student records"/>
+          <StatCard title="Active staff" value={summary.active_staff} icon={<Users/>} note="Teaching and non-teaching"/>
+        </>:/academic|director of studies|\\bdos\\b|deputy|headteacher|examination/.test(role)?<>
+          <StatCard title="Total classes" value={summary.total_classes} icon={<BookOpen/>} note="Classes and streams"/>
+          <StatCard title="Students present" value={summary.students_present_today} icon={<CalendarCheck/>} note="Marked present today"/>
+          <StatCard title="Active staff" value={summary.active_staff} icon={<Users/>} note="Teaching and non-teaching"/>
+        </>:<>
+          <StatCard title="Active staff" value={summary.active_staff} icon={<Users/>} note="Teaching and non-teaching"/>
+          <StatCard title="Total classes" value={summary.total_classes} icon={<BookOpen/>} note="Classes and streams"/>
+          <StatCard title="Students present" value={summary.students_present_today} icon={<CalendarCheck/>} note="Marked present today"/>
+        </>}
+      </section>}
       <section className="hybrid-dashboard-summary">
         <div className="hybrid-summary-card"><span className="hybrid-summary-icon"><Clock size={19}/></span><div><small>TODAY'S RESPONSIBILITIES</small><strong>{workCount}</strong><span>Assigned items</span></div></div>
         <div className="hybrid-summary-card"><span className="hybrid-summary-icon"><Building2 size={19}/></span><div><small>YOUR ROLE</small><strong className="hybrid-role-value">{data.role_label||'Staff'}</strong><span>School staff workspace</span></div></div>
@@ -864,7 +883,7 @@ function App() {
             </>
           )}
 
-                    {active === 'Overview' && user.role !== 'admin' && (isFinanceAccount(user) ? <FinanceAccountDashboard token={token} username={user.username} onNavigate={(section,tab)=>{if(tab)setFinanceTabRequest(tab);setActive(section)}}/> : user.role === 'staff' ? <RoleSpecificDashboard token={token} username={user.username} onNavigate={setActive}/> : <PersonalDashboard token={token} username={user.username} onNavigate={setActive}/>)}
+                    {active === 'Overview' && user.role !== 'admin' && (isFinanceAccount(user) ? <FinanceAccountDashboard token={token} username={user.username} onNavigate={(section,tab)=>{if(tab)setFinanceTabRequest(tab);setActive(section)}}/> : user.role === 'staff' ? <RoleSpecificDashboard token={token} username={user.username} onNavigate={setActive} summary={dashboardSummary} summaryAvailable={(user.permissions?.['Overview']||[]).includes('view')}/> : <PersonalDashboard token={token} username={user.username} onNavigate={setActive}/>)}
 
           {active === 'Students' && (
             <section className="panel">
