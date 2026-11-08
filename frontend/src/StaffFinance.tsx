@@ -18,6 +18,7 @@ async function request<T>(path:string, token:string, options:RequestInit={}):Pro
 
 export default function StaffFinance({token,active,classes=[],refreshKey=0,initialTab='overview',canAddStaff=false}:{token:string;active:string;classes?:{id:number;name?:string;section?:string}[];refreshKey?:number;initialTab?:'overview'|'payments'|'balances';canAddStaff?:boolean}) {
   const [staff,setStaff]=useState<Staff[]>([])
+  const [subjectOptions,setSubjectOptions]=useState<{id:number;name:string;code?:string}[]>([])
   const [staffTotal,setStaffTotal]=useState(0)
   const [search,setSearch]=useState('')
   const [category,setCategory]=useState('')
@@ -57,6 +58,7 @@ export default function StaffFinance({token,active,classes=[],refreshKey=0,initi
 
   useEffect(()=>{
     if(active!=='Staff' && active!=='Fees & Finance') return
+    if(active==='Staff') request<{id:number;name:string;code?:string}[]>('subjects',token).then(setSubjectOptions).catch(e=>setMessage(e.message))
     const params=new URLSearchParams({search,page:'1',page_size:active==='Staff'?'5':'100'})
     if(category) params.set('category',category)
     request<Page<Staff>>('staff?'+params.toString(),token).then(r=>{setStaff(r.items);setStaffTotal(r.total)}).catch(e=>setMessage(e.message))
@@ -113,6 +115,13 @@ export default function StaffFinance({token,active,classes=[],refreshKey=0,initi
     finally{setSavingFee(false)}
   }
 
+  const selectedStaffSubjects=form.subjects.split(',').map(value=>value.trim()).filter(Boolean)
+  function toggleStaffSubject(name:string){
+    const selected=new Set(selectedStaffSubjects)
+    if(selected.has(name)) selected.delete(name); else selected.add(name)
+    setForm({...form,subjects:subjectOptions.filter(item=>selected.has(item.name)).map(item=>item.name).join(', ')})
+  }
+
   async function addStaff(e:FormEvent){
     e.preventDefault()
     const missingStaffFields = [
@@ -120,7 +129,7 @@ export default function StaffFinance({token,active,classes=[],refreshKey=0,initi
       !form.category ? 'Staff category' : '',
       !form.position.trim() ? 'Job title / position' : '',
       !form.department.trim() ? 'Department' : '',
-      form.category === 'Teaching' && !form.subjects.trim() ? 'Subjects taught' : '',
+      form.category === 'Teaching' && !selectedStaffSubjects.length ? 'At least one registered subject' : '',
     ].filter(Boolean)
     if(missingStaffFields.length){setMessage('Cannot save staff member. Complete: '+missingStaffFields.join(', ')+'.');return}
     setMessage('');setSavingStaff(true)
@@ -196,7 +205,7 @@ export default function StaffFinance({token,active,classes=[],refreshKey=0,initi
         <label>Staff category *<select required value={form.category} onChange={e=>setForm({...form,category:e.target.value})}><option>Teaching</option><option>Non-teaching</option></select></label>
         <label>Job title / position *<input required list="school-staff-roles" value={form.position} onChange={e=>setForm({...form,position:e.target.value})} placeholder="Choose or type a role"/><datalist id="school-staff-roles">{(form.category==='Teaching'?['Head Teacher','Deputy Head Teacher','Director of Studies','Class Teacher','Subject Teacher','Senior Teacher','Head of Department','Examinations Officer','Guidance and Counselling Teacher','Special Needs Teacher']:['School Administrator','Bursar','Accountant','Secretary','Librarian','Laboratory Technician','ICT Technician','Nurse','Matron','Warden','Driver','Security Officer','Cook','Cleaner','Groundskeeper','Storekeeper','Procurement Officer']).map(x=><option key={x} value={x}/>)}</datalist></label>
         <label>Department *<input required list="school-departments" value={form.department} onChange={e=>setForm({...form,department:e.target.value})} placeholder="Choose or type a department"/><datalist id="school-departments">{['Administration','Academics','Languages','Sciences','Humanities','Mathematics','ICT','Examinations','Finance and Accounts','Human Resources','Library','Laboratory','Student Affairs','Guidance and Counselling','Sports and Games','Health Services','Catering','Transport','Maintenance','Security','Boarding'].map(x=><option key={x} value={x}/>)}</datalist></label>
-        {form.category==='Teaching'&&<label className="field-span-full">Subjects taught *<input required value={form.subjects} onChange={e=>setForm({...form,subjects:e.target.value})} placeholder="e.g. Mathematics, Physics, Chemistry"/><small className="field-hint">Enter one or more subjects, separated by commas.</small></label>}
+        {form.category==='Teaching'&&<div className="field-span-full staff-subject-picker"><div className="staff-subject-picker-heading"><strong>Subjects this teacher is qualified to teach *</strong><span>{selectedStaffSubjects.length} selected</span></div><p className="field-hint">Select every subject assigned to this teacher during registration. You can select more than one. Only these subjects will be available when assigning classes.</p><div className="permission-choice-grid staff-subject-choice-grid">{subjectOptions.map(subject=><button type="button" key={subject.id} className={selectedStaffSubjects.includes(subject.name)?'permission-choice active':'permission-choice'} aria-pressed={selectedStaffSubjects.includes(subject.name)} onClick={()=>toggleStaffSubject(subject.name)}><span>{subject.name}</span><small>{selectedStaffSubjects.includes(subject.name)?'Selected':'Select subject'}</small></button>)}</div>{!subjectOptions.length&&<small className="field-hint">No registered subjects are available. Add subjects under Examinations before registering a subject teacher.</small>}{!selectedStaffSubjects.length&&<small className="field-error">Select at least one subject for this teaching staff member.</small>}</div>}
       </div></section>
       <section className="form-section"><div className="form-section-heading"><span className="form-section-number">03</span><div><h4>Contact information</h4><p>How the school can contact this employee.</p></div></div><div className="student-form-grid">
         <label>Phone number<input type="tel" autoComplete="tel" value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})} placeholder="e.g. 07XX XXX XXX"/></label>
