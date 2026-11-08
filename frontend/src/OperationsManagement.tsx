@@ -27,6 +27,7 @@ export default function OperationsManagement({ token, active, permissions = {}, 
   const [classes, setClasses] = useState<SchoolClass[]>([])
   const [subjects, setSubjects] = useState<Subject[]>([])
   const [staffStatuses, setStaffStatuses] = useState<Record<number, string>>({})
+  const [staffNotes, setStaffNotes] = useState<Record<number, string>>({})
   const [staffDate, setStaffDate] = useState(today())
   const [staffRows, setStaffRows] = useState<StaffAttendance[]>([])
   const [staffMonthRows, setStaffMonthRows] = useState<StaffAttendance[]>([])
@@ -74,12 +75,14 @@ export default function OperationsManagement({ token, active, permissions = {}, 
       setStaffRows(rows); setStaffSummary(totals)
       const values: Record<number, string> = {}
       const times: Record<number, { checkIn: string; checkOut: string }> = {}
+      const notes: Record<number, string> = {}
       staff.forEach(person => {
         const record = rows.find(row => row.staff_id === person.id)
         values[person.id] = record?.status || ''
         times[person.id] = { checkIn: record?.check_in_at?.slice(11, 16) || '', checkOut: record?.check_out_at?.slice(11, 16) || '' }
+        notes[person.id] = record?.notes || ''
       })
-      setStaffStatuses(values); setStaffTimeDrafts(times)
+      setStaffStatuses(values); setStaffTimeDrafts(times); setStaffNotes(notes)
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to load staff attendance.') }
   }
 
@@ -103,7 +106,7 @@ export default function OperationsManagement({ token, active, permissions = {}, 
     try {
       const result = await request<{ saved: number }>('staff-attendance/register', token, {
         method: 'PUT',
-        body: JSON.stringify({ attendance_date: staffDate, records: staff.map(person => ({ staff_id: person.id, status: staffStatuses[person.id], check_in_time: staffTimeDrafts[person.id]?.checkIn || null, check_out_time: staffTimeDrafts[person.id]?.checkOut || null })) }),
+        body: JSON.stringify({ attendance_date: staffDate, records: staff.map(person => ({ staff_id: person.id, status: staffStatuses[person.id], check_in_time: staffTimeDrafts[person.id]?.checkIn || null, check_out_time: staffTimeDrafts[person.id]?.checkOut || null, notes: staffNotes[person.id] || null })) }),
       })
       setMessage(`${result.saved} staff attendance records saved for ${staffDate}.`)
       await loadStaffAttendance()
@@ -186,12 +189,12 @@ export default function OperationsManagement({ token, active, permissions = {}, 
             {!staffMonthRows.length && <span className="form-hint">No attendance records have been saved for this month yet.</span>}
           </div>
         </div>
-        {loading ? <p className="form-hint">Loading staff...</p> : <div className="table-wrap"><table><thead><tr><th>Staff member</th><th>Staff number</th><th>Category</th><th>Check in</th><th>Check out</th><th>Status</th></tr></thead><tbody>
+        {loading ? <p className="form-hint">Loading staff...</p> : <div className="table-wrap"><table><thead><tr><th>Staff member</th><th>Staff number</th><th>Category</th><th>Check in</th><th>Check out</th><th>Status</th><th>Notes / admin correction</th></tr></thead><tbody>
           {staffCategories.map(category => <Fragment key={category}>
-            <tr className="staff-category-row"><td colSpan={6}>{category} staff <span>{staff.filter(person => (person.category || 'Other') === category).length}</span></td></tr>
-            {staff.filter(person => (person.category || 'Other') === category).map(person => <tr key={person.id}><td><strong>{person.first_name} {person.last_name}</strong></td><td>{person.staff_number}</td><td>{person.category || 'Other'}</td><td>{canEditStaffAttendance ? <input aria-label={'Check-in time for ' + person.first_name} type="time" value={staffTimeDrafts[person.id]?.checkIn || ''} onChange={event => setStaffTimeDrafts(current => ({ ...current, [person.id]: { checkIn: event.target.value, checkOut: current[person.id]?.checkOut || '' } }))}/> : staffTimeDrafts[person.id]?.checkIn || '—'}</td><td>{canEditStaffAttendance ? <input aria-label={'Check-out time for ' + person.first_name} type="time" value={staffTimeDrafts[person.id]?.checkOut || ''} onChange={event => setStaffTimeDrafts(current => ({ ...current, [person.id]: { checkIn: current[person.id]?.checkIn || '', checkOut: event.target.value } }))}/> : staffTimeDrafts[person.id]?.checkOut || '—'}</td><td>{canEditStaffAttendance ? <div className="attendance-choice-group" role="group" aria-label={'Attendance for ' + person.first_name + ' ' + person.last_name}>{(['Present', 'Absent', 'Late', 'Excused'] as const).map(status => <button key={status} type="button" className={'attendance-choice attendance-' + status.toLowerCase() + (staffStatuses[person.id] === status ? ' selected' : '')} aria-pressed={staffStatuses[person.id] === status} onClick={() => setStaffStatuses(current => ({ ...current, [person.id]: status }))}>{status}</button>)}</div> : <span className="attendance-status-pill">{staffStatuses[person.id] || 'Not marked'}</span>}</td></tr>)}
+            <tr className="staff-category-row"><td colSpan={7}>{category} staff <span>{staff.filter(person => (person.category || 'Other') === category).length}</span></td></tr>
+            {staff.filter(person => (person.category || 'Other') === category).map(person => <tr key={person.id}><td><strong>{person.first_name} {person.last_name}</strong></td><td>{person.staff_number}</td><td>{person.category || 'Other'}</td><td>{canEditStaffAttendance ? <input aria-label={'Check-in time for ' + person.first_name} type="time" value={staffTimeDrafts[person.id]?.checkIn || ''} onChange={event => setStaffTimeDrafts(current => ({ ...current, [person.id]: { checkIn: event.target.value, checkOut: current[person.id]?.checkOut || '' } }))}/> : staffTimeDrafts[person.id]?.checkIn || '—'}</td><td>{canEditStaffAttendance ? <input aria-label={'Check-out time for ' + person.first_name} type="time" value={staffTimeDrafts[person.id]?.checkOut || ''} onChange={event => setStaffTimeDrafts(current => ({ ...current, [person.id]: { checkIn: current[person.id]?.checkIn || '', checkOut: event.target.value } }))}/> : staffTimeDrafts[person.id]?.checkOut || '—'}</td><td>{canEditStaffAttendance ? <div className="attendance-choice-group" role="group" aria-label={'Attendance for ' + person.first_name + ' ' + person.last_name}>{(['Present', 'Absent', 'Late', 'Excused'] as const).map(status => <button key={status} type="button" className={'attendance-choice attendance-' + status.toLowerCase() + (staffStatuses[person.id] === status ? ' selected' : '')} aria-pressed={staffStatuses[person.id] === status} onClick={() => setStaffStatuses(current => ({ ...current, [person.id]: status }))}>{status}</button>)}</div> : <span className="attendance-status-pill">{staffStatuses[person.id] || 'Not marked'}</span>}</td><td>{canEditStaffAttendance ? <input aria-label={'Attendance note for ' + person.first_name} type="text" maxLength={255} placeholder="Optional note" value={staffNotes[person.id] || ''} onChange={event => setStaffNotes(current => ({ ...current, [person.id]: event.target.value }))}/> : staffNotes[person.id] || '—'}</td></tr>)}
           </Fragment>)}
-          {!staff.length && <tr><td colSpan={6}>No active staff records found.</td></tr>}
+          {!staff.length && <tr><td colSpan={7}>No active staff records found.</td></tr>}
         </tbody></table></div>}
         {canEditStaffAttendance && <div className="form-actions"><button className="primary-button" type="button" disabled={saving || !staff.length} onClick={() => void saveStaffRegister()}><Save size={15}/>{saving ? 'Saving...' : 'Save staff attendance'}</button></div>}
         {!canEditStaffAttendance && <p className="form-hint">View-only staff attendance access. You cannot change this register.</p>}
