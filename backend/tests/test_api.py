@@ -1,5 +1,6 @@
 import os
 import sqlite3
+from datetime import date
 
 # Configure an isolated SQLite database before importing the application.
 os.environ["SCHOOLBRIDGE_DATABASE_URL"] = "sqlite:///./schoolbridge_test.db"
