@@ -125,7 +125,7 @@ export default function Phase4Workspace({ token, role, active }: { token: string
     <section className="panel">
       <div className="panel-heading"><div><h2><Users size={20}/> Parent account management</h2><p>Create secure parent logins and link each account to one or more registered students.</p></div></div>
       {error && <div className="form-error" role="alert">{error}</div>}{message && <div className="success-notice" role="status">{message}</div>}
-      {issuedPasscode && <div className="success-notice" role="status">
+      {issuedPasscode && <div className="success-notice parent-passcode-handover" role="status">
         <strong>Parent login passcode — show this to the parent now</strong>
         <p>Username: <strong>{issuedPasscode.username}</strong></p>
         <p>Email: {issuedPasscode.email}</p>
