@@ -83,7 +83,6 @@ export default function OperationsManagement({ token, active, permissions = {}, 
 
   useEffect(() => { void loadSetup() }, [token, active, canEditTimetable])
   useEffect(() => { if (active === 'Staff Attendance' && staff.length) void loadStaffAttendance() }, [active, staff.length, staffDate])
-  useEffect(() => { if (active === 'Timetable') void loadTimetable() }, [active, token])
 
   async function saveStaffRegister() {
     if (staff.some(person => !staffStatuses[person.id])) { setError('Select an attendance status for every staff member before saving the register.'); return }
