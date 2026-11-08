@@ -107,6 +107,8 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(150), unique=True, index=True)
     hashed_password: Mapped[str] = mapped_column(String(255))
     role: Mapped[str] = mapped_column(String(20), default="teacher")
+    role_label: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    permissions_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(default=True)
 
 
