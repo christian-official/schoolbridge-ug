@@ -231,7 +231,7 @@ function PersonalDashboard({token,username,onNavigate}:{token:string;username:st
   </div>
 }
 
-function FinanceAccountDashboard({token,username,onNavigate}:{token:string;username:string;onNavigate:(section:string)=>void}) {
+function FinanceAccountDashboard({token,username,onNavigate}:{token:string;username:string;onNavigate:(section:string,tab?:'overview'|'payments'|'balances')=>void}) {
   const [summary,setSummary]=useState<{fees_expected:number;fees_collected:number;outstanding:number;salary_expenses?:number;other_expenses?:number;total_expenses?:number;net_cash_position?:number}|null>(null)
   const [error,setError]=useState('')
   const [loading,setLoading]=useState(true)
@@ -254,8 +254,8 @@ function FinanceAccountDashboard({token,username,onNavigate}:{token:string;usern
       <StatCard title="Total expenses" value={money(summary.total_expenses)} icon={<Users/>} note="Salary and other expenses" />
     </section>}
     <section className="role-dashboard-actions">
-      <button type="button" className="quick-action" onClick={()=>onNavigate('Fees & Finance')}><span className="quick-icon blue"><FileText/></span><span><strong>Finance workspace</strong><small>Open payments, balances, expenses and fee structures.</small></span><ArrowUpRight size={17}/></button>
-      <button type="button" className="quick-action" onClick={()=>onNavigate('Fees & Finance')}><span className="quick-icon purple"><TrendingUp/></span><span><strong>Outstanding fee follow-up</strong><small>Review student balances and follow up collections.</small></span><ArrowUpRight size={17}/></button>
+      <button type="button" className="quick-action" onClick={()=>onNavigate('Fees & Finance','overview')}><span className="quick-icon blue"><FileText/></span><span><strong>Finance workspace</strong><small>Open payments, balances, expenses and fee structures.</small></span><ArrowUpRight size={17}/></button>
+      <button type="button" className="quick-action" onClick={()=>onNavigate('Fees & Finance','balances')}><span className="quick-icon purple"><TrendingUp/></span><span><strong>Outstanding fee follow-up</strong><small>Review student balances and follow up collections.</small></span><ArrowUpRight size={17}/></button>
     </section>
     {!loading&&!summary&&!error&&<p className="empty-state">No finance summary is available yet.</p>}
   </div>
@@ -659,7 +659,7 @@ function App() {
         </div>
         <div className="school-label">SCHOOL MANAGEMENT</div>
         <nav>
-          {(user.role === 'parent' ? parentMenu : user.role === 'admin' ? menu : [...menu, ...teacherMenu.filter(item => !menu.some(base => base.label === item.label))].filter(item => isFinanceAccount(user) ? ['Overview','Fees & Finance'].includes(item.label) : item.label === 'My Profile' || (user.permissions?.[item.label] || []).includes('view') || (item.label === 'Attendance' && (user.permissions?.['Staff Attendance'] || []).includes('view')))).map(item => {
+          {(user.role === 'parent' ? parentMenu : user.role === 'admin' ? menu : [...menu, ...teacherMenu.filter(item => !menu.some(base => base.label === item.label))].filter(item => isFinanceAccount(user) ? ['Overview','Fees & Finance','My Profile'].includes(item.label) : item.label === 'My Profile' || (user.permissions?.[item.label] || []).includes('view') || (item.label === 'Attendance' && (user.permissions?.['Staff Attendance'] || []).includes('view')))).map(item => {
             const Icon = item.icon
             return (
               <button key={item.label} className={`nav-item ${active === item.label ? 'active' : ''}`} onClick={() => { setActive(item.label); setMobileMenu(false) }}>
@@ -743,7 +743,7 @@ function App() {
             </>
           )}
 
-                    {active === 'Overview' && user.role !== 'admin' && (isFinanceAccount(user) ? <FinanceAccountDashboard token={token} username={user.username} onNavigate={setActive}/> : <PersonalDashboard token={token} username={user.username} onNavigate={setActive}/>)}
+                    {active === 'Overview' && user.role !== 'admin' && (isFinanceAccount(user) ? <FinanceAccountDashboard token={token} username={user.username} onNavigate={(section,tab)=>{if(tab)setFinanceTabRequest(tab);setActive(section)}}/> : <PersonalDashboard token={token} username={user.username} onNavigate={setActive}/>)}
 
           {active === 'Students' && (
             <section className="panel">
