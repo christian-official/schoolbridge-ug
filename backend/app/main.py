@@ -743,7 +743,7 @@ def list_subjects(db: Session = Depends(get_db)):
 
 
 @app.post("/api/students", response_model=StudentOut, tags=["Students"])
-def create_student(data: StudentCreate, db: Session = Depends(get_db)):
+def create_student(data: StudentCreate, db: Session = Depends(get_db), admin=Depends(require_admin)):
     if not data.first_name.strip() or not data.last_name.strip():
         raise HTTPException(422, "Enter the student's first and last names before registering.")
     if not data.gender or not data.gender.strip():
@@ -2657,7 +2657,7 @@ def remove_teacher_duty(duty_id: int, db: Session = Depends(get_db), admin=Depen
 
 
 @app.post("/api/staff", tags=["Staff"])
-def create_staff(data: StaffCreate, db: Session = Depends(get_db)):
+def create_staff(data: StaffCreate, db: Session = Depends(get_db), admin=Depends(require_admin)):
     if not data.first_name.strip() or not data.last_name.strip():
         raise HTTPException(422, "Enter the staff member's first and last names before saving.")
     if not data.category:
@@ -2691,12 +2691,12 @@ def create_staff(data: StaffCreate, db: Session = Depends(get_db)):
         default_permissions = {
             "Overview": ["view"], "My Classes": ["view"],
             "My Attendance": ["view"], "My Results": ["view", "add", "edit"],
-            "Announcements": ["view"], "Timetable": ["view"],
+            "Announcements": ["view"],
         }
     else:
         title = (data.position or "").strip().lower()
         if "bursar" in title or "account" in title:
-            sections = ["Overview", "Fees & Finance", "Students", "Reports"]
+            sections = ["Overview", "Fees & Finance"]
         elif "secretary" in title or "admin" in title:
             sections = ["Overview", "Students", "Staff", "Parent Access", "Announcements", "Reports"]
         elif "head" in title or title == "dos" or "director of studies" in title:
