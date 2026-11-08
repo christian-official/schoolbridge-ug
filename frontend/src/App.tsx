@@ -1009,8 +1009,13 @@ function AcademicCurriculumSettings({token,onSaved}:{token:string;onSaved:()=>vo
 function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:RecordItem[];onSaved:()=>void}) {
   const [users,setUsers]=useState<any[]>([])
   const [subjects,setSubjects]=useState<any[]>([])
+  const [catalog,setCatalog]=useState<any>({sections:[],actions:[],presets:{}})
   const [teacher,setTeacher]=useState({username:'',email:'',password:''})
   const [assignment,setAssignment]=useState({teacher_id:'',class_id:'',subject_id:''})
+  const [selectedId,setSelectedId]=useState('')
+  const [roleLabel,setRoleLabel]=useState('')
+  const [roleType,setRoleType]=useState<'teacher'|'staff'>('staff')
+  const [permissions,setPermissions]=useState<Record<string,string[]>>({})
   const [message,setMessage]=useState('')
   const [error,setError]=useState('')
   const [loading,setLoading]=useState(true)
@@ -1019,31 +1024,72 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
   async function load() {
     setLoading(true);setError('')
     try {
-      const [u,sub]=await Promise.all([api<any[]>('auth/users',token),api<any[]>('subjects',token)])
-      setUsers(u);setSubjects(sub)
+      const [u,sub,permissionData]=await Promise.all([
+        api<any[]>('auth/users',token),api<any[]>('subjects',token),api<any>('auth/permissions',token)
+      ])
+      setUsers(u);setSubjects(sub);setCatalog(permissionData)
+      const first=u.find((item:any)=>item.role!=='admin'&&item.role!=='parent')
+      if(first&&!selectedId){setSelectedId(String(first.id));setRoleLabel(first.role_label||first.role);setRoleType(first.role==='teacher'?'teacher':'staff');setPermissions(first.permissions||{})}
     } catch(e) {
-      setError(e instanceof Error?e.message:'Unable to load teacher accounts and subjects.')
+      setError(e instanceof Error?e.message:'Unable to load staff accounts and permissions.')
     } finally {setLoading(false)}
   }
   useEffect(()=>{void load()},[token])
 
+  function selectAccount(id:string) {
+    setSelectedId(id)
+    const item=users.find(u=>String(u.id)===id)
+    if(item){setRoleLabel(item.role_label||item.role);setRoleType(item.role==='teacher'?'teacher':'staff');setPermissions(item.permissions||{})}
+  }
+  function applyPreset(label:string) {
+    const sections=catalog.presets?.[label]||[]
+    const next:Record<string,string[]>={}
+    sections.forEach((section:string)=>{next[section]=['view']})
+    if(label==='Teacher'||label==='Class Teacher') {
+      next['Attendance']=['view','add']
+      next['My Classes']=['view']
+      next['My Attendance']=['view']
+      next['My Results']=['view']
+      next['Announcements']=['view']
+    }
+    setRoleLabel(label)
+    setRoleType(label==='Teacher'||label==='Class Teacher'?'teacher':'staff')
+    setPermissions(next)
+  }
+  function togglePermission(section:string,action:string,checked:boolean) {
+    setPermissions(current=>{
+      const actions=new Set(current[section]||[])
+      if(checked)actions.add(action);else actions.delete(action)
+      const next={...current}
+      if(actions.size)next[section]=Array.from(actions);else delete next[section]
+      return next
+    })
+  }
+  async function savePermissions() {
+    if(!selectedId||roleLabel.trim().length<2){setError('Choose a staff account and enter a role name.');return}
+    setBusy(true);setError('');setMessage('')
+    try {
+      await api('auth/users/'+selectedId+'/permissions',token,{method:'PUT',body:JSON.stringify({role:roleType,role_label:roleLabel.trim(),permissions})})
+      setMessage('Role and permissions saved. The account must sign in again for its menu to refresh.')
+      await load()
+      onSaved()
+    } catch(e) {setError(e instanceof Error?e.message:'Unable to save staff permissions.')}
+    finally {setBusy(false)}
+  }
   async function create(e:React.FormEvent) {
     e.preventDefault()
-    const username=teacher.username.trim()
-    const email=teacher.email.trim()
+    const username=teacher.username.trim(),email=teacher.email.trim()
     if(!username||!email||teacher.password.length<12){setError('Enter a username, valid email and password of at least 12 characters.');return}
     setBusy(true);setError('');setMessage('')
     try {
       await api('auth/teachers',token,{method:'POST',body:JSON.stringify({username,email,password:teacher.password})})
       setTeacher({username:'',email:'',password:''})
-      setMessage('Teacher account created successfully.')
+      setMessage('Staff login created. Select the account below to assign its job role and permissions.')
       await load()
       onSaved()
-    } catch(e) {
-      setError(e instanceof Error?e.message:'Unable to create teacher account.')
-    } finally {setBusy(false)}
+    } catch(e) {setError(e instanceof Error?e.message:'Unable to create staff account.')}
+    finally {setBusy(false)}
   }
-
   async function assign(e:React.FormEvent) {
     e.preventDefault()
     if(!assignment.teacher_id||!assignment.class_id||!assignment.subject_id){setError('Select a teacher, class and subject before saving.');return}
@@ -1051,47 +1097,56 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
     try {
       await api('teacher-assignments',token,{method:'POST',body:JSON.stringify({teacher_id:Number(assignment.teacher_id),class_id:Number(assignment.class_id),subject_id:Number(assignment.subject_id)})})
       setAssignment({teacher_id:'',class_id:'',subject_id:''})
-      setMessage('Teacher assignment saved successfully.')
+      setMessage('Teacher class and subject assignment saved.')
       onSaved()
-    } catch(e) {
-      setError(e instanceof Error?e.message:'Unable to assign teacher.')
-    } finally {setBusy(false)}
+    } catch(e) {setError(e instanceof Error?e.message:'Unable to assign teacher.')}
+    finally {setBusy(false)}
   }
-
   const activeTeachers=users.filter(u=>u.role==='teacher'&&u.active)
+  const editableUsers=users.filter(u=>u.role!=='admin'&&u.role!=='parent')
   return <section className="panel settings-panel">
-    <div className="panel-heading"><div><h2>Users and permissions</h2><p>Create teacher accounts and restrict their workspace to assigned classes and subjects.</p></div><button type="button" className="secondary-button" onClick={()=>void load()} disabled={loading||busy}>{loading?'Loading...':'Refresh accounts'}</button></div>
+    <div className="panel-heading"><div><h2>Users, roles and permissions</h2><p>Give every staff login only the school sections and actions needed for their job.</p></div><button type="button" className="secondary-button" onClick={()=>void load()} disabled={loading||busy}>{loading?'Loading...':'Refresh accounts'}</button></div>
     {error&&<div className="form-error" role="alert">{error}</div>}
     {message&&<div className="success-notice" role="status">{message}</div>}
-    <h3>Create teacher account</h3>
-    <details className="form-disclosure"><summary>Create teacher account</summary>
+    <h3>Create staff login</h3>
+    <details className="form-disclosure"><summary>Create a staff account</summary>
       <form className="student-form" onSubmit={create}>
         <div className="student-form-grid">
-          <label>Username *<input required maxLength={60} autoComplete="username" value={teacher.username} onChange={e=>setTeacher({...teacher,username:e.target.value})} placeholder="Enter a username"/></label>
-          <label>Email address *<input required type="email" maxLength={254} autoComplete="email" value={teacher.email} onChange={e=>setTeacher({...teacher,email:e.target.value})} placeholder="teacher@example.com"/></label>
+          <label>Username *<input required maxLength={60} autoComplete="username" value={teacher.username} onChange={e=>setTeacher({...teacher,username:e.target.value})} placeholder="Enter username"/></label>
+          <label>Email address *<input required type="email" maxLength={254} autoComplete="email" value={teacher.email} onChange={e=>setTeacher({...teacher,email:e.target.value})} placeholder="staff@example.com"/></label>
           <label>Temporary password *<input required type="password" minLength={12} maxLength={128} autoComplete="new-password" value={teacher.password} onChange={e=>setTeacher({...teacher,password:e.target.value})} placeholder="At least 12 characters"/></label>
         </div>
-        <p className="form-hint">Use a strong password of at least 12 characters and share it securely with the teacher.</p>
-        <div className="form-actions"><button className="primary-button" disabled={busy||loading}>{busy?'Saving...':'Create teacher account'}</button></div>
+        <p className="form-hint">Create the login, then select the account below to set its position and permissions. The account starts with limited access.</p>
+        <div className="form-actions"><button className="primary-button" disabled={busy||loading}>{busy?'Saving...':'Create staff login'}</button></div>
       </form>
     </details>
-    <h3>Assign classes and subjects</h3>
-    <details className="form-disclosure"><summary>Assign teacher classes and subjects</summary>
-      <form className="student-form" onSubmit={assign}>
-        <div className="student-form-grid">
-          <label>Teacher *<select required value={assignment.teacher_id} onChange={e=>setAssignment({...assignment,teacher_id:e.target.value})}><option value="">Select teacher</option>{activeTeachers.map(u=><option key={u.id} value={u.id}>{u.username}</option>)}</select></label>
-          <label>Class *<select required value={assignment.class_id} onChange={e=>setAssignment({...assignment,class_id:e.target.value})}><option value="">Select class</option>{classes.map(c=><option key={c.id} value={c.id}>{c.name}{c.section?' — '+c.section:''}</option>)}</select></label>
-          <label>Subject *<select required value={assignment.subject_id} onChange={e=>setAssignment({...assignment,subject_id:e.target.value})}><option value="">Select subject</option>{subjects.map(sub=><option key={sub.id} value={sub.id}>{sub.name}</option>)}</select></label>
-        </div>
-        {(!activeTeachers.length||!classes.length||!subjects.length)&&<p className="form-hint">To make an assignment, ensure there is at least one active teacher account, one class and one subject.</p>}
-        <div className="form-actions"><button className="primary-button" disabled={busy||loading||!activeTeachers.length||!subjects.length||!classes.length}>{busy?'Saving...':'Save teacher assignment'}</button></div>
-      </form>
-    </details>
+    <h3>Assign role and permissions</h3>
+    {loading?<p className="form-hint">Loading accounts...</p>:!editableUsers.length?<p className="form-hint">No staff login accounts yet. Create one above.</p>:<>
+      <div className="student-form-grid">
+        <label>Staff login<select value={selectedId} onChange={e=>selectAccount(e.target.value)}><option value="">Choose account</option>{editableUsers.map(u=><option key={u.id} value={u.id}>{u.username} — {u.email}</option>)}</select></label>
+        <label>Role preset<select value={catalog.presets&&Object.keys(catalog.presets).includes(roleLabel)?roleLabel:'Custom'} onChange={e=>e.target.value!=='Custom'&&applyPreset(e.target.value)}><option>Custom</option>{Object.keys(catalog.presets||{}).map((name:string)=><option key={name}>{name}</option>)}</select></label>
+        <label>Job title / role name *<input value={roleLabel} onChange={e=>setRoleLabel(e.target.value)} maxLength={80} placeholder="e.g. Bursar, Secretary, DOS"/></label>
+        <label>Account type<select value={roleType} onChange={e=>setRoleType(e.target.value as 'teacher'|'staff')}><option value="staff">Non-teaching staff</option><option value="teacher">Teaching staff</option></select></label>
+      </div>
+      <div className="table-wrap"><table><thead><tr><th>School section</th>{(catalog.actions||[]).map((action:string)=><th key={action}>{action}</th>)}</tr></thead><tbody>
+        {(catalog.sections||[]).map((section:string)=><tr key={section}><td><strong>{section}</strong></td>{(catalog.actions||[]).map((action:string)=><td key={action}><input aria-label={section+' '+action} type="checkbox" checked={(permissions[section]||[]).includes(action)} onChange={e=>togglePermission(section,action,e.target.checked)}/></td>)}</tr>)}
+      </tbody></table></div>
+      <div className="form-actions"><button type="button" className="primary-button" onClick={()=>void savePermissions()} disabled={busy||!selectedId}>{busy?'Saving...':'Save role and permissions'}</button></div>
+    </>}
+    <h3>Teacher class and subject assignments</h3>
+    <form className="student-form" onSubmit={assign}>
+      <div className="student-form-grid">
+        <label>Teacher *<select required value={assignment.teacher_id} onChange={e=>setAssignment({...assignment,teacher_id:e.target.value})}><option value="">Select teacher</option>{activeTeachers.map(u=><option key={u.id} value={u.id}>{u.username}</option>)}</select></label>
+        <label>Class *<select required value={assignment.class_id} onChange={e=>setAssignment({...assignment,class_id:e.target.value})}><option value="">Select class</option>{classes.map(item=><option key={item.id} value={item.id}>{item.name}{item.section?' — '+item.section:''}</option>)}</select></label>
+        <label>Subject *<select required value={assignment.subject_id} onChange={e=>setAssignment({...assignment,subject_id:e.target.value})}><option value="">Select subject</option>{subjects.map(sub=><option key={sub.id} value={sub.id}>{sub.name}</option>)}</select></label>
+      </div>
+      <div className="form-actions"><button className="primary-button" disabled={busy||loading||!activeTeachers.length||!subjects.length||!classes.length}>{busy?'Saving...':'Save teacher assignment'}</button></div>
+    </form>
     <h3>School user accounts</h3>
-    {loading?<p className="form-hint">Loading school accounts...</p>:<div className="table-wrap"><table><thead><tr><th>Username</th><th>Email</th><th>Role</th><th>Status</th></tr></thead><tbody>
-      {users.map(u=><tr key={u.id}><td>{u.username}</td><td>{u.email}</td><td>{u.role}</td><td><span className={u.active?'':'form-hint'}>{u.active?'Active':'Disabled'}</span></td></tr>)}
-      {!users.length&&<tr><td colSpan={4}>No user accounts found.</td></tr>}
-    </tbody></table></div>}
+    <div className="table-wrap"><table><thead><tr><th>Username</th><th>Email</th><th>Job role</th><th>Sections enabled</th><th>Status</th></tr></thead><tbody>
+      {users.map(u=><tr key={u.id}><td>{u.username}</td><td>{u.email}</td><td>{u.role==='admin'?'Administrator':u.role==='parent'?'Parent':u.role_label||u.role}</td><td>{Object.keys(u.permissions||{}).length|| (u.role==='admin'?'All':'Limited')}</td><td>{u.active?'Active':'Disabled'}</td></tr>)}
+      {!users.length&&<tr><td colSpan={5}>No user accounts found.</td></tr>}
+    </tbody></table></div>
   </section>
 }
 function BackupSettings({token}:{token:string}) {
