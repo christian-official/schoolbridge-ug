@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 type Profile = {
   first_name: string; last_name: string; staff_number: string; position?: string | null; department?: string | null; subjects?: string | null; phone?: string | null;
-  email?: string | null; position?: string | null; department?: string | null;
+  email?: string | null;
   category: string; username: string
 }
 async function request<T>(path: string, token: string, options: RequestInit = {}): Promise<T> {
