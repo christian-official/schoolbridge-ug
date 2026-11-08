@@ -845,24 +845,18 @@ function App() {
           {active === 'Timetable' && user.role !== 'parent' && <OperationsManagement token={token} active={active} permissions={user.permissions} isAdmin={user.role === 'admin'} roleLabel={user.role_label || ''} />}
           {active === 'My Profile' && user.role !== 'parent' && user.role !== 'admin' && <MyStaffProfile token={token} />}
           {active === 'Leadership & Duty' && user.role !== 'parent' && <LeadershipDuty token={token} />}
+          {active === 'Settings' && <nav className="settings-main-tabs" aria-label="School settings sections">
+            {[['home','Home'],['school','School profile'],['classes','Classes'],['admission','Admissions'],['academic','Academic year'],['curriculum','Curriculum'],['users','Users & permissions'],['backups','Backups'],['audit','Audit log']].map(([key,label])=><button type="button" key={key} className={settingsSection===key?'active':''} aria-current={settingsSection===key?'page':undefined} onClick={()=>setSettingsSection(key)}>{label}</button>)}
+          </nav>}
           {active === 'Settings' && settingsSection === 'home' && (
             <section className="settings-hub">
               <div className="panel-heading"><div><h2>School settings</h2><p>Choose a category to configure how SchoolBridge works for this school.</p></div></div>
-              <div className="settings-category-grid">
-                <button className="settings-category" onClick={() => setSettingsSection('school')}><span className="settings-category-icon"><GraduationCap /></span><strong>School Profile</strong><small>School name, contacts and identity</small><ArrowUpRight /></button>
-                <button className="settings-category" onClick={() => setSettingsSection('classes')}><span className="settings-category-icon"><BookOpen /></span><strong>Classes & Streams</strong><small>Create classes, streams and manage class fees</small><ArrowUpRight /></button>
-                <button className="settings-category" onClick={() => setSettingsSection('admission')}><span className="settings-category-icon"><Users /></span><strong>Admission Numbers</strong><small>Set the format for student admission numbers</small><ArrowUpRight /></button>
-                <button className="settings-category" onClick={() => setSettingsSection('academic')}><span className="settings-category-icon"><CalendarDays /></span><strong>Academic Year & Terms</strong><small>Set the active academic year and term</small><ArrowUpRight /></button>
-                <button className="settings-category" onClick={() => setSettingsSection('curriculum')}><span className="settings-category-icon"><BookOpen /></span><strong>Academic & Curriculum</strong><small>Configure A-Level combinations, O-Level optional and subsidiary subjects</small><ArrowUpRight /></button>
-                <button className="settings-category" onClick={() => setSettingsSection('users')}><span className="settings-category-icon"><ShieldCheck /></span><strong>Users & Permissions</strong><small>Teaching and non-teaching staff roles, tabs and actions</small><ArrowUpRight /></button>
-                <button className="settings-category" onClick={() => setSettingsSection('backups')}><span className="settings-category-icon"><Settings /></span><strong>Backups & Restore</strong><small>Protect and restore school records</small><ArrowUpRight /></button>
-                <button className="settings-category" onClick={() => setSettingsSection('audit')}><span className="settings-category-icon"><ShieldCheck /></span><strong>Audit Log</strong><small>Review important changes and financial actions</small><ArrowUpRight /></button>
-              </div>
+              <div className="settings-home-summary"><strong>School settings</strong><p>Use the tabs above to move between school identity, academic setup, user access, backups and audit records. Each section opens only when selected.</p></div>
             </section>
           )}
           {active === 'Settings' && settingsSection !== 'home' && (
             <div className="settings-detail">
-              <button className="settings-back" onClick={() => setSettingsSection('home')}>← All settings</button>
+              
               {settingsSection === 'admission' && (
             <section className="panel settings-panel">
               <div className="panel-heading"><div><h2>Admission number settings</h2><p>Choose the format used for newly registered students at this school.</p></div></div>
@@ -1311,7 +1305,7 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
     </div>}
     {accountTab==='staff'&&<div className="account-tab-panel">
     <h3>School staff login accounts</h3>
-    <p className="form-hint">Staff accounts are listed separately from administrator and parent accounts. Search to find any staff login; only the first 8 are shown until you search or choose to view all.</p>
+    <p className="form-hint">Staff accounts are separate from administrator and parent accounts. The first 8 are shown; search to find any other account.</p>
     <div className="table-tools student-tools"><div className="search-box"><Search size={17}/><input aria-label="Search staff login accounts" placeholder="Search staff name, staff number or username..." value={staffLoginSearch} onChange={e=>setStaffLoginSearch(e.target.value)}/></div><span className="count-pill">{staffLoginMatches.length} staff accounts</span></div>
     <div className="table-wrap"><table><thead><tr><th>Staff member</th><th>Username</th><th>Job role</th><th>Areas available</th><th>Status</th><th>Actions</th></tr></thead><tbody>
       {visibleStaffLogins.map(u=>{const person=staff.find((p:any)=>p.id===u.staff_id);return <tr key={u.id}><td>{person?person.first_name+' '+person.last_name:'Unlinked staff login'}</td><td>{u.username}</td><td>{u.role_label||u.role}</td><td>{Object.keys(u.permissions||{}).length||'Limited'}</td><td>{u.active?'Active':'Disabled'}</td><td><button type="button" className="secondary-button" disabled={busy} onClick={()=>{setSelectedId(String(u.id));setResetPasscode(null);setRoleLabel(u.role_label||u.role);setRoleType(u.role==='teacher'?'teacher':'staff');setPermissions(u.permissions||{});void resetAccountPassword(String(u.id),u.username)}}>Reset password</button></td></tr>})}
