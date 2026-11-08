@@ -381,3 +381,14 @@
 @media(max-width:760px){
   .redesigned-app-shell>.sidebar{padding:25px 17px 18px!important}
 }
+
+
+/* New unified sidebar colour: calm deep slate-teal across every role. */
+.redesigned-app-shell>.sidebar{
+  background:linear-gradient(180deg,#243746 0%,#315363 58%,#3d6873 100%)!important;
+}
+.redesigned-app-shell>.sidebar .nav-item.active,
+.redesigned-app-shell>.sidebar .nav-item:hover{
+  background:#ffffff24!important;
+  color:#fff!important;
+}
