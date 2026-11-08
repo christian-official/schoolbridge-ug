@@ -725,6 +725,79 @@ def test_verified_marks_are_locked_for_teachers_until_admin_unlocks():
         assert corrected.json()["verified"] is False
 
 
+
+def test_staff_registration_handles_contact_email_already_used_by_another_login():
+    reset_database()
+    admin = create_admin()
+    headers = {"Authorization": f"Bearer {create_access_token(admin)}"}
+    payload = {
+        "category": "Non-teaching",
+        "position": "Secretary",
+        "department": "Administration",
+        "email": "shared-staff@example.com",
+    }
+    with TestClient(app) as client:
+        first = client.post("/api/staff", headers=headers, json={
+            **payload, "first_name": "Alex", "last_name": "One",
+        })
+        second = client.post("/api/staff", headers=headers, json={
+            **payload, "first_name": "Sam", "last_name": "Two",
+        })
+        assert first.status_code == 200, first.text
+        assert second.status_code == 200, second.text
+        assert first.json()["login"]["email"] == "shared-staff@example.com"
+        assert second.json()["login"]["email"].endswith("@accounts.schoolbridge.local")
+        assert second.json()["email"] == "shared-staff@example.com"
+
+        searched = client.get("/api/staff?search=Administration&page_size=100", headers=headers)
+        assert searched.status_code == 200
+        assert searched.json()["total"] == 2
+
+
+def test_admin_can_verify_all_scores_for_one_subject_in_one_action():
+    reset_database()
+    admin = create_admin()
+    headers = {"Authorization": f"Bearer {create_access_token(admin)}"}
+    db = SessionLocal()
+    try:
+        school_class = models.SchoolClass(name="Senior 2", section="East")
+        biology = models.Subject(name="Biology")
+        chemistry = models.Subject(name="Chemistry")
+        db.add_all([school_class, biology, chemistry])
+        db.flush()
+        exam = models.Exam(name="Term 1 Assessment", term="Term 1", year=2026, class_id=school_class.id)
+        students = [
+            models.Student(admission_number="SB-BATCH-001", first_name="A", last_name="One", class_id=school_class.id),
+            models.Student(admission_number="SB-BATCH-002", first_name="B", last_name="Two", class_id=school_class.id),
+        ]
+        db.add_all([exam, *students])
+        db.flush()
+        db.add_all([
+            models.Mark(student_id=students[0].id, subject_id=biology.id, exam_id=exam.id, score=70),
+            models.Mark(student_id=students[1].id, subject_id=biology.id, exam_id=exam.id, score=80),
+            models.Mark(student_id=students[0].id, subject_id=chemistry.id, exam_id=exam.id, score=60),
+        ])
+        db.commit()
+        exam_id, biology_id, chemistry_id = exam.id, biology.id, chemistry.id
+    finally:
+        db.close()
+
+    with TestClient(app) as client:
+        verified = client.patch(
+            f"/api/subjects/{biology_id}/marks/verification?exam_id={exam_id}&verified=true",
+            headers=headers,
+        )
+        assert verified.status_code == 200, verified.text
+        assert verified.json()["records"] == 2
+        assert verified.json()["changed"] == 2
+        marks = client.get(f"/api/marks?exam_id={exam_id}", headers=headers).json()
+        biology_marks = [row for row in marks if row["subject_id"] == biology_id]
+        chemistry_marks = [row for row in marks if row["subject_id"] == chemistry_id]
+        assert all(row["verified"] for row in biology_marks)
+        assert not any(row["verified"] for row in chemistry_marks)
+
+
+
 def test_parent_portal_only_exposes_linked_child_records_and_audience_announcements():
     reset_database()
     admin = create_admin()
