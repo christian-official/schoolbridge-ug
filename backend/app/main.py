@@ -1004,6 +1004,37 @@ class AssignmentCreate(BaseModel):
     class_id: int
     subject_id: int
 
+class ParentAccountCreate(BaseModel):
+    username: str = Field(min_length=3, max_length=80)
+    email: str = Field(min_length=5, max_length=150)
+    password: str = Field(min_length=12, max_length=128)
+    student_ids: list[int] = Field(min_length=1, max_length=10)
+
+
+class AnnouncementCreate(BaseModel):
+    title: str = Field(min_length=3, max_length=160)
+    message: str = Field(min_length=3, max_length=5000)
+    audience: str = Field(default="All", pattern="^(All|Parents|Teachers)$")
+    published: bool = True
+
+
+def require_parent(user=Depends(get_current_user)):
+    if user.role != "parent":
+        raise HTTPException(403, "Parent account required.")
+    return user
+
+
+def linked_parent_student(db: Session, parent, student_id: int):
+    link = db.query(models.ParentStudentLink).filter_by(
+        user_id=parent.id, student_id=student_id
+    ).first()
+    if not link:
+        raise HTTPException(404, "This student is not linked to your parent account.")
+    student = db.get(models.Student, student_id)
+    if not student:
+        raise HTTPException(404, "Student record not found.")
+    return student
+
 
 def create_access_token(user):
     expires = datetime.now(timezone.utc) + timedelta(hours=TOKEN_HOURS)
@@ -1374,6 +1405,123 @@ def list_users(
         for u in users
     ]
 
+
+
+
+@app.post("/api/parent-accounts", tags=["Parent Access"])
+def create_parent_account(data: ParentAccountCreate, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    student_ids = list(dict.fromkeys(data.student_ids))
+    students = db.query(models.Student).filter(models.Student.id.in_(student_ids)).all()
+    if len(students) != len(student_ids):
+        raise HTTPException(404, "One or more selected students could not be found.")
+    parent = models.User(
+        username=data.username.strip(),
+        email=data.email.strip().lower(),
+        hashed_password=password_hash.hash(data.password),
+        role="parent",
+    )
+    db.add(parent)
+    try:
+        db.flush()
+        db.add_all([models.ParentStudentLink(user_id=parent.id, student_id=student_id) for student_id in student_ids])
+        write_audit(db, admin, "parent_account_created", "user", parent.id, f"Linked student IDs: {', '.join(map(str, student_ids))}")
+        db.commit()
+        db.refresh(parent)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "That username or email is already registered, or a parent link already exists.")
+    return {"id": parent.id, "username": parent.username, "email": parent.email, "role": parent.role, "linked_students": len(student_ids)}
+
+
+@app.get("/api/parent-accounts", tags=["Parent Access"])
+def list_parent_accounts(db: Session = Depends(get_db), admin=Depends(require_admin)):
+    parents = db.query(models.User).filter_by(role="parent").order_by(models.User.username).all()
+    output = []
+    for parent in parents:
+        links = db.query(models.ParentStudentLink).filter_by(user_id=parent.id).all()
+        children = []
+        for link in links:
+            student = db.get(models.Student, link.student_id)
+            if student:
+                children.append({"id": student.id, "name": " ".join(x for x in [student.first_name, student.middle_name, student.last_name] if x), "admission_number": student.admission_number})
+        output.append({"id": parent.id, "username": parent.username, "email": parent.email, "active": parent.is_active, "children": children})
+    return output
+
+
+@app.get("/api/parent/children", tags=["Parent Portal"])
+def parent_children(db: Session = Depends(get_db), parent=Depends(require_parent)):
+    links = db.query(models.ParentStudentLink).filter_by(user_id=parent.id).all()
+    output = []
+    for link in links:
+        student = db.get(models.Student, link.student_id)
+        if not student:
+            continue
+        school_class = db.get(models.SchoolClass, student.class_id) if student.class_id else None
+        charges = db.query(models.FeeCharge).filter_by(student_id=student.id).all()
+        total_charged = sum(row.amount for row in charges)
+        total_paid = sum(db.query(func.coalesce(func.sum(models.FeePayment.amount), 0)).filter_by(charge_id=row.id).scalar() or 0 for row in charges)
+        output.append({"id": student.id, "name": " ".join(x for x in [student.first_name, student.middle_name, student.last_name] if x), "admission_number": student.admission_number, "status": student.status, "class_name": school_class.name if school_class else "Unassigned", "stream": school_class.section if school_class else "", "fees_charged": total_charged, "fees_paid": total_paid, "balance": total_charged-total_paid})
+    return output
+
+
+@app.get("/api/parent/children/{student_id}/results", tags=["Parent Portal"])
+def parent_child_results(student_id: int, db: Session = Depends(get_db), parent=Depends(require_parent)):
+    student = linked_parent_student(db, parent, student_id)
+    rows = db.query(models.Mark, models.Exam, models.Subject).join(
+        models.Exam, models.Exam.id == models.Mark.exam_id
+    ).join(models.Subject, models.Subject.id == models.Mark.subject_id).filter(
+        models.Mark.student_id == student.id, models.Mark.verified.is_(True)
+    ).order_by(models.Exam.year.desc(), models.Exam.term, models.Exam.name, models.Subject.name).all()
+    return [{"exam": exam.name, "term": exam.term, "year": exam.year, "subject": subject.name, "score": mark.score} for mark, exam, subject in rows]
+
+
+@app.get("/api/parent/children/{student_id}/attendance", tags=["Parent Portal"])
+def parent_child_attendance(student_id: int, db: Session = Depends(get_db), parent=Depends(require_parent)):
+    student = linked_parent_student(db, parent, student_id)
+    rows = db.query(models.Attendance).filter_by(student_id=student.id).order_by(
+        models.Attendance.attendance_date.desc(), models.Attendance.id.desc()
+    ).limit(120).all()
+    return [{"date": row.attendance_date, "status": row.status} for row in rows]
+
+
+@app.get("/api/parent/children/{student_id}/fees", tags=["Parent Portal"])
+def parent_child_fees(student_id: int, db: Session = Depends(get_db), parent=Depends(require_parent)):
+    student = linked_parent_student(db, parent, student_id)
+    charges = db.query(models.FeeCharge).filter_by(student_id=student.id).order_by(
+        models.FeeCharge.year.desc(), models.FeeCharge.term
+    ).all()
+    output = []
+    for charge in charges:
+        payments = db.query(models.FeePayment).filter_by(charge_id=charge.id).order_by(
+            models.FeePayment.payment_date.desc(), models.FeePayment.id.desc()
+        ).all()
+        paid = sum(row.amount for row in payments)
+        output.append({"term": charge.term, "year": charge.year, "charged": charge.amount, "paid": paid, "balance": charge.amount-paid, "payments": [{"date": row.payment_date, "amount": row.amount, "receipt_number": row.receipt_number} for row in payments]})
+    return output
+
+
+@app.post("/api/announcements", tags=["School Announcements"])
+def create_announcement(data: AnnouncementCreate, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    item = models.SchoolAnnouncement(**data.model_dump(), created_by=admin.id)
+    db.add(item)
+    db.flush()
+    write_audit(db, admin, "announcement_created", "announcement", item.id, item.title)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@app.get("/api/announcements", tags=["School Announcements"])
+def list_announcements(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    if user.role == "admin":
+        query = db.query(models.SchoolAnnouncement)
+    elif user.role == "parent":
+        query = db.query(models.SchoolAnnouncement).filter(models.SchoolAnnouncement.published.is_(True), models.SchoolAnnouncement.audience.in_(["All", "Parents"]))
+    elif user.role == "teacher":
+        query = db.query(models.SchoolAnnouncement).filter(models.SchoolAnnouncement.published.is_(True), models.SchoolAnnouncement.audience.in_(["All", "Teachers"]))
+    else:
+        raise HTTPException(403, "This account cannot view school announcements.")
+    return query.order_by(models.SchoolAnnouncement.created_at.desc(), models.SchoolAnnouncement.id.desc()).limit(100).all()
 
 @app.post("/api/teacher-assignments", tags=["Teacher Management"])
 def assign_teacher(
