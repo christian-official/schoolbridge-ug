@@ -1661,3 +1661,39 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .dos-footer-note svg{flex:none;color:#1d4ed8}
 @media(max-width:900px){.dos-management-grid{grid-template-columns:1fr}}
 @media(max-width:600px){.dos-result-stats{grid-template-columns:1fr 1fr}.dos-result-stats>div:last-child{grid-column:span 2}.dos-exam-row{align-items:flex-start;flex-direction:column}}
+
+
+/* Role-specific command dashboards */
+.command-dashboard{display:flex;flex-direction:column;gap:20px}
+.command-hero{display:flex;align-items:flex-start;justify-content:space-between;gap:22px;padding:28px;border:1px solid var(--border-color,#e5e7eb);border-radius:18px;background:linear-gradient(120deg,#f8fbff 0%,#eef4ff 55%,#f8faff 100%)}
+.command-hero h2{font-size:clamp(1.45rem,2.3vw,2rem);margin:5px 0 8px;color:#172b4d}
+.command-hero p:not(.eyebrow){max-width:760px;margin:0;color:#5d6b82;line-height:1.6}
+.command-role-chip{display:inline-flex;align-items:center;gap:8px;white-space:nowrap;padding:9px 13px;border:1px solid #d7e2f2;border-radius:999px;background:#fff;color:#344b6b;font-size:.82rem;font-weight:650}
+.command-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.command-finance-strip{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) auto;align-items:center;gap:15px;padding:17px 20px;border:1px solid var(--border-color,#e5e7eb);border-radius:14px;background:#fff}
+.command-finance-strip>div{display:flex;flex-direction:column;gap:5px}
+.command-finance-strip small{font-size:.68rem;letter-spacing:.07em;color:#77849a;font-weight:700}
+.command-finance-strip strong{font-size:1.12rem;color:#1d3557}
+.command-content{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(260px,.8fr);gap:18px;align-items:start}
+.command-main-panel,.command-side-panel{padding:20px;border:1px solid var(--border-color,#e5e7eb);border-radius:16px;background:#fff;min-width:0}
+.command-action-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.command-action-card{display:flex;align-items:center;gap:12px;text-align:left;padding:15px;border:1px solid #e4e9f1;border-radius:12px;background:#fff;color:inherit;cursor:pointer;transition:border-color .16s,transform .16s,box-shadow .16s}
+.command-action-card:hover{border-color:#9db7dc;transform:translateY(-1px);box-shadow:0 5px 16px rgba(24,55,95,.07)}
+.command-action-card>span:nth-child(2){display:flex;flex:1;flex-direction:column;gap:4px;min-width:0}
+.command-action-card strong{font-size:.9rem;color:#243b5a}
+.command-action-card small{font-size:.77rem;line-height:1.45;color:#718096}
+.command-action-icon{display:grid;place-items:center;flex:0 0 40px;width:40px;height:40px;border-radius:11px}
+.command-action-icon svg{width:19px;height:19px}
+.command-action-icon.blue{background:#eaf2ff;color:#3567a8}
+.command-action-icon.purple{background:#f1edff;color:#7054b8}
+.command-action-icon.green{background:#e8f7ef;color:#278052}
+.command-action-icon.amber{background:#fff4df;color:#a36b16}
+.command-brief-item{display:flex;flex-direction:column;gap:5px;padding:14px 0;border-bottom:1px solid #edf0f4}
+.command-brief-item:last-child{border-bottom:0}
+.command-brief-item strong{font-size:.87rem;color:#263d5c}
+.command-brief-item span{font-size:.8rem;line-height:1.5;color:#718096}
+.headteacher-dashboard .command-hero{border-color:#d6e1f1;background:linear-gradient(115deg,#edf4ff,#f7faff 65%,#eef7f5)}
+.secretary-dashboard .command-hero{background:linear-gradient(115deg,#f4f2ff,#faf9ff 65%,#f2f7ff)}
+.attendance-officer-dashboard .command-hero{background:linear-gradient(115deg,#edf8f3,#f8fcfa 65%,#eef5ff)}
+@media(max-width:1050px){.command-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.command-content{grid-template-columns:1fr}.command-finance-strip{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:640px){.command-hero{flex-direction:column;padding:20px}.command-role-chip{white-space:normal}.command-metrics{grid-template-columns:1fr 1fr}.command-action-grid{grid-template-columns:1fr}.command-finance-strip{grid-template-columns:1fr}.command-main-panel,.command-side-panel{padding:15px}}
