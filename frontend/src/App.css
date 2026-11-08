@@ -1514,3 +1514,23 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .recorded-marks-filters strong{font-size:13px}
 .exam-create-form .exam-create-meta{align-items:flex-start}
 .exam-create-form .exam-class-picker{margin-top:18px}
+
+
+/* Project-wide checkbox replacements: clear, accessible, clickable selection controls. */
+.choice-toggle{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:9px 14px;border:1px solid #dce3ee;border-radius:9px;background:#fff;color:#53627a;font-size:12px;font-weight:750;cursor:pointer}
+.choice-toggle.active{border-color:#4569cb;background:#edf3ff;color:#244bb0;box-shadow:0 0 0 1px #4569cb inset}
+.permission-choice-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:9px;margin:12px 0}
+.permission-choice{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:46px;padding:10px 12px;border:1px solid #dce3ee;border-radius:9px;background:#fff;color:#53627a;text-align:left;font-size:12px;font-weight:750;cursor:pointer}
+.permission-choice small{color:#8792a5;font-size:10px;white-space:nowrap}
+.permission-choice.active{border-color:#4569cb;background:#edf3ff;color:#244bb0;box-shadow:0 0 0 1px #4569cb inset}
+.subject-choice-button{min-height:38px;padding:9px 12px;border:1px solid #dce3ee;border-radius:9px;background:#fff;color:#53627a;font-size:12px;font-weight:700;cursor:pointer}
+.subject-choice-button.active{border-color:#4569cb;background:#edf3ff;color:#244bb0;box-shadow:0 0 0 1px #4569cb inset}
+.subject-choice-button:focus-visible,.permission-choice:focus-visible,.phase4-student-option:focus-visible,.choice-toggle:focus-visible{outline:2px solid #4569cb;outline-offset:2px}
+.phase4-student-options{display:grid;gap:8px}
+.phase4-student-option{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;padding:12px;border:1px solid #dce3ee;border-radius:10px;background:#fff;color:#35445c;text-align:left;cursor:pointer}
+.phase4-student-option>span{display:grid;gap:5px}
+.phase4-student-option small{display:block;color:#718096;font-size:11px;margin-top:4px}
+.phase4-student-option>b{flex:0 0 auto;padding:6px 9px;border-radius:7px;background:#f1f4f8;color:#66748a;font-size:10px}
+.phase4-student-option.active{border-color:#4569cb;background:#edf3ff;box-shadow:0 0 0 1px #4569cb inset}
+.phase4-student-option.active>b{background:#dce7ff;color:#244bb0}
+.teacher-exam-selection{display:grid;gap:13px;margin:16px 0;padding:16px;border:1px solid #e2e8f2;border-radius:14px;background:#f9fbff}
