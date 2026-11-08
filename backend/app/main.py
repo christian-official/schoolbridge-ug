@@ -54,7 +54,7 @@ def get_current_user(
 PERMISSION_SECTIONS = {
     "Overview", "Students", "Staff", "Fees & Finance", "Examinations",
     "Attendance", "Staff Attendance", "Timetable", "Leadership & Duty",
-    "Parent Access", "Announcements", "Reports", "Settings",
+    "Parent Access", "Parent Liaison", "Announcements", "Reports", "Settings",
     "My Classes", "My Attendance", "My Results",
 }
 PERMISSION_ACTIONS = {"view", "add", "edit", "delete", "approve", "print"}
@@ -111,6 +111,7 @@ def permission_for_path(path: str):
     if path.startswith("/api/timetable"): return "Timetable"
     if path.startswith(("/api/leadership", "/api/prefects", "/api/teacher-duties")): return "Leadership & Duty"
     if path.startswith("/api/parent-accounts"): return "Parent Access"
+    if path.startswith("/api/parent-liaison"): return "Parent Liaison"
     if path.startswith("/api/announcements"): return "Announcements"
     if path.startswith("/api/reports"): return "Reports"
     if path.startswith(("/api/settings", "/api/backups", "/api/audit-logs")): return "Settings"
@@ -1238,6 +1239,20 @@ class ParentAccountCreate(BaseModel):
     student_ids: list[int] = Field(min_length=1, max_length=10)
 
 
+
+
+class ParentLiaisonThreadCreate(BaseModel):
+    student_id: int
+    parent_user_id: int
+    subject: str = Field(min_length=3, max_length=160)
+    category: str = Field(default="General enquiry", pattern="^(Academic performance|Attendance|Behaviour and discipline|Fees and payments|Meeting request|General enquiry)$")
+    message: str = Field(min_length=2, max_length=5000)
+
+
+class ParentLiaisonMessageCreate(BaseModel):
+    message: str = Field(min_length=2, max_length=5000)
+
+
 class AnnouncementCreate(BaseModel):
     title: str = Field(min_length=3, max_length=160)
     message: str = Field(min_length=3, max_length=5000)
@@ -2104,6 +2119,196 @@ def parent_child_fees(student_id: int, db: Session = Depends(get_db), parent=Dep
         paid = sum(row.amount for row in payments)
         output.append({"term": charge.term, "year": charge.year, "charged": charge.amount, "paid": paid, "balance": charge.amount-paid, "payments": [{"date": row.payment_date, "amount": row.amount, "receipt_number": row.receipt_number} for row in payments]})
     return output
+
+
+
+
+def _parent_liaison_staff_access(user, action: str = "view"):
+    if user.role == "admin":
+        return
+    if user.role not in {"teacher", "staff"}:
+        raise HTTPException(403, "Authorised staff account required.")
+    if action not in user_permissions(user).get("Parent Liaison", set()):
+        raise HTTPException(403, "You do not have permission to use Parent Liaison.")
+
+
+def _staff_can_contact_student(db: Session, user, student):
+    if user.role == "admin":
+        return True
+    if user.role == "teacher":
+        if is_assigned_class_teacher(db, user.id, student.class_id or -1):
+            return True
+        return db.query(models.TeacherAssignment.id).filter_by(
+            teacher_id=user.id, class_id=student.class_id
+        ).first() is not None
+    return "add" in user_permissions(user).get("Parent Liaison", set())
+
+
+def _liaison_thread_access(db: Session, user, thread):
+    if user.role == "parent":
+        if thread.parent_user_id != user.id:
+            raise HTTPException(404, "Communication record not found.")
+        linked_parent_student(db, user, thread.student_id)
+        return "parent"
+    _parent_liaison_staff_access(user, "view")
+    if user.role == "admin" or thread.initiated_by == user.id:
+        return "staff"
+    student = db.get(models.Student, thread.student_id)
+    if student and _staff_can_contact_student(db, user, student):
+        return "staff"
+    raise HTTPException(404, "Communication record not found.")
+
+
+@app.get("/api/parent-liaison/recipients", tags=["Parent Liaison"])
+def parent_liaison_recipients(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    _parent_liaison_staff_access(user, "add")
+    students = db.query(models.Student).filter(models.Student.status == "active").order_by(
+        models.Student.last_name, models.Student.first_name
+    ).all()
+    output = []
+    for student in students:
+        if not _staff_can_contact_student(db, user, student):
+            continue
+        links = db.query(models.ParentStudentLink, models.User).join(
+            models.User, models.User.id == models.ParentStudentLink.user_id
+        ).filter(models.ParentStudentLink.student_id == student.id, models.User.is_active.is_(True)).all()
+        if not links:
+            continue
+        school_class = db.get(models.SchoolClass, student.class_id) if student.class_id else None
+        output.append({
+            "student_id": student.id,
+            "student_name": " ".join(part for part in [student.first_name, student.middle_name, student.last_name] if part),
+            "admission_number": student.admission_number,
+            "class_name": school_class.name if school_class else "Unassigned",
+            "parents": [{"id": parent.id, "username": parent.username, "email": parent.email} for _, parent in links],
+        })
+    return output
+
+
+@app.post("/api/parent-liaison/threads", tags=["Parent Liaison"])
+def create_parent_liaison_thread(data: ParentLiaisonThreadCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    _parent_liaison_staff_access(user, "add")
+    student = db.get(models.Student, data.student_id)
+    if not student or student.status != "active":
+        raise HTTPException(404, "Active student record not found.")
+    if not _staff_can_contact_student(db, user, student):
+        raise HTTPException(403, "You are not authorised to contact parents for this student.")
+    parent = db.query(models.User).filter_by(id=data.parent_user_id, role="parent", is_active=True).first()
+    link = db.query(models.ParentStudentLink.id).filter_by(
+        user_id=data.parent_user_id, student_id=data.student_id
+    ).first()
+    if not parent or not link:
+        raise HTTPException(422, "The selected parent account is not linked to this student.")
+    thread = models.ParentLiaisonThread(
+        student_id=student.id, parent_user_id=parent.id, initiated_by=user.id,
+        subject=data.subject.strip(), category=data.category,
+    )
+    db.add(thread)
+    db.flush()
+    first_message = models.ParentLiaisonMessage(thread_id=thread.id, sender_id=user.id, message=data.message.strip())
+    db.add(first_message)
+    write_audit(db, user, "parent_liaison_initiated", "parent_liaison_thread", thread.id,
+                f"student_id={student.id}; parent_user_id={parent.id}; category={data.category}")
+    db.commit()
+    db.refresh(thread)
+    return {"id": thread.id, "subject": thread.subject, "status": thread.status, "created_at": thread.created_at}
+
+
+@app.get("/api/parent-liaison/threads", tags=["Parent Liaison"])
+def list_parent_liaison_threads(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    if user.role == "parent":
+        query = db.query(models.ParentLiaisonThread).filter_by(parent_user_id=user.id)
+    else:
+        _parent_liaison_staff_access(user, "view")
+        if user.role == "admin":
+            query = db.query(models.ParentLiaisonThread)
+        else:
+            query = db.query(models.ParentLiaisonThread).filter(
+                models.ParentLiaisonThread.initiated_by == user.id
+            )
+    rows = query.order_by(models.ParentLiaisonThread.updated_at.desc(), models.ParentLiaisonThread.id.desc()).limit(200).all()
+    output = []
+    for thread in rows:
+        student = db.get(models.Student, thread.student_id)
+        parent = db.get(models.User, thread.parent_user_id)
+        last = db.query(models.ParentLiaisonMessage).filter_by(thread_id=thread.id).order_by(
+            models.ParentLiaisonMessage.id.desc()
+        ).first()
+        output.append({
+            "id": thread.id, "student_id": thread.student_id,
+            "student_name": " ".join(part for part in [student.first_name, student.middle_name, student.last_name] if part) if student else "Student",
+            "parent_name": parent.username if parent else "Parent",
+            "subject": thread.subject, "category": thread.category, "status": thread.status,
+            "created_at": thread.created_at, "updated_at": thread.updated_at,
+            "last_message": last.message[:180] if last else "",
+            "last_sender_id": last.sender_id if last else None,
+        })
+    return output
+
+
+@app.get("/api/parent-liaison/threads/{thread_id}", tags=["Parent Liaison"])
+def get_parent_liaison_thread(thread_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    thread = db.get(models.ParentLiaisonThread, thread_id)
+    if not thread:
+        raise HTTPException(404, "Communication record not found.")
+    _liaison_thread_access(db, user, thread)
+    messages = db.query(models.ParentLiaisonMessage).filter_by(thread_id=thread.id).order_by(
+        models.ParentLiaisonMessage.id
+    ).all()
+    for item in messages:
+        if item.sender_id != user.id and item.read_at is None:
+            item.read_at = datetime.utcnow()
+    db.commit()
+    return {
+        "id": thread.id, "student_id": thread.student_id, "subject": thread.subject,
+        "category": thread.category, "status": thread.status,
+        "student_name": " ".join(part for part in [
+            db.get(models.Student, thread.student_id).first_name,
+            db.get(models.Student, thread.student_id).middle_name,
+            db.get(models.Student, thread.student_id).last_name,
+        ] if part),
+        "messages": [{
+            "id": item.id, "sender_id": item.sender_id,
+            "sender_name": (db.get(models.User, item.sender_id).username if db.get(models.User, item.sender_id) else "User"),
+            "message": item.message, "created_at": item.created_at,
+            "read_at": item.read_at,
+        } for item in messages],
+    }
+
+
+@app.post("/api/parent-liaison/threads/{thread_id}/messages", tags=["Parent Liaison"])
+def reply_parent_liaison_thread(thread_id: int, data: ParentLiaisonMessageCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    thread = db.get(models.ParentLiaisonThread, thread_id)
+    if not thread:
+        raise HTTPException(404, "Communication record not found.")
+    side = _liaison_thread_access(db, user, thread)
+    if thread.status != "Open":
+        raise HTTPException(409, "This communication record is closed.")
+    item = models.ParentLiaisonMessage(thread_id=thread.id, sender_id=user.id, message=data.message.strip())
+    thread.updated_at = datetime.utcnow()
+    db.add(item)
+    write_audit(db, user, "parent_liaison_reply_sent", "parent_liaison_thread", thread.id,
+                f"sender_role={side}")
+    db.commit()
+    db.refresh(item)
+    return {"id": item.id, "created_at": item.created_at, "message": item.message}
+
+
+@app.patch("/api/parent-liaison/threads/{thread_id}/status", tags=["Parent Liaison"])
+def update_parent_liaison_status(thread_id: int, status: str, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    _parent_liaison_staff_access(user, "edit")
+    thread = db.get(models.ParentLiaisonThread, thread_id)
+    if not thread:
+        raise HTTPException(404, "Communication record not found.")
+    if user.role != "admin" and thread.initiated_by != user.id:
+        raise HTTPException(404, "Communication record not found.")
+    if status not in {"Open", "Closed"}:
+        raise HTTPException(422, "Status must be Open or Closed.")
+    thread.status = status
+    thread.updated_at = datetime.utcnow()
+    write_audit(db, user, "parent_liaison_status_changed", "parent_liaison_thread", thread.id, status)
+    db.commit()
+    return {"id": thread.id, "status": thread.status}
 
 
 @app.post("/api/announcements", tags=["School Announcements"])

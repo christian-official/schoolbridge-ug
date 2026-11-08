@@ -316,3 +316,28 @@ class TimetableEntry(Base):
     start_time: Mapped[str] = mapped_column(String(5))
     end_time: Mapped[str] = mapped_column(String(5))
     room: Mapped[str | None] = mapped_column(String(60), nullable=True)
+
+
+class ParentLiaisonThread(Base):
+    __tablename__ = "parent_liaison_threads"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    student_id: Mapped[int] = mapped_column(ForeignKey("students.id"), index=True)
+    parent_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    initiated_by: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    subject: Mapped[str] = mapped_column(String(160))
+    category: Mapped[str] = mapped_column(String(40), default="General enquiry")
+    status: Mapped[str] = mapped_column(String(20), default="Open")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+class ParentLiaisonMessage(Base):
+    __tablename__ = "parent_liaison_messages"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    thread_id: Mapped[int] = mapped_column(ForeignKey("parent_liaison_threads.id", ondelete="CASCADE"), index=True)
+    sender_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    message: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
