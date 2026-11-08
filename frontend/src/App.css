@@ -226,6 +226,12 @@ select:disabled { background-color:#f4f6fa; color:#99a4b5; cursor:not-allowed; }
 .settings-section-tabs { display:flex; flex-wrap:wrap; gap:7px; padding:6px; margin:0 0 20px; border:1px solid #e5eaf3; border-radius:12px; background:#f7f9fd; }
 .settings-section-tabs button { border:0; border-radius:8px; padding:10px 16px; color:#61718a; background:transparent; font-weight:700; cursor:pointer; }
 .settings-section-tabs button.active,.settings-section-tabs button:focus { color:#244fb9; background:#fff; box-shadow:0 2px 8px #1b376018; }
+.account-management-tabs { display:flex; flex-wrap:wrap; gap:8px; padding:7px; border:1px solid #e1e8f2; border-radius:13px; background:linear-gradient(135deg,#f7f9fd,#f1f5fb); margin:18px 0; }
+.account-management-tabs [role=tab] { border:1px solid transparent; border-radius:9px; padding:11px 15px; color:#65748b; background:transparent; font-weight:750; transition:all .18s ease; }
+.account-management-tabs [role=tab]:hover { color:#284f9f; background:#fff; }
+.account-management-tabs [role=tab].active { color:#244fb9; background:#fff; border-color:#dce5f5; box-shadow:0 3px 10px rgba(31,55,94,.08); }
+.account-tab-panel { border:1px solid #e6ebf3; border-radius:12px; padding:20px; background:#fff; }
+@media(max-width:650px){.account-management-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.account-management-tabs [role=tab]{padding:10px 8px}}
 
 .primary-button,.secondary-button { min-height: 42px; }
 .finance-toolbar { display:flex; justify-content:space-between; align-items:center; gap:14px; flex-wrap:wrap; margin:8px 0 22px; }

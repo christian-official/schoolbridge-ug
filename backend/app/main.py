@@ -2097,7 +2097,8 @@ def parent_children(db: Session = Depends(get_db), parent=Depends(require_parent
         charges = db.query(models.FeeCharge).filter_by(student_id=student.id).all()
         total_charged = sum(row.amount for row in charges)
         total_paid = sum(db.query(func.coalesce(func.sum(models.FeePayment.amount), 0)).filter_by(charge_id=row.id).scalar() or 0 for row in charges)
-        output.append({"id": student.id, "name": " ".join(x for x in [student.first_name, student.middle_name, student.last_name] if x), "admission_number": student.admission_number, "status": student.status, "class_name": school_class.name if school_class else "Unassigned", "stream": school_class.section if school_class else "", "fees_charged": total_charged, "fees_paid": total_paid, "balance": total_charged-total_paid})
+        output.append({"id": student.id, "name": " ".join(x for x in [student.first_name, student.middle_name, student.last_name] if x), "admission_number": student.admission_number, "status": student.status, "class_id": student.class_id,
+            "class_name": (school_class.name + (" — " + school_class.section if school_class and school_class.section else "")) if school_class else "Unassigned", "stream": school_class.section if school_class else "", "fees_charged": total_charged, "fees_paid": total_paid, "balance": total_charged-total_paid})
     return output
 
 

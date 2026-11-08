@@ -11,7 +11,7 @@ async function api<T>(path: string, token: string, options: RequestInit = {}): P
   if (!response.ok) throw new Error(result.detail || `Request failed: ${response.status}`)
   return result as T
 }
-type Recipient = { student_id: number; student_name: string; admission_number: string; class_name: string; parent_account: string }
+type Recipient = { student_id: number; student_name: string; admission_number: string; class_id: number | null; class_name: string; parent_account: string }
 type LiaisonThread = { id: number; student_id: number; student_name: string; parent_name: string; subject: string; category: string; status: string; updated_at: string; last_message: string; last_sender_id: number | null }
 type LiaisonDetail = { current_user_id: number; id: number; student_id: number; student_name: string; subject: string; category: string; status: string; messages: { id: number; sender_id: number; sender_name: string; sender_role: string; message: string; created_at: string; read_at: string | null }[] }
 
@@ -63,6 +63,18 @@ export default function ParentLiaisonWorkspace({ token, role }: { token: string;
     return () => { cancelled = true }
   }, [token, role])
 
+  useEffect(() => {
+    if (isParent || !compose) return
+    let cancelled = false
+    const params = new URLSearchParams()
+    if (studentSearch.trim()) params.set('search', studentSearch.trim())
+    if (classFilter) params.set('class_id', classFilter)
+    api<Recipient[]>('parent-liaison/recipients?' + params.toString(), token)
+      .then(rows => { if (!cancelled) setRecipients(rows) })
+      .catch(e => { if (!cancelled) setError(e instanceof Error ? e.message : 'Unable to search students.') })
+    return () => { cancelled = true }
+  }, [isParent, compose, studentSearch, classFilter, token])
+
   async function openThread(id: number) {
     setSelectedId(id); setError('')
     try { setDetail(await api<LiaisonDetail>(`parent-liaison/threads/${id}`, token)) }
@@ -110,8 +122,8 @@ export default function ParentLiaisonWorkspace({ token, role }: { token: string;
   }
 
   const selectedRecipient = recipients.find(row => String(row.student_id) === studentId)
-  const availableClasses = Array.from(new Set(recipients.map(row => row.class_name))).sort()
-  const visibleRecipients = recipients.filter(row => (!classFilter || row.class_name === classFilter) && (!studentSearch.trim() || [row.student_name,row.admission_number,row.class_name].join(' ').toLowerCase().includes(studentSearch.trim().toLowerCase())))
+  const availableClasses = Array.from(new Map(recipients.filter(row => row.class_id !== null).map(row => [row.class_id as number, { id: row.class_id as number, name: row.class_name }])).values())
+  const visibleRecipients = recipients
   return <div className="phase4-workspace parent-liaison-workspace">
     <section className="panel">
       <div className="panel-heading">
@@ -124,7 +136,7 @@ export default function ParentLiaisonWorkspace({ token, role }: { token: string;
         <div className="form-heading"><div><h3>Start a school communication</h3><p>Search by student name or admission number, then narrow the results by class. The linked shared parent account is selected automatically.</p></div></div>
         <div className="student-form-grid">
           <label>Search student *<input required value={studentSearch} onChange={e => { setStudentSearch(e.target.value); setStudentId('') }} placeholder="Name or admission number" /></label>
-          <label>Filter by class<select value={classFilter} onChange={e => { setClassFilter(e.target.value); setStudentId('') }}><option value="">All classes</option>{availableClasses.map(item => <option key={item}>{item}</option>)}</select></label>
+          <label>Filter by class<select value={classFilter} onChange={e => { setClassFilter(e.target.value); setStudentId('') }}><option value="">All classes</option>{availableClasses.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
           <label className="field-span-full">Matching student *
             <select required value={studentId} onChange={e => setStudentId(e.target.value)}>
               <option value="">Choose a student from the filtered results</option>
