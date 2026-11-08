@@ -20,7 +20,8 @@ type ChildResult = { exam: string; term: string; year: number; subject: string; 
 type ChildAttendance = { date: string; status: string }
 type ChildFee = { term: string; year: number; charged: number; paid: number; balance: number; payments: { date: string; amount: number; receipt_number?: string | null }[] }
 
-export default function Phase4Workspace({ token, role, active }: { token: string; role: string; active: string }) {
+export default function Phase4Workspace({ token, role, active, permissions }: { token: string; role: string; active: string; permissions?: Record<string, string[]> }) {
+  const canPublish = role === 'admin' || (permissions?.Announcements || []).includes('add')
   const [students, setStudents] = useState<StudentOption[]>([])
   const [parents, setParents] = useState<any[]>([])
   const [selectedStudentIds, setSelectedStudentIds] = useState<number[]>([])
@@ -53,7 +54,7 @@ export default function Phase4Workspace({ token, role, active }: { token: string
   useEffect(() => {
     let cancelled = false
     setError('')
-    if (role === 'admin' && active === 'Parent Access') {
+    if (role !== 'parent' && active === 'Parent Access') {
       setBusy(true)
       Promise.all([
         api<{ items: StudentOption[] }>('students/search?page=1&page_size=100', token),
@@ -121,7 +122,7 @@ export default function Phase4Workspace({ token, role, active }: { token: string
     finally { setSavingAnnouncement(false) }
   }
 
-  if (role === 'admin' && active === 'Parent Access') return <div className="phase4-workspace">
+  if (role !== 'parent' && active === 'Parent Access') return <div className="phase4-workspace">
     <section className="panel">
       <div className="panel-heading"><div><h2><Users size={20}/> Parent account management</h2><p>Create secure parent logins and link each account to one or more registered students.</p></div></div>
       {error && <div className="form-error" role="alert">{error}</div>}{message && <div className="success-notice" role="status">{message}</div>}
@@ -177,7 +178,7 @@ export default function Phase4Workspace({ token, role, active }: { token: string
   </div>
 
   if (active === 'Announcements') return <div className="phase4-workspace">
-    {role === 'admin' && <section className="panel">
+    {canPublish && <section className="panel">
       <div className="panel-heading"><div><h2><PlusCircle size={20}/> Publish school announcement</h2><p>Share school updates with parents, teachers or everyone.</p></div></div>
       {error && <div className="form-error" role="alert">{error}</div>}{message && <div className="success-notice" role="status">{message}</div>}
       <form className="student-form" onSubmit={publishAnnouncement}>
@@ -190,8 +191,8 @@ export default function Phase4Workspace({ token, role, active }: { token: string
       </form>
     </section>}
     <section className="panel">
-      <div className="panel-heading"><div><h2><Bell size={20}/> School announcements</h2><p>{role === 'admin' ? 'Published and draft school updates.' : 'Updates shared by your school.'}</p></div></div>
-      {error && role !== 'admin' && <div className="form-error" role="alert">{error}</div>}
+      <div className="panel-heading"><div><h2><Bell size={20}/> School announcements</h2><p>{canPublish ? 'Published and draft school updates.' : 'Updates shared by your school.'}</p></div></div>
+      {error && !canPublish && <div className="form-error" role="alert">{error}</div>}
       {announcements.map(item => <article className="phase4-announcement" key={item.id}><div><strong>{item.title}</strong><span>{item.audience} · {new Date(item.created_at).toLocaleDateString('en-UG', { day: 'numeric', month: 'short', year: 'numeric' })}</span></div><p>{item.message}</p></article>)}
       {!announcements.length && <div className="empty-state">{busy ? 'Loading announcements...' : 'There are no announcements yet.'}</div>}
     </section>
