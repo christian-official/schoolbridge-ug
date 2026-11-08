@@ -1675,6 +1675,10 @@ async def protect_school_data(request: Request, call_next):
         elif path.startswith("/api/parent/"):
             if user.role != "parent":
                 return JSONResponse({"detail": "Parent account required."}, status_code=403)
+        elif path.startswith("/api/parent-liaison/") and user.role == "parent":
+            # Parents may only access threads explicitly linked to their account;
+            # the route handlers enforce thread ownership and prohibit initiation.
+            pass
         elif path == "/api/announcements" and user.role == "parent":
             pass
         elif user.role != "admin":
