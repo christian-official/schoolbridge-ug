@@ -1272,7 +1272,7 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
       </details>
       <div className="form-actions"><button type="button" className="primary-button" onClick={()=>void savePermissions()} disabled={busy||!selectedId}>{busy?'Saving...':'Save staff access'}</button></div>
       <div className="form-actions"><button type="button" className="secondary-button" onClick={()=>void resetSelectedPassword()} disabled={busy||!selectedId}>{busy?'Working...':'Reset login passcode'}</button></div>
-      {resetPasscode&&<div className="success-notice password-reset-result" role="status"><strong>Temporary passcode for {resetPasscode.username}</strong><code>{resetPasscode.password}</code><button type="button" className="secondary-button" onClick={()=>void navigator.clipboard.writeText('Username: '+resetPasscode.username+'\\nTemporary passcode: '+resetPasscode.password)}>Copy login details</button><small>Shown once. Share it privately; the staff member must change it at their next sign-in.</small></div>}
+      {resetPasscode&&<div className="success-notice password-reset-result" role="status"><strong>Temporary passcode for {resetPasscode.username}</strong><code>{resetPasscode.password}</code><button type="button" className="secondary-button" onClick={()=>void navigator.clipboard.writeText('Username: '+resetPasscode.username+'\nTemporary passcode: '+resetPasscode.password)}>Copy login details</button><small>Shown once. Share it privately; the staff member must change it at their next sign-in.</small></div>}
     </>}
     <h3>Assign classes and subjects to teachers</h3>
     <form className="student-form" onSubmit={assign}><div className="student-form-grid">
