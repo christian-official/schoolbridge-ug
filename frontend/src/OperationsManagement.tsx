@@ -55,8 +55,8 @@ export default function OperationsManagement({ token, active, permissions = {}, 
           setClasses(unique)
         }
       } else {
-        const [staffResult] = await Promise.all([request<{ items: Staff[] }>('staff?page=1&page_size=100', token)])
-        setStaff(staffResult.items.filter(person => person.status === 'active'))
+        const staffRows = await request<Staff[]>('staff-attendance/roster', token)
+        setStaff(staffRows)
       }
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to load school operations.') }
     finally { setLoading(false) }
