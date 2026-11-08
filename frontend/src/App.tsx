@@ -97,6 +97,45 @@ async function api<T>(path: string, token: string, options: RequestInit = {}): P
   return result as T
 }
 
+type PersonalDashboardData = {
+  staff_name: string
+  role_label: string
+  available_sections: string[]
+  today_lessons: {class_id:number|null;class_name:string;subject:string;start_time:string;end_time:string}[]
+  class_teacher_classes: {class_id:number;class_name:string}[]
+  today_duty: {date:string;notes:string}|null
+}
+function PersonalDashboard({token,username,onNavigate}:{token:string;username:string;onNavigate:(section:string)=>void}) {
+  const [data,setData]=useState<PersonalDashboardData|null>(null)
+  const [error,setError]=useState('')
+  const [loading,setLoading]=useState(true)
+  useEffect(()=>{
+    let cancelled=false
+    setLoading(true);setError('')
+    api<PersonalDashboardData>('dashboard/my-work',token).then(result=>{if(!cancelled)setData(result)})
+      .catch(e=>{if(!cancelled)setError(e instanceof Error?e.message:'Unable to load your assigned work.')})
+      .finally(()=>{if(!cancelled)setLoading(false)})
+    return ()=>{cancelled=true}
+  },[token])
+  const workCount=(data?.today_lessons.length||0)+(data?.class_teacher_classes.length||0)+(data?.today_duty?1:0)
+  return <div className="academic-workspace">
+    <section className="panel">
+      <div className="panel-heading"><div><h2>Your work dashboard</h2><p>{data?.staff_name||username} · {data?.role_label||'Staff account'} · Work and responsibilities assigned to your account.</p></div><span className="count-pill">{workCount} active items today</span></div>
+      {loading&&<p className="form-hint">Loading your assigned work...</p>}
+      {error&&<div className="form-error" role="alert">{error}</div>}
+      {data&&!loading&&<>
+        {data.today_duty&&<div className="quick-action"><span className="quick-icon purple"><ShieldCheck/></span><span><strong>Today's assigned duty</strong><small>{data.today_duty.notes}</small></span></div>}
+        {data.today_lessons.length>0&&<><h3>Today's teaching timetable</h3><div className="table-wrap"><table><thead><tr><th>Time</th><th>Class</th><th>Subject</th></tr></thead><tbody>{data.today_lessons.map((lesson,index)=><tr key={index}><td>{lesson.start_time}–{lesson.end_time}</td><td>{lesson.class_name}</td><td>{lesson.subject}</td></tr>)}</tbody></table></div></>}
+        {data.class_teacher_classes.length>0&&<><h3>Your class-teacher responsibilities</h3><div className="class-grid">{data.class_teacher_classes.map(item=><div className="class-card" key={item.class_id}><Users size={20}/><strong>{item.class_name}</strong><span>Class attendance responsibility</span></div>)}</div></>}
+        {workCount===0&&<div className="empty-state"><CalendarDays size={30}/><p>No lessons or duty assignments are scheduled for you today.</p><small>Your available work areas are listed below.</small></div>}
+        <h3>Work areas you can access</h3>
+        <div className="overview-leadership-grid">{data.available_sections.filter(section=>section!=='Overview').map(section=><button type="button" className="leadership-shortcut" key={section} onClick={()=>onNavigate(section)}><span className="quick-icon blue"><ArrowUpRight/></span><span><strong>{section}</strong><small>Open your authorised {section.toLowerCase()} workspace.</small></span><ArrowUpRight size={16}/></button>)}</div>
+        {!data.available_sections.length&&<p className="form-hint">No school work areas have been assigned. Contact the administrator.</p>}
+      </>}
+    </section>
+  </div>
+}
+
 function validateRequiredFields(event: React.FormEvent<HTMLDivElement>) {
   const form = event.target as HTMLFormElement
   if (form.tagName !== 'FORM') return
@@ -540,7 +579,7 @@ function App() {
           {(active === 'My Classes' || active === 'Attendance' || active === 'My Attendance' || active === 'My Results') && user.role === 'teacher' && <TeacherWorkspace token={token} active={active} />}
           {((active === 'Parent Access' || active === 'Announcements') && user.role !== 'parent' || (active === 'My Children' || active === 'Announcements') && user.role === 'parent') && <Phase4Workspace token={token} role={user.role} active={active} permissions={user.permissions} />}
 
-          {active === 'Overview' && (
+          {active === 'Overview' && user.role === 'admin' && (
             <>
               <section className="stats-grid">
                 <StatCard title="Total students" value={studentTotal} icon={<GraduationCap />} note="All registered students" />
@@ -560,7 +599,7 @@ function App() {
                 <div className="panel quick-panel">
                   <div className="panel-heading"><div><h2>Daily registers</h2><p>Complete the records that keep today’s operations accurate.</p></div></div>
                   <button className="quick-action" onClick={() => setActive('Attendance')}><span className="quick-icon blue"><CalendarDays /></span><span><strong>Record class attendance</strong><small>Mark students present, absent or late for each class.</small></span><ArrowUpRight size={17} /></button>
-                  <button className="quick-action" onClick={() => setActive('Staff Attendance')}><span className="quick-icon purple"><Users /></span><span><strong>Complete staff daily register</strong><small>Review teaching and non-teaching staff attendance and unmarked records.</small></span><ArrowUpRight size={17} /></button>
+                  <button className="quick-action" onClick={() => setActive('Attendance')}><span className="quick-icon purple"><Users /></span><span><strong>Complete staff daily register</strong><small>Review teaching and non-teaching staff attendance and unmarked records.</small></span><ArrowUpRight size={17} /></button>
                 </div>
               </section>
               <section className="panel overview-leadership">
@@ -572,6 +611,8 @@ function App() {
               </section>
             </>
           )}
+
+                    {active === 'Overview' && user.role !== 'admin' && <PersonalDashboard token={token} username={user.username} onNavigate={setActive}/>}
 
           {active === 'Students' && (
             <section className="panel">
