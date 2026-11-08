@@ -1582,3 +1582,55 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   .hybrid-role-heading { align-items: flex-start; flex-direction: column; gap: 13px; }
   .hybrid-role-heading .dashboard-heading-actions { width: 100%; justify-content: space-between; }
 }
+
+
+/* Dedicated Director of Studies academic control centre */
+.dos-dashboard{display:flex;flex-direction:column;gap:20px}
+.dos-hero{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;padding:28px 30px;border-radius:18px;background:linear-gradient(120deg,#172554,#1e40af 58%,#2563eb);color:#fff;box-shadow:0 12px 30px rgba(30,64,175,.13)}
+.dos-hero .eyebrow{color:#bfdbfe;letter-spacing:.13em;font-size:10px;font-weight:800;margin:0 0 10px}
+.dos-hero h2{font-size:28px;line-height:1.15;margin:0 0 9px;color:#fff}
+.dos-hero-copy>p:last-child{margin:0;color:#dbeafe;max-width:720px;line-height:1.55;font-size:13px}
+.dos-hero-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:flex-end}
+.dos-live-indicator{display:flex;align-items:center;gap:8px;font-size:11px;color:#dbeafe;white-space:nowrap}
+.dos-live-indicator>span{width:8px;height:8px;border-radius:50%;background:#4ade80;box-shadow:0 0 0 4px rgba(74,222,128,.15)}
+.dos-hero .secondary-button{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.28);color:#fff}
+.dos-metric-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.dos-metric{display:flex;align-items:center;gap:13px;padding:17px 18px;background:var(--surface,#fff);border:1px solid var(--border,#e5e7eb);border-radius:14px;min-width:0}
+.dos-metric-icon{width:42px;height:42px;border-radius:12px;background:#eff6ff;color:#1d4ed8;display:grid;place-items:center;flex:none}
+.dos-metric>div{display:flex;flex-direction:column;min-width:0;gap:2px}
+.dos-metric small{font-size:9px;letter-spacing:.1em;font-weight:800;color:var(--muted,#64748b)}
+.dos-metric strong{font-size:23px;line-height:1.2;color:var(--text,#111827)}
+.dos-metric>div>span{font-size:10px;color:var(--muted,#64748b)}
+.dos-content-grid{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(280px,.9fr);gap:18px;align-items:start}
+.dos-workstreams,.dos-schedule-panel,.dos-duty-panel{padding:20px}
+.dos-section-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:16px}
+.dos-section-heading .eyebrow,.dos-duty-panel>.eyebrow{font-size:9px;font-weight:800;letter-spacing:.12em;color:#64748b;margin:0 0 6px}
+.dos-section-heading h3,.dos-duty-panel h3{font-size:17px;margin:0 0 5px}
+.dos-section-heading p:not(.eyebrow){font-size:11px;color:var(--muted,#64748b);margin:0}
+.dos-workstream-list{display:flex;flex-direction:column}
+.dos-workstream{display:flex;align-items:center;gap:13px;text-align:left;padding:15px 2px;border:0;border-top:1px solid var(--border,#e5e7eb);background:transparent;color:inherit;cursor:pointer;width:100%}
+.dos-workstream:hover .dos-workstream-action{color:#1d4ed8}
+.dos-workstream-icon{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;flex:none}
+.dos-workstream-icon.violet{background:#f3e8ff;color:#7e22ce}.dos-workstream-icon.blue{background:#dbeafe;color:#1d4ed8}.dos-workstream-icon.green{background:#dcfce7;color:#15803d}.dos-workstream-icon.amber{background:#fef3c7;color:#b45309}.dos-workstream-icon.slate{background:#e2e8f0;color:#334155}.dos-workstream-icon.rose{background:#ffe4e6;color:#be123c}
+.dos-workstream-copy{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
+.dos-workstream-copy>small{font-size:8px;letter-spacing:.1em;font-weight:800;color:#64748b}
+.dos-workstream-copy>strong{font-size:13px}
+.dos-workstream-copy>span{font-size:10px;color:var(--muted,#64748b);line-height:1.45}
+.dos-workstream-action{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;color:#475569;white-space:nowrap}
+.dos-side-column{display:flex;flex-direction:column;gap:18px}
+.dos-lesson-list{display:flex;flex-direction:column}
+.dos-lesson{display:flex;gap:13px;padding:12px 0;border-top:1px solid var(--border,#e5e7eb)}
+.dos-lesson-time{width:56px;flex:none;font-size:12px;font-weight:800;color:#1d4ed8}
+.dos-lesson-time small{display:block;font-size:10px;color:#64748b;font-weight:500;margin-top:3px}
+.dos-lesson>span:last-child{display:flex;flex-direction:column;gap:3px;font-size:12px}
+.dos-lesson>span:last-child small{font-size:10px;color:#64748b}
+.dos-empty-note{padding:16px 10px;text-align:center;color:#64748b;display:flex;align-items:center;flex-direction:column;gap:7px}
+.dos-empty-note p{font-size:12px;font-weight:700;color:var(--text,#334155);margin:0}
+.dos-empty-note small{font-size:10px;line-height:1.5}
+.dos-duty-panel h3{margin-bottom:12px}
+.dos-duty-panel>.muted{font-size:11px;line-height:1.5}
+.dos-duty-note{display:flex;gap:10px;align-items:flex-start;padding:12px;border-radius:10px;background:#f5f3ff;color:#5b21b6;font-size:12px;line-height:1.5}
+.dos-class-tags{margin-top:14px}.dos-class-tags>strong{font-size:10px}.dos-class-tags>div{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.dos-class-tags span{padding:5px 9px;border-radius:20px;background:#eff6ff;color:#1e40af;font-size:10px;font-weight:700}
+.dos-dashboard .text-action{display:inline-flex;align-items:center;gap:5px;border:0;background:none;color:#1d4ed8;font-size:11px;font-weight:700;padding:8px 0 0;cursor:pointer}
+@media(max-width:900px){.dos-metric-strip{grid-template-columns:repeat(2,minmax(0,1fr))}.dos-content-grid{grid-template-columns:1fr}}
+@media(max-width:600px){.dos-hero{align-items:flex-start;flex-direction:column;padding:22px}.dos-hero h2{font-size:23px}.dos-hero-actions{justify-content:flex-start}.dos-metric-strip{grid-template-columns:1fr 1fr}.dos-metric{padding:13px 11px;gap:9px}.dos-metric-icon{width:36px;height:36px}.dos-metric strong{font-size:20px}.dos-workstream{align-items:flex-start}.dos-workstream-action{font-size:0}.dos-workstream-action svg{width:18px;height:18px}}
