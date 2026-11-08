@@ -1600,7 +1600,7 @@ class PasswordResetRequest(BaseModel):
 
 class PasswordResetConfirm(BaseModel):
     identifier: str = Field(min_length=1, max_length=160)
-    code: str = Field(min_length=6, max_length=6, pattern=r"^\\d{6}$")
+    code: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
     new_password: str = Field(min_length=8, max_length=128)
 
 
@@ -1633,7 +1633,7 @@ def send_password_recovery_email(user, code: str) -> bool:
     message["From"] = smtp_from
     message["To"] = recipient
     message.set_content(
-        "A password reset was requested for your SchoolBridge account.\\n\\n"
+        "A password reset was requested for your SchoolBridge account.\n\\n"
         f"Your verification code is: {code}\\n"
         "This code expires in 15 minutes and can only be used once. "
         "If you did not request this, you can ignore this email.\\n"
