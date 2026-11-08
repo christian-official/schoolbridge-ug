@@ -1087,7 +1087,7 @@ function TeacherWorkspace({token,active}:{token:string;active:string}) {
   </div>
     if(active==='My Results') return <div className="academic-workspace">
     <section className="panel">
-      <div className="panel-heading"><div><h2>Class results entry</h2><p>Your assigned subject and class are loaded automatically. Enter the whole class register and submit once.</p></div></div>
+      <div className="panel-heading"><div><h2>Class results entry</h2><p>Your assigned subject and class are loaded automatically. Enter the whole class register and submit once. Blank scores are submitted as <strong>No score (0)</strong> for academic officers to review.</p></div></div>
       {resultError&&<div className="form-error" role="alert">{resultError}</div>}
       {resultMessage&&<div className="success-notice" role="status">{resultMessage}</div>}
       <div className="student-form-grid">
