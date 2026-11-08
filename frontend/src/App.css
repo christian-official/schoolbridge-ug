@@ -1303,7 +1303,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   @page report { size:A4 portrait; margin:7mm; }
   body[data-schoolbridge-print="report"] .academic-report-print > .report-card-sheet,
   body[data-schoolbridge-print="class-reports"] .class-reports-print-batch .report-card-sheet {
-    box-sizing:border-box !important; width:133.33% !important; height:380mm !important; max-height:380mm !important;
+    box-sizing:border-box !important; width:133.33% !important; height:376mm !important; max-height:376mm !important;
     overflow:hidden !important; zoom:.75 !important; padding:0 !important;
   }
   body[data-schoolbridge-print="report"] .report-card-header,
@@ -1338,6 +1338,11 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   body:has(.parent-passcode-handover) * { visibility:hidden !important; }
   .parent-passcode-handover,
   .parent-passcode-handover * { visibility:visible !important; }
+  .parent-passcode-handover button { display:none !important; }
   .parent-passcode-handover { position:absolute !important; inset:0 auto auto 0 !important; width:100% !important; padding:18px !important; border:1px solid #9aa8bd !important; background:#fff !important; color:#17243b !important; }
   .student-form input[type=file]::file-selector-button { padding:8px 12px; border:0; border-radius:6px; background:#eaf0ff; color:#3157b7; font-weight:700; cursor:pointer; }
 }
+
+.student-form input[type=file] { max-width:100%; padding:8px; border:1px dashed #cbd6e7; border-radius:8px; background:#fff; color:#43536d; cursor:pointer; }
+.student-form input[type=file]::file-selector-button { margin-right:10px; padding:8px 11px; border:0; border-radius:6px; background:#eaf0ff; color:#3157b7; font:700 11px inherit; cursor:pointer; }
+.student-form input[type=file]::file-selector-button:hover { background:#dce7ff; }
