@@ -4,7 +4,7 @@ import {
   FileText, Settings, LogOut,
   Search, Plus, Menu, X, ArrowUpRight, UserPlus,
   CalendarDays, TrendingUp, ShieldCheck, LoaderCircle, RefreshCw,
-  Contact, Megaphone, Briefcase, Clock, FolderOpen, CalendarCheck, Building2,
+  Contact, Megaphone, Briefcase, Clock, FolderOpen, CalendarCheck,
 } from 'lucide-react'
 import StaffFinance from './StaffFinance'
 import AcademicManagement from './AcademicManagement'
@@ -104,7 +104,8 @@ function getStaffNavigation(user:User) {
     (item.label === 'Attendance' && (user.permissions?.['Staff Attendance'] || []).includes('view'))
   )
   const role = (user.role_label || '').toLowerCase()
-  const priority = /teacher/.test(role) && !/head ?teacher|deputy/.test(role)\n    ? ['Overview','My Classes','My Results','Timetable','Attendance','My Attendance','Announcements','My Profile']\n    : /secretary|office administrator/.test(role)
+  const priority = /teacher/.test(role) && !/head ?teacher|deputy/.test(role)
+    ? ['Overview','My Classes','My Results','Timetable','Attendance','My Attendance','Announcements','My Profile']\n    : /secretary|office administrator/.test(role)
     ? ['Overview','Students','Staff','Parent Access','Announcements','Reports','My Attendance','My Profile']
     : /attendance/.test(role)
       ? ['Overview','Attendance','My Attendance','Staff','Reports','Announcements','My Profile']
