@@ -1007,14 +1007,16 @@ function App() {
         </header>
 
         <div className="content">
-          <div className="welcome-row">
-            <div>
-              <p className="eyebrow">SCHOOL MANAGEMENT SYSTEM</p>
-              <h1>{active === 'Overview' ? (user.role === 'admin' || /school administrator|system administrator|^administrator$/i.test(user.role_label||'') ? 'Administrator command centre' : /director of studies|\\bdos\\b/i.test(user.role_label||'') ? 'Director of Studies control centre' : /secretary|office administrator/i.test(user.role_label||'') ? 'Administration & records centre' : /attendance/i.test(user.role_label||'') ? 'Attendance operations centre' : /teacher/i.test(user.role_label||'') ? 'Teacher workspace' : isFinanceAccount(user) ? 'Finance dashboard' : 'School workspace') : active}</h1>
-              <p className="muted">Welcome back, {user.username}. {active === 'Overview' && (user.role === 'admin' || /school administrator|system administrator|^administrator$/i.test(user.role_label||'')) ? 'Your school-wide management overview.' : isFinanceAccount(user) ? 'Here is your finance workspace at a glance.' : 'Here is your assigned school workspace.'}</p>
+          {active !== 'Overview' && (
+            <div className="welcome-row">
+              <div>
+                <p className="eyebrow">SCHOOL MANAGEMENT SYSTEM</p>
+                <h1>{active === 'Overview' ? (user.role === 'admin' || /school administrator|system administrator|^administrator$/i.test(user.role_label||'') ? 'Administrator command centre' : /director of studies|\\bdos\\b/i.test(user.role_label||'') ? 'Director of Studies control centre' : /secretary|office administrator/i.test(user.role_label||'') ? 'Administration & records centre' : /attendance/i.test(user.role_label||'') ? 'Attendance operations centre' : /teacher/i.test(user.role_label||'') ? 'Teacher workspace' : isFinanceAccount(user) ? 'Finance dashboard' : 'School workspace') : active}</h1>
+                <p className="muted">Welcome back, {user.username}. {active === 'Overview' && (user.role === 'admin' || /school administrator|system administrator|^administrator$/i.test(user.role_label||'')) ? 'Your school-wide management overview.' : isFinanceAccount(user) ? 'Here is your finance workspace at a glance.' : 'Here is your assigned school workspace.'}</p>
+              </div>
+              <div className="date-chip"><CalendarDays size={17} /> {new Date().toLocaleDateString('en-UG', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
             </div>
-            <div className="date-chip"><CalendarDays size={17} /> {new Date().toLocaleDateString('en-UG', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
-          </div>
+          )}
 
           {dataError && <div className="notice">{dataError} <button onClick={() => void loadSchoolData(token)}>Retry</button></div>}
 
