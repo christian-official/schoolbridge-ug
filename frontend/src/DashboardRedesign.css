@@ -465,3 +465,48 @@
 @media(max-width:700px){
   .redesigned-app-shell>.main-area>.topbar .top-user-name{font-size:11px}
 }
+
+
+/* Give top-bar information a clear accent and make refresh the primary utility action. */
+.redesigned-app-shell>.main-area>.topbar .breadcrumb{
+  color:#66758c!important;
+  font-weight:600;
+}
+.redesigned-app-shell>.main-area>.topbar .breadcrumb strong{
+  color:var(--role-primary,#1768bd)!important;
+  font-weight:800;
+}
+.redesigned-app-shell>.main-area>.topbar .top-user-name{
+  color:var(--role-deep,#102f58)!important;
+  font-weight:800!important;
+}
+.redesigned-app-shell>.main-area>.topbar .top-avatar{
+  background:var(--role-primary,#1768bd)!important;
+  color:#fff!important;
+  box-shadow:0 3px 9px color-mix(in srgb,var(--role-primary,#1768bd) 24%,transparent);
+}
+.redesigned-app-shell>.main-area>.topbar .refresh-button{
+  min-height:38px;
+  padding:9px 15px!important;
+  border:1px solid var(--role-primary,#1768bd)!important;
+  border-radius:10px!important;
+  background:var(--role-primary,#1768bd)!important;
+  color:#fff!important;
+  font-size:11px!important;
+  font-weight:800!important;
+  box-shadow:0 4px 11px color-mix(in srgb,var(--role-primary,#1768bd) 22%,transparent);
+  transition:background .18s ease,box-shadow .18s ease,transform .18s ease;
+}
+.redesigned-app-shell>.main-area>.topbar .refresh-button:hover:not(:disabled){
+  filter:brightness(.92);
+  box-shadow:0 6px 15px color-mix(in srgb,var(--role-primary,#1768bd) 30%,transparent);
+  transform:translateY(-1px);
+}
+.redesigned-app-shell>.main-area>.topbar .refresh-button:disabled{
+  opacity:.78;
+  cursor:wait;
+}
+.redesigned-app-shell>.main-area>.topbar .refresh-button .spin{
+  animation:schoolbridge-refresh-spin .85s linear infinite;
+}
+@keyframes schoolbridge-refresh-spin{to{transform:rotate(360deg)}}
