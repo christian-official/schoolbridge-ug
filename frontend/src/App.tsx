@@ -961,7 +961,7 @@ function App() {
   if (user.must_change_password) return <ForcePasswordChange token={token} username={user.username} onComplete={()=>void loadUser(token)}/>;
 
   return (
-    <div className={`app-shell ${user.role==='admin'||/administrator/i.test(user.role_label||'')?'role-theme-admin':/director of studies|\\bdos\\b/i.test(user.role_label||'')?'role-theme-dos':/bursar|accountant|finance/i.test(user.role_label||'')?'role-theme-finance':/secretary|office administrator/i.test(user.role_label||'')?'role-theme-secretary':/attendance/i.test(user.role_label||'')?'role-theme-attendance':/teacher/i.test(user.role_label||'')?'role-theme-teacher':''}`} onSubmitCapture={validateRequiredFields}>
+    <div className={`app-shell ${user.role==='admin'||/^(school administrator|system administrator|administrator)$/i.test(user.role_label||'')?'role-theme-admin':/director of studies|\\bdos\\b/i.test(user.role_label||'')?'role-theme-dos':/bursar|accountant|finance/i.test(user.role_label||'')?'role-theme-finance':/secretary|office administrator/i.test(user.role_label||'')?'role-theme-secretary':/attendance/i.test(user.role_label||'')?'role-theme-attendance':/teacher/i.test(user.role_label||'')?'role-theme-teacher':''}`} onSubmitCapture={validateRequiredFields}>
       <aside className={`sidebar ${mobileMenu ? 'sidebar-open' : ''}`}>
         <div className="sidebar-brand">
           <div className="brand-mark"><GraduationCap size={25} /></div>
