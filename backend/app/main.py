@@ -511,6 +511,11 @@ class StudentUpdate(BaseModel):
     guardian_name: str | None = None
     guardian_relationship: str | None = None
     guardian_phone: str | None = None
+    guardian2_name: str | None = None
+    guardian2_relationship: str | None = None
+    guardian2_phone: str | None = None
+    study_mode: str | None = Field(default=None, pattern="^(Boarding|Day)$")
+    house: str | None = None
     previous_school: str | None = None
     admission_date: date | None = None
     class_id: int | None = None
@@ -2870,6 +2875,7 @@ def upgrade_existing_database():
     settings_columns = {c["name"] for c in inspector.get_columns("school_settings")} if "school_settings" in inspector.get_table_names() else set()
     staff_columns = {c["name"] for c in inspector.get_columns("staff_members")} if "staff_members" in inspector.get_table_names() else set()
     payment_columns = {c["name"] for c in inspector.get_columns("fee_payments")} if "fee_payments" in inspector.get_table_names() else set()
+    class_fee_columns = {c["name"] for c in inspector.get_columns("class_fees")} if "class_fees" in inspector.get_table_names() else set()
     with engine.begin() as connection:
         for name, sql_type in additions.items():
             if name not in existing: connection.execute(text("ALTER TABLE students ADD COLUMN " + name + " " + sql_type))
@@ -2878,6 +2884,9 @@ def upgrade_existing_database():
             if "salary_amount" not in staff_columns: connection.execute(text("ALTER TABLE staff_members ADD COLUMN salary_amount INTEGER"))
             if "salary_frequency" not in staff_columns: connection.execute(text("ALTER TABLE staff_members ADD COLUMN salary_frequency VARCHAR(20) NOT NULL DEFAULT 'Monthly'"))
             if "house" not in staff_columns: connection.execute(text("ALTER TABLE staff_members ADD COLUMN house VARCHAR(80)"))
+        if "class_fees" in inspector.get_table_names():
+            if "boarding_amount" not in class_fee_columns: connection.execute(text("ALTER TABLE class_fees ADD COLUMN boarding_amount INTEGER"))
+            if "day_amount" not in class_fee_columns: connection.execute(text("ALTER TABLE class_fees ADD COLUMN day_amount INTEGER"))
         if "fee_payments" in inspector.get_table_names() and "receipt_number" not in payment_columns:
             connection.execute(text("ALTER TABLE fee_payments ADD COLUMN receipt_number VARCHAR(50)"))
         if "fee_payments" in inspector.get_table_names():
