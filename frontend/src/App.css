@@ -1534,3 +1534,13 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .phase4-student-option.active{border-color:#4569cb;background:#edf3ff;box-shadow:0 0 0 1px #4569cb inset}
 .phase4-student-option.active>b{background:#dce7ff;color:#244bb0}
 .teacher-exam-selection{display:grid;gap:13px;margin:16px 0;padding:16px;border:1px solid #e2e8f2;border-radius:14px;background:#f9fbff}
+
+/* Teacher subject registration picker */
+.staff-subject-picker{padding:16px;border:1px solid #dce5f2;border-radius:13px;background:linear-gradient(145deg,#f8faff,#ffffff)}
+.staff-subject-picker-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;color:#26364f;font-size:13px}
+.staff-subject-picker-heading>span{flex:0 0 auto;padding:5px 9px;border-radius:999px;background:#e9efff;color:#3158b8;font-size:11px;font-weight:800}
+.staff-subject-choice-grid{grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;margin:13px 0 2px}
+.staff-subject-choice-grid .permission-choice{min-height:52px;padding:11px 12px;border-radius:10px}
+.staff-subject-choice-grid .permission-choice>span{font-size:12px}
+.staff-subject-choice-grid .permission-choice.active{background:#edf4ff;border-color:#5276d5}
+.staff-subject-picker .field-error{display:block;margin-top:9px;color:#b42318;font-size:11px;font-weight:650}
