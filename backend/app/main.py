@@ -1912,8 +1912,19 @@ def assign_class_teacher(data: ClassTeacherAssignmentCreate, db: Session = Depen
         raise HTTPException(404, "Class not found.")
     existing = db.query(models.ClassTeacherAssignment).filter_by(class_id=data.class_id).first()
     if existing:
+        previous_teacher_id = existing.teacher_id
         existing.teacher_id = data.teacher_id
         assignment = existing
+        if previous_teacher_id != data.teacher_id:
+            previous_teacher = db.get(models.User, previous_teacher_id)
+            remaining = db.query(models.ClassTeacherAssignment.id).filter(
+                models.ClassTeacherAssignment.teacher_id == previous_teacher_id,
+                models.ClassTeacherAssignment.id != existing.id,
+            ).first()
+            if previous_teacher and not remaining:
+                previous_permissions = user_permissions(previous_teacher)
+                previous_permissions.pop("Attendance", None)
+                previous_teacher.permissions_json = json.dumps({key: sorted(value) for key, value in previous_permissions.items()})
     else:
         assignment = models.ClassTeacherAssignment(**data.model_dump())
         db.add(assignment)
