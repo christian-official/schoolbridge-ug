@@ -136,7 +136,7 @@ export default function Phase4Workspace({ token, role, active }: { token: string
         <div className="form-actions">
           <button type="button" className="secondary-button" onClick={() => void navigator.clipboard?.writeText('SchoolBridge parent login\nUsername: '+issuedPasscode.username+'\nTemporary passcode: '+issuedPasscode.password)}>Copy login details</button>
           {issuedPasscode.phone && <button type="button" className="secondary-button" onClick={() => void navigator.clipboard?.writeText('Your SchoolBridge parent account is ready. Username: '+issuedPasscode.username+'. Temporary passcode: '+issuedPasscode.password+'. Sign in to the school portal and change your passcode.')}>Copy SMS message</button>}
-          <button type="button" className="secondary-button" onClick={() => window.print()}>Print handover details</button>
+          <button type="button" className="secondary-button" onClick={() => { const cleanup = () => { delete document.body.dataset.schoolbridgePrint }; document.body.dataset.schoolbridgePrint = "handover"; window.addEventListener("afterprint", cleanup, { once: true }); window.print() }}>Print handover details</button>
         </div>
         <small>This passcode is shown only once. Share it securely and ask the parent to change it after signing in. SMS sending requires a configured provider; copying or printing is available without SMS charges.</small>
       </div>}
