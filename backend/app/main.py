@@ -1,6 +1,8 @@
 import os
 import re
 import secrets
+import smtplib
+from email.message import EmailMessage
 from datetime import date, datetime
 from uuid import uuid4
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
@@ -1443,7 +1445,38 @@ def create_parent_account(data: ParentAccountCreate, db: Session = Depends(get_d
     except IntegrityError:
         db.rollback()
         raise HTTPException(409, "That username or email is already registered, or a parent link already exists.")
-    return {"id": parent.id, "username": parent.username, "email": parent.email, "role": parent.role, "linked_students": len(student_ids), "temporary_password": temporary_password}
+    email_sent = False
+    email_error = None
+    smtp_host = os.getenv("SCHOOLBRIDGE_SMTP_HOST", "").strip()
+    smtp_from = os.getenv("SCHOOLBRIDGE_SMTP_FROM", "").strip()
+    if smtp_host and smtp_from:
+        try:
+            message = EmailMessage()
+            message["Subject"] = "Your SchoolBridge parent account"
+            message["From"] = smtp_from
+            message["To"] = parent.email
+            message.set_content(
+                f"Hello,\n\nYour SchoolBridge parent account has been created.\n"
+                f"Username: {parent.username}\nTemporary passcode: {temporary_password}\n\n"
+                "Sign in using the SchoolBridge portal and change your passcode after signing in. Keep these details private.\n"
+            )
+            smtp_port = int(os.getenv("SCHOOLBRIDGE_SMTP_PORT", "587"))
+            smtp_user = os.getenv("SCHOOLBRIDGE_SMTP_USERNAME", "").strip()
+            smtp_password = os.getenv("SCHOOLBRIDGE_SMTP_PASSWORD", "")
+            with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as server:
+                server.ehlo()
+                if os.getenv("SCHOOLBRIDGE_SMTP_USE_TLS", "true").lower() not in ("0", "false", "no"):
+                    server.starttls()
+                    server.ehlo()
+                if smtp_user:
+                    server.login(smtp_user, smtp_password)
+                server.send_message(message)
+            email_sent = True
+        except Exception:
+            email_error = "Email delivery could not be completed. Use the displayed local handover details."
+    else:
+        email_error = "Email delivery is not configured on this school server."
+    return {"id": parent.id, "username": parent.username, "email": parent.email, "role": parent.role, "linked_students": len(student_ids), "temporary_password": temporary_password, "email_sent": email_sent, "email_error": email_error}
 
 
 @app.get("/api/parent-accounts", tags=["Parent Access"])
