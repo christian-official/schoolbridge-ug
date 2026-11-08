@@ -1081,6 +1081,38 @@ def verify_subject_marks_batch(
     return {"exam_id": exam_id, "subject_id": subject_id, "verified": verified, "records": len(rows), "changed": changed}
 
 
+@app.patch("/api/exams/{exam_id}/results/verification", tags=["Marks"])
+def verify_exam_results_batch(
+    exam_id: int,
+    verified: bool = True,
+    db: Session = Depends(get_db),
+    approver=Depends(require_admin),
+):
+    exam = db.get(models.Exam, exam_id)
+    if not exam:
+        raise HTTPException(404, "Examination not found.")
+    query = db.query(models.Mark).filter(models.Mark.exam_id == exam_id)
+    if exam.class_id is not None:
+        query = query.join(models.Student, models.Student.id == models.Mark.student_id).filter(
+            models.Student.class_id == exam.class_id
+        )
+    rows = query.all()
+    if not rows:
+        raise HTTPException(404, "There are no submitted results for this examination.")
+    changed = 0
+    for mark in rows:
+        if mark.verified != verified:
+            mark.verified = verified
+            changed += 1
+    write_audit(
+        db, approver, "exam_results_verified" if verified else "exam_results_unlocked",
+        "exam", exam.id,
+        f"records={len(rows)}; changed={changed}; class={exam.class_id}",
+    )
+    db.commit()
+    return {"exam_id": exam.id, "verified": verified, "records": len(rows), "changed": changed}
+
+
 @app.get("/api/grading-scale", tags=["Grading"])
 def get_grading_scale(db: Session = Depends(get_db)):
     return db.query(models.GradeBand).order_by(
