@@ -604,7 +604,7 @@ function App() {
     )
   }
 
-  if (user.must_change_password) return <ForcePasswordChange token={token} username={user.username} onComplete={()=>setUser(current=>current?{...current,must_change_password:false}:current)}/>;
+  if (user.must_change_password) return <ForcePasswordChange token={token} username={user.username} onComplete={()=>void loadUser(token)}/>;
 
   return (
     <div className="app-shell" onSubmitCapture={validateRequiredFields}>
