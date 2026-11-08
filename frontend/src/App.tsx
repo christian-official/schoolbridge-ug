@@ -1018,9 +1018,11 @@ function AcademicCurriculumSettings({token,onSaved}:{token:string;onSaved:()=>vo
 
 function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:RecordItem[];onSaved:()=>void}) {
   const [users,setUsers]=useState<any[]>([])
+  const [staff,setStaff]=useState<any[]>([])
   const [subjects,setSubjects]=useState<any[]>([])
   const [catalog,setCatalog]=useState<any>({sections:[],actions:[],presets:{}})
-  const [teacher,setTeacher]=useState({username:'',email:'',password:''})
+  const [selectedStaffId,setSelectedStaffId]=useState('')
+  const [login,setLogin]=useState({username:'',email:'',password:''})
   const [assignment,setAssignment]=useState({teacher_id:'',class_id:'',subject_id:''})
   const [selectedId,setSelectedId]=useState('')
   const [roleLabel,setRoleLabel]=useState('')
@@ -1034,18 +1036,24 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
   async function load() {
     setLoading(true);setError('')
     try {
-      const [u,sub,permissionData]=await Promise.all([
-        api<any[]>('auth/users',token),api<any[]>('subjects',token),api<any>('auth/permissions',token)
+      const [u,st,sub,permissionData]=await Promise.all([
+        api<any[]>('auth/users',token),api<any>('staff?page=1&page_size=100',token),api<any[]>('subjects',token),api<any>('auth/permissions',token)
       ])
-      setUsers(u);setSubjects(sub);setCatalog(permissionData)
+      setUsers(u);setStaff(st.items||[]);setSubjects(sub);setCatalog(permissionData)
       const first=u.find((item:any)=>item.role!=='admin'&&item.role!=='parent')
       if(first&&!selectedId){setSelectedId(String(first.id));setRoleLabel(first.role_label||first.role);setRoleType(first.role==='teacher'?'teacher':'staff');setPermissions(first.permissions||{})}
-    } catch(e) {
-      setError(e instanceof Error?e.message:'Unable to load staff accounts and permissions.')
-    } finally {setLoading(false)}
+    } catch(e) {setError(e instanceof Error?e.message:'Unable to load staff records and permissions.')}
+    finally {setLoading(false)}
   }
   useEffect(()=>{void load()},[token])
-
+  const selectedStaff=staff.find((item:any)=>String(item.id)===selectedStaffId)
+  const linkedStaffIds=new Set(users.map((item:any)=>item.staff_id).filter(Boolean))
+  const availableStaff=staff.filter((item:any)=>item.status==='active'&&!linkedStaffIds.has(item.id))
+  function chooseStaff(id:string) {
+    setSelectedStaffId(id)
+    const person=staff.find((item:any)=>String(item.id)===id)
+    if(person)setLogin({username:(person.staff_number||'').toLowerCase(),email:person.email||'',password:''})
+  }
   function selectAccount(id:string) {
     setSelectedId(id)
     const item=users.find(u=>String(u.id)===id)
@@ -1056,48 +1064,33 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
     const next:Record<string,string[]>={}
     sections.forEach((section:string)=>{next[section]=['view']})
     if(label==='Teacher'||label==='Class Teacher') {
-      next['Attendance']=['view','add']
-      next['My Classes']=['view']
-      next['My Attendance']=['view']
-      next['My Results']=['view','add','edit']
-      next['Announcements']=['view']
+      next['Attendance']=['view','add'];next['My Classes']=['view'];next['My Attendance']=['view'];next['My Results']=['view','add','edit'];next['Announcements']=['view']
     }
-    setRoleLabel(label)
-    setRoleType(label==='Teacher'||label==='Class Teacher'?'teacher':'staff')
-    setPermissions(next)
+    setRoleLabel(label);setRoleType(label==='Teacher'||label==='Class Teacher'?'teacher':'staff');setPermissions(next)
   }
   function togglePermission(section:string,action:string,checked:boolean) {
-    setPermissions(current=>{
-      const actions=new Set(current[section]||[])
-      if(checked)actions.add(action);else actions.delete(action)
-      const next={...current}
-      if(actions.size)next[section]=Array.from(actions);else delete next[section]
-      return next
-    })
+    setPermissions(current=>{const actions=new Set(current[section]||[]);if(checked)actions.add(action);else actions.delete(action);const next={...current};if(actions.size)next[section]=Array.from(actions);else delete next[section];return next})
+  }
+  async function create(e:React.FormEvent) {
+    e.preventDefault()
+    if(!selectedStaffId||!login.username.trim()||!login.email.trim()||login.password.length<12){setError('Select an existing staff member and enter a username, email and password of at least 12 characters.');return}
+    setBusy(true);setError('');setMessage('')
+    try {
+      await api('auth/teachers',token,{method:'POST',body:JSON.stringify({staff_id:Number(selectedStaffId),username:login.username.trim(),email:login.email.trim(),password:login.password})})
+      setSelectedStaffId('');setLogin({username:'',email:'',password:''})
+      setMessage('Login linked to the existing staff record. No duplicate staff profile was created.')
+      await load();onSaved()
+    } catch(e) {setError(e instanceof Error?e.message:'Unable to create linked staff login.')}
+    finally {setBusy(false)}
   }
   async function savePermissions() {
-    if(!selectedId||roleLabel.trim().length<2){setError('Choose a staff account and enter a role name.');return}
+    if(!selectedId||roleLabel.trim().length<2){setError('Choose a staff login and enter a role name.');return}
     setBusy(true);setError('');setMessage('')
     try {
       await api('auth/users/'+selectedId+'/permissions',token,{method:'PUT',body:JSON.stringify({role:roleType,role_label:roleLabel.trim(),permissions})})
       setMessage('Role and permissions saved. The account must sign in again for its menu to refresh.')
-      await load()
-      onSaved()
+      await load();onSaved()
     } catch(e) {setError(e instanceof Error?e.message:'Unable to save staff permissions.')}
-    finally {setBusy(false)}
-  }
-  async function create(e:React.FormEvent) {
-    e.preventDefault()
-    const username=teacher.username.trim(),email=teacher.email.trim()
-    if(!username||!email||teacher.password.length<12){setError('Enter a username, valid email and password of at least 12 characters.');return}
-    setBusy(true);setError('');setMessage('')
-    try {
-      await api('auth/teachers',token,{method:'POST',body:JSON.stringify({username,email,password:teacher.password})})
-      setTeacher({username:'',email:'',password:''})
-      setMessage('Staff login created. Select the account below to assign its job role and permissions.')
-      await load()
-      onSaved()
-    } catch(e) {setError(e instanceof Error?e.message:'Unable to create staff account.')}
     finally {setBusy(false)}
   }
   async function assign(e:React.FormEvent) {
@@ -1106,34 +1099,32 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
     setBusy(true);setError('');setMessage('')
     try {
       await api('teacher-assignments',token,{method:'POST',body:JSON.stringify({teacher_id:Number(assignment.teacher_id),class_id:Number(assignment.class_id),subject_id:Number(assignment.subject_id)})})
-      setAssignment({teacher_id:'',class_id:'',subject_id:''})
-      setMessage('Teacher class and subject assignment saved.')
-      onSaved()
+      setAssignment({teacher_id:'',class_id:'',subject_id:''});setMessage('Teacher class and subject assignment saved.');onSaved()
     } catch(e) {setError(e instanceof Error?e.message:'Unable to assign teacher.')}
     finally {setBusy(false)}
   }
   const activeTeachers=users.filter(u=>u.role==='teacher'&&u.active)
   const editableUsers=users.filter(u=>u.role!=='admin'&&u.role!=='parent')
   return <section className="panel settings-panel">
-    <div className="panel-heading"><div><h2>Users, roles and permissions</h2><p>Give every staff login only the school sections and actions needed for their job.</p></div><button type="button" className="secondary-button" onClick={()=>void load()} disabled={loading||busy}>{loading?'Loading...':'Refresh accounts'}</button></div>
-    {error&&<div className="form-error" role="alert">{error}</div>}
-    {message&&<div className="success-notice" role="status">{message}</div>}
-    <h3>Create staff login</h3>
-    <details className="form-disclosure"><summary>Create a staff account</summary>
-      <form className="student-form" onSubmit={create}>
-        <div className="student-form-grid">
-          <label>Username *<input required maxLength={60} autoComplete="username" value={teacher.username} onChange={e=>setTeacher({...teacher,username:e.target.value})} placeholder="Enter username"/></label>
-          <label>Email address *<input required type="email" maxLength={254} autoComplete="email" value={teacher.email} onChange={e=>setTeacher({...teacher,email:e.target.value})} placeholder="staff@example.com"/></label>
-          <label>Temporary password *<input required type="password" minLength={12} maxLength={128} autoComplete="new-password" value={teacher.password} onChange={e=>setTeacher({...teacher,password:e.target.value})} placeholder="At least 12 characters"/></label>
-        </div>
-        <p className="form-hint">Create the login, then select the account below to set its position and permissions. The account starts with limited access.</p>
-        <div className="form-actions"><button className="primary-button" disabled={busy||loading}>{busy?'Saving...':'Create staff login'}</button></div>
-      </form>
-    </details>
-    <h3>Assign role and permissions</h3>
-    {loading?<p className="form-hint">Loading accounts...</p>:!editableUsers.length?<p className="form-hint">No staff login accounts yet. Create one above.</p>:<>
+    <div className="panel-heading"><div><h2>Staff login & permissions</h2><p>Connect accounts to staff already registered in the Staff directory. Staff details are not entered twice.</p></div><button type="button" className="secondary-button" onClick={()=>void load()} disabled={loading||busy}>{loading?'Loading...':'Refresh'}</button></div>
+    {error&&<div className="form-error" role="alert">{error}</div>}{message&&<div className="success-notice" role="status">{message}</div>}
+    <h3>1. Create a login for an existing staff member</h3>
+    {loading?<p className="form-hint">Loading staff directory...</p>:<form className="student-form" onSubmit={create}>
       <div className="student-form-grid">
-        <label>Staff login<select value={selectedId} onChange={e=>selectAccount(e.target.value)}><option value="">Choose account</option>{editableUsers.map(u=><option key={u.id} value={u.id}>{u.username} — {u.email}</option>)}</select></label>
+        <label>Existing staff member *<select required value={selectedStaffId} onChange={e=>chooseStaff(e.target.value)}><option value="">Select from Staff directory</option>{availableStaff.map((p:any)=><option key={p.id} value={p.id}>{p.first_name} {p.last_name} — {p.position||p.category} ({p.staff_number})</option>)}</select></label>
+        <label>Username *<input required maxLength={80} value={login.username} onChange={e=>setLogin({...login,username:e.target.value})} placeholder="Login username"/></label>
+        <label>Email address *<input required type="email" maxLength={150} value={login.email} onChange={e=>setLogin({...login,email:e.target.value})} placeholder="Staff email"/></label>
+        <label>Temporary password *<input required type="password" minLength={12} maxLength={128} value={login.password} onChange={e=>setLogin({...login,password:e.target.value})} placeholder="At least 12 characters"/></label>
+      </div>
+      {selectedStaff&&<p className="form-hint">Selected: <strong>{selectedStaff.first_name} {selectedStaff.last_name}</strong> · {selectedStaff.position||selectedStaff.category} · {selectedStaff.department||'No department'} · {selectedStaff.email||'Add an email above'}</p>}
+      <p className="form-hint">The account inherits its teaching or non-teaching type and job title from the selected staff profile. Only login details are added here.</p>
+      <div className="form-actions"><button className="primary-button" disabled={busy||!selectedStaffId}>{busy?'Saving...':'Create linked login'}</button></div>
+      {!availableStaff.length&&<p className="form-hint">Every active staff member already has a login, or no active staff records exist. Add staff in the Staff directory first.</p>}
+    </form>}
+    <h3>2. Assign role and permissions</h3>
+    {loading?<p className="form-hint">Loading accounts...</p>:!editableUsers.length?<p className="form-hint">No linked staff logins yet.</p>:<>
+      <div className="student-form-grid">
+        <label>Staff account<select value={selectedId} onChange={e=>selectAccount(e.target.value)}><option value="">Choose account</option>{editableUsers.map(u=>{const person=staff.find((p:any)=>p.id===u.staff_id);return <option key={u.id} value={u.id}>{person?person.first_name+' '+person.last_name:u.username} — {u.username}</option>})}</select></label>
         <label>Role preset<select value={catalog.presets&&Object.keys(catalog.presets).includes(roleLabel)?roleLabel:'Custom'} onChange={e=>e.target.value!=='Custom'&&applyPreset(e.target.value)}><option>Custom</option>{Object.keys(catalog.presets||{}).map((name:string)=><option key={name}>{name}</option>)}</select></label>
         <label>Job title / role name *<input value={roleLabel} onChange={e=>setRoleLabel(e.target.value)} maxLength={80} placeholder="e.g. Bursar, Secretary, DOS"/></label>
         <label>Account type<select value={roleType} onChange={e=>setRoleType(e.target.value as 'teacher'|'staff')}><option value="staff">Non-teaching staff</option><option value="teacher">Teaching staff</option></select></label>
@@ -1143,18 +1134,15 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
       </tbody></table></div>
       <div className="form-actions"><button type="button" className="primary-button" onClick={()=>void savePermissions()} disabled={busy||!selectedId}>{busy?'Saving...':'Save role and permissions'}</button></div>
     </>}
-    <h3>Teacher class and subject assignments</h3>
-    <form className="student-form" onSubmit={assign}>
-      <div className="student-form-grid">
-        <label>Teacher *<select required value={assignment.teacher_id} onChange={e=>setAssignment({...assignment,teacher_id:e.target.value})}><option value="">Select teacher</option>{activeTeachers.map(u=><option key={u.id} value={u.id}>{u.username}</option>)}</select></label>
-        <label>Class *<select required value={assignment.class_id} onChange={e=>setAssignment({...assignment,class_id:e.target.value})}><option value="">Select class</option>{classes.map(item=><option key={item.id} value={item.id}>{item.name}{item.section?' — '+item.section:''}</option>)}</select></label>
-        <label>Subject *<select required value={assignment.subject_id} onChange={e=>setAssignment({...assignment,subject_id:e.target.value})}><option value="">Select subject</option>{subjects.map(sub=><option key={sub.id} value={sub.id}>{sub.name}</option>)}</select></label>
-      </div>
-      <div className="form-actions"><button className="primary-button" disabled={busy||loading||!activeTeachers.length||!subjects.length||!classes.length}>{busy?'Saving...':'Save teacher assignment'}</button></div>
-    </form>
+    <h3>3. Teacher class and subject assignments</h3>
+    <form className="student-form" onSubmit={assign}><div className="student-form-grid">
+      <label>Teacher *<select required value={assignment.teacher_id} onChange={e=>setAssignment({...assignment,teacher_id:e.target.value})}><option value="">Select teacher</option>{activeTeachers.map(u=>{const person=staff.find((p:any)=>p.id===u.staff_id);return <option key={u.id} value={u.id}>{person?person.first_name+' '+person.last_name:u.username}</option>})}</select></label>
+      <label>Class *<select required value={assignment.class_id} onChange={e=>setAssignment({...assignment,class_id:e.target.value})}><option value="">Select class</option>{classes.map(item=><option key={item.id} value={item.id}>{item.name}{item.section?' — '+item.section:''}</option>)}</select></label>
+      <label>Subject *<select required value={assignment.subject_id} onChange={e=>setAssignment({...assignment,subject_id:e.target.value})}><option value="">Select subject</option>{subjects.map(sub=><option key={sub.id} value={sub.id}>{sub.name}</option>)}</select></label>
+    </div><div className="form-actions"><button className="primary-button" disabled={busy||loading||!activeTeachers.length||!subjects.length||!classes.length}>{busy?'Saving...':'Save teacher assignment'}</button></div></form>
     <h3>School user accounts</h3>
-    <div className="table-wrap"><table><thead><tr><th>Username</th><th>Email</th><th>Job role</th><th>Sections enabled</th><th>Status</th></tr></thead><tbody>
-      {users.map(u=><tr key={u.id}><td>{u.username}</td><td>{u.email}</td><td>{u.role==='admin'?'Administrator':u.role==='parent'?'Parent':u.role_label||u.role}</td><td>{Object.keys(u.permissions||{}).length|| (u.role==='admin'?'All':'Limited')}</td><td>{u.active?'Active':'Disabled'}</td></tr>)}
+    <div className="table-wrap"><table><thead><tr><th>Staff member</th><th>Username</th><th>Job role</th><th>Sections enabled</th><th>Status</th></tr></thead><tbody>
+      {users.map(u=>{const person=staff.find((p:any)=>p.id===u.staff_id);return <tr key={u.id}><td>{person?person.first_name+' '+person.last_name:(u.role==='admin'?'—':'Unlinked staff login')}</td><td>{u.username}</td><td>{u.role==='admin'?'Administrator':u.role==='parent'?'Parent':u.role_label||u.role}</td><td>{Object.keys(u.permissions||{}).length|| (u.role==='admin'?'All':'Limited')}</td><td>{u.active?'Active':'Disabled'}</td></tr>})}
       {!users.length&&<tr><td colSpan={5}>No user accounts found.</td></tr>}
     </tbody></table></div>
   </section>
