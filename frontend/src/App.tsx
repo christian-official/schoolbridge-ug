@@ -210,17 +210,19 @@ function PersonalDashboard({token,username,onNavigate}:{token:string;username:st
       .finally(()=>{if(!cancelled)setLoading(false)})
     return ()=>{cancelled=true}
   },[token])
-  const workCount=(data?.today_lessons.length||0)+(data?.class_teacher_classes.length||0)+(data?.today_duty?1:0)
-  return <div className="academic-workspace">
+  const roleName=(data?.role_label||'').toLowerCase()
+  const isAcademicAccount=/teacher|academic|director of studies|\bdos\b|head teacher|deputy|examinations officer/.test(roleName)
+  const workCount=(isAcademicAccount?(data?.today_lessons.length||0)+(data?.class_teacher_classes.length||0):0)+(data?.today_duty?1:0)
+  return <div className="role-dashboard staff-account-dashboard">
     <section className="panel">
-      <div className="panel-heading"><div><h2>Your work dashboard</h2><p>{data?.staff_name||username} · {data?.role_label||'Staff account'} · Work and responsibilities assigned to your account.</p></div><span className="count-pill">{workCount} active items today</span></div>
+      <div className="panel-heading"><div><h2>{isAcademicAccount?'Academic & teaching overview':'Your responsibilities overview'}</h2><p>{data?.staff_name||username} · {data?.role_label||'Staff account'} · Only work and areas assigned to your account are shown.</p></div><span className="count-pill">{workCount} active items today</span></div>
       {loading&&<p className="form-hint">Loading your assigned work...</p>}
       {error&&<div className="form-error" role="alert">{error}</div>}
       {data&&!loading&&<>
         {data.today_duty&&<div className="quick-action"><span className="quick-icon purple"><ShieldCheck/></span><span><strong>Today's assigned duty</strong><small>{data.today_duty.notes}</small></span></div>}
-        {data.today_lessons.length>0&&<><h3>Today's teaching timetable</h3><div className="table-wrap"><table><thead><tr><th>Time</th><th>Class</th><th>Subject</th></tr></thead><tbody>{data.today_lessons.map((lesson,index)=><tr key={index}><td>{lesson.start_time}–{lesson.end_time}</td><td>{lesson.class_name}</td><td>{lesson.subject}</td></tr>)}</tbody></table></div></>}
-        {data.class_teacher_classes.length>0&&<><h3>Your class-teacher responsibilities</h3><div className="class-grid">{data.class_teacher_classes.map(item=><div className="class-card" key={item.class_id}><Users size={20}/><strong>{item.class_name}</strong><span>Class attendance responsibility</span></div>)}</div></>}
-        {workCount===0&&<div className="empty-state"><CalendarDays size={30}/><p>No lessons or duty assignments are scheduled for you today.</p><small>Your available work areas are listed below.</small></div>}
+        {isAcademicAccount&&data.today_lessons.length>0&&<><h3>Today's teaching timetable</h3><div className="table-wrap"><table><thead><tr><th>Time</th><th>Class</th><th>Subject</th></tr></thead><tbody>{data.today_lessons.map((lesson,index)=><tr key={index}><td>{lesson.start_time}–{lesson.end_time}</td><td>{lesson.class_name}</td><td>{lesson.subject}</td></tr>)}</tbody></table></div></>}
+        {isAcademicAccount&&data.class_teacher_classes.length>0&&<><h3>Your class-teacher responsibilities</h3><div className="class-grid">{data.class_teacher_classes.map(item=><div className="class-card" key={item.class_id}><Users size={20}/><strong>{item.class_name}</strong><span>Class attendance responsibility</span></div>)}</div></>}
+        {workCount===0&&<div className="empty-state"><CalendarDays size={30}/><p>{isAcademicAccount?'No lessons or duty assignments are scheduled for you today.':'No duty has been assigned to you for today.'}</p><small>Your available work areas are listed below.</small></div>}
         <h3>Work areas you can access</h3>
         <div className="overview-leadership-grid">{data.available_sections.filter(section=>section!=='Overview').map(section=><button type="button" className="leadership-shortcut" key={section} onClick={()=>onNavigate(section)}><span className="quick-icon blue"><ArrowUpRight/></span><span><strong>{section}</strong><small>Open your authorised {section.toLowerCase()} workspace.</small></span><ArrowUpRight size={16}/></button>)}</div>
         {!data.available_sections.length&&<p className="form-hint">No school work areas have been assigned. Contact the administrator.</p>}
