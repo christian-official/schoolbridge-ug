@@ -1306,11 +1306,39 @@ def list_timetable(
         raise HTTPException(403, "You do not have permission to view the timetable.")
     if class_id:
         query = query.filter(models.TimetableEntry.class_id == class_id)
-    return query.order_by(
+    rows = query.order_by(
         models.TimetableEntry.day_of_week,
         models.TimetableEntry.start_time,
         models.TimetableEntry.id,
     ).all()
+    output = []
+    for entry in rows:
+        school_class = db.get(models.SchoolClass, entry.class_id)
+        subject = db.get(models.Subject, entry.subject_id) if entry.subject_id else None
+        staff = db.get(models.StaffMember, entry.staff_id) if entry.staff_id else None
+        output.append({
+            "id": entry.id, "class_id": entry.class_id, "class_name": school_class.name if school_class else "Class",
+            "class_section": school_class.section if school_class else "",
+            "subject_id": entry.subject_id, "subject_name": subject.name if subject else "Lesson",
+            "staff_id": entry.staff_id, "teacher_name": (staff.first_name + " " + staff.last_name) if staff else "Unassigned",
+            "day_of_week": entry.day_of_week, "start_time": entry.start_time, "end_time": entry.end_time,
+        })
+    return output
+
+
+@app.get("/api/timetable/options", tags=["Timetable"])
+def timetable_options(db: Session = Depends(get_db), academic=Depends(require_timetable_editor)):
+    classes = db.query(models.SchoolClass).order_by(models.SchoolClass.name, models.SchoolClass.section).all()
+    subjects = db.query(models.Subject).order_by(models.Subject.name).all()
+    staff = db.query(models.StaffMember).filter_by(category="Teaching", status="active").order_by(
+        models.StaffMember.first_name, models.StaffMember.last_name
+    ).all()
+    return {
+        "classes": [{"id": row.id, "name": row.name, "section": row.section} for row in classes],
+        "subjects": [{"id": row.id, "name": row.name, "code": row.code} for row in subjects],
+        "staff": [{"id": row.id, "first_name": row.first_name, "last_name": row.last_name,
+                   "staff_number": row.staff_number, "category": row.category, "status": row.status} for row in staff],
+    }
 
 
 @app.post("/api/timetable", tags=["Timetable"])
@@ -1357,6 +1385,34 @@ def create_timetable_entry(
     except IntegrityError:
         db.rollback()
         raise HTTPException(409, "A timetable entry already exists for this class and start time.")
+    return item
+
+
+@app.put("/api/timetable/{entry_id}", tags=["Timetable"])
+def update_timetable_entry(entry_id: int, data: TimetableEntryCreate, db: Session = Depends(get_db),
+                           academic=Depends(require_timetable_editor)):
+    item = db.get(models.TimetableEntry, entry_id)
+    if not item:
+        raise HTTPException(404, "Timetable entry not found.")
+    if data.end_time <= data.start_time:
+        raise HTTPException(422, "Lesson end time must be later than its start time.")
+    if not db.get(models.SchoolClass, data.class_id):
+        raise HTTPException(404, "Class not found.")
+    overlaps = db.query(models.TimetableEntry).filter(
+        models.TimetableEntry.class_id == data.class_id,
+        models.TimetableEntry.day_of_week == data.day_of_week,
+        models.TimetableEntry.id != entry_id,
+        models.TimetableEntry.start_time < data.end_time,
+        models.TimetableEntry.end_time > data.start_time,
+    ).first()
+    if overlaps:
+        raise HTTPException(409, "This lesson overlaps another lesson for the same class.")
+    for key, value in data.model_dump().items():
+        setattr(item, key, value)
+    write_audit(db, academic, "timetable_entry_updated", "timetable_entry", item.id,
+                f"Class {data.class_id}; day {data.day_of_week}; {data.start_time}-{data.end_time}")
+    db.commit()
+    db.refresh(item)
     return item
 
 
@@ -1992,17 +2048,21 @@ def save_teacher_marks_bulk(data: BulkMarkCreate, db: Session = Depends(get_db),
         models.Mark.student_id.in_(student_ids)
     ).all()
     by_student = {row.student_id: row for row in existing}
-    verified = [row.student_id for row in existing if row.verified]
-    if verified:
-        raise HTTPException(409, "Some marks have already been verified. Ask the administrator to unlock them before resubmitting.")
+    verified = {row.student_id: row for row in existing if row.verified}
+    changed_verified = [entry.student_id for entry in data.records
+                        if entry.student_id in verified and verified[entry.student_id].score != entry.score]
+    if changed_verified:
+        raise HTTPException(409, "Some submitted marks have already been verified. Ask the administrator to unlock them before changing those scores.")
     saved = 0
     for entry in data.records:
         mark = by_student.get(entry.student_id)
         if mark:
-            mark.score = entry.score
+            if not mark.verified:
+                mark.score = entry.score
+                saved += 1
         else:
             db.add(models.Mark(student_id=entry.student_id, subject_id=subject.id, exam_id=exam.id, score=entry.score))
-        saved += 1
+            saved += 1
     write_audit(db, teacher, "teacher_class_marks_submitted", "exam", exam.id,
                 f"{saved} marks; class {exam.class_id}; subject {subject.name}")
     db.commit()
