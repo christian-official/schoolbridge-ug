@@ -1410,6 +1410,12 @@ def update_timetable_entry(entry_id: int, data: TimetableEntryCreate, db: Sessio
         raise HTTPException(422, "Lesson end time must be later than its start time.")
     if not db.get(models.SchoolClass, data.class_id):
         raise HTTPException(404, "Class not found.")
+    if data.subject_id is not None and not db.get(models.Subject, data.subject_id):
+        raise HTTPException(404, "Subject not found.")
+    if data.staff_id is not None:
+        staff = db.get(models.StaffMember, data.staff_id)
+        if not staff or staff.status != "active" or staff.category != "Teaching":
+            raise HTTPException(404, "Select an active teaching staff member.")
     overlaps = db.query(models.TimetableEntry).filter(
         models.TimetableEntry.class_id == data.class_id,
         models.TimetableEntry.day_of_week == data.day_of_week,
