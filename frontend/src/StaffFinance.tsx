@@ -33,6 +33,7 @@ export default function StaffFinance({token,active,classes=[],refreshKey=0,initi
   const [savingFee,setSavingFee]=useState(false)
   const [editingStaff,setEditingStaff]=useState<number|null>(null)
   const [message,setMessage]=useState('')
+  const [newStaffLogin,setNewStaffLogin]=useState<{name:string;username:string;email:string;temporary_passcode:string}|null>(null)
   const emptyStaffForm={full_name:'',category:'Teaching',position:'',department:'',subjects:'',phone:'',email:'',salary_amount:'',salary_frequency:'Monthly'}
   const [form,setForm]=useState(emptyStaffForm)
   const [summary,setSummary]=useState<Summary>({fees_expected:0,fees_collected:0,outstanding:0})
@@ -104,7 +105,20 @@ export default function StaffFinance({token,active,classes=[],refreshKey=0,initi
     ].filter(Boolean)
     if(missingStaffFields.length){setMessage('Cannot save staff member. Complete: '+missingStaffFields.join(', ')+'.');return}
     setMessage('');setSavingStaff(true)
-    try { await request(editingStaff?'staff/'+editingStaff:'staff',token,{method:editingStaff?'PATCH':'POST',body:JSON.stringify({...(()=>{const names=form.full_name.trim().split(/\s+/);return {first_name:names.shift()||'',last_name:names.join(' ')||'—'}})(),...form,salary_amount:form.salary_amount===''?null:Number(form.salary_amount),subjects:form.category==='Teaching'?form.subjects:null})});setEditingStaff(null);setForm(emptyStaffForm);setShowForm(false);setMessage(editingStaff?'Staff profile updated.':'Staff member registered.');const p=new URLSearchParams({search,page:'1',page_size:'100'});if(category)p.set('category',category);const r=await request<Page<Staff>>('staff?'+p.toString(),token);setStaff(r.items);setStaffTotal(r.total) }
+    try {
+      const payload={...(()=>{const names=form.full_name.trim().split(/\s+/);return {first_name:names.shift()||'',last_name:names.join(' ')||'—'}})(),...form,salary_amount:form.salary_amount===''?null:Number(form.salary_amount),subjects:form.category==='Teaching'?form.subjects:null}
+      if(editingStaff){
+        await request('staff/'+editingStaff,token,{method:'PATCH',body:JSON.stringify(payload)})
+        setMessage('Staff profile updated.')
+        setNewStaffLogin(null)
+      }else{
+        const created=await request<{staff:Staff;login:{username:string;email:string;temporary_passcode:string}}>('staff',token,{method:'POST',body:JSON.stringify(payload)})
+        setNewStaffLogin({name:form.full_name,...created.login})
+        setMessage('Staff member registered and login account created. Copy the temporary passcode now; it will not be shown again.')
+      }
+      setEditingStaff(null);setForm(emptyStaffForm);setShowForm(false)
+      const p=new URLSearchParams({search,page:'1',page_size:'100'});if(category)p.set('category',category);const r=await request<Page<Staff>>('staff?'+p.toString(),token);setStaff(r.items);setStaffTotal(r.total)
+    }
     catch(e){setMessage(e instanceof Error?e.message:'Unable to save staff member.')}
     finally{setSavingStaff(false)}
   }
@@ -155,6 +169,7 @@ export default function StaffFinance({token,active,classes=[],refreshKey=0,initi
   if(active==='Staff') return <section className="panel">
     <div className="panel-heading"><div><h2>Staff directory</h2><p>{staffTotal} staff members · teaching and non-teaching</p></div><button className="primary-button add-student-button" onClick={()=>{if(showForm){setShowForm(false);setEditingStaff(null)}else{setEditingStaff(null);setForm(emptyStaffForm);setMessage('');setShowForm(true)}}}><Plus size={16}/>{showForm?'Close form':'Add staff member'}</button></div>
     {message&&<div className="success-notice">{message}</div>}
+    {newStaffLogin&&<div className="success-notice staff-login-handover"><strong>Staff login created — hand these details to {newStaffLogin.name}</strong><p>Username: <b>{newStaffLogin.username}</b></p><p>Email / account ID: <b>{newStaffLogin.email}</b></p><p>Temporary passcode: <b>{newStaffLogin.temporary_passcode}</b></p><p>Ask the staff member to change the passcode after signing in. This passcode is shown only once.</p><button type="button" className="secondary-button" onClick={()=>{void navigator.clipboard?.writeText('SchoolBridge login\\nUsername: '+newStaffLogin.username+'\\nTemporary passcode: '+newStaffLogin.temporary_passcode)}}>Copy login details</button><button type="button" className="secondary-button" onClick={()=>setNewStaffLogin(null)}>I have saved these details</button></div>}
     {showForm&&<form className="student-form registration-form" onSubmit={addStaff}>
       <div className="form-heading"><div><h3>{editingStaff?'Update staff profile':'Register a staff member'}</h3><p>Enter the employee's details. Fields marked * are compulsory.</p></div><span className="required-note">* Required</span></div>
       <section className="form-section"><div className="form-section-heading"><span className="form-section-number">01</span><div><h4>Biodata</h4><p>Enter the employee's full legal name.</p></div></div><div className="student-form-grid"><label className="field-span-full">Full name *<input autoComplete="name" required value={form.full_name} onChange={e=>setForm({...form,full_name:e.target.value})} placeholder="Enter employee's full name"/></label></div></section>
