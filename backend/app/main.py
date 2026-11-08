@@ -2305,7 +2305,7 @@ def save_teacher_marks_bulk(data: BulkMarkCreate, db: Session = Depends(get_db),
         else:
             db.add(models.Mark(student_id=entry.student_id, subject_id=subject.id, exam_id=exam.id, score=entry.score))
             saved += 1
-    no_score_count = 0
+    no_score_count = sum(1 for entry in data.records if entry.score == 0)
     # Create explicit zero-score rows for active learners omitted from the submission.
     # This records "No score" and lets academic officers verify the complete class.
     missing_students = db.query(models.Student).filter(
