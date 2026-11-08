@@ -4,7 +4,7 @@ import {
   FileText, Settings, LogOut,
   Search, Plus, Menu, X, ArrowUpRight, UserPlus,
   CalendarDays, TrendingUp, ShieldCheck, LoaderCircle, RefreshCw,
-  Contact, Megaphone, Briefcase, Clock, FolderOpen, CalendarCheck, CheckCircle2, UserX,
+  Contact, Megaphone, Briefcase, Clock, FolderOpen, CalendarCheck, CheckCircle2, UserX, MessageSquareText,
 } from 'lucide-react'
 import StaffFinance from './StaffFinance'
 import AcademicManagement from './AcademicManagement'
@@ -12,6 +12,7 @@ import AttendanceHub from './AttendanceHub'
 import MyStaffProfile from './MyStaffProfile'
 import OperationsManagement from './OperationsManagement'
 import Phase4Workspace from './Phase4Workspace'
+import ParentLiaisonWorkspace from './ParentLiaison'
 import './App.css'
 import './DashboardRedesign.css'
 
@@ -70,6 +71,7 @@ const menu = [
   { label: 'Leadership & Duty', icon: ShieldCheck },
   { label: 'Parent Access', icon: Users },
   { label: 'Announcements', icon: FileText },
+  { label: 'Parent Liaison', icon: MessageSquareText },
 ]
 const teacherMenu = [
   { label: 'My Classes', icon: BookOpen },
@@ -83,6 +85,7 @@ const teacherMenu = [
 const parentMenu = [
   { label: 'My Children', icon: GraduationCap },
   { label: 'Announcements', icon: FileText },
+  { label: 'Parent Liaison', icon: MessageSquareText },
 ]
 
 function isFinanceAccount(user:User) {
@@ -106,11 +109,11 @@ function getStaffNavigation(user:User) {
   )
   const role = (user.role_label || '').toLowerCase()
   const priority = /school administrator|system administrator|^administrator$/.test(role)
-    ? ['Overview','Students','Staff','Examinations','Attendance','Fees & Finance','Timetable','Leadership & Duty','Parent Access','Announcements','Reports','My Attendance','My Profile']
+    ? ['Overview','Students','Staff','Examinations','Attendance','Fees & Finance','Timetable','Leadership & Duty','Parent Access','Parent Liaison','Announcements','Reports','My Attendance','My Profile']
     : /teacher|head\s?teacher/.test(role)
-    ? ['Overview','My Classes','My Results','Timetable','Attendance','My Attendance','Announcements','My Profile']
+    ? ['Overview','My Classes','My Results','Timetable','Attendance','My Attendance','Parent Liaison','Announcements','My Profile']
     : /secretary|office administrator/.test(role)
-    ? ['Overview','Students','Staff','Parent Access','Announcements','Reports','My Attendance','My Profile']
+    ? ['Overview','Students','Staff','Parent Access','Parent Liaison','Announcements','Reports','My Attendance','My Profile']
     : /attendance/.test(role)
       ? ['Overview','Attendance','My Attendance','Staff','Reports','Announcements','My Profile']
       : /bursar|accountant|finance|accounts/.test(role)
@@ -1063,6 +1066,7 @@ function App() {
           {active === 'My Attendance' && user.role !== 'teacher' && user.role !== 'parent' && user.role !== 'admin' && <StaffSelfAttendance token={token} />}
           {((active === 'Parent Access' || active === 'Announcements') && user.role !== 'parent' || (active === 'My Children' || active === 'Announcements') && user.role === 'parent') && <Phase4Workspace token={token} role={user.role} active={active} permissions={user.permissions} />}
 
+          {active === 'Parent Liaison' && <ParentLiaisonWorkspace token={token} role={user.role} />}
           {active === 'Overview' && user.role === 'admin' && <AdministratorDashboard token={token} username={user.username} onNavigate={setActive} summary={dashboardSummary} financeSummary={financeDashboard} availableSections={['Students','Staff','Fees & Finance','Examinations','Attendance','Timetable','Leadership & Duty','Parent Access','Announcements','Reports']}/>} 
 
                     {active === 'Overview' && user.role !== 'admin' && (user.role === 'staff' && /school administrator|system administrator|^administrator$/i.test(user.role_label||'') ? <AdministratorDashboard token={token} username={user.username} onNavigate={setActive} summary={dashboardSummary} financeSummary={financeDashboard} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)}/> : isFinanceAccount(user) ? <FinanceAccountDashboard token={token} username={user.username} onNavigate={(section,tab)=>{if(tab)setFinanceTabRequest(tab);setActive(section)}}/> : user.role === 'staff' && /director of studies|\bdos\b/i.test(user.role_label||'') ? <DirectorOfStudiesDashboard token={token} onNavigate={setActive} summary={dashboardSummary} summaryAvailable={(user.permissions?.['Overview']||[]).includes('view')} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)}/> : user.role === 'staff' && /secretary|office administrator/i.test(user.role_label||'') ? <SecretaryDashboard username={user.username} onNavigate={setActive} summary={dashboardSummary} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)}/> : user.role === 'staff' && /attendance/i.test(user.role_label||'') ? <AttendanceOfficerDashboard username={user.username} onNavigate={setActive} summary={dashboardSummary} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)}/> : user.role === 'staff' && /teacher|head\s?teacher/i.test(user.role_label||'') ? <TeacherDashboard token={token} username={user.username} onNavigate={setActive}/> : user.role === 'staff' ? <RoleSpecificDashboard username={user.username} roleLabel={user.role_label||'Staff'} onNavigate={setActive} summary={dashboardSummary} summaryAvailable={(user.permissions?.['Overview']||[]).includes('view')} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)} financeSummary={financeDashboard}/> : <PersonalDashboard token={token} username={user.username} onNavigate={setActive}/>) } 
