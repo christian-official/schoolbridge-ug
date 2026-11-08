@@ -141,7 +141,7 @@ export default function ParentLiaisonWorkspace({ token, role }: { token: string;
           {detail ? <>
             <header className="parent-liaison-conversation-head"><div><strong>{detail.subject}</strong><span>{detail.student_name} · {detail.category}</span></div><span className={detail.status === 'Open' ? 'attendance-status-pill status-present' : 'attendance-status-pill'}>{detail.status}</span></header>
             <div className="parent-liaison-messages">
-              {detail.messages.map((item, index) => <article key={item.id} className={item.sender_id === detail.current_user_id ? 'parent-liaison-message sent' : 'parent-liaison-message received'}>
+              {detail.messages.map(item => <article key={item.id} className={item.sender_id === detail.current_user_id ? 'parent-liaison-message sent' : 'parent-liaison-message received'}>
                 <div className="parent-liaison-message-meta"><strong>{item.sender_name}</strong><time>{new Date(item.created_at).toLocaleString('en-UG', { dateStyle: 'medium', timeStyle: 'short' })}</time></div>
                 <p>{item.message}</p>
                 {item.read_at && <small><CheckCheck size={12}/> Read</small>}
