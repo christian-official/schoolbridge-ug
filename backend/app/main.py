@@ -2744,7 +2744,7 @@ def list_staff(search: str = "", category: str | None = None, page: int = 1, pag
     query = db.query(models.StaffMember)
     if search.strip():
         term = "%" + search.strip() + "%"
-        query = query.filter(or_(models.StaffMember.staff_number.ilike(term), models.StaffMember.first_name.ilike(term), models.StaffMember.last_name.ilike(term)))
+        query = query.filter(or_(models.StaffMember.staff_number.ilike(term), models.StaffMember.first_name.ilike(term), models.StaffMember.last_name.ilike(term), models.StaffMember.position.ilike(term), models.StaffMember.department.ilike(term), models.StaffMember.email.ilike(term), models.StaffMember.phone.ilike(term)))
     if category:
         query = query.filter(models.StaffMember.category == category)
     total = query.count()
