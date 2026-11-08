@@ -1816,3 +1816,88 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 @media(max-width:1080px){.admin-dashboard-main-grid{grid-template-columns:1fr}.admin-dashboard-side{display:grid;grid-template-columns:1fr 1fr;align-items:start}.admin-results-status{grid-column:1/-1}}
 @media(max-width:760px){.admin-kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-command-hero{align-items:flex-start;flex-direction:column;padding:22px}.admin-hero-actions{align-items:flex-start;flex-direction:row;flex-wrap:wrap}.admin-dashboard-side{display:flex}.admin-attendance-content{gap:20px}}
 @media(max-width:480px){.admin-kpi-grid{grid-template-columns:1fr 1fr;gap:8px}.admin-kpi-card{align-items:flex-start;flex-direction:column;padding:13px}.admin-kpi-card strong{font-size:1.3rem}.admin-dashboard-panel{padding:15px}.admin-finance-grid{grid-template-columns:1fr}.admin-attendance-content{align-items:flex-start;flex-direction:column}.admin-attendance-ring{align-self:center}}
+
+
+/* Secretary — Design 4: office administration and records */
+.secretary-office-dashboard{display:flex;flex-direction:column;gap:17px}
+.secretary-office-hero{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:25px 28px;border:1px solid #e6e0f4;border-radius:17px;background:linear-gradient(115deg,#f1efff,#fbfaff 62%,#f0f5ff)}
+.secretary-office-hero>div:first-child>span,.secretary-office-heading>div>span,.secretary-office-side>span{color:#8574b8;font-size:.64rem;font-weight:850;letter-spacing:1.1px}
+.secretary-office-hero h2{margin:7px 0;color:#332b58;font-size:1.65rem}
+.secretary-office-hero p{max-width:660px;margin:0;color:#77728e;font-size:.84rem;line-height:1.55}
+.secretary-hero-mark{display:flex;flex-direction:column;align-items:center;gap:7px;padding:15px 18px;border:1px solid #ded7f1;border-radius:14px;background:#ffffffa8;color:#7761b3}
+.secretary-hero-mark small{font-size:.58rem;font-weight:850;letter-spacing:.8px}
+.secretary-stat-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.secretary-stat-grid>div{display:flex;flex-direction:column;gap:5px;padding:16px;border:1px solid #e7eaf1;border-radius:13px;background:#fff}
+.secretary-stat-grid>div>svg{width:20px;height:20px;margin-bottom:5px;color:#7662b0}
+.secretary-stat-grid small{color:#9290a5;font-size:.61rem;font-weight:850;letter-spacing:.7px}
+.secretary-stat-grid strong{color:#342d57;font-size:1.55rem}
+.secretary-stat-grid span{color:#8b899d;font-size:.7rem}
+.secretary-office-layout{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(260px,.8fr);gap:15px;align-items:start}
+.secretary-office-main,.secretary-office-side{padding:19px;border:1px solid #e7eaf1;border-radius:14px;background:#fff}
+.secretary-office-heading{display:flex;justify-content:space-between;gap:12px;align-items:flex-end;margin-bottom:15px}
+.secretary-office-heading h3,.secretary-office-side h3{margin:5px 0 0;color:#342d57;font-size:1rem}
+.secretary-office-heading>small{color:#89879b;font-size:.68rem}
+.secretary-office-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.secretary-office-actions button{display:flex;align-items:center;gap:10px;min-width:0;padding:13px;border:1px solid #eceaf3;border-radius:11px;background:#fcfbff;text-align:left;cursor:pointer}
+.secretary-office-actions button:hover{border-color:#c9bee8;background:#f8f6ff}
+.secretary-action-icon{display:grid;place-items:center;flex:0 0 37px;width:37px;height:37px;border-radius:10px}
+.secretary-action-icon svg{width:18px;height:18px}
+.secretary-action-icon.tone-0{background:#eeeaff;color:#755db4}.secretary-action-icon.tone-1{background:#eaf2ff;color:#4778b5}.secretary-action-icon.tone-2{background:#e8f6ef;color:#398563}.secretary-action-icon.tone-3{background:#fff3e5;color:#a97836}
+.secretary-office-actions button>span:nth-child(2){display:flex;flex:1;flex-direction:column;gap:4px;min-width:0}
+.secretary-office-actions strong{color:#40385f;font-size:.78rem}
+.secretary-office-actions small{color:#8a879b;font-size:.67rem;line-height:1.4}
+.secretary-office-actions button>svg{flex-shrink:0;color:#9993b1}
+.secretary-office-side{background:linear-gradient(150deg,#faf9ff,#fff)}
+.secretary-office-side>p{margin:8px 0 13px;color:#858197;font-size:.75rem;line-height:1.55}
+.secretary-check-item{display:flex;align-items:flex-start;gap:10px;padding:12px 0;border-top:1px solid #efedf5}
+.secretary-check-item>svg{width:18px;height:18px;flex-shrink:0;color:#7764b3}
+.secretary-check-item>span{display:flex;flex-direction:column;gap:4px}
+.secretary-check-item strong{color:#433b61;font-size:.76rem}
+.secretary-check-item small{color:#89869a;font-size:.68rem;line-height:1.4}
+
+/* Attendance Officer — Design 5: daily attendance control room */
+.attendance-control-dashboard{display:flex;flex-direction:column;gap:17px}
+.attendance-control-hero{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:25px 28px;border:1px solid #d9ebe3;border-radius:17px;background:linear-gradient(115deg,#eaf7f0,#f9fcfa 65%,#edf5ff)}
+.attendance-control-hero>div:first-child>span,.attendance-control-panel>span,.attendance-followup-panel>span{color:#568c76;font-size:.63rem;font-weight:850;letter-spacing:1px}
+.attendance-control-hero h2{margin:7px 0;color:#234b3b;font-size:1.65rem}
+.attendance-control-hero p{max-width:660px;margin:0;color:#6e897c;font-size:.84rem;line-height:1.55}
+.attendance-today-badge{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:88px;padding:13px;border:1px solid #d3e7dc;border-radius:13px;background:#ffffffa8;color:#36815f}
+.attendance-today-badge strong{color:#315c49;font-size:.86rem}
+.attendance-today-badge small{font-size:.58rem;font-weight:850;letter-spacing:.8px}
+.attendance-overview-grid{display:grid;grid-template-columns:1.45fr repeat(3,minmax(0,1fr));gap:12px}
+.attendance-rate-card,.attendance-count-card{padding:16px;border:1px solid #e2ece7;border-radius:13px;background:#fff}
+.attendance-rate-card>div:first-child>span,.attendance-count-card>small{color:#82958c;font-size:.61rem;font-weight:850;letter-spacing:.75px}
+.attendance-rate-card h3{margin:5px 0 0;color:#287653;font-size:1.8rem}
+.attendance-rate-card p{margin:2px 0 13px;color:#87958e;font-size:.69rem}
+.attendance-rate-track{height:9px;overflow:hidden;border-radius:999px;background:#edf3ef}
+.attendance-rate-track span{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,#27845b,#7dc5a2)}
+.attendance-rate-legend{display:flex;justify-content:space-between;gap:10px;margin-top:12px}
+.attendance-rate-legend span{display:flex;align-items:center;gap:5px;color:#87958e;font-size:.65rem}
+.attendance-rate-legend i{width:7px;height:7px;border-radius:50%;background:#31966b}
+.attendance-rate-legend span:nth-child(2) i{background:#d5a45b}
+.attendance-rate-legend strong{color:#3b594a}
+.attendance-count-card{display:flex;flex-direction:column;align-items:flex-start;gap:5px}
+.attendance-count-icon{display:grid;place-items:center;width:35px;height:35px;margin-bottom:4px;border-radius:10px}
+.attendance-count-icon svg{width:18px;height:18px}
+.attendance-count-icon.green{background:#e8f6ef;color:#36815f}.attendance-count-icon.amber{background:#fff4e2;color:#a87528}.attendance-count-icon.blue{background:#eaf2ff;color:#4778b5}
+.attendance-count-card strong{color:#294d3d;font-size:1.55rem}
+.attendance-count-card>span:last-child{color:#87958e;font-size:.68rem}
+.attendance-control-lower{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(260px,.8fr);gap:14px;align-items:start}
+.attendance-control-panel,.attendance-followup-panel{padding:19px;border:1px solid #e2ece7;border-radius:14px;background:#fff}
+.attendance-control-panel h3,.attendance-followup-panel h3{margin:5px 0 14px;color:#294d3d;font-size:1rem}
+.attendance-control-links{display:flex;flex-direction:column}
+.attendance-control-links button{display:flex;align-items:center;gap:11px;padding:12px 0;border:0;border-bottom:1px solid #edf2ef;background:transparent;text-align:left;cursor:pointer}
+.attendance-control-links button:last-child{border-bottom:0}
+.attendance-control-links button>span:first-child{display:grid;place-items:center;flex:0 0 36px;width:36px;height:36px;border-radius:10px;background:#eaf6ef;color:#38815f}
+.attendance-control-links button>span:first-child svg{width:18px;height:18px}
+.attendance-control-links button>span:nth-child(2){display:flex;flex:1;flex-direction:column;gap:4px}
+.attendance-control-links strong{color:#345746;font-size:.78rem}
+.attendance-control-links small{color:#87958e;font-size:.68rem;line-height:1.4}
+.attendance-control-links button>svg{color:#8da197}
+.attendance-followup-panel{background:linear-gradient(150deg,#f5fbf7,#fff)}
+.attendance-followup-panel>div{padding:13px 0;border-top:1px solid #e8f0eb}
+.attendance-followup-panel>div strong{color:#2d7b56;font-size:1.45rem}
+.attendance-followup-panel>div p{margin:4px 0 0;color:#7e9187;font-size:.72rem;line-height:1.5}
+@media(max-width:1050px){.attendance-overview-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.attendance-rate-card{grid-column:1/-1}.secretary-office-layout,.attendance-control-lower{grid-template-columns:1fr}}
+@media(max-width:760px){.secretary-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.secretary-office-hero,.attendance-control-hero{align-items:flex-start;flex-direction:column}.secretary-office-actions{grid-template-columns:1fr}.attendance-overview-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.attendance-rate-card{grid-column:1/-1}}
+@media(max-width:460px){.secretary-stat-grid{gap:8px}.secretary-stat-grid>div{padding:12px}.attendance-overview-grid{grid-template-columns:1fr}.attendance-rate-card{grid-column:auto}.attendance-rate-legend{flex-direction:column}}
