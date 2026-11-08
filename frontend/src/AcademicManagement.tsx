@@ -306,7 +306,7 @@ export default function AcademicManagement({ token, classes }: { token: string; 
     setSaving(true); setError(''); setMessage('')
     try {
       const params = new URLSearchParams({ exam_id: String(selectedExam.id), subject_id: String(subjectId), verified: String(verified) })
-      const result = await request<{records:number;changed:number}>(`marks/verification/batch?${params.toString()}`, token, { method: 'PATCH' })
+      const result = await request<{records:number;changed:number}>(`subjects/${subjectId}/marks/verification?${params.toString()}`, token, { method: 'PATCH' })
       const next = await request<Mark[]>(`marks?exam_id=${selectedExam.id}`, token)
       setMarks(next)
       setMessage((verified ? 'All ' : 'All ') + result.records + ' recorded ' + (subject?.name || 'subject') + ' scores ' + (verified ? 'verified and locked.' : 'unlocked for correction.') )
