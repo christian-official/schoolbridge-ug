@@ -202,6 +202,7 @@ function PersonalDashboard({token,username,onNavigate}:{token:string;username:st
   const [data,setData]=useState<PersonalDashboardData|null>(null)
   const [error,setError]=useState('')
   const [loading,setLoading]=useState(true)
+  const [refreshCount,setRefreshCount]=useState(0)
   useEffect(()=>{
     let cancelled=false
     setLoading(true);setError('')
@@ -209,13 +210,13 @@ function PersonalDashboard({token,username,onNavigate}:{token:string;username:st
       .catch(e=>{if(!cancelled)setError(e instanceof Error?e.message:'Unable to load your assigned work.')})
       .finally(()=>{if(!cancelled)setLoading(false)})
     return ()=>{cancelled=true}
-  },[token])
+  },[token,refreshCount])
   const roleName=(data?.role_label||'').toLowerCase()
   const isAcademicAccount=/teacher|academic|director of studies|\bdos\b|head teacher|deputy|examinations officer/.test(roleName)
   const workCount=(isAcademicAccount?(data?.today_lessons.length||0)+(data?.class_teacher_classes.length||0):0)+(data?.today_duty?1:0)
   return <div className="role-dashboard staff-account-dashboard">
     <section className="panel">
-      <div className="panel-heading"><div><h2>{isAcademicAccount?'Academic & teaching overview':'Your responsibilities overview'}</h2><p>{data?.staff_name||username} · {data?.role_label||'Staff account'} · Only work and areas assigned to your account are shown.</p></div><span className="count-pill">{workCount} active items today</span></div>
+      <div className="panel-heading"><div><h2>{isAcademicAccount?'Academic & teaching overview':'Your responsibilities overview'}</h2><p>{data?.staff_name||username} · {data?.role_label||'Staff account'} · Only work and areas assigned to your account are shown.</p></div><div className="dashboard-heading-actions"><span className="count-pill">{workCount} active items today</span><button type="button" className="secondary-button" onClick={()=>setRefreshCount(value=>value+1)} disabled={loading}>{loading?'Refreshing...':'Refresh data'}</button></div></div>
       {loading&&<p className="form-hint">Loading your assigned work...</p>}
       {error&&<div className="form-error" role="alert">{error}</div>}
       {data&&!loading&&<>
@@ -235,16 +236,18 @@ function FinanceAccountDashboard({token,username,onNavigate}:{token:string;usern
   const [summary,setSummary]=useState<{fees_expected:number;fees_collected:number;outstanding:number;salary_expenses?:number;other_expenses?:number;total_expenses?:number;net_cash_position?:number}|null>(null)
   const [error,setError]=useState('')
   const [loading,setLoading]=useState(true)
+  const [refreshCount,setRefreshCount]=useState(0)
   useEffect(()=>{
     let cancelled=false
+    setLoading(true);setError('')
     api<any>('finance/summary',token).then(result=>{if(!cancelled)setSummary(result)})
       .catch(e=>{if(!cancelled)setError(e instanceof Error?e.message:'Unable to load finance records.')})
       .finally(()=>{if(!cancelled)setLoading(false)})
     return ()=>{cancelled=true}
-  },[token])
+  },[token,refreshCount])
   const money=(value:number|undefined)=>'UGX '+Number(value||0).toLocaleString('en-UG')
   return <div className="role-dashboard finance-account-dashboard">
-    <section className="dashboard-role-heading"><div><p className="eyebrow">FINANCE WORKSPACE</p><h2>Finance overview</h2><p>{username} · Collections, outstanding fees and school expenditure.</p></div><span className="count-pill">Finance account</span></section>
+    <section className="dashboard-role-heading"><div><p className="eyebrow">FINANCE WORKSPACE</p><h2>Finance overview</h2><p>{username} · Collections, outstanding fees and school expenditure.</p></div><div className="dashboard-heading-actions"><span className="count-pill">Finance account</span><button type="button" className="secondary-button" onClick={()=>setRefreshCount(value=>value+1)} disabled={loading}>{loading?'Refreshing...':'Refresh data'}</button></div></section>
     {loading&&<p className="form-hint">Loading finance summary...</p>}
     {error&&<div className="form-error" role="alert">{error}</div>}
     {summary&&<section className="role-dashboard-stats">
