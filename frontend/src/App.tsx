@@ -1168,8 +1168,6 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
   const [resetPasscode,setResetPasscode]=useState<{username:string;password:string}|null>(null)
   const [staffLoginSearch,setStaffLoginSearch]=useState('')
   const [otherLoginSearch,setOtherLoginSearch]=useState('')
-  const [showAllStaffLogins,setShowAllStaffLogins]=useState(false)
-  const [showAllOtherLogins,setShowAllOtherLogins]=useState(false)
   const [accountTab,setAccountTab]=useState<'access'|'assignments'|'staff'|'other'>('staff')
   async function load() {
     setLoading(true);setError('')
@@ -1265,8 +1263,8 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
     return haystack.includes(staffLoginSearch.trim().toLowerCase())
   })
   const otherLoginMatches=otherAccounts.filter(u=>[u.username,u.email,u.role_label,u.role].filter(Boolean).join(' ').toLowerCase().includes(otherLoginSearch.trim().toLowerCase()))
-  const visibleStaffLogins=showAllStaffLogins||staffLoginSearch.trim()?staffLoginMatches:staffLoginMatches.slice(0,8)
-  const visibleOtherLogins=showAllOtherLogins||otherLoginSearch.trim()?otherLoginMatches:otherLoginMatches.slice(0,8)
+  const visibleStaffLogins=staffLoginSearch.trim()?staffLoginMatches:staffLoginMatches.slice(0,8)
+  const visibleOtherLogins=otherLoginSearch.trim()?otherLoginMatches:otherLoginMatches.slice(0,8)
   const presetNames=Object.keys(catalog.presets||{})
   return <section className="panel settings-panel">
     <div className="panel-heading"><div><h2>Staff accounts & access</h2><p>Staff login details are created automatically when you register a staff member in the Staff directory.</p></div><button type="button" className="secondary-button" onClick={()=>void load()} disabled={loading||busy}>{loading?'Loading...':'Refresh'}</button></div>
@@ -1314,23 +1312,21 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
     {accountTab==='staff'&&<div className="account-tab-panel">
     <h3>School staff login accounts</h3>
     <p className="form-hint">Staff accounts are listed separately from administrator and parent accounts. Search to find any staff login; only the first 8 are shown until you search or choose to view all.</p>
-    <div className="table-tools student-tools"><div className="search-box"><Search size={17}/><input aria-label="Search staff login accounts" placeholder="Search staff name, staff number or username..." value={staffLoginSearch} onChange={e=>{setStaffLoginSearch(e.target.value);setShowAllStaffLogins(false)}}/></div><span className="count-pill">{staffLoginMatches.length} staff accounts</span></div>
+    <div className="table-tools student-tools"><div className="search-box"><Search size={17}/><input aria-label="Search staff login accounts" placeholder="Search staff name, staff number or username..." value={staffLoginSearch} onChange={e=>setStaffLoginSearch(e.target.value)}/></div><span className="count-pill">{staffLoginMatches.length} staff accounts</span></div>
     <div className="table-wrap"><table><thead><tr><th>Staff member</th><th>Username</th><th>Job role</th><th>Areas available</th><th>Status</th><th>Actions</th></tr></thead><tbody>
       {visibleStaffLogins.map(u=>{const person=staff.find((p:any)=>p.id===u.staff_id);return <tr key={u.id}><td>{person?person.first_name+' '+person.last_name:'Unlinked staff login'}</td><td>{u.username}</td><td>{u.role_label||u.role}</td><td>{Object.keys(u.permissions||{}).length||'Limited'}</td><td>{u.active?'Active':'Disabled'}</td><td><button type="button" className="secondary-button" disabled={busy} onClick={()=>{setSelectedId(String(u.id));setResetPasscode(null);setRoleLabel(u.role_label||u.role);setRoleType(u.role==='teacher'?'teacher':'staff');setPermissions(u.permissions||{});void resetAccountPassword(String(u.id),u.username)}}>Reset password</button></td></tr>})}
       {!staffLoginMatches.length&&<tr><td colSpan={6}>No staff login accounts match this search.</td></tr>}
     </tbody></table></div>
-    {!staffLoginSearch.trim()&&staffLoginMatches.length>8&&<button type="button" className="secondary-button" onClick={()=>setShowAllStaffLogins(v=>!v)}>{showAllStaffLogins?'Show fewer':'Show all '+staffLoginMatches.length+' staff accounts'}</button>}
     {resetPasscode&&<div className="success-notice password-reset-result" role="status"><strong>Temporary password for {resetPasscode.username}</strong><code>{resetPasscode.password}</code><button type="button" className="secondary-button" onClick={()=>void navigator.clipboard.writeText('Username: '+resetPasscode.username+'\\nTemporary password: '+resetPasscode.password)}>Copy login details</button><small>Shown once. Share it privately. The staff member must change it at their next sign-in.</small></div>}
     </div>}
     {accountTab==='other'&&<div className="account-tab-panel">
     <h3>Other system accounts</h3>
     <p className="form-hint">Administrator and parent accounts are kept separate from staff logins.</p>
-    <div className="table-tools student-tools"><div className="search-box"><Search size={17}/><input aria-label="Search administrator and parent accounts" placeholder="Search administrator or parent accounts..." value={otherLoginSearch} onChange={e=>{setOtherLoginSearch(e.target.value);setShowAllOtherLogins(false)}}/></div><span className="count-pill">{otherLoginMatches.length} accounts</span></div>
+    <div className="table-tools student-tools"><div className="search-box"><Search size={17}/><input aria-label="Search administrator and parent accounts" placeholder="Search administrator or parent accounts..." value={otherLoginSearch} onChange={e=>setOtherLoginSearch(e.target.value)}/></div><span className="count-pill">{otherLoginMatches.length} accounts</span></div>
     <div className="table-wrap"><table><thead><tr><th>Account type</th><th>Username</th><th>Email</th><th>Status</th></tr></thead><tbody>
       {visibleOtherLogins.map(u=><tr key={u.id}><td>{u.role==='admin'?'Administrator':'Parent'}</td><td>{u.username}</td><td>{u.email||'—'}</td><td>{u.active?'Active':'Disabled'}</td></tr>)}
       {!otherLoginMatches.length&&<tr><td colSpan={4}>No administrator or parent accounts match this search.</td></tr>}
     </tbody></table></div>
-    {!otherLoginSearch.trim()&&otherLoginMatches.length>8&&<button type="button" className="secondary-button" onClick={()=>setShowAllOtherLogins(v=>!v)}>{showAllOtherLogins?'Show fewer':'Show all '+otherLoginMatches.length+' accounts'}</button>}
     </div>}
   </section>
 }
