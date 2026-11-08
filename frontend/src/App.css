@@ -1443,3 +1443,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   .main-area { height: 100dvh; }
   .main-area > .content { height: calc(100dvh - 76px); padding: 22px 16px 18px; }
 }
+
+
+/* Staff directory category filters are direct clickable options, not a dropdown. */
+.staff-category-options { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.staff-category-option { border:1px solid var(--line); background:#fff; color:#53627a; border-radius:9px; padding:10px 14px; min-height:42px; font-size:13px; font-weight:700; cursor:pointer; }
+.staff-category-option.active { color:var(--blue); border-color:#b9c8ff; background:#edf2ff; }
+.staff-category-option:focus-visible { outline:2px solid var(--blue); outline-offset:2px; }
+.staff-list-count { margin:8px 0 12px; color:var(--muted,#667085); font-size:13px; }
+@media (max-width:760px) { .staff-category-options { width:100%; } .staff-category-option { flex:1 1 auto; } }
