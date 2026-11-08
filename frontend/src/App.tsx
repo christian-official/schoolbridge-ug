@@ -4,7 +4,7 @@ import {
   FileText, Settings, LogOut,
   Search, Plus, Menu, X, ArrowUpRight, UserPlus,
   CalendarDays, TrendingUp, ShieldCheck, LoaderCircle, RefreshCw,
-  ClipboardList, Contact, Megaphone, Briefcase, Clock, FolderOpen, CalendarCheck, Building2,
+  Contact, Megaphone, Briefcase, Clock, FolderOpen, CalendarCheck, Building2,
 } from 'lucide-react'
 import StaffFinance from './StaffFinance'
 import AcademicManagement from './AcademicManagement'
