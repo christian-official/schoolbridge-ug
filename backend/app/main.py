@@ -1215,6 +1215,17 @@ def save_attendance_register(
 
 
 
+@app.get("/api/staff-attendance/roster", tags=["Attendance"])
+def staff_attendance_roster(db: Session = Depends(get_db), admin=Depends(require_admin)):
+    rows = db.query(models.StaffMember).filter_by(status="active").order_by(
+        models.StaffMember.category, models.StaffMember.first_name, models.StaffMember.last_name
+    ).all()
+    return [{
+        "id": row.id, "first_name": row.first_name, "last_name": row.last_name,
+        "staff_number": row.staff_number, "category": row.category, "status": row.status,
+    } for row in rows]
+
+
 @app.get("/api/staff-attendance", tags=["Attendance"])
 def list_staff_attendance(
     attendance_date: date | None = None,
