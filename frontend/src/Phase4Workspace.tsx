@@ -135,7 +135,10 @@ export default function Phase4Workspace({ token, role, active }: { token: string
           <small>Student and guardian details are already stored in registration. Tick the student(s) belonging to this parent.</small>
           <div className="phase4-student-options">
             {students.filter(student => (student.first_name + ' ' + (student.middle_name || '') + ' ' + student.last_name + ' ' + student.admission_number).toLowerCase().includes(studentSearch.trim().toLowerCase())).map(student => <label className="subject-choice" key={student.id}>
-              <input type="checkbox" checked={selectedStudentIds.includes(student.id)} onChange={e => setSelectedStudentIds(current => e.target.checked ? [...current, student.id] : current.filter(id => id !== student.id))}/>
+              <input type="checkbox" checked={selectedStudentIds.includes(student.id)} onChange={e => {
+                setSelectedStudentIds(current => e.target.checked ? [...current, student.id] : current.filter(id => id !== student.id))
+                if (e.target.checked && student.guardian_name && !account.username.trim()) setAccount(current => ({ ...current, username: student.guardian_name!.trim().toLowerCase().replace(/[^a-z0-9]+/g, '.') }))
+              }}/>
               <span><strong>{student.first_name} {student.middle_name || ''} {student.last_name}</strong> · {student.admission_number}<small>Guardian: {student.guardian_name || 'Not recorded'}{student.guardian_relationship ? ' · ' + student.guardian_relationship : ''}{student.guardian_phone ? ' · ' + student.guardian_phone : ''}</small></span>
             </label>)}
             {!students.length && <p className="form-hint">No registered students are available.</p>}
