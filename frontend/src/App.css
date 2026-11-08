@@ -1425,3 +1425,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .attendance-choice.active.status-late { border-color:#e8cf9b; background:#fff6e6; color:#94600a; }
 .attendance-choice.active.status-excused { border-color:#cbd3df; background:#f0f2f5; color:#586477; }
 @media(max-width:700px) { .teacher-attendance-controls { grid-template-columns:1fr; } .teacher-attendance-date { width:100%; } .attendance-choice-group { min-width:0; } .account-management-tabs { overflow-x:auto; flex-wrap:nowrap; } .account-management-tabs button { white-space:nowrap; } }
+
+
+/* Consistent navigation across every SchoolBridge settings category. */
+.settings-main-tabs { display:flex; gap:6px; margin:0 0 18px; padding:6px; overflow-x:auto; border:1px solid #e1e8f2; border-radius:12px; background:#f7f9fc; scrollbar-width:thin; }
+.settings-main-tabs button { flex:0 0 auto; min-height:38px; padding:8px 12px; border:1px solid transparent; border-radius:8px; background:transparent; color:#66758d; font-size:11px; font-weight:800; white-space:nowrap; cursor:pointer; }
+.settings-main-tabs button.active { border-color:#d8e2f5; background:#fff; color:#294b9b; box-shadow:0 2px 7px #233b6410; }
+.settings-home-summary { padding:20px; border:1px solid #e2e8f1; border-radius:12px; background:#fff; }
+.settings-home-summary strong { color:#263d65; font-size:15px; }
+.settings-home-summary p { margin:7px 0 0; color:#71809a; font-size:12px; line-height:1.6; }
