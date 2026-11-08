@@ -1289,3 +1289,45 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .phase4-announcement span { color:#8792a5; font-size:11px; }
 .phase4-announcement p { margin:9px 0 0; color:#52617a; font-size:13px; white-space:pre-wrap; }
 @media(max-width:650px) { .phase4-summary-grid { grid-template-columns:1fr; } .phase4-announcement > div { align-items:flex-start; flex-direction:column; gap:4px; } }
+
+
+/* School profile logo picker and consistent file upload controls */
+.file-upload-button { display:inline-flex; align-items:center; justify-content:center; width:max-content; max-width:100%; min-height:42px; padding:10px 15px; border:1px solid #cbd7ea; border-radius:9px; background:#eef3ff; color:#3157b7; font-size:12px; font-weight:800; cursor:pointer; transition:background .15s ease,border-color .15s ease,transform .15s ease; }
+.file-upload-button:hover { border-color:#8099d8; background:#e4ecff; }
+.file-upload-button input[type=file] { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; }
+.school-logo-settings-preview { display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-top:12px; }
+.school-logo-settings-preview img { width:86px; height:86px; padding:7px; border:1px solid #e1e8f2; border-radius:10px; object-fit:contain; background:#fff; }
+.report-customisation-panel input[type=file] { max-width:100%; padding:8px; border:1px dashed #cbd6e7; border-radius:8px; background:#fff; color:#43536d; cursor:pointer; }
+.report-customisation-panel input[type=file]::file-selector-button { margin-right:10px; padding:8px 11px; border:0; border-radius:6px; background:#eaf0ff; color:#3157b7; font:700 11px inherit; cursor:pointer; }
+@media print {
+  @page report { size:A4 portrait; margin:7mm; }
+  body[data-schoolbridge-print="report"] .academic-report-print > .report-card-sheet,
+  body[data-schoolbridge-print="class-reports"] .class-reports-print-batch .report-card-sheet {
+    box-sizing:border-box !important; width:133.33% !important; height:380mm !important; max-height:380mm !important;
+    overflow:hidden !important; zoom:.75 !important; padding:0 !important;
+  }
+  body[data-schoolbridge-print="report"] .report-card-header,
+  body[data-schoolbridge-print="class-reports"] .report-card-header { gap:8px !important; padding-bottom:8px !important; border-bottom-width:2px !important; }
+  body[data-schoolbridge-print="report"] .report-school-title h2,
+  body[data-schoolbridge-print="class-reports"] .report-school-title h2 { margin:2px 0 !important; font-size:17px !important; }
+  body[data-schoolbridge-print="report"] .report-student-details,
+  body[data-schoolbridge-print="class-reports"] .report-student-details { margin:8px 0 !important; }
+  body[data-schoolbridge-print="report"] .report-student-details > div,
+  body[data-schoolbridge-print="class-reports"] .report-student-details > div { min-height:0 !important; gap:2px !important; padding:6px 8px !important; }
+  body[data-schoolbridge-print="report"] .report-section-heading,
+  body[data-schoolbridge-print="class-reports"] .report-section-heading { margin:9px 0 5px !important; padding-bottom:4px !important; }
+  body[data-schoolbridge-print="report"] .report-results-table td,
+  body[data-schoolbridge-print="class-reports"] .report-results-table td { padding:5px 6px !important; font-size:9px !important; }
+  body[data-schoolbridge-print="report"] .report-summary-grid,
+  body[data-schoolbridge-print="class-reports"] .report-summary-grid { gap:5px !important; margin-top:7px !important; }
+  body[data-schoolbridge-print="report"] .report-summary-grid > div,
+  body[data-schoolbridge-print="class-reports"] .report-summary-grid > div { gap:3px !important; padding:7px !important; }
+  body[data-schoolbridge-print="report"] .report-summary-grid strong,
+  body[data-schoolbridge-print="class-reports"] .report-summary-grid strong { font-size:15px !important; }
+  body[data-schoolbridge-print="report"] .report-remarks-grid textarea,
+  body[data-schoolbridge-print="class-reports"] .report-remarks-grid textarea { min-height:42px !important; padding:5px !important; font-size:9px !important; }
+  body[data-schoolbridge-print="report"] .report-signatures,
+  body[data-schoolbridge-print="class-reports"] .report-signatures { gap:8px 14px !important; margin-top:10px !important; padding-top:8px !important; }
+  body[data-schoolbridge-print="report"] .report-card-footer,
+  body[data-schoolbridge-print="class-reports"] .report-card-footer { margin-top:10px !important; padding-top:5px !important; }
+}
