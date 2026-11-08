@@ -77,7 +77,7 @@ def user_permissions(user):
                 clean[section] = set(actions) & PERMISSION_ACTIONS
     if user.role == "teacher" and not clean:
         clean = {
-            "My Classes": {"view"},
+            "Overview": {"view"}, "My Classes": {"view"},
             "My Attendance": {"view"}, "My Results": {"view", "add", "edit"},
             "Announcements": {"view"},
         }
@@ -2477,7 +2477,7 @@ def create_staff(data: StaffCreate, db: Session = Depends(get_db)):
         raise HTTPException(409, "A login already exists with this staff username or email. Check the staff details.")
     if account_role == "teacher":
         default_permissions = {
-            "My Classes": ["view"],
+            "Overview": ["view"], "My Classes": ["view"],
             "My Attendance": ["view"], "My Results": ["view", "add", "edit"],
             "Announcements": ["view"], "Timetable": ["view"],
         }
