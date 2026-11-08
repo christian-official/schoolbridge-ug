@@ -21,6 +21,7 @@ type User = {
   role_label?: string
   permissions?: Record<string, string[]>
   active: boolean
+  must_change_password?: boolean
 }
 
 type StudentPage = { items: RecordItem[]; total: number; page: number; pages: number }
@@ -97,6 +98,87 @@ async function api<T>(path: string, token: string, options: RequestInit = {}): P
   return result as T
 }
 
+function PasswordRecovery({onBack}:{onBack:()=>void}) {
+  const [stage,setStage]=useState<'request'|'confirm'>('request')
+  const [identifier,setIdentifier]=useState('')
+  const [code,setCode]=useState('')
+  const [newPassword,setNewPassword]=useState('')
+  const [confirmPassword,setConfirmPassword]=useState('')
+  const [busy,setBusy]=useState(false)
+  const [error,setError]=useState('')
+  const [message,setMessage]=useState('')
+  async function requestCode(e:React.FormEvent){
+    e.preventDefault();setBusy(true);setError('');setMessage('')
+    try {
+      const response=await fetch(`${API_BASE_URL}/api/auth/password-reset/request`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({identifier})})
+      const data=await response.json().catch(()=>({}))
+      if(!response.ok)throw new Error(data.detail||'Unable to request a recovery code.')
+      setMessage(data.message||'If the account has a registered email, a code will be sent. Check your inbox and spam folder.')
+      setStage('confirm')
+    } catch(e){setError(e instanceof Error?e.message:'Unable to request a recovery code.')}
+    finally{setBusy(false)}
+  }
+  async function confirmReset(e:React.FormEvent){
+    e.preventDefault();setError('');setMessage('')
+    if(newPassword!==confirmPassword){setError('The new passwords do not match.');return}
+    setBusy(true)
+    try {
+      const response=await fetch(`${API_BASE_URL}/api/auth/password-reset/confirm`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({identifier,code,new_password:newPassword})})
+      const data=await response.json().catch(()=>({}))
+      if(!response.ok)throw new Error(data.detail||'Password reset failed.')
+      setMessage(data.message||'Password reset successfully. You can now sign in.')
+      setCode('');setNewPassword('');setConfirmPassword('')
+      setTimeout(onBack,1200)
+    } catch(e){setError(e instanceof Error?e.message:'Password reset failed.')}
+    finally{setBusy(false)}
+  }
+  return <div className="password-recovery">
+    <h2>{stage==='request'?'Recover your password':'Enter verification code'}</h2>
+    <p className="muted">{stage==='request'?'Enter your username, staff number, surname or registered email address.':'Enter the six-digit code sent to your registered email address.'}</p>
+    {error&&<p className="error" role="alert">{error}</p>}{message&&<p className="success-notice" role="status">{message}</p>}
+    {stage==='request'?<form onSubmit={requestCode}>
+      <label htmlFor="recovery-identifier">Account identifier</label><input id="recovery-identifier" value={identifier} onChange={e=>setIdentifier(e.target.value)} autoComplete="username" required placeholder="Staff number, surname or email"/>
+      <button className="primary-button login-button" disabled={busy}>{busy?'Sending request...':'Send recovery code'}</button>
+    </form>:<form onSubmit={confirmReset}>
+      <label htmlFor="recovery-code">Verification code</label><input id="recovery-code" value={code} onChange={e=>setCode(e.target.value.replace(/\\D/g,'').slice(0,6))} inputMode="numeric" autoComplete="one-time-code" required minLength={6} maxLength={6} placeholder="6-digit code"/>
+      <label htmlFor="recovery-new-password">New password</label><input id="recovery-new-password" type="password" value={newPassword} onChange={e=>setNewPassword(e.target.value)} autoComplete="new-password" required minLength={8}/>
+      <label htmlFor="recovery-confirm-password">Confirm new password</label><input id="recovery-confirm-password" type="password" value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)} autoComplete="new-password" required minLength={8}/>
+      <button className="primary-button login-button" disabled={busy}>{busy?'Updating...':'Set new password'}</button>
+      <button type="button" className="secondary-button recovery-secondary" disabled={busy} onClick={()=>{setStage('request');setMessage('')}}>Request another code</button>
+    </form>}
+    <button type="button" className="recovery-back" onClick={onBack}>Back to sign in</button>
+  </div>
+}
+
+function ForcePasswordChange({token,username,onComplete}:{token:string;username:string;onComplete:()=>void}) {
+  const [currentPassword,setCurrentPassword]=useState('')
+  const [newPassword,setNewPassword]=useState('')
+  const [confirmPassword,setConfirmPassword]=useState('')
+  const [error,setError]=useState('')
+  const [busy,setBusy]=useState(false)
+  async function submit(e:React.FormEvent){
+    e.preventDefault();setError('')
+    if(newPassword!==confirmPassword){setError('The new passwords do not match.');return}
+    if(newPassword.length<8){setError('Use at least 8 characters for your new password.');return}
+    setBusy(true)
+    try{await api('me/password',token,{method:'PUT',body:JSON.stringify({current_password:currentPassword,new_password:newPassword})});onComplete()}
+    catch(e){setError(e instanceof Error?e.message:'Unable to update password.')}
+    finally{setBusy(false)}
+  }
+  return <main className="login-page"><section className="login-card">
+    <div className="brand-mark"><ShieldCheck size={30}/></div><div className="brand-name">School<span>Bridge</span></div>
+    <h1>Change your temporary password</h1><p className="muted">Hello {username}. Your account has a temporary passcode. Set a private password before continuing.</p>
+    {error&&<p className="error" role="alert">{error}</p>}
+    <form onSubmit={submit}>
+      <label htmlFor="temporary-password">Temporary passcode</label><input id="temporary-password" type="password" value={currentPassword} onChange={e=>setCurrentPassword(e.target.value)} autoComplete="current-password" required/>
+      <label htmlFor="new-password">New password</label><input id="new-password" type="password" value={newPassword} onChange={e=>setNewPassword(e.target.value)} autoComplete="new-password" minLength={8} required/>
+      <label htmlFor="confirm-new-password">Confirm new password</label><input id="confirm-new-password" type="password" value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)} autoComplete="new-password" minLength={8} required/>
+      <button className="primary-button login-button" disabled={busy}>{busy?'Updating...':'Save new password'}</button>
+    </form>
+    <p className="login-foot"><ShieldCheck size={15}/> Your temporary passcode will stop working after this change.</p>
+  </section></main>
+}
+
 type PersonalDashboardData = {
   staff_name: string
   role_label: string
@@ -158,6 +240,7 @@ function App() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [loginError, setLoginError] = useState('')
+  const [showRecovery, setShowRecovery] = useState(false)
   const [loading, setLoading] = useState(false)
   const [active, setActive] = useState('Overview')
   const [financeTabRequest, setFinanceTabRequest] = useState<'overview' | 'payments' | 'balances'>('overview')
@@ -500,23 +583,28 @@ function App() {
           <div className="brand-mark"><GraduationCap size={30} /></div>
           <div className="brand-name">School<span>Bridge</span></div>
           <p className="login-subtitle">Your school's operations, connected.</p>
-          <h1>Welcome back</h1>
-          <p className="muted">Sign in to your school workspace.</p>
-          <form onSubmit={login}>
-            <label htmlFor="username">Username</label>
-            <input id="username" value={username} onChange={e => setUsername(e.target.value)} placeholder="Enter staff number or surname" required />
-            <label htmlFor="password">Password</label>
-            <input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter your password" required />
-            {loginError && <p className="error">{loginError}</p>}
-            <button className="primary-button login-button" disabled={loading}>
-              {loading ? <><LoaderCircle className="spin" size={18} /> Signing in...</> : 'Sign in'}
-            </button>
-          </form>
-          <p className="login-foot"><ShieldCheck size={15} /> Secure school access</p>
+          {showRecovery ? <PasswordRecovery onBack={()=>setShowRecovery(false)}/> : <>
+            <h1>Welcome back</h1>
+            <p className="muted">Sign in to your school workspace.</p>
+            <form onSubmit={login}>
+              <label htmlFor="username">Username</label>
+              <input id="username" value={username} onChange={e => setUsername(e.target.value)} placeholder="Enter staff number or surname" required />
+              <label htmlFor="password">Password</label>
+              <input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter your password" required />
+              {loginError && <p className="error">{loginError}</p>}
+              <button className="primary-button login-button" disabled={loading}>
+                {loading ? <><LoaderCircle className="spin" size={18} /> Signing in...</> : 'Sign in'}
+              </button>
+            </form>
+            <button type="button" className="recovery-link" onClick={()=>{setShowRecovery(true);setLoginError('')}}>Forgot your password?</button>
+            <p className="login-foot"><ShieldCheck size={15} /> Secure school access</p>
+          </>}
         </section>
       </main>
     )
   }
+
+  if (user.must_change_password) return <ForcePasswordChange token={token} username={user.username} onComplete={()=>setUser(current=>current?{...current,must_change_password:false}:current)}/>;
 
   return (
     <div className="app-shell" onSubmitCapture={validateRequiredFields}>
