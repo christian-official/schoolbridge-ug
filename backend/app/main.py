@@ -55,7 +55,7 @@ PERMISSION_SECTIONS = {
     "Overview", "Students", "Staff", "Fees & Finance", "Examinations",
     "Attendance", "Staff Attendance", "Timetable", "Leadership & Duty",
     "Parent Access", "Parent Liaison", "Announcements", "Reports", "Settings",
-    "My Classes", "My Attendance", "My Results",
+    "My Classes", "My Attendance", "My Results", "School Community",
 }
 PERMISSION_ACTIONS = {"view", "add", "edit", "delete", "approve", "print"}
 ADMIN_ONLY_PATHS = {
@@ -102,6 +102,7 @@ def permission_for_path(path: str):
     if path.startswith("/api/teacher/my-staff-attendance"): return "My Attendance"
     if path.startswith("/api/teacher/attendance"): return "Attendance"
     if path.startswith(("/api/teacher/marks", "/api/teacher/exams", "/api/teacher/result-status")): return "My Results"
+    if path.startswith("/api/school-community"): return "School Community"
     if path.startswith("/api/students"): return "Students"
     if path.startswith(("/api/staff", "/api/teacher-assignments", "/api/class-teacher-assignments")): return "Staff"
     if path.startswith(("/api/finance", "/api/fees", "/api/salary", "/api/expenses")): return "Fees & Finance"
@@ -1934,17 +1935,17 @@ class UserPermissionsUpdate(BaseModel):
 @app.get("/api/auth/permissions", tags=["User Management"])
 def permission_catalog(admin=Depends(require_admin)):
     presets = {
-        "Headteacher": ["Overview", "Students", "Staff", "Fees & Finance", "Examinations", "Attendance", "Staff Attendance", "Timetable", "Leadership & Duty", "Parent Access", "Parent Liaison", "Announcements", "Reports"],
-        "Deputy Headteacher": ["Overview", "Students", "Staff", "Examinations", "Attendance", "Timetable", "Leadership & Duty", "Parent Liaison", "Announcements", "Reports"],
-        "DOS": ["Overview", "Staff", "Examinations", "Attendance", "Timetable", "Students", "Parent Liaison", "Reports", "Announcements"],
+        "Headteacher": ["Overview", "School Community", "Students", "Staff", "Fees & Finance", "Examinations", "Attendance", "Staff Attendance", "Timetable", "Leadership & Duty", "Parent Access", "Parent Liaison", "Announcements", "Reports"],
+        "Deputy Headteacher": ["Overview", "School Community", "Students", "Staff", "Examinations", "Attendance", "Timetable", "Leadership & Duty", "Parent Liaison", "Announcements", "Reports"],
+        "DOS": ["Overview", "School Community", "Staff", "Examinations", "Attendance", "Timetable", "Students", "Parent Liaison", "Reports", "Announcements"],
         "Academic Administrator": ["Overview", "Examinations", "Timetable", "Students", "Parent Liaison", "Reports", "Announcements"],
         "Academics Officer": ["Overview", "Examinations", "Timetable", "Students", "Reports"],
         "Bursar": ["Overview", "Fees & Finance", "Students", "Reports"],
         "Accountant": ["Overview", "Fees & Finance", "Staff", "Reports"],
-        "Secretary": ["Overview", "Students", "Staff", "Parent Access", "Parent Liaison", "Announcements", "Reports"],
+        "Secretary": ["Overview", "School Community", "Students", "Staff", "Parent Access", "Parent Liaison", "Announcements", "Reports"],
         "Attendance Officer": ["Overview", "Attendance", "Staff Attendance", "Reports"],
-        "Teacher": ["My Classes", "My Attendance", "My Results", "Parent Liaison", "Announcements", "Timetable"],
-        "Class Teacher": ["My Classes", "Students", "Attendance", "My Attendance", "My Results", "Parent Liaison", "Announcements", "Timetable"],
+        "Teacher": ["School Community", "My Classes", "My Attendance", "My Results", "Parent Liaison", "Announcements", "Timetable"],
+        "Class Teacher": ["School Community", "My Classes", "Students", "Attendance", "My Attendance", "My Results", "Parent Liaison", "Announcements", "Timetable"],
     }
     return {"sections": sorted(PERMISSION_SECTIONS), "actions": sorted(PERMISSION_ACTIONS), "presets": presets}
 
@@ -2980,6 +2981,46 @@ def search_students(page: int = 1, page_size: int = 25, search: str = "", class_
     rows = query.order_by(models.Student.last_name, models.Student.first_name).offset((page - 1) * page_size).limit(page_size).all()
     return {"items": rows, "total": total, "page": page, "page_size": page_size, "pages": (total + page_size - 1) // page_size}
 
+
+
+@app.get("/api/school-community", tags=["School Community"])
+def school_community(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    """Read-only directory of enrolled learners and active staff for authorised school members."""
+    students = db.query(models.Student, models.SchoolClass).outerjoin(
+        models.SchoolClass, models.SchoolClass.id == models.Student.class_id
+    ).filter(models.Student.status == "active").order_by(
+        models.Student.last_name, models.Student.first_name
+    ).all()
+    staff_rows = db.query(models.StaffMember).filter(
+        models.StaffMember.status == "active"
+    ).order_by(models.StaffMember.first_name, models.StaffMember.last_name).all()
+    house_names = []
+    profile = db.get(models.SchoolProfile, 1)
+    if profile and profile.house_names:
+        house_names = [name.strip() for name in profile.house_names.splitlines() if name.strip()]
+    house_names = sorted(set(house_names) | {
+        row.house.strip() for row, _ in students if row.house and row.house.strip()
+    } | {row.house.strip() for row in staff_rows if row.house and row.house.strip()})
+    return {
+        "houses": house_names,
+        "students": [{
+            "id": student.id,
+            "name": " ".join(part for part in [student.first_name, student.middle_name, student.last_name] if part),
+            "admission_number": student.admission_number,
+            "class_name": (school_class.name + (" — " + school_class.section if school_class.section else "")) if school_class else "Unassigned",
+            "study_mode": student.study_mode or "Day",
+            "house": student.house,
+            "member_type": "Student",
+        } for student, school_class in students],
+        "staff": [{
+            "id": member.id,
+            "name": " ".join(part for part in [member.first_name, member.last_name] if part),
+            "staff_number": member.staff_number,
+            "position": member.position or member.category,
+            "house": member.house,
+            "member_type": "Staff",
+        } for member in staff_rows],
+    }
 
 @app.get("/api/dashboard/my-work", tags=["Dashboard"])
 def my_dashboard_work(db: Session = Depends(get_db), user=Depends(get_current_user)):

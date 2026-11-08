@@ -72,6 +72,7 @@ const menu = [
   { label: 'Parent Access', icon: Users },
   { label: 'Announcements', icon: FileText },
   { label: 'Parent Liaison', icon: MessageSquareText },
+  { label: 'School Community', icon: Users },
 ]
 const teacherMenu = [
   { label: 'My Classes', icon: BookOpen },
@@ -1072,6 +1073,7 @@ function App() {
           {((active === 'Parent Access' || active === 'Announcements') && user.role !== 'parent' || (active === 'My Children' || active === 'Announcements') && user.role === 'parent') && <Phase4Workspace token={token} role={user.role} active={active} permissions={user.permissions} />}
 
           {active === 'Parent Liaison' && <ParentLiaisonWorkspace token={token} role={user.role} />}
+          {active === 'School Community' && <SchoolCommunityWorkspace token={token} />}
           {active === 'Overview' && user.role === 'admin' && <AdministratorDashboard token={token} username={user.username} onNavigate={setActive} summary={dashboardSummary} financeSummary={financeDashboard} availableSections={['Students','Staff','Fees & Finance','Examinations','Attendance','Timetable','Leadership & Duty','Parent Access','Parent Liaison','Announcements','Reports']}/>} 
 
                     {active === 'Overview' && user.role !== 'admin' && (user.role === 'staff' && /school administrator|system administrator|^administrator$/i.test(user.role_label||'') ? <AdministratorDashboard token={token} username={user.username} onNavigate={setActive} summary={dashboardSummary} financeSummary={financeDashboard} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)}/> : isFinanceAccount(user) ? <FinanceAccountDashboard token={token} username={user.username} onNavigate={(section,tab)=>{if(tab)setFinanceTabRequest(tab);setActive(section)}}/> : user.role === 'staff' && /director of studies|\bdos\b/i.test(user.role_label||'') ? <DirectorOfStudiesDashboard token={token} onNavigate={setActive} summary={dashboardSummary} summaryAvailable={(user.permissions?.['Overview']||[]).includes('view')} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)}/> : user.role === 'staff' && /secretary|office administrator/i.test(user.role_label||'') ? <SecretaryDashboard username={user.username} onNavigate={setActive} summary={dashboardSummary} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)}/> : user.role === 'staff' && /attendance/i.test(user.role_label||'') ? <AttendanceOfficerDashboard username={user.username} onNavigate={setActive} summary={dashboardSummary} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)}/> : user.role === 'staff' && /teacher|head\s?teacher/i.test(user.role_label||'') ? <TeacherDashboard token={token} username={user.username} onNavigate={setActive}/> : user.role === 'staff' ? <RoleSpecificDashboard username={user.username} roleLabel={user.role_label||'Staff'} onNavigate={setActive} summary={dashboardSummary} summaryAvailable={(user.permissions?.['Overview']||[]).includes('view')} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)} financeSummary={financeDashboard}/> : <PersonalDashboard token={token} username={user.username} onNavigate={setActive}/>) } 
@@ -1561,6 +1563,45 @@ function TeacherWorkspace({token,active}:{token:string;active:string}) {
   </div>
   return <section className="panel teacher-class-attendance"><div className="panel-heading"><div><h2>Class attendance</h2><p>Mark the whole class register and submit it once. Only your separately assigned class-teacher responsibilities appear here.</p></div></div>{message&&<div className="notice">{message}</div>}<div className="teacher-attendance-controls"><div><strong>Choose your responsible class</strong><div className="teacher-class-picks">{classTeacherAssignments.map(a=><button type="button" key={a.assignment_id} className={String(classId)===String(a.class_id)?"teacher-class-pick active":"teacher-class-pick"} aria-pressed={String(classId)===String(a.class_id)} onClick={()=>{setClassId(String(a.class_id));setStatuses({})}}>{a.class}</button>)}</div></div><label className="teacher-attendance-date">Attendance date<input type="date" value={attendanceDate} onChange={e=>setAttendanceDate(e.target.value)}/></label></div><div className="table-wrap"><table><thead><tr><th>#</th><th>Student</th><th>Admission number</th><th>Status</th></tr></thead><tbody>{students.map((student,index)=><tr key={student.id}><td>{index+1}</td><td>{student.first_name} {student.last_name}</td><td>{student.admission_number}</td><td><div className="attendance-choice-group" role="group" aria-label={"Attendance status for "+student.first_name+" "+student.last_name}>{["Present","Absent","Late","Excused"].map(status=><button type="button" key={status} className={(statuses[student.id]||"Present")===status?"attendance-choice active status-"+status.toLowerCase():"attendance-choice"} aria-pressed={(statuses[student.id]||"Present")===status} onClick={()=>setStatuses(old=>({...old,[student.id]:status}))}>{status}</button>)}</div></td></tr>)}</tbody></table></div>{students.length>0&&<div className="form-actions"><button type="button" className="primary-button" disabled={busy!==null} onClick={()=>void saveClassAttendance()}>{busy!==null?'Saving register...':'Submit class attendance'}</button></div>}{!students.length&&<div className="empty-state"><Users size={30}/><p>{classTeacherAssignments.length?'Choose one of your assigned classes to load its active students.':'No class has been assigned to you as class teacher. Subject teaching assignments do not grant class attendance access.'}</p></div>}</section>
 }
+
+type CommunityStudent = {id:number;name:string;admission_number:string;class_name:string;study_mode:string;house:string|null;member_type:string}
+type CommunityStaff = {id:number;name:string;staff_number:string;position:string;house:string|null;member_type:string}
+function SchoolCommunityWorkspace({token}:{token:string}) {
+  const [data,setData]=useState<{houses:string[];students:CommunityStudent[];staff:CommunityStaff[]}>({houses:[],students:[],staff:[]})
+  const [tab,setTab]=useState('All members')
+  const [search,setSearch]=useState('')
+  const [loading,setLoading]=useState(true)
+  const [error,setError]=useState('')
+  const [refresh,setRefresh]=useState(0)
+  useEffect(()=>{
+    let cancelled=false
+    setLoading(true);setError('')
+    api<{houses:string[];students:CommunityStudent[];staff:CommunityStaff[]}>('school-community',token)
+      .then(result=>{if(!cancelled)setData(result)})
+      .catch(e=>{if(!cancelled)setError(e instanceof Error?e.message:'Unable to load the school community.')})
+      .finally(()=>{if(!cancelled)setLoading(false)})
+    return()=>{cancelled=true}
+  },[token,refresh])
+  const all=[...data.students,...data.staff]
+  const tabs=['All members',...data.houses.map(h=>'House: '+h),'Day students','Boarding students','Staff']
+  const filtered=all.filter(member=>{
+    if(tab.startsWith('House: ')&&member.house!==tab.slice(7))return false
+    if(tab==='Day students'&&(!('study_mode' in member)||member.study_mode!=='Day'))return false
+    if(tab==='Boarding students'&&(!('study_mode' in member)||member.study_mode!=='Boarding'))return false
+    if(tab==='Staff'&&member.member_type!=='Staff')return false
+    const q=search.trim().toLowerCase()
+    return !q||[member.name,member.member_type,member.house||'',('class_name' in member?member.class_name:''),('admission_number' in member?member.admission_number:''),('staff_number' in member?member.staff_number:''),('position' in member?member.position:'')].join(' ').toLowerCase().includes(q)
+  })
+  return <section className="panel school-community-workspace">
+    <div className="panel-heading"><div><h2>School Community</h2><p>Explore enrolled learners and active staff by house, study arrangement or membership type.</p></div><button type="button" className="secondary-button" onClick={()=>setRefresh(v=>v+1)} disabled={loading}><RefreshCw size={15}/>{loading?'Refreshing...':'Refresh'}</button></div>
+    <div className="community-summary-grid"><div><span className="community-summary-icon"><Users size={18}/></span><div><small>ALL MEMBERS</small><strong>{all.length}</strong></div></div><div><span className="community-summary-icon"><GraduationCap size={18}/></span><div><small>STUDENTS</small><strong>{data.students.length}</strong></div></div><div><span className="community-summary-icon"><Briefcase size={18}/></span><div><small>STAFF</small><strong>{data.staff.length}</strong></div></div><div><span className="community-summary-icon"><ShieldCheck size={18}/></span><div><small>HOUSES</small><strong>{data.houses.length}</strong></div></div></div>
+    <div className="community-toolbar"><label className="community-search"><Search size={17}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search name, admission number, class or house"/></label><span className="community-result-count">{filtered.length} members shown</span></div>
+    <div className="community-tabs" role="tablist" aria-label="School community categories">{tabs.map(item=><button key={item} type="button" role="tab" aria-selected={tab===item} className={tab===item?'active':''} onClick={()=>setTab(item)}>{item}</button>)}</div>
+    {error&&<div className="form-error" role="alert">{error}</div>}
+    {loading?<div className="empty-state"><LoaderCircle className="spin" size={25}/><p>Loading school community...</p></div>:filtered.length?<div className="table-wrap community-table"><table><thead><tr><th>Member</th><th>Category</th><th>Class / Position</th><th>Study mode</th><th>House</th><th>Reference</th></tr></thead><tbody>{filtered.map(member=><tr key={member.member_type+'-'+member.id}><td><strong>{member.name}</strong></td><td><span className={'community-member-type '+member.member_type.toLowerCase()}>{member.member_type}</span></td><td>{'class_name' in member?member.class_name:member.position}</td><td>{'study_mode' in member?member.study_mode:'—'}</td><td>{member.house||'Unassigned'}</td><td>{'admission_number' in member?member.admission_number:member.staff_number}</td></tr>)}</tbody></table></div>:<div className="empty-state"><Users size={27}/><p>No members match this community view.</p><small>Try another category or search term.</small></div>}
+  </section>
+}
+
 function SchoolProfileSettings({token,onSaved}:{token:string;onSaved:()=>void}) {
   const [profileTab,setProfileTab]=useState<'identity'|'contact'|'houses'|'branding'>('identity')
   const [form,setForm]=useState({name:'',address:'',phone:'',email:'',motto:'',school_type:'Secondary',a_level_combinations:'',o_level_optional_subjects:'',a_level_subsidiary_subjects:'',report_logo:'',house_names:''})
