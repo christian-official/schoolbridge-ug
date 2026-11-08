@@ -25,7 +25,8 @@ export default function Phase4Workspace({ token, role, active }: { token: string
   const [parents, setParents] = useState<any[]>([])
   const [selectedStudentIds, setSelectedStudentIds] = useState<number[]>([])
   const [studentSearch, setStudentSearch] = useState('')
-  const [account, setAccount] = useState({ username: '', email: '', password: '' })
+  const [account, setAccount] = useState({ username: '', email: '' })
+  const [issuedPasscode, setIssuedPasscode] = useState<{ username: string; email: string; password: string } | null>(null)
   const [savingAccount, setSavingAccount] = useState(false)
   const [children, setChildren] = useState<ParentChild[]>([])
   const [selectedChildId, setSelectedChildId] = useState<number | null>(null)
@@ -98,10 +99,11 @@ export default function Phase4Workspace({ token, role, active }: { token: string
     if (!selectedStudentIds.length) { setError('Select at least one student to link to this parent.'); return }
     setSavingAccount(true); setError(''); setMessage('')
     try {
-      await api('parent-accounts', token, { method: 'POST', body: JSON.stringify({ ...account, student_ids: selectedStudentIds }) })
-      setAccount({ username: '', email: '', password: '' }); setSelectedStudentIds([])
+      const created = await api<{ username: string; email: string; temporary_password: string }>('parent-accounts', token, { method: 'POST', body: JSON.stringify({ ...account, student_ids: selectedStudentIds }) })
+      setIssuedPasscode({ username: created.username, email: created.email, password: created.temporary_password })
+      setAccount({ username: '', email: '' }); setSelectedStudentIds([]); setStudentSearch('')
       await loadAdminParents()
-      setMessage('Parent account created and linked to the selected student records.')
+      setMessage('Parent account created. Copy the temporary passcode and give it securely to the parent.')
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to create parent account.') }
     finally { setSavingAccount(false) }
   }
@@ -122,13 +124,20 @@ export default function Phase4Workspace({ token, role, active }: { token: string
     <section className="panel">
       <div className="panel-heading"><div><h2><Users size={20}/> Parent account management</h2><p>Create secure parent logins and link each account to one or more registered students.</p></div></div>
       {error && <div className="form-error" role="alert">{error}</div>}{message && <div className="success-notice" role="status">{message}</div>}
+      {issuedPasscode && <div className="success-notice" role="status">
+        <strong>Parent login passcode — show this to the parent now</strong>
+        <p>Username: <strong>{issuedPasscode.username}</strong></p>
+        <p>Email: {issuedPasscode.email}</p>
+        <p>Temporary passcode: <strong>{issuedPasscode.password}</strong></p>
+        <button type="button" className="secondary-button" onClick={() => void navigator.clipboard?.writeText('Username: '+issuedPasscode.username+'\nEmail: '+issuedPasscode.email+'\nTemporary passcode: '+issuedPasscode.password)}>Copy login details</button>
+        <small>This passcode is shown only once. Give it to the parent securely and ask them to change it after signing in.</small>
+      </div>}
       <form className="student-form" onSubmit={createParentAccount}>
         <div className="student-form-grid">
           <label>Find student by name or admission number<input type="search" value={studentSearch} onChange={e => setStudentSearch(e.target.value)} placeholder="Search registered students"/></label>
           <label>Parent / guardian name<input readOnly value={[...new Set(students.filter(student => selectedStudentIds.includes(student.id)).map(student => student.guardian_name).filter(Boolean))].join(', ')} placeholder="Automatically taken from student registration"/><small>Loaded from the selected student's registration record.</small></label>
           <label>Parent username *<input required minLength={3} value={account.username} onChange={e => setAccount({ ...account, username: e.target.value })}/></label>
           <label>Parent email *<input required type="email" value={account.email} onChange={e => setAccount({ ...account, email: e.target.value })}/></label>
-          <label>Temporary password *<input required type="password" minLength={12} autoComplete="new-password" value={account.password} onChange={e => setAccount({ ...account, password: e.target.value })}/><small>Use at least 12 characters and share it securely with the parent.</small></label>
         </div>
         <div className="phase4-student-picker">
           <strong>Choose registered student(s) to link *</strong>
