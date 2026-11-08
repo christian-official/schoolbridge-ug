@@ -95,3 +95,23 @@
  .redesigned-app-shell .admin-command-hero h2,.redesigned-app-shell .dos-hero h2,.redesigned-app-shell .dashboard-role-heading h2,.redesigned-app-shell .secretary-office-hero h2,.redesigned-app-shell .attendance-control-hero h2,.redesigned-app-shell .teacher-workspace-hero h2{font-size:24px}
  .redesigned-app-shell .top-actions{gap:8px}.redesigned-app-shell .refresh-button{padding:8px!important;font-size:0!important}
 }
+
+/* Keep each role sidebar in the same colour family as its dashboard hero */
+.redesigned-app-shell.role-theme-admin .sidebar{
+  background:linear-gradient(180deg,#102b52 0%,#174b7b 58%,#34718b 100%);
+}
+.redesigned-app-shell.role-theme-dos .sidebar{
+  background:linear-gradient(180deg,#064b3b 0%,#08775b 62%,#1d8d72 100%);
+}
+.redesigned-app-shell.role-theme-finance .sidebar{
+  background:linear-gradient(180deg,#5d142b 0%,#7d1937 62%,#96334f 100%);
+}
+.redesigned-app-shell.role-theme-secretary .sidebar{
+  background:linear-gradient(180deg,#064b69 0%,#087ea8 64%,#36a8c5 100%);
+}
+.redesigned-app-shell.role-theme-attendance .sidebar{
+  background:linear-gradient(180deg,#414d05 0%,#66780a 62%,#899b20 100%);
+}
+.redesigned-app-shell.role-theme-teacher .sidebar{
+  background:linear-gradient(180deg,#3d2169 0%,#633b96 62%,#825bb1 100%);
+}
