@@ -1080,6 +1080,22 @@ class AssignmentCreate(BaseModel):
     class_id: int
     subject_id: int
 
+class ClassTeacherAssignmentCreate(BaseModel):
+    teacher_id: int
+    class_id: int
+
+
+class BulkMarkEntry(BaseModel):
+    student_id: int
+    score: float = Field(ge=0, le=100)
+
+
+class BulkMarkCreate(BaseModel):
+    exam_id: int
+    subject_id: int
+    records: list[BulkMarkEntry] = Field(min_length=1, max_length=500)
+
+
 class ParentAccountCreate(BaseModel):
     username: str = Field(min_length=3, max_length=80)
     email: str = Field(min_length=5, max_length=150)
@@ -1736,6 +1752,64 @@ def assign_teacher(
     return {"message": "Teacher assigned successfully.", "id": assignment.id}
 
 
+@app.get("/api/class-teacher-assignments", tags=["Teacher Management"])
+def list_class_teacher_assignments(db: Session = Depends(get_db), admin=Depends(require_admin)):
+    rows = db.query(models.ClassTeacherAssignment, models.User, models.SchoolClass).join(
+        models.User, models.User.id == models.ClassTeacherAssignment.teacher_id
+    ).join(models.SchoolClass, models.SchoolClass.id == models.ClassTeacherAssignment.class_id).order_by(
+        models.SchoolClass.name, models.SchoolClass.section
+    ).all()
+    return [{
+        "id": assignment.id, "teacher_id": teacher.id, "class_id": school_class.id,
+        "teacher_name": teacher.username, "class_name": school_class.name,
+        "section": school_class.section,
+    } for assignment, teacher, school_class in rows]
+
+
+@app.post("/api/class-teacher-assignments", tags=["Teacher Management"])
+def assign_class_teacher(data: ClassTeacherAssignmentCreate, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    teacher = db.get(models.User, data.teacher_id)
+    if not teacher or teacher.role != "teacher":
+        raise HTTPException(404, "Select a valid teacher login account.")
+    if not db.get(models.SchoolClass, data.class_id):
+        raise HTTPException(404, "Class not found.")
+    existing = db.query(models.ClassTeacherAssignment).filter_by(class_id=data.class_id).first()
+    if existing:
+        existing.teacher_id = data.teacher_id
+        assignment = existing
+    else:
+        assignment = models.ClassTeacherAssignment(**data.model_dump())
+        db.add(assignment)
+    write_audit(db, admin, "class_teacher_assigned", "class", data.class_id, f"Teacher account {teacher.username}")
+    db.commit()
+    db.refresh(assignment)
+    return {"id": assignment.id, "message": "Class teacher assigned successfully."}
+
+
+@app.delete("/api/class-teacher-assignments/{assignment_id}", tags=["Teacher Management"])
+def remove_class_teacher(assignment_id: int, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    assignment = db.get(models.ClassTeacherAssignment, assignment_id)
+    if not assignment:
+        raise HTTPException(404, "Class teacher assignment not found.")
+    write_audit(db, admin, "class_teacher_removed", "class", assignment.class_id, f"Assignment {assignment.id}")
+    db.delete(assignment)
+    db.commit()
+    return {"message": "Class teacher assignment removed."}
+
+
+@app.get("/api/teacher/my-class-teacher-assignments", tags=["Teacher Workspace"])
+def my_class_teacher_assignments(db: Session = Depends(get_db), teacher=Depends(get_current_user)):
+    if teacher.role != "teacher":
+        raise HTTPException(403, "Teacher account required.")
+    rows = db.query(models.ClassTeacherAssignment, models.SchoolClass).join(
+        models.SchoolClass, models.SchoolClass.id == models.ClassTeacherAssignment.class_id
+    ).filter(models.ClassTeacherAssignment.teacher_id == teacher.id).all()
+    return [{
+        "assignment_id": assignment.id, "class_id": school_class.id,
+        "class": school_class.name + (" — " + school_class.section if school_class.section else ""),
+    } for assignment, school_class in rows]
+
+
 @app.get("/api/teacher/my-staff-attendance", tags=["Teacher Workspace"])
 def teacher_my_staff_attendance(
     db: Session = Depends(get_db),
@@ -1800,16 +1874,23 @@ def my_assignments(
 def teacher_exams(db: Session = Depends(get_db), teacher=Depends(get_current_user)):
     if teacher.role != "teacher":
         raise HTTPException(403, "Teacher account required.")
-    class_ids = [
-        row.class_id for row in db.query(models.TeacherAssignment).filter_by(
-            teacher_id=teacher.id
-        ).all()
-    ]
+    assigned_pairs = {
+        (row.class_id, row.subject_id) for row in db.query(models.TeacherAssignment).filter_by(teacher_id=teacher.id).all()
+    }
+    class_ids = sorted({class_id for class_id, _ in assigned_pairs})
     if not class_ids:
         return []
-    return db.query(models.Exam).filter(
-        models.Exam.class_id.in_(class_ids)
-    ).order_by(models.Exam.year.desc(), models.Exam.term, models.Exam.name).all()
+    exams = db.query(models.Exam).filter(models.Exam.class_id.in_(class_ids)).order_by(
+        models.Exam.year.desc(), models.Exam.term, models.Exam.name
+    ).all()
+    output = []
+    for exam in exams:
+        subject_ids = [subject_id for class_id, subject_id in assigned_pairs if class_id == exam.class_id]
+        subjects = db.query(models.Subject).filter(models.Subject.id.in_(subject_ids or [-1])).order_by(models.Subject.name).all()
+        if subjects:
+            output.append({**{key: getattr(exam, key) for key in ("id", "name", "term", "year", "class_id")},
+                           "assigned_subjects": [{"id": subject.id, "name": subject.name} for subject in subjects]})
+    return output
 
 
 @app.get("/api/teacher/marks", tags=["Teacher Workspace"])
@@ -1843,6 +1924,51 @@ def teacher_marks(exam_id: int | None = None, db: Session = Depends(get_db),
             "class_id": student.class_id,
         })
     return rows
+
+
+@app.post("/api/teacher/marks/bulk", tags=["Teacher Workspace"])
+def save_teacher_marks_bulk(data: BulkMarkCreate, db: Session = Depends(get_db), teacher=Depends(get_current_user)):
+    if teacher.role != "teacher":
+        raise HTTPException(403, "Teacher account required.")
+    exam = db.get(models.Exam, data.exam_id)
+    subject = db.get(models.Subject, data.subject_id)
+    if not exam or not subject or exam.class_id is None:
+        raise HTTPException(404, "Class examination or subject not found.")
+    assigned = db.query(models.TeacherAssignment).filter_by(
+        teacher_id=teacher.id, class_id=exam.class_id, subject_id=subject.id
+    ).first()
+    if not assigned:
+        raise HTTPException(403, "You are not assigned to teach this subject in this class.")
+    student_ids = [row.student_id for row in data.records]
+    if len(student_ids) != len(set(student_ids)):
+        raise HTTPException(422, "Each student may appear only once in this class submission.")
+    students = db.query(models.Student).filter(
+        models.Student.id.in_(student_ids), models.Student.class_id == exam.class_id,
+        models.Student.status == "active"
+    ).all()
+    if len(students) != len(student_ids):
+        raise HTTPException(422, "Every submitted student must be active and belong to this examination's class.")
+    existing = db.query(models.Mark).filter(
+        models.Mark.exam_id == exam.id, models.Mark.subject_id == subject.id,
+        models.Mark.student_id.in_(student_ids)
+    ).all()
+    by_student = {row.student_id: row for row in existing}
+    verified = [row.student_id for row in existing if row.verified]
+    if verified:
+        raise HTTPException(409, "Some marks have already been verified. Ask the administrator to unlock them before resubmitting.")
+    saved = 0
+    for entry in data.records:
+        mark = by_student.get(entry.student_id)
+        if mark:
+            mark.score = entry.score
+        else:
+            db.add(models.Mark(student_id=entry.student_id, subject_id=subject.id, exam_id=exam.id, score=entry.score))
+        saved += 1
+    write_audit(db, teacher, "teacher_class_marks_submitted", "exam", exam.id,
+                f"{saved} marks; class {exam.class_id}; subject {subject.name}")
+    db.commit()
+    return {"message": "Class results submitted successfully.", "saved": saved, "exam_id": exam.id,
+            "class_id": exam.class_id, "subject_id": subject.id}
 
 
 @app.put("/api/teacher/marks", tags=["Teacher Workspace"])
