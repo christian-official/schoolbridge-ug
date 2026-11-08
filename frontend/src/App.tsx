@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   LayoutDashboard, Users, GraduationCap, BookOpen,
   FileText, Settings, LogOut,
@@ -598,6 +598,44 @@ function App() {
   const [showRecovery, setShowRecovery] = useState(false)
   const [loading, setLoading] = useState(false)
   const [active, setActive] = useState('Overview')
+  const [overviewShortcuts, setOverviewShortcuts] = useState<string[]>([])
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const longPressTriggered = useRef(false)
+  useEffect(() => {
+    if (!user) { setOverviewShortcuts([]); return }
+    try {
+      const saved = localStorage.getItem(`schoolbridge-overview-shortcuts-${user.id}`)
+      setOverviewShortcuts(saved ? (JSON.parse(saved) as string[]) : [])
+    } catch { setOverviewShortcuts([]) }
+  }, [user?.id])
+  function addOverviewShortcut(section: string) {
+    if (section === 'Overview' || section === 'Settings') return
+    setOverviewShortcuts(current => {
+      if (current.includes(section)) return current
+      const next = [...current, section]
+      if (user) localStorage.setItem(`schoolbridge-overview-shortcuts-${user.id}`, JSON.stringify(next))
+      return next
+    })
+  }
+  function removeOverviewShortcut(section: string) {
+    setOverviewShortcuts(current => {
+      const next = current.filter(item => item !== section)
+      if (user) localStorage.setItem(`schoolbridge-overview-shortcuts-${user.id}`, JSON.stringify(next))
+      return next
+    })
+  }
+  function beginShortcutHold(section: string) {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current)
+    longPressTriggered.current = false
+    longPressTimer.current = setTimeout(() => {
+      longPressTriggered.current = true
+      addOverviewShortcut(section)
+    }, 5000)
+  }
+  function cancelShortcutHold() {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current)
+    longPressTimer.current = null
+  }
   const [financeTabRequest, setFinanceTabRequest] = useState<'overview' | 'payments' | 'balances'>('overview')
   const [refreshKey, setRefreshKey] = useState(0)
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -974,7 +1012,7 @@ function App() {
           {(user.role === 'parent' ? parentMenu : user.role === 'admin' ? menu : isFinanceAccount(user) ? getStaffNavigation(user).filter(item => ['Overview','Fees & Finance','My Attendance','My Profile'].includes(item.label)) : getStaffNavigation(user)).map(item => {
             const Icon = item.icon
             return (
-              <button key={item.label} className={`nav-item ${active === item.label ? 'active' : ''}`} onClick={() => { setActive(item.label); setMobileMenu(false) }}>
+              <button key={item.label} className={`nav-item ${active === item.label ? 'active' : ''}`} title="Hold for 5 seconds to add this page to your Overview shortcuts" onPointerDown={() => beginShortcutHold(item.label)} onPointerUp={cancelShortcutHold} onPointerLeave={cancelShortcutHold} onPointerCancel={cancelShortcutHold} onContextMenu={event => event.preventDefault()} onClick={() => { if (longPressTriggered.current) { longPressTriggered.current = false; return } setActive(item.label); setMobileMenu(false) }}>
                 <Icon size={19} /> <span>{item.label}</span>
                 {active === item.label && <span className="active-dot" />}
               </button>
@@ -1027,7 +1065,14 @@ function App() {
 
           {active === 'Overview' && user.role === 'admin' && <AdministratorDashboard token={token} username={user.username} onNavigate={setActive} summary={dashboardSummary} financeSummary={financeDashboard} availableSections={['Students','Staff','Fees & Finance','Examinations','Attendance','Timetable','Leadership & Duty','Parent Access','Announcements','Reports']}/>} 
 
-                    {active === 'Overview' && user.role !== 'admin' && (user.role === 'staff' && /school administrator|system administrator|^administrator$/i.test(user.role_label||'') ? <AdministratorDashboard token={token} username={user.username} onNavigate={setActive} summary={dashboardSummary} financeSummary={financeDashboard} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)}/> : isFinanceAccount(user) ? <FinanceAccountDashboard token={token} username={user.username} onNavigate={(section,tab)=>{if(tab)setFinanceTabRequest(tab);setActive(section)}}/> : user.role === 'staff' && /director of studies|\bdos\b/i.test(user.role_label||'') ? <DirectorOfStudiesDashboard token={token} onNavigate={setActive} summary={dashboardSummary} summaryAvailable={(user.permissions?.['Overview']||[]).includes('view')} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)}/> : user.role === 'staff' && /secretary|office administrator/i.test(user.role_label||'') ? <SecretaryDashboard username={user.username} onNavigate={setActive} summary={dashboardSummary} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)}/> : user.role === 'staff' && /attendance/i.test(user.role_label||'') ? <AttendanceOfficerDashboard username={user.username} onNavigate={setActive} summary={dashboardSummary} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)}/> : user.role === 'staff' && /teacher|head\s?teacher/i.test(user.role_label||'') ? <TeacherDashboard token={token} username={user.username} onNavigate={setActive}/> : user.role === 'staff' ? <RoleSpecificDashboard username={user.username} roleLabel={user.role_label||'Staff'} onNavigate={setActive} summary={dashboardSummary} summaryAvailable={(user.permissions?.['Overview']||[]).includes('view')} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)} financeSummary={financeDashboard}/> : <PersonalDashboard token={token} username={user.username} onNavigate={setActive}/>) }
+                    {active === 'Overview' && user.role !== 'admin' && (user.role === 'staff' && /school administrator|system administrator|^administrator$/i.test(user.role_label||'') ? <AdministratorDashboard token={token} username={user.username} onNavigate={setActive} summary={dashboardSummary} financeSummary={financeDashboard} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)}/> : isFinanceAccount(user) ? <FinanceAccountDashboard token={token} username={user.username} onNavigate={(section,tab)=>{if(tab)setFinanceTabRequest(tab);setActive(section)}}/> : user.role === 'staff' && /director of studies|\bdos\b/i.test(user.role_label||'') ? <DirectorOfStudiesDashboard token={token} onNavigate={setActive} summary={dashboardSummary} summaryAvailable={(user.permissions?.['Overview']||[]).includes('view')} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)}/> : user.role === 'staff' && /secretary|office administrator/i.test(user.role_label||'') ? <SecretaryDashboard username={user.username} onNavigate={setActive} summary={dashboardSummary} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)}/> : user.role === 'staff' && /attendance/i.test(user.role_label||'') ? <AttendanceOfficerDashboard username={user.username} onNavigate={setActive} summary={dashboardSummary} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)}/> : user.role === 'staff' && /teacher|head\s?teacher/i.test(user.role_label||'') ? <TeacherDashboard token={token} username={user.username} onNavigate={setActive}/> : user.role === 'staff' ? <RoleSpecificDashboard username={user.username} roleLabel={user.role_label||'Staff'} onNavigate={setActive} summary={dashboardSummary} summaryAvailable={(user.permissions?.['Overview']||[]).includes('view')} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)} financeSummary={financeDashboard}/> : <PersonalDashboard token={token} username={user.username} onNavigate={setActive}/>) } 
+          {active === 'Overview' && <section className="overview-custom-shortcuts panel">
+            <div className="panel-heading"><div><h2>My shortcuts</h2><p>Hold any sidebar page for 5 seconds to pin it here. These shortcuts are private to your account.</p></div><span className="shortcut-count">{overviewShortcuts.length} pinned</span></div>
+            {overviewShortcuts.length > 0 ? <div className="overview-shortcut-grid">{overviewShortcuts.map((section,index) => {
+              const Icon = [...menu,...teacherMenu,...parentMenu].find(item => item.label === section)?.icon || FolderOpen
+              return <div className="overview-shortcut-card" key={section}><button type="button" className="overview-shortcut-open" onClick={() => setActive(section)}><span className={`overview-shortcut-icon tone-${index%4}`}><Icon size={19}/></span><strong>{section}</strong><ArrowUpRight size={16}/></button><button type="button" className="overview-shortcut-remove" aria-label={`Remove ${section} shortcut`} title="Remove shortcut" onClick={() => removeOverviewShortcut(section)}><X size={14}/></button></div>
+            })}</div> : <div className="overview-shortcut-empty"><Plus size={19}/><span>No shortcuts pinned yet. Press and hold a page in the sidebar for 5 seconds to add it.</span></div>}
+          </section>}
 
           {active === 'Students' && (
             <section className="panel">
