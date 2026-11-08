@@ -263,7 +263,7 @@ function PersonalDashboard({token,username,onNavigate}:{token:string;username:st
   </div>
 }
 
-function TeacherDashboard({token,username,onNavigate}:{token:string;username:string;onNavigate:(section:string)=>void}) {
+function TeacherDashboard({token,username: _username,onNavigate}:{token:string;username:string;onNavigate:(section:string)=>void}) {
   const [data,setData]=useState<PersonalDashboardData|null>(null)
   const [error,setError]=useState('')
   const [loading,setLoading]=useState(true)
@@ -310,7 +310,7 @@ function TeacherDashboard({token,username,onNavigate}:{token:string;username:str
 
 type AdminExamRecord = {id:number;name:string;exam_type?:string;term?:string;year?:number;class_id:number;class_name?:string}
 type AdminMarkRecord = {id:number;verified:boolean;score:number;subject_id:number}
-function AdministratorDashboard({token,username,onNavigate,summary,financeSummary,availableSections}:{token:string;username:string;onNavigate:(section:string)=>void;summary:DashboardSummary;financeSummary:FinanceDashboardSummary;availableSections:string[]}) {
+function AdministratorDashboard({token,username: _username,onNavigate,summary,financeSummary,availableSections}:{token:string;username:string;onNavigate:(section:string)=>void;summary:DashboardSummary;financeSummary:FinanceDashboardSummary;availableSections:string[]}) {
   const [examRecords,setExamRecords]=useState<{exam:AdminExamRecord;marks:AdminMarkRecord[]}[]>([])
   const [loading,setLoading]=useState(true)
   const [error,setError]=useState('')
@@ -461,7 +461,7 @@ function DirectorOfStudiesDashboard({token,onNavigate,summary,summaryAvailable,a
   </div>
 }
 
-function SecretaryDashboard({username,onNavigate,summary,availableSections}:{username:string;onNavigate:(section:string)=>void;summary:DashboardSummary;availableSections:string[]}) {
+function SecretaryDashboard({username: _username,onNavigate,summary,availableSections}:{username:string;onNavigate:(section:string)=>void;summary:DashboardSummary;availableSections:string[]}) {
   const can=(section:string)=>availableSections.includes(section)
   const items=[
     {section:'Students',title:'Student registration & records',detail:'Register learners, update profiles and maintain class records.',icon:<GraduationCap/>},
@@ -477,7 +477,7 @@ function SecretaryDashboard({username,onNavigate,summary,availableSections}:{use
   </div>
 }
 
-function AttendanceOfficerDashboard({username,onNavigate,summary,availableSections}:{username:string;onNavigate:(section:string)=>void;summary:DashboardSummary;availableSections:string[]}) {
+function AttendanceOfficerDashboard({username: _username,onNavigate,summary,availableSections}:{username:string;onNavigate:(section:string)=>void;summary:DashboardSummary;availableSections:string[]}) {
   const can=(section:string)=>availableSections.includes(section)
   const rate=summary.active_students?Math.round(summary.students_present_today/summary.active_students*100):0
   const absent=Math.max(0,summary.active_students-summary.students_present_today)
@@ -540,7 +540,7 @@ function RoleSpecificDashboard({username,roleLabel,onNavigate,summary,summaryAva
   </div>
 }
 
-function FinanceAccountDashboard({token,username,onNavigate}:{token:string;username:string;onNavigate:(section:string,tab?:'overview'|'payments'|'balances')=>void}) {
+function FinanceAccountDashboard({token,username: _username,onNavigate}:{token:string;username:string;onNavigate:(section:string,tab?:'overview'|'payments'|'balances')=>void}) {
   const [summary,setSummary]=useState<{fees_expected:number;fees_collected:number;outstanding:number;salary_expenses?:number;other_expenses?:number;total_expenses?:number;net_cash_position?:number}|null>(null)
   const [error,setError]=useState('')
   const [loading,setLoading]=useState(true)
