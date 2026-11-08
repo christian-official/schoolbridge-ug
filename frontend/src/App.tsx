@@ -1125,6 +1125,11 @@ function TeacherWorkspace({token,active}:{token:string;active:string}) {
     }catch(error){setResultError(error instanceof Error?error.message:'Unable to refresh result status.')}
   }
   useEffect(()=>{
+    if(active!=='My Results'||!selectedTeacherExam)return
+    const refreshId=window.setInterval(()=>{void refreshTeacherResultStatus()},15000)
+    return ()=>window.clearInterval(refreshId)
+  },[active,examId,selectedSubjectId,token])
+  useEffect(()=>{
     if(active!=='My Results'||!selectedTeacherExam){setResultStudents([]);setResultMarks([]);return}
     let cancelled=false
     setResultError('')
