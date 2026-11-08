@@ -13,6 +13,7 @@ import MyStaffProfile from './MyStaffProfile'
 import OperationsManagement from './OperationsManagement'
 import Phase4Workspace from './Phase4Workspace'
 import './App.css'
+import './DashboardRedesign.css'
 
 type User = {
   id: number

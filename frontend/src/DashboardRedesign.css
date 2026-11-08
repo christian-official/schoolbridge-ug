@@ -1,0 +1,97 @@
+/* SchoolBridge complete workspace redesign — structural shell and role-specific visual system */
+.redesigned-app-shell{--sb-ink:#18243b;--sb-muted:#7d899d;--sb-line:#e7ebf2;--sb-canvas:#f3f5f9;min-height:100vh;background:var(--sb-canvas);color:var(--sb-ink)}
+.redesigned-app-shell.role-theme-admin{--role-primary:#1768bd;--role-deep:#102f58;--role-soft:#eaf3ff;--role-accent:#4d9be8}
+.redesigned-app-shell.role-theme-dos{--role-primary:#087b59;--role-deep:#064c3b;--role-soft:#e7f6ef;--role-accent:#36b98b}
+.redesigned-app-shell.role-theme-finance{--role-primary:#a91f43;--role-deep:#5d142b;--role-soft:#fff0f3;--role-accent:#df5871}
+.redesigned-app-shell.role-theme-secretary{--role-primary:#087ea8;--role-deep:#064b69;--role-soft:#e8f7fc;--role-accent:#31b3d8}
+.redesigned-app-shell.role-theme-attendance{--role-primary:#74850b;--role-deep:#414d05;--role-soft:#f3f6dc;--role-accent:#b0c52c}
+.redesigned-app-shell.role-theme-teacher{--role-primary:#7540b4;--role-deep:#3d2169;--role-soft:#f2eafd;--role-accent:#a77bdb}
+.redesigned-app-shell .sidebar{width:274px;min-width:274px;padding:25px 17px 18px;background:linear-gradient(180deg,var(--role-deep,#122c4b),color-mix(in srgb,var(--role-deep,#122c4b) 88%,#071426));color:#fff;border:0;box-shadow:8px 0 30px #152a4510;position:relative;z-index:10}
+.redesigned-brand{padding:0 10px 25px!important;gap:12px!important;align-items:center}
+.redesigned-app-shell .brand-mark{width:46px;height:46px;border-radius:15px;background:linear-gradient(145deg,var(--role-primary,#2869b4),var(--role-accent,#5d9cda));box-shadow:0 8px 20px #0003}
+.brand-lockup{display:grid;gap:4px;min-width:0}
+.redesigned-app-shell .brand-name{font-size:20px;line-height:1;color:#fff;letter-spacing:-.8px}
+.redesigned-app-shell .brand-name span{color:#d6e9ff}
+.brand-lockup small{font-size:8px;font-weight:800;letter-spacing:1.55px;color:#ffffff88}
+.redesigned-app-shell .mobile-close{color:#fff}
+.sidebar-school-card{display:flex;align-items:center;gap:10px;padding:12px;border:1px solid #ffffff20;border-radius:13px;background:#ffffff0c;margin:0 1px 25px}
+.sidebar-school-symbol{width:34px;height:34px;display:grid;place-items:center;border-radius:10px;background:#ffffff18;color:#fff}
+.sidebar-school-card>span:nth-child(2){display:grid;gap:3px;flex:1}
+.sidebar-school-card strong{font-size:11px;color:#fff;font-weight:750}.sidebar-school-card small{font-size:9px;color:#ffffff88}
+.sidebar-school-card i{width:7px;height:7px;border-radius:50%;background:#57d89b;box-shadow:0 0 0 4px #57d89b20}
+.redesigned-app-shell .school-label{padding:0 12px 11px;color:#ffffff70;font-size:9px;letter-spacing:1.5px}
+.redesigned-navigation{display:grid;gap:5px}
+.redesigned-app-shell .sidebar .nav-item{min-height:44px;padding:11px 13px;border-radius:10px;color:#ffffffb8;font-size:12px;font-weight:600;gap:12px;transition:background .18s ease,color .18s ease,transform .18s ease}
+.redesigned-app-shell .sidebar .nav-item svg{width:17px;height:17px;opacity:.9}
+.redesigned-app-shell .sidebar .nav-item:hover{background:#ffffff12;color:#fff;transform:translateX(2px)}
+.redesigned-app-shell .sidebar .nav-item.active{background:var(--role-primary,#2869b4);color:#fff;box-shadow:0 7px 18px #0002,inset 3px 0 #ffffff}
+.redesigned-app-shell .active-dot{background:#fff;width:6px;height:6px}
+.redesigned-app-shell .sidebar-bottom{margin-top:auto;padding-top:20px}
+.redesigned-app-shell .sidebar-settings-link{margin-bottom:13px}
+.redesigned-profile{border-top:1px solid #ffffff24!important;padding:18px 4px 0!important;margin-top:0!important}
+.redesigned-app-shell .avatar{background:#ffffff20;color:#fff;width:38px;height:38px}
+.redesigned-app-shell .profile-info strong{color:#fff;font-size:11px}.redesigned-app-shell .profile-info small{color:#ffffff80;font-size:9px}
+.redesigned-app-shell .logout-button{color:#ffffff9c}
+.redesigned-app-shell .main-area{min-width:0;background:var(--sb-canvas)}
+.redesigned-topbar{height:82px;padding:0 38px;background:#fff;border:0;border-bottom:1px solid var(--sb-line);box-shadow:0 3px 16px #192b4510}
+.topbar-start{display:flex;align-items:center;gap:15px}.topbar-heading{display:grid;gap:4px}
+.topbar-heading>span{font-size:8px;font-weight:850;letter-spacing:1.45px;color:#9aa5b6}
+.topbar-heading>strong{font-size:17px;letter-spacing:-.3px;color:#1c2b43}
+.redesigned-topbar .top-actions{gap:18px}
+.redesigned-app-shell .refresh-button{border:1px solid #e3e8f0;background:#fff;border-radius:9px;padding:9px 13px;color:#56657c;font-size:10px}
+.redesigned-app-shell .online-status{font-size:10px;color:#758197}
+.top-user-chip{display:flex;align-items:center;gap:9px;padding-left:17px;border-left:1px solid #e8ecf2}
+.top-user-chip>span{display:grid;gap:3px}.top-user-chip strong{font-size:10px;color:#27364e}.top-user-chip small{font-size:9px;color:#96a0b0;text-transform:capitalize}
+.redesigned-app-shell .top-avatar{width:36px;height:36px;background:var(--role-soft,#eaf2ff);color:var(--role-primary,#2869b4);font-weight:850}
+.redesigned-app-shell .content{max-width:1680px;padding:34px 38px 30px}
+.redesigned-app-shell .welcome-row{margin-bottom:25px}.redesigned-app-shell .welcome-row h1{font-size:28px;color:#192941}
+.redesigned-app-shell .panel,.redesigned-app-shell .stat-card{border:1px solid #e8ecf2;border-radius:16px;box-shadow:0 7px 24px #23344d08}
+.redesigned-app-shell .panel{padding:23px}
+.redesigned-app-shell .panel-heading h2,.redesigned-app-shell .panel-heading h3{font-size:15px;color:#22334c}
+.redesigned-app-shell .primary-button{background:var(--role-primary,#2869b4);border-color:var(--role-primary,#2869b4);border-radius:9px}
+.redesigned-app-shell .secondary-button{border-radius:9px}
+.redesigned-app-shell button:focus-visible{outline:3px solid color-mix(in srgb,var(--role-accent,#4d9be8) 55%,white);outline-offset:2px}
+/* Distinct role overview canvases */
+.redesigned-app-shell .admin-command-hero,.redesigned-app-shell .dos-hero,.redesigned-app-shell .dashboard-role-heading,.redesigned-app-shell .secretary-office-hero,.redesigned-app-shell .attendance-control-hero,.redesigned-app-shell .teacher-workspace-hero{position:relative;overflow:hidden;min-height:205px;padding:32px 35px;border:0;border-radius:20px;box-shadow:0 16px 34px #182d4515}
+.redesigned-app-shell .admin-command-hero{background:linear-gradient(100deg,#102b52 0%,#174b7b 58%,#34718b 100%);isolation:isolate}
+.redesigned-app-shell .admin-command-hero:after{content:"";position:absolute;z-index:-1;right:0;top:0;width:43%;height:100%;background:url('/role-backgrounds/admin.svg') center right/auto 125% no-repeat;opacity:.9}
+.redesigned-app-shell .dos-hero{background:linear-gradient(105deg,#064b3b 0%,#08775b 62%,#1d8d72 100%);align-items:center}
+.redesigned-app-shell .dos-hero:after{content:"";position:absolute;right:0;top:0;width:40%;height:100%;background:url('/role-backgrounds/dos.svg') center right/auto 125% no-repeat;opacity:.9;pointer-events:none}
+.redesigned-app-shell .dashboard-role-heading{background-image:linear-gradient(100deg,rgba(93,20,43,.97),rgba(125,25,55,.84) 60%,rgba(125,25,55,.35)),url('/role-backgrounds/finance.svg');background-size:cover,auto 120%;background-position:center,right center}
+.redesigned-app-shell .secretary-office-hero{background:linear-gradient(100deg,#064b69 0%,#087ea8 64%,#36a8c5 100%);border:0}
+.redesigned-app-shell .secretary-office-hero:after{content:"";position:absolute;right:0;top:0;width:39%;height:100%;background:url('/role-backgrounds/secretary.svg') center right/auto 125% no-repeat;opacity:.9;pointer-events:none}
+.redesigned-app-shell .attendance-control-hero{background:linear-gradient(100deg,#414d05 0%,#66780a 62%,#899b20 100%);border:0}
+.redesigned-app-shell .attendance-control-hero:after{content:"";position:absolute;right:0;top:0;width:40%;height:100%;background:url('/role-backgrounds/attendance.svg') center right/auto 125% no-repeat;opacity:.95;pointer-events:none}
+.redesigned-app-shell .teacher-workspace-hero{background:linear-gradient(100deg,#3d2169 0%,#633b96 62%,#825bb1 100%);border:0}
+.redesigned-app-shell .teacher-workspace-hero:after{content:"";position:absolute;right:0;top:0;width:40%;height:100%;background:url('/role-backgrounds/teacher.svg') center right/auto 125% no-repeat;opacity:.95;pointer-events:none}
+.redesigned-app-shell .admin-command-hero h2,.redesigned-app-shell .dos-hero h2,.redesigned-app-shell .dashboard-role-heading h2,.redesigned-app-shell .secretary-office-hero h2,.redesigned-app-shell .attendance-control-hero h2,.redesigned-app-shell .teacher-workspace-hero h2{color:#fff;font-size:29px;letter-spacing:-.65px}
+.redesigned-app-shell .admin-command-hero p,.redesigned-app-shell .dos-hero-copy>p:last-child,.redesigned-app-shell .dashboard-role-heading p,.redesigned-app-shell .secretary-office-hero p,.redesigned-app-shell .attendance-control-hero p,.redesigned-app-shell .teacher-workspace-hero p:not(.eyebrow){color:#ffffffd6;max-width:620px}
+.redesigned-app-shell .admin-kpi-grid,.redesigned-app-shell .dos-metric-strip,.redesigned-app-shell .secretary-stat-grid,.redesigned-app-shell .attendance-overview-grid,.redesigned-app-shell .teacher-workspace-metrics{gap:15px;margin-top:19px}
+.redesigned-app-shell .admin-kpi-card,.redesigned-app-shell .dos-metric,.redesigned-app-shell .secretary-stat-grid>div,.redesigned-app-shell .attendance-count-card,.redesigned-app-shell .teacher-workspace-metrics>div{border:1px solid #e6eaf1;border-radius:15px;box-shadow:0 6px 20px #1d304b08;background:#fff;padding:19px}
+.redesigned-app-shell .admin-dashboard-panel,.redesigned-app-shell .dos-management-grid>.panel,.redesigned-app-shell .secretary-office-main,.redesigned-app-shell .secretary-office-side,.redesigned-app-shell .attendance-control-panel,.redesigned-app-shell .attendance-followup-panel{border:1px solid #e7ebf1;border-radius:16px;box-shadow:0 6px 22px #1d304b08;background:#fff}
+.redesigned-app-shell .admin-dashboard-main-grid,.redesigned-app-shell .dos-management-grid,.redesigned-app-shell .secretary-office-layout,.redesigned-app-shell .attendance-control-lower,.redesigned-app-shell .teacher-workspace-layout{gap:18px;margin-top:18px}
+.redesigned-app-shell .admin-dashboard-panel,.redesigned-app-shell .secretary-office-main,.redesigned-app-shell .secretary-office-side,.redesigned-app-shell .attendance-control-panel,.redesigned-app-shell .attendance-followup-panel{padding:23px}
+.redesigned-app-shell .admin-performance-bar{background:linear-gradient(180deg,var(--role-accent),var(--role-primary))}
+.redesigned-app-shell .dos-responsibility-strip,.redesigned-app-shell .dos-results-panel,.redesigned-app-shell .teacher-workspace-main>.panel,.redesigned-app-shell .teacher-tools-panel{border:1px solid #e6eaf1;border-radius:16px;box-shadow:0 6px 22px #1d304b08;background:#fff}
+.redesigned-app-shell .dos-responsibility-strip{padding:22px;margin-top:18px}
+.redesigned-app-shell .dos-responsibility-card,.redesigned-app-shell .secretary-office-actions>button,.redesigned-app-shell .attendance-control-links>button,.redesigned-app-shell .teacher-tool-link{border-radius:12px;transition:transform .18s ease,box-shadow .18s ease}
+.redesigned-app-shell .dos-responsibility-card:hover,.redesigned-app-shell .secretary-office-actions>button:hover,.redesigned-app-shell .attendance-control-links>button:hover,.redesigned-app-shell .teacher-tool-link:hover{transform:translateY(-2px);box-shadow:0 9px 20px #1c2e4510}
+.redesigned-app-shell table{border-collapse:separate;border-spacing:0}.redesigned-app-shell th{background:#f6f8fb;color:#77849a;font-size:9px;letter-spacing:.07em;text-transform:uppercase}
+.redesigned-app-shell td{font-size:11px}
+@media(max-width:1050px){.redesigned-app-shell .sidebar{width:250px;min-width:250px}.redesigned-app-shell .content{padding:26px 24px}.redesigned-topbar{padding:0 24px}}
+@media(max-width:760px){
+ .redesigned-app-shell .sidebar{position:fixed;left:0;top:0;bottom:0;width:280px;min-width:280px;transform:translateX(-105%);transition:transform .24s ease}
+ .redesigned-app-shell .sidebar.sidebar-open{transform:translateX(0)}
+ .redesigned-app-shell .main-area{width:100%;min-width:0}.redesigned-topbar{height:70px;padding:0 15px}
+ .topbar-heading>span,.top-user-chip>span,.redesigned-topbar .online-status{display:none}.top-user-chip{padding-left:10px}
+ .redesigned-app-shell .content{padding:20px 14px 24px}
+ .redesigned-app-shell .admin-command-hero,.redesigned-app-shell .dos-hero,.redesigned-app-shell .dashboard-role-heading,.redesigned-app-shell .secretary-office-hero,.redesigned-app-shell .attendance-control-hero,.redesigned-app-shell .teacher-workspace-hero{padding:24px 20px;min-height:190px}
+ .redesigned-app-shell .admin-command-hero:after,.redesigned-app-shell .dos-hero:after,.redesigned-app-shell .secretary-office-hero:after,.redesigned-app-shell .attendance-control-hero:after,.redesigned-app-shell .teacher-workspace-hero:after{opacity:.35;width:50%}
+ .redesigned-app-shell .admin-kpi-grid,.redesigned-app-shell .dos-metric-strip,.redesigned-app-shell .secretary-stat-grid,.redesigned-app-shell .attendance-overview-grid,.redesigned-app-shell .teacher-workspace-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .redesigned-app-shell .admin-dashboard-main-grid,.redesigned-app-shell .dos-management-grid,.redesigned-app-shell .secretary-office-layout,.redesigned-app-shell .attendance-control-lower,.redesigned-app-shell .teacher-workspace-layout{grid-template-columns:1fr}
+}
+@media(max-width:460px){
+ .redesigned-app-shell .admin-kpi-grid,.redesigned-app-shell .dos-metric-strip,.redesigned-app-shell .secretary-stat-grid,.redesigned-app-shell .attendance-overview-grid,.redesigned-app-shell .teacher-workspace-metrics{grid-template-columns:1fr}
+ .redesigned-app-shell .admin-command-hero h2,.redesigned-app-shell .dos-hero h2,.redesigned-app-shell .dashboard-role-heading h2,.redesigned-app-shell .secretary-office-hero h2,.redesigned-app-shell .attendance-control-hero h2,.redesigned-app-shell .teacher-workspace-hero h2{font-size:24px}
+ .redesigned-app-shell .top-actions{gap:8px}.redesigned-app-shell .refresh-button{padding:8px!important;font-size:0!important}
+}
