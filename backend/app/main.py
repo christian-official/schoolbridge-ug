@@ -95,7 +95,7 @@ def permission_for_path(path: str):
     if path.startswith(("/api/teacher/my-assignments", "/api/teacher/my-class-teacher-assignments", "/api/teacher/students")): return "My Classes"
     if path.startswith("/api/teacher/my-staff-attendance"): return "My Attendance"
     if path.startswith("/api/teacher/attendance"): return "Attendance"
-    if path.startswith(("/api/teacher/marks", "/api/teacher/exams")): return "My Results"
+    if path.startswith(("/api/teacher/marks", "/api/teacher/exams", "/api/teacher/result-status")): return "My Results"
     if path.startswith("/api/students"): return "Students"
     if path.startswith("/api/staff"): return "Staff"
     if path.startswith(("/api/finance", "/api/fees", "/api/salary", "/api/expenses")): return "Fees & Finance"
