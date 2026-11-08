@@ -82,6 +82,16 @@ const parentMenu = [
   { label: 'Announcements', icon: FileText },
 ]
 
+function isFinanceAccount(user:User) {
+  if (user.role === 'admin') return false
+  const label = (user.role_label || '').toLowerCase()
+  const permissions = user.permissions || {}
+  const financeRole = /bursar|accountant|finance|accounts/.test(label)
+  const financeOnlyAccess = (permissions['Fees & Finance'] || []).includes('view') &&
+    !['My Classes','My Results','My Attendance','Attendance','Examinations','Timetable','Leadership & Duty'].some(section => (permissions[section] || []).includes('view'))
+  return financeRole || financeOnlyAccess
+}
+
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 
 async function api<T>(path: string, token: string, options: RequestInit = {}): Promise<T> {
@@ -216,6 +226,36 @@ function PersonalDashboard({token,username,onNavigate}:{token:string;username:st
         {!data.available_sections.length&&<p className="form-hint">No school work areas have been assigned. Contact the administrator.</p>}
       </>}
     </section>
+  </div>
+}
+
+function FinanceAccountDashboard({token,username,onNavigate}:{token:string;username:string;onNavigate:(section:string)=>void}) {
+  const [summary,setSummary]=useState<{fees_expected:number;fees_collected:number;outstanding:number;salary_expenses?:number;other_expenses?:number;total_expenses?:number;net_cash_position?:number}|null>(null)
+  const [error,setError]=useState('')
+  const [loading,setLoading]=useState(true)
+  useEffect(()=>{
+    let cancelled=false
+    api<any>('finance/summary',token).then(result=>{if(!cancelled)setSummary(result)})
+      .catch(e=>{if(!cancelled)setError(e instanceof Error?e.message:'Unable to load finance records.')})
+      .finally(()=>{if(!cancelled)setLoading(false)})
+    return ()=>{cancelled=true}
+  },[token])
+  const money=(value:number|undefined)=>'UGX '+Number(value||0).toLocaleString('en-UG')
+  return <div className="role-dashboard finance-account-dashboard">
+    <section className="dashboard-role-heading"><div><p className="eyebrow">FINANCE WORKSPACE</p><h2>Finance overview</h2><p>{username} · Collections, outstanding fees and school expenditure.</p></div><span className="count-pill">Finance account</span></section>
+    {loading&&<p className="form-hint">Loading finance summary...</p>}
+    {error&&<div className="form-error" role="alert">{error}</div>}
+    {summary&&<section className="role-dashboard-stats">
+      <StatCard title="Fees collected" value={money(summary.fees_collected)} icon={<TrendingUp/>} note="Payments received" />
+      <StatCard title="Outstanding fees" value={money(summary.outstanding)} icon={<FileText/>} note="Balances still due" />
+      <StatCard title="Expected fees" value={money(summary.fees_expected)} icon={<BookOpen/>} note="Total charges raised" />
+      <StatCard title="Total expenses" value={money(summary.total_expenses)} icon={<Users/>} note="Salary and other expenses" />
+    </section>}
+    <section className="role-dashboard-actions">
+      <button type="button" className="quick-action" onClick={()=>onNavigate('Fees & Finance')}><span className="quick-icon blue"><FileText/></span><span><strong>Finance workspace</strong><small>Open payments, balances, expenses and fee structures.</small></span><ArrowUpRight size={17}/></button>
+      <button type="button" className="quick-action" onClick={()=>onNavigate('Fees & Finance')}><span className="quick-icon purple"><TrendingUp/></span><span><strong>Outstanding fee follow-up</strong><small>Review student balances and follow up collections.</small></span><ArrowUpRight size={17}/></button>
+    </section>
+    {!loading&&!summary&&!error&&<p className="empty-state">No finance summary is available yet.</p>}
   </div>
 }
 
@@ -617,7 +657,7 @@ function App() {
         </div>
         <div className="school-label">SCHOOL MANAGEMENT</div>
         <nav>
-          {(user.role === 'parent' ? parentMenu : user.role === 'admin' ? menu : [...menu, ...teacherMenu.filter(item => !menu.some(base => base.label === item.label))].filter(item => item.label === 'My Profile' || (user.permissions?.[item.label] || []).includes('view') || (item.label === 'Attendance' && (user.permissions?.['Staff Attendance'] || []).includes('view')))).map(item => {
+          {(user.role === 'parent' ? parentMenu : user.role === 'admin' ? menu : [...menu, ...teacherMenu.filter(item => !menu.some(base => base.label === item.label))].filter(item => isFinanceAccount(user) ? ['Overview','Fees & Finance'].includes(item.label) : item.label === 'My Profile' || (user.permissions?.[item.label] || []).includes('view') || (item.label === 'Attendance' && (user.permissions?.['Staff Attendance'] || []).includes('view')))).map(item => {
             const Icon = item.icon
             return (
               <button key={item.label} className={`nav-item ${active === item.label ? 'active' : ''}`} onClick={() => { setActive(item.label); setMobileMenu(false) }}>
@@ -658,7 +698,7 @@ function App() {
             <div>
               <p className="eyebrow">SCHOOL MANAGEMENT SYSTEM</p>
               <h1>{active === 'Overview' ? 'Dashboard overview' : active}</h1>
-              <p className="muted">Welcome back, {user.username}. Here's your school at a glance.</p>
+              <p className="muted">Welcome back, {user.username}. {isFinanceAccount(user) ? 'Here is your finance workspace at a glance.' : 'Here is your assigned school workspace.'}</p>
             </div>
             <div className="date-chip"><CalendarDays size={17} /> {new Date().toLocaleDateString('en-UG', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
           </div>
@@ -701,14 +741,14 @@ function App() {
             </>
           )}
 
-                    {active === 'Overview' && user.role !== 'admin' && <PersonalDashboard token={token} username={user.username} onNavigate={setActive}/>}
+                    {active === 'Overview' && user.role !== 'admin' && (isFinanceAccount(user) ? <FinanceAccountDashboard token={token} username={user.username} onNavigate={setActive}/> : <PersonalDashboard token={token} username={user.username} onNavigate={setActive}/>)}
 
           {active === 'Students' && (
             <section className="panel">
-              <div className="panel-heading student-workspace-heading"><div><h2>Students</h2><p>{studentTotal.toLocaleString()} registered students · Select a class to view its student list.</p></div><button type="button" className="primary-button add-student-button" onClick={() => { setShowStudentForm(v => !v); setStudentError(''); setStudentSuccess('') }}><UserPlus size={16} /> {showStudentForm ? 'Close registration' : 'Register student'}</button></div>
+              <div className="panel-heading student-workspace-heading"><div><h2>Students</h2><p>{studentTotal.toLocaleString()} registered students · Select a class to view its student list.</p></div>{(user.role === 'admin' || (user.permissions?.['Students'] || []).includes('add')) && <button type="button" className="primary-button add-student-button" onClick={() => { setShowStudentForm(v => !v); setStudentError(''); setStudentSuccess('') }}><UserPlus size={16} /> {showStudentForm ? 'Close registration' : 'Register student'}</button>}</div>
               {studentSuccess && <div className="success-notice">{studentSuccess}</div>}
               {studentError && <div className="form-error">{studentError}</div>}
-              {showStudentForm && (
+              {showStudentForm && (user.role === 'admin' || (user.permissions?.['Students'] || []).includes('add')) && (
                 <form className="student-form registration-form" onSubmit={registerStudent}>
                   <div className="form-heading">
                     <div><h3>Register a new student</h3><p>Complete the sections below. Compulsory fields are full name, class, gender, parent/guardian name and guardian phone. Other details are optional unless required by the selected class.</p></div>
@@ -774,7 +814,7 @@ function App() {
 
 
 
-          <StaffFinance token={token} active={active} classes={classes} refreshKey={refreshKey} initialTab={financeTabRequest} />
+          <StaffFinance token={token} active={active} classes={classes} refreshKey={refreshKey} initialTab={financeTabRequest} canAddStaff={user.role === 'admin' || (user.permissions?.['Staff'] || []).includes('add')} />
           {studentProfile && (
             <div className="modal-backdrop" onClick={()=>setStudentProfile(null)}>
               <section className="panel student-profile-modal" onClick={e=>e.stopPropagation()}>
