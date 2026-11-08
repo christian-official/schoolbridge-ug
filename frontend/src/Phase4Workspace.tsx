@@ -52,16 +52,21 @@ export default function Phase4Workspace({ token, role, active, permissions }: { 
   }
 
   useEffect(() => {
+    if (role === 'parent' || active !== 'Parent Access') return
+    let cancelled = false
+    api<any[]>('parent-accounts', token).then(rows => { if (!cancelled) setParents(rows) })
+      .catch(e => { if (!cancelled) setError(e instanceof Error ? e.message : 'Unable to load parent accounts.') })
+    return () => { cancelled = true }
+  }, [token, role, active])
+
+  useEffect(() => {
     let cancelled = false
     setError('')
     if (role !== 'parent' && active === 'Parent Access') {
       setBusy(true)
-      Promise.all([
-        api<{ items: StudentOption[] }>('students/search?page=1&page_size=5&search='+encodeURIComponent(studentSearch.trim()), token),
-        api<any[]>('parent-accounts', token),
-      ]).then(([studentData, parentData]) => {
-        if (!cancelled) { setStudents(studentData.items || []); setParents(parentData) }
-      }).catch(e => { if (!cancelled) setError(e instanceof Error ? e.message : 'Unable to load parent accounts.') })
+      api<{ items: StudentOption[] }>('students/search?page=1&page_size=5&search='+encodeURIComponent(studentSearch.trim()), token)
+        .then(studentData => { if (!cancelled) setStudents(studentData.items || []) })
+        .catch(e => { if (!cancelled) setError(e instanceof Error ? e.message : 'Unable to search students.') })
         .finally(() => { if (!cancelled) setBusy(false) })
     }
     if (active === 'Announcements') {
