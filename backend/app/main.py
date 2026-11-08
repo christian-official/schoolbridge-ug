@@ -81,6 +81,12 @@ def user_permissions(user):
             "My Attendance": {"view"}, "My Results": {"view", "add", "edit"},
             "Announcements": {"view"},
         }
+    # Academic officers are responsible for reviewing and approving submitted marks.
+    if (user.role_label or "").strip().lower() in {
+        "academic administrator", "academics administrator", "academics officer",
+        "director of studies", "dos", "deputy director of studies",
+    }:
+        clean.setdefault("Examinations", set()).update({"view", "approve"})
     return clean
 
 
