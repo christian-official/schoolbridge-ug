@@ -1922,3 +1922,47 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .dos-responsibility-icon.assignment{background:#ede9fe;color:#6d28d9}
 .dos-responsibility-icon.timetable{background:#ccfbf1;color:#0f766e}
 @media(max-width:760px){.dos-responsibility-heading{align-items:flex-start}.dos-academic-illustration{display:none}.dos-responsibility-actions{grid-template-columns:1fr}}
+
+
+/* Six selected SchoolBridge role templates: role colour, sidebar and photographic hero */
+.role-theme-admin{--role-primary:#0752a0;--role-deep:#073b7a;--role-soft:#e8f2ff;--role-accent:#1684e8}
+.role-theme-dos{--role-primary:#07815e;--role-deep:#075b45;--role-soft:#e7f7f0;--role-accent:#13a879}
+.role-theme-finance{--role-primary:#b42345;--role-deep:#7d102d;--role-soft:#fff0f3;--role-accent:#e34c35}
+.role-theme-secretary{--role-primary:#087eaf;--role-deep:#075477;--role-soft:#e7f6fc;--role-accent:#16a6d7}
+.role-theme-attendance{--role-primary:#718400;--role-deep:#4c5b00;--role-soft:#f3f7d9;--role-accent:#a3b817}
+.role-theme-teacher{--role-primary:#7136ad;--role-deep:#4b237e;--role-soft:#f2eaff;--role-accent:#9253d2}
+.role-theme-admin .sidebar,.role-theme-dos .sidebar,.role-theme-finance .sidebar,.role-theme-secretary .sidebar,.role-theme-attendance .sidebar,.role-theme-teacher .sidebar{background:var(--role-deep);border-right:0;color:#fff}
+.role-theme-admin .sidebar .nav-item.active,.role-theme-dos .sidebar .nav-item.active,.role-theme-finance .sidebar .nav-item.active,.role-theme-secretary .sidebar .nav-item.active,.role-theme-attendance .sidebar .nav-item.active,.role-theme-teacher .sidebar .nav-item.active{background:var(--role-primary);color:#fff;box-shadow:inset 3px 0 #fff}
+.role-theme-admin .sidebar .brand-mark,.role-theme-dos .sidebar .brand-mark,.role-theme-finance .sidebar .brand-mark,.role-theme-secretary .sidebar .brand-mark,.role-theme-attendance .sidebar .brand-mark,.role-theme-teacher .sidebar .brand-mark{background:#ffffff1c;color:#fff}
+.role-theme-admin .sidebar .school-label,.role-theme-dos .sidebar .school-label,.role-theme-finance .sidebar .school-label,.role-theme-secretary .sidebar .school-label,.role-theme-attendance .sidebar .school-label,.role-theme-teacher .sidebar .school-label{color:#ffffffa8}
+.role-theme-admin .sidebar .nav-item,.role-theme-dos .sidebar .nav-item,.role-theme-finance .sidebar .nav-item,.role-theme-secretary .sidebar .nav-item,.role-theme-attendance .sidebar .nav-item,.role-theme-teacher .sidebar .nav-item{color:#ffffffdf}
+.role-theme-admin .sidebar .profile-card,.role-theme-dos .sidebar .profile-card,.role-theme-finance .sidebar .profile-card,.role-theme-secretary .sidebar .profile-card,.role-theme-attendance .sidebar .profile-card,.role-theme-teacher .sidebar .profile-card{border-color:#ffffff30}
+.role-theme-admin .admin-command-hero{background-image:linear-gradient(90deg,rgba(7,59,122,.98) 0%,rgba(7,59,122,.91) 48%,rgba(7,59,122,.25) 100%),url('https://images.unsplash.com/photo-1562774053-701939374585?auto=format&fit=crop&w=1400&q=85');background-size:cover;background-position:center right;border-color:#0a4b8f;min-height:170px}
+.role-theme-dos .dos-hero{background-image:linear-gradient(90deg,rgba(5,91,69,.98) 0%,rgba(5,91,69,.9) 48%,rgba(5,91,69,.24) 100%),url('https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&w=1400&q=85');background-size:cover;background-position:center right;border-color:#087454;min-height:170px}
+.role-theme-dos .dos-responsibility-strip{background:linear-gradient(115deg,#075b45 0%,#087e5a 70%,#0b6b5c 100%)}
+.role-theme-finance .finance-account-dashboard .dashboard-role-heading{background-image:linear-gradient(90deg,rgba(125,16,45,.98) 0%,rgba(125,16,45,.9) 48%,rgba(125,16,45,.22) 100%),url('https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&w=1400&q=85');background-size:cover;background-position:center right;border:0;border-radius:17px;padding:25px 28px;color:#fff;min-height:150px}
+.role-theme-finance .dashboard-role-heading h2,.role-theme-finance .dashboard-role-heading p,.role-theme-finance .dashboard-role-heading .eyebrow{color:#fff}
+.role-theme-finance .dashboard-role-heading .count-pill{background:#ffffff20;border-color:#ffffff55;color:#fff}
+.role-theme-finance .dashboard-role-heading .secondary-button{background:#ffffff18;border-color:#ffffff70;color:#fff}
+.role-theme-secretary .secretary-office-hero{background-image:linear-gradient(90deg,rgba(7,84,119,.97) 0%,rgba(7,84,119,.88) 48%,rgba(7,84,119,.18) 100%),url('https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=1400&q=85');background-size:cover;background-position:center right;border-color:#087eaf;min-height:160px}
+.role-theme-secretary .secretary-office-hero h2,.role-theme-secretary .secretary-office-hero p,.role-theme-secretary .secretary-office-hero>div:first-child>span{color:#fff}
+.role-theme-secretary .secretary-hero-mark{background:#ffffff20;border-color:#ffffff55;color:#fff}
+.role-theme-secretary .secretary-stat-grid>div>svg{color:#087eaf}
+.role-theme-secretary .secretary-stat-grid strong,.role-theme-secretary .secretary-office-heading h3,.role-theme-secretary .secretary-office-side h3{color:#075477}
+.role-theme-attendance .attendance-control-hero{background-image:linear-gradient(90deg,rgba(76,91,0,.97) 0%,rgba(76,91,0,.88) 48%,rgba(76,91,0,.2) 100%),url('https://images.unsplash.com/photo-1521737711867-e3b97375f902?auto=format&fit=crop&w=1400&q=85');background-size:cover;background-position:center right;border-color:#718400;min-height:160px}
+.role-theme-attendance .attendance-control-hero h2,.role-theme-attendance .attendance-control-hero p,.role-theme-attendance .attendance-control-hero>div:first-child>span{color:#fff}
+.role-theme-attendance .attendance-today-badge{background:#ffffff20;border-color:#ffffff55;color:#fff}
+.role-theme-attendance .attendance-today-badge strong{color:#fff}
+.role-theme-attendance .attendance-rate-card h3{color:#718400}
+.role-theme-attendance .attendance-rate-track span{background:linear-gradient(90deg,#718400,#b4c83c)}
+.role-theme-teacher .teacher-workspace-hero{background-image:linear-gradient(90deg,rgba(75,35,126,.97) 0%,rgba(75,35,126,.87) 48%,rgba(75,35,126,.2) 100%),url('https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=1400&q=85');background-size:cover;background-position:center right;border-color:#7136ad;min-height:160px;color:#fff}
+.role-theme-teacher .teacher-workspace-hero h2,.role-theme-teacher .teacher-workspace-hero p:not(.eyebrow),.role-theme-teacher .teacher-workspace-hero .eyebrow{color:#fff}
+.role-theme-teacher .teacher-workspace-metrics strong,.role-theme-teacher .teacher-class-card svg{color:#7136ad}
+.role-theme-teacher .teacher-class-card{border-color:#e6d9f4;background:#fbf8ff}
+.role-theme-teacher .teacher-tool-icon.blue{background:#f0e8fb;color:#7136ad}
+.role-theme-teacher .teacher-tool-icon.purple{background:#7136ad;color:#fff}
+.role-theme-admin .admin-kpi-icon.blue{background:#e8f2ff;color:#0752a0}
+.role-theme-admin .admin-kpi-icon.violet{background:#f0eaff;color:#7136ad}
+.role-theme-admin .admin-kpi-icon.green{background:#e7f7f0;color:#07815e}
+.role-theme-admin .admin-kpi-icon.orange{background:#fff0e8;color:#e34c35}
+@media(max-width:760px){.role-theme-admin .admin-command-hero,.role-theme-dos .dos-hero,.role-theme-finance .finance-account-dashboard .dashboard-role-heading,.role-theme-secretary .secretary-office-hero,.role-theme-attendance .attendance-control-hero,.role-theme-teacher .teacher-workspace-hero{background-position:center;background-size:cover}}
