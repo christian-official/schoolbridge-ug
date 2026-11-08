@@ -140,7 +140,7 @@ function PasswordRecovery({onBack}:{onBack:()=>void}) {
       <label htmlFor="recovery-identifier">Account identifier</label><input id="recovery-identifier" value={identifier} onChange={e=>setIdentifier(e.target.value)} autoComplete="username" required placeholder="Staff number, surname or email"/>
       <button className="primary-button login-button" disabled={busy}>{busy?'Sending request...':'Send recovery code'}</button>
     </form>:<form onSubmit={confirmReset}>
-      <label htmlFor="recovery-code">Verification code</label><input id="recovery-code" value={code} onChange={e=>setCode(e.target.value.replace(/\\D/g,'').slice(0,6))} inputMode="numeric" autoComplete="one-time-code" required minLength={6} maxLength={6} placeholder="6-digit code"/>
+      <label htmlFor="recovery-code">Verification code</label><input id="recovery-code" value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,'').slice(0,6))} inputMode="numeric" autoComplete="one-time-code" required minLength={6} maxLength={6} placeholder="6-digit code"/>
       <label htmlFor="recovery-new-password">New password</label><input id="recovery-new-password" type="password" value={newPassword} onChange={e=>setNewPassword(e.target.value)} autoComplete="new-password" required minLength={8}/>
       <label htmlFor="recovery-confirm-password">Confirm new password</label><input id="recovery-confirm-password" type="password" value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)} autoComplete="new-password" required minLength={8}/>
       <button className="primary-button login-button" disabled={busy}>{busy?'Updating...':'Set new password'}</button>
@@ -1164,6 +1164,7 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
   const [error,setError]=useState('')
   const [loading,setLoading]=useState(true)
   const [busy,setBusy]=useState(false)
+  const [resetPasscode,setResetPasscode]=useState<{username:string;password:string}|null>(null)
   async function load() {
     setLoading(true);setError('')
     try {
@@ -1178,7 +1179,7 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
   }
   useEffect(()=>{void load()},[token])
   function selectAccount(id:string) {
-    setSelectedId(id)
+    setSelectedId(id);setResetPasscode(null)
     const item=users.find(u=>String(u.id)===id)
     if(item){setRoleLabel(item.role_label||item.role);setRoleType(item.role==='teacher'?'teacher':'staff');setPermissions(item.permissions||{})}
   }
@@ -1210,6 +1211,17 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
       setMessage('Staff access settings saved. The staff member should sign in again to refresh their access.')
       await load();onSaved()
     } catch(e) {setError(e instanceof Error?e.message:'Unable to save staff access settings.')}
+    finally {setBusy(false)}
+  }
+  async function resetSelectedPassword() {
+    if(!selectedId)return
+    if(!window.confirm('Issue a new temporary passcode for this staff member? Their existing password will stop working immediately.'))return
+    setBusy(true);setError('');setMessage('');setResetPasscode(null)
+    try {
+      const result=await api<{username:string;temporary_password:string;message:string}>('auth/users/'+selectedId+'/reset-password',token,{method:'POST'})
+      setResetPasscode({username:result.username,password:result.temporary_password})
+      setMessage(result.message)
+    } catch(e) {setError(e instanceof Error?e.message:'Unable to reset this staff password.')}
     finally {setBusy(false)}
   }
   async function assignClassTeacher(e:React.FormEvent) {
@@ -1258,6 +1270,8 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
         <div className="student-form-grid">{(catalog.sections||[]).map((section:string)=><label className="settings-checkbox" key={section}><input type="checkbox" checked={Boolean(permissions[section]?.includes('view'))} onChange={e=>toggleSection(section,e.target.checked)}/>{section}</label>)}</div>
       </details>
       <div className="form-actions"><button type="button" className="primary-button" onClick={()=>void savePermissions()} disabled={busy||!selectedId}>{busy?'Saving...':'Save staff access'}</button></div>
+      <div className="form-actions"><button type="button" className="secondary-button" onClick={()=>void resetSelectedPassword()} disabled={busy||!selectedId}>{busy?'Working...':'Reset login passcode'}</button></div>
+      {resetPasscode&&<div className="success-notice password-reset-result" role="status"><strong>Temporary passcode for {resetPasscode.username}</strong><code>{resetPasscode.password}</code><button type="button" className="secondary-button" onClick={()=>void navigator.clipboard.writeText('Username: '+resetPasscode.username+'\\nTemporary passcode: '+resetPasscode.password)}>Copy login details</button><small>Shown once. Share it privately; the staff member must change it at their next sign-in.</small></div>}
     </>}
     <h3>Assign classes and subjects to teachers</h3>
     <form className="student-form" onSubmit={assign}><div className="student-form-grid">
