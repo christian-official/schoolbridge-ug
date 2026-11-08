@@ -26,7 +26,7 @@ export default function Phase4Workspace({ token, role, active }: { token: string
   const [selectedStudentIds, setSelectedStudentIds] = useState<number[]>([])
   const [studentSearch, setStudentSearch] = useState('')
   const [account, setAccount] = useState({ username: '', email: '' })
-  const [issuedPasscode, setIssuedPasscode] = useState<{ username: string; email: string; password: string } | null>(null)
+  const [issuedPasscode, setIssuedPasscode] = useState<{ username: string; email: string; password: string; emailSent: boolean; emailError?: string; phone: string } | null>(null)
   const [savingAccount, setSavingAccount] = useState(false)
   const [children, setChildren] = useState<ParentChild[]>([])
   const [selectedChildId, setSelectedChildId] = useState<number | null>(null)
@@ -99,8 +99,9 @@ export default function Phase4Workspace({ token, role, active }: { token: string
     if (!selectedStudentIds.length) { setError('Select at least one student to link to this parent.'); return }
     setSavingAccount(true); setError(''); setMessage('')
     try {
-      const created = await api<{ username: string; email: string; temporary_password: string }>('parent-accounts', token, { method: 'POST', body: JSON.stringify({ ...account, student_ids: selectedStudentIds }) })
-      setIssuedPasscode({ username: created.username, email: created.email, password: created.temporary_password })
+      const created = await api<{ username: string; email: string; temporary_password: string; email_sent?: boolean; email_error?: string }>('parent-accounts', token, { method: 'POST', body: JSON.stringify({ ...account, student_ids: selectedStudentIds }) })
+      const guardianPhones = [...new Set(students.filter(student => selectedStudentIds.includes(student.id)).map(student => student.guardian_phone?.trim()).filter(Boolean))]
+      setIssuedPasscode({ username: created.username, email: created.email, password: created.temporary_password, emailSent: !!created.email_sent, emailError: created.email_error, phone: guardianPhones.join(', ') })
       setAccount({ username: '', email: '' }); setSelectedStudentIds([]); setStudentSearch('')
       await loadAdminParents()
       setMessage('Parent account created. Copy the temporary passcode and give it securely to the parent.')
@@ -129,8 +130,15 @@ export default function Phase4Workspace({ token, role, active }: { token: string
         <p>Username: <strong>{issuedPasscode.username}</strong></p>
         <p>Email: {issuedPasscode.email}</p>
         <p>Temporary passcode: <strong>{issuedPasscode.password}</strong></p>
-        <button type="button" className="secondary-button" onClick={() => void navigator.clipboard?.writeText('Username: '+issuedPasscode.username+'\nEmail: '+issuedPasscode.email+'\nTemporary passcode: '+issuedPasscode.password)}>Copy login details</button>
-        <small>This passcode is shown only once. Give it to the parent securely and ask them to change it after signing in.</small>
+        <p><strong>Email delivery:</strong> {issuedPasscode.emailSent ? 'Sent successfully.' : 'Not sent automatically.'}</p>
+        {!issuedPasscode.emailSent && <small>{issuedPasscode.emailError || 'Configure SMTP on the school server to send email automatically.'}</small>}
+        <p><strong>Registered guardian phone:</strong> {issuedPasscode.phone || 'No phone number was saved for the selected guardian.'}</p>
+        <div className="form-actions">
+          <button type="button" className="secondary-button" onClick={() => void navigator.clipboard?.writeText('SchoolBridge parent login\nUsername: '+issuedPasscode.username+'\nTemporary passcode: '+issuedPasscode.password)}>Copy login details</button>
+          {issuedPasscode.phone && <button type="button" className="secondary-button" onClick={() => void navigator.clipboard?.writeText('Your SchoolBridge parent account is ready. Username: '+issuedPasscode.username+'. Temporary passcode: '+issuedPasscode.password+'. Sign in to the school portal and change your passcode.')}>Copy SMS message</button>}
+          <button type="button" className="secondary-button" onClick={() => window.print()}>Print handover details</button>
+        </div>
+        <small>This passcode is shown only once. Share it securely and ask the parent to change it after signing in. SMS sending requires a configured provider; copying or printing is available without SMS charges.</small>
       </div>}
       <form className="student-form" onSubmit={createParentAccount}>
         <div className="student-form-grid">
