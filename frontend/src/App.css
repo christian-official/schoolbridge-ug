@@ -1998,3 +1998,166 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .role-theme-admin .content .welcome-row h1,.role-theme-dos .content .welcome-row h1,.role-theme-finance .content .welcome-row h1,.role-theme-secretary .content .welcome-row h1,.role-theme-attendance .content .welcome-row h1,.role-theme-teacher .content .welcome-row h1{color:var(--role-deep)}
 .role-theme-admin .date-chip,.role-theme-dos .date-chip,.role-theme-finance .date-chip,.role-theme-secretary .date-chip,.role-theme-attendance .date-chip,.role-theme-teacher .date-chip{border-color:color-mix(in srgb,var(--role-primary) 22%,white)}
 @media(max-width:700px){.role-theme-admin .topbar,.role-theme-dos .topbar,.role-theme-finance .topbar,.role-theme-secretary .topbar,.role-theme-attendance .topbar,.role-theme-teacher .topbar{background:var(--role-deep)}}
+
+
+/* Reference-led role dashboards: compact branded shell, photographic-style hero panels,
+   colour-coded KPI cards and role-specific lower workspaces. */
+.content{max-width:none;padding:18px 20px 22px}
+.sidebar{width:180px;padding:15px 11px 14px}
+.sidebar-brand{gap:8px;padding:0 6px 20px}
+.sidebar-brand .brand-mark{width:36px;height:36px;border-radius:10px}
+.sidebar-brand .brand-name{font-size:17px}
+.school-label{font-size:9px;padding:0 9px 10px}
+.sidebar nav{gap:4px}
+.nav-item{min-height:38px;padding:9px 10px;gap:9px;font-size:12px;border-radius:8px}
+.nav-item svg{width:16px;height:16px}
+.profile-card{padding-top:13px;gap:8px}
+.avatar{width:30px;height:30px}
+.profile-info strong{font-size:11px}
+.profile-info small{font-size:10px}
+.topbar{height:58px;padding:0 20px}
+.top-actions{gap:12px}
+.topbar .secondary-button{min-height:34px;padding:7px 10px;font-size:11px}
+.content>.welcome-row{margin-bottom:16px}
+.role-theme-admin .content,.role-theme-dos .content,.role-theme-finance .content,.role-theme-secretary .content,.role-theme-attendance .content,.role-theme-teacher .content{background:var(--role-page)}
+.role-theme-admin .panel,.role-theme-dos .panel,.role-theme-finance .panel,.role-theme-secretary .panel,.role-theme-attendance .panel,.role-theme-teacher .panel{border-radius:11px}
+
+/* Shared hero proportions and readable copy. */
+.role-theme-admin .admin-command-hero,.role-theme-dos .dos-hero,
+.role-theme-finance .finance-account-dashboard .dashboard-role-heading,
+.role-theme-secretary .secretary-office-hero,.role-theme-attendance .attendance-control-hero,
+.role-theme-teacher .teacher-workspace-hero{
+ min-height:122px!important;height:auto;padding:17px 20px;border-radius:12px;
+ display:flex;align-items:center;justify-content:space-between;gap:16px;
+ background-repeat:no-repeat;background-position:center right;background-size:cover,auto 100%;
+ box-shadow:0 4px 13px rgba(16,35,65,.08);overflow:hidden
+}
+.role-theme-admin .admin-command-hero h2,.role-theme-dos .dos-hero h2,
+.role-theme-finance .dashboard-role-heading h2,.role-theme-secretary .secretary-office-hero h2,
+.role-theme-attendance .attendance-control-hero h2,.role-theme-teacher .teacher-workspace-hero h2{
+ font-size:22px;line-height:1.2;letter-spacing:-.45px;margin:3px 0 6px
+}
+.role-theme-admin .admin-command-hero p:not(.eyebrow),.role-theme-dos .dos-hero p:not(.eyebrow),
+.role-theme-finance .dashboard-role-heading p:not(.eyebrow),.role-theme-secretary .secretary-office-hero p,
+.role-theme-attendance .attendance-control-hero p,.role-theme-teacher .teacher-workspace-hero p:not(.eyebrow){
+ font-size:13px;line-height:1.45;max-width:620px;margin:0
+}
+.role-theme-admin .admin-live-label,.role-theme-dos .dos-hero .eyebrow,
+.role-theme-finance .dashboard-role-heading .eyebrow,.role-theme-secretary .secretary-office-hero>div:first-child>span,
+.role-theme-attendance .attendance-control-hero>div:first-child>span,.role-theme-teacher .teacher-workspace-hero .eyebrow{
+ font-size:9px;letter-spacing:.12em;font-weight:800
+}
+.role-theme-admin .admin-hero-actions,.role-theme-dos .dos-hero-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.role-theme-admin .admin-hero-actions .secondary-button,.role-theme-dos .dos-hero-actions .secondary-button,
+.role-theme-finance .dashboard-role-heading .secondary-button,.role-theme-teacher .teacher-workspace-hero .secondary-button{
+ background:#ffffffed;color:var(--role-deep);border-color:#ffffffb0
+}
+
+/* Administrator: executive metrics followed by an analytical two-column workspace. */
+.role-theme-admin .admin-kpi-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:12px 0}
+.role-theme-admin .admin-kpi-card{min-height:68px;padding:12px 13px;border-radius:10px;border-color:#dce8f8;box-shadow:0 3px 10px #0b39750b}
+.role-theme-admin .admin-kpi-icon{width:36px;height:36px;border-radius:9px}
+.role-theme-admin .admin-kpi-card small{font-size:9px;letter-spacing:.04em}
+.role-theme-admin .admin-kpi-card strong{font-size:21px}
+.role-theme-admin .admin-dashboard-main-grid{grid-template-columns:minmax(0,1.55fr) minmax(250px,.9fr);gap:12px}
+.role-theme-admin .admin-dashboard-primary,.role-theme-admin .admin-dashboard-side{gap:12px}
+.role-theme-admin .admin-dashboard-panel{padding:15px;border-radius:11px}
+.role-theme-admin .admin-panel-heading{margin-bottom:12px}
+.role-theme-admin .admin-panel-heading h3{font-size:15px}
+.role-theme-admin .admin-section-kicker{font-size:9px}
+.role-theme-admin .admin-priority-list button{padding:9px 7px;gap:9px}
+.role-theme-admin .admin-priority-list button strong{font-size:11px}
+.role-theme-admin .admin-priority-list button small{font-size:10px}
+
+/* Director of Studies: three prominent academic control actions below the hero. */
+.role-theme-dos .dos-responsibility-strip{margin:12px 0;background:transparent!important;border:0;box-shadow:none;padding:0}
+.role-theme-dos .dos-responsibility-heading{display:none}
+.role-theme-dos .dos-responsibility-actions{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:0}
+.role-theme-dos .dos-responsibility-card{min-height:68px;padding:13px;border:0;border-radius:10px;box-shadow:0 4px 12px #064e3b14}
+.role-theme-dos .dos-responsibility-card:nth-child(1){background:#079b5a}
+.role-theme-dos .dos-responsibility-card:nth-child(2){background:#0865e8}
+.role-theme-dos .dos-responsibility-card:nth-child(3){background:#792bda}
+.role-theme-dos .dos-responsibility-card strong{color:#fff;font-size:13px}
+.role-theme-dos .dos-responsibility-card small{color:#ffffffd9;font-size:10px}
+.role-theme-dos .dos-responsibility-card>svg{color:#fff}
+.role-theme-dos .dos-responsibility-icon{background:#ffffff20!important;color:#fff!important}
+.role-theme-dos .dos-metric-strip{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:12px 0}
+.role-theme-dos .dos-metric{padding:12px;border-radius:10px}
+.role-theme-dos .dos-management-grid{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:12px}
+.role-theme-dos .dos-results-panel,.role-theme-dos .dos-priority-panel{padding:15px;border-radius:11px}
+.role-theme-dos .dos-oversight-list{gap:7px}
+.role-theme-dos .dos-oversight-item{padding:9px;border-radius:9px}
+
+/* Bursar: burgundy finance identity with clear monetary cards and finance shortcuts. */
+.role-theme-finance .role-dashboard-stats{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:12px 0}
+.role-theme-finance .role-dashboard-stats .stat-card{padding:13px;border-radius:10px}
+.role-theme-finance .role-dashboard-stats .stat-value{font-size:19px;overflow-wrap:anywhere}
+.role-theme-finance .role-dashboard-stats .stat-top{font-size:10px}
+.role-theme-finance .role-dashboard-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.role-theme-finance .role-dashboard-actions .quick-action{border:1px solid #f1d9df;border-radius:10px;background:#fff;padding:13px}
+.role-theme-finance .role-dashboard-actions .quick-action strong{color:#7d102d}
+.role-theme-finance .role-dashboard-actions .quick-action small{font-size:11px}
+
+/* Secretary: blue records office with compact indicators and correspondence-like action rows. */
+.role-theme-secretary .secretary-stat-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:12px 0}
+.role-theme-secretary .secretary-stat-grid>div{padding:13px;border-radius:10px;min-height:70px}
+.role-theme-secretary .secretary-stat-grid>div>svg{width:22px;height:22px}
+.role-theme-secretary .secretary-stat-grid strong{font-size:20px}
+.role-theme-secretary .secretary-office-layout{grid-template-columns:minmax(0,1.5fr) minmax(230px,.85fr);gap:12px}
+.role-theme-secretary .secretary-office-main,.role-theme-secretary .secretary-office-side{padding:15px;border-radius:11px}
+.role-theme-secretary .secretary-office-actions{gap:7px}
+.role-theme-secretary .secretary-office-actions>button{padding:10px;border-radius:9px}
+.role-theme-secretary .secretary-office-actions>button strong{font-size:12px}
+.role-theme-secretary .secretary-office-actions>button small{font-size:10px}
+
+/* Attendance: olive control room with four readable attendance indicators and trend/follow-up panels. */
+.role-theme-attendance .attendance-overview-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:12px 0}
+.role-theme-attendance .attendance-rate-card,.role-theme-attendance .attendance-count-card{min-height:88px;padding:13px;border-radius:10px}
+.role-theme-attendance .attendance-rate-card h3{font-size:25px}
+.role-theme-attendance .attendance-count-card strong{font-size:22px}
+.role-theme-attendance .attendance-control-lower{grid-template-columns:minmax(0,1.4fr) minmax(230px,.9fr);gap:12px}
+.role-theme-attendance .attendance-control-panel,.role-theme-attendance .attendance-followup-panel{padding:15px;border-radius:11px}
+.role-theme-attendance .attendance-control-links{gap:7px}
+.role-theme-attendance .attendance-control-links button{padding:10px;border-radius:9px}
+.role-theme-attendance .attendance-control-links button strong{font-size:12px}
+.role-theme-attendance .attendance-control-links button small{font-size:10px}
+
+/* Teacher and Headteacher: purple teaching workspace, class list and teaching tools. */
+.role-theme-teacher .teacher-workspace-metrics{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0}
+.role-theme-teacher .teacher-workspace-metrics>div{padding:13px;border-radius:10px}
+.role-theme-teacher .teacher-workspace-metrics strong{font-size:22px}
+.role-theme-teacher .teacher-workspace-layout{grid-template-columns:minmax(0,1.35fr) minmax(240px,.9fr);gap:12px}
+.role-theme-teacher .teacher-workspace-layout>.panel,.role-theme-teacher .teacher-tools-panel{padding:15px;border-radius:11px}
+.role-theme-teacher .teacher-class-card{padding:10px;border-radius:9px}
+.role-theme-teacher .teacher-tool-link{padding:10px;border-radius:9px}
+.role-theme-teacher .teacher-tool-link strong{font-size:12px}
+.role-theme-teacher .teacher-tool-link small{font-size:10px;line-height:1.4}
+
+/* Responsive layout keeps the same role hierarchy without horizontal overflow. */
+@media(max-width:1050px){
+ .sidebar{width:190px}
+ .role-theme-admin .admin-dashboard-main-grid,.role-theme-dos .dos-management-grid,
+ .role-theme-secretary .secretary-office-layout,.role-theme-attendance .attendance-control-lower,
+ .role-theme-teacher .teacher-workspace-layout{grid-template-columns:1fr}
+}
+@media(max-width:760px){
+ .content{padding:14px 12px}
+ .sidebar{width:270px}
+ .role-theme-admin .admin-kpi-grid,.role-theme-dos .dos-metric-strip,
+ .role-theme-finance .role-dashboard-stats,.role-theme-secretary .secretary-stat-grid,
+ .role-theme-attendance .attendance-overview-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .role-theme-dos .dos-responsibility-actions{grid-template-columns:1fr}
+ .role-theme-admin .admin-command-hero,.role-theme-dos .dos-hero,
+ .role-theme-finance .finance-account-dashboard .dashboard-role-heading,
+ .role-theme-secretary .secretary-office-hero,.role-theme-attendance .attendance-control-hero,
+ .role-theme-teacher .teacher-workspace-hero{min-height:112px!important;padding:14px}
+ .role-theme-admin .admin-command-hero h2,.role-theme-dos .dos-hero h2,
+ .role-theme-finance .dashboard-role-heading h2,.role-theme-secretary .secretary-office-hero h2,
+ .role-theme-attendance .attendance-control-hero h2,.role-theme-teacher .teacher-workspace-hero h2{font-size:19px}
+ .role-theme-teacher .teacher-workspace-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:480px){
+ .role-theme-finance .role-dashboard-actions{grid-template-columns:1fr}
+ .role-theme-attendance .attendance-overview-grid{grid-template-columns:1fr 1fr}
+ .role-theme-teacher .teacher-workspace-metrics{grid-template-columns:1fr 1fr}
+}
