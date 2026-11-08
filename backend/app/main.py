@@ -1,4 +1,5 @@
 import os
+import json
 import re
 import secrets
 import smtplib
@@ -49,9 +50,72 @@ def get_current_user(
     return user
 
 
-def require_admin(user=Depends(get_current_user)):
-    if user.role != "admin":
+PERMISSION_SECTIONS = {
+    "Overview", "Students", "Staff", "Fees & Finance", "Examinations",
+    "Attendance", "Staff Attendance", "Timetable", "Leadership & Duty",
+    "Parent Access", "Announcements", "Reports", "Settings",
+    "My Classes", "My Attendance", "My Results",
+}
+PERMISSION_ACTIONS = {"view", "add", "edit", "delete", "approve", "print"}
+ADMIN_ONLY_PATHS = {
+    "/api/auth/users", "/api/auth/teachers", "/api/auth/permissions",
+    "/api/parent-accounts", "/api/teacher-assignments",
+}
+
+
+def user_permissions(user):
+    if user.role == "admin":
+        return {section: set(PERMISSION_ACTIONS) for section in PERMISSION_SECTIONS}
+    try:
+        raw = json.loads(user.permissions_json or "{}")
+    except (TypeError, ValueError):
+        raw = {}
+    clean = {}
+    if isinstance(raw, dict):
+        for section, actions in raw.items():
+            if section in PERMISSION_SECTIONS and isinstance(actions, list):
+                clean[section] = set(actions) & PERMISSION_ACTIONS
+    if user.role == "teacher" and not clean:
+        clean = {
+            "My Classes": {"view"}, "Attendance": {"view", "add"},
+            "My Attendance": {"view"}, "My Results": {"view"},
+            "Announcements": {"view"},
+        }
+    return clean
+
+
+def permission_for_path(path: str):
+    if path.startswith("/api/students"): return "Students"
+    if path.startswith("/api/staff"): return "Staff"
+    if path.startswith(("/api/finance", "/api/fees", "/api/salary", "/api/expenses")): return "Fees & Finance"
+    if path.startswith(("/api/exams", "/api/marks", "/api/grades", "/api/subjects")): return "Examinations"
+    if path.startswith("/api/attendance"): return "Attendance"
+    if path.startswith("/api/staff-attendance"): return "Staff Attendance"
+    if path.startswith("/api/timetable"): return "Timetable"
+    if path.startswith(("/api/leadership", "/api/prefects", "/api/teacher-duties")): return "Leadership & Duty"
+    if path.startswith("/api/parent-accounts"): return "Parent Access"
+    if path.startswith("/api/announcements"): return "Announcements"
+    if path.startswith("/api/reports"): return "Reports"
+    if path.startswith("/api/settings"): return "Settings"
+    if path.startswith("/api/dashboard"): return "Overview"
+    if path.startswith("/api/classes"): return "Students"
+    return None
+
+
+def action_for_method(method: str):
+    return {"GET": "view", "POST": "add", "PUT": "edit", "PATCH": "edit", "DELETE": "delete"}.get(method, "view")
+
+
+def require_admin(request: Request, user=Depends(get_current_user)):
+    path = request.url.path
+    if user.role == "admin":
+        return user
+    if path in ADMIN_ONLY_PATHS or path.startswith("/api/auth/"):
         raise HTTPException(403, "Administrator permission required.")
+    section = permission_for_path(path)
+    action = action_for_method(request.method)
+    if not section or action not in user_permissions(user).get(section, set()):
+        raise HTTPException(403, "You do not have permission to perform this action.")
     return user
 
 
@@ -1305,33 +1369,21 @@ async def protect_school_data(request: Request, call_next):
 
         if path == "/api/auth/me":
             pass
-        elif path in {
-            "/api/teacher/my-assignments", "/api/teacher/my-staff-attendance",
-            "/api/teacher/students", "/api/teacher/attendance",
-            "/api/teacher/exams", "/api/teacher/marks",
-        }:
+        elif path.startswith("/api/teacher/"):
             if user.role != "teacher":
-                return JSONResponse(
-                    {"detail": "Teacher permission required."},
-                    status_code=403,
-                )
+                return JSONResponse({"detail": "Teacher account required."}, status_code=403)
         elif path.startswith("/api/parent/"):
             if user.role != "parent":
-                return JSONResponse(
-                    {"detail": "Parent permission required."},
-                    status_code=403,
-                )
-        elif path == "/api/announcements":
-            if user.role not in {"admin", "teacher", "parent"}:
-                return JSONResponse(
-                    {"detail": "School account permission required."},
-                    status_code=403,
-                )
+                return JSONResponse({"detail": "Parent account required."}, status_code=403)
+        elif path == "/api/announcements" and user.role == "parent":
+            pass
         elif user.role != "admin":
-            return JSONResponse(
-                {"detail": "Administrator permission required."},
-                status_code=403,
-            )
+            if path in ADMIN_ONLY_PATHS or path.startswith("/api/auth/"):
+                return JSONResponse({"detail": "Administrator permission required."}, status_code=403)
+            section = permission_for_path(path)
+            action = action_for_method(request.method)
+            if not section or action not in user_permissions(user).get(section, set()):
+                return JSONResponse({"detail": "You do not have permission to access this section or perform this action."}, status_code=403)
 
         return await call_next(request)
     finally:
@@ -1368,6 +1420,8 @@ def current_account(user=Depends(get_current_user)):
         "username": user.username,
         "email": user.email,
         "role": user.role,
+        "role_label": user.role_label or user.role.title(),
+        "permissions": {k: sorted(v) for k, v in user_permissions(user).items()},
         "active": user.is_active,
     }
 
@@ -1403,6 +1457,50 @@ def create_teacher(
     }
 
 
+class UserPermissionsUpdate(BaseModel):
+    role: str = Field(pattern="^(teacher|staff)$")
+    role_label: str = Field(min_length=2, max_length=80)
+    permissions: dict[str, list[str]]
+
+
+@app.get("/api/auth/permissions", tags=["User Management"])
+def permission_catalog(admin=Depends(require_admin)):
+    presets = {
+        "Headteacher": ["Overview", "Students", "Staff", "Fees & Finance", "Examinations", "Attendance", "Staff Attendance", "Timetable", "Leadership & Duty", "Parent Access", "Announcements", "Reports"],
+        "Deputy Headteacher": ["Overview", "Students", "Staff", "Examinations", "Attendance", "Timetable", "Leadership & Duty", "Announcements", "Reports"],
+        "DOS": ["Overview", "Examinations", "Attendance", "Timetable", "Students", "Reports", "Announcements"],
+        "Bursar": ["Overview", "Fees & Finance", "Students", "Reports"],
+        "Accountant": ["Overview", "Fees & Finance", "Staff", "Reports"],
+        "Secretary": ["Overview", "Students", "Staff", "Parent Access", "Announcements", "Reports"],
+        "Teacher": ["My Classes", "Attendance", "My Attendance", "My Results", "Announcements", "Timetable"],
+        "Class Teacher": ["My Classes", "Students", "Attendance", "My Attendance", "My Results", "Announcements", "Timetable"],
+    }
+    return {"sections": sorted(PERMISSION_SECTIONS), "actions": sorted(PERMISSION_ACTIONS), "presets": presets}
+
+
+@app.put("/api/auth/users/{user_id}/permissions", tags=["User Management"])
+def update_user_permissions(user_id: int, data: UserPermissionsUpdate, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    target = db.get(models.User, user_id)
+    if not target or target.role in {"admin", "parent"}:
+        raise HTTPException(404, "Staff login account not found.")
+    cleaned = {}
+    for section, actions in data.permissions.items():
+        if section not in PERMISSION_SECTIONS or not isinstance(actions, list):
+            raise HTTPException(422, "Invalid permission section.")
+        invalid = set(actions) - PERMISSION_ACTIONS
+        if invalid:
+            raise HTTPException(422, "Invalid permission action.")
+        if actions:
+            cleaned[section] = sorted(set(actions))
+    if data.role == "teacher" and not any(k in cleaned for k in ("My Classes", "Attendance", "My Results")):
+        raise HTTPException(422, "Teacher accounts must retain at least one teaching permission.")
+    target.role = data.role
+    target.role_label = data.role_label.strip()
+    target.permissions_json = json.dumps(cleaned)
+    db.commit()
+    return {"id": target.id, "role": target.role, "role_label": target.role_label, "permissions": cleaned}
+
+
 @app.get("/api/auth/users", tags=["User Management"])
 def list_users(
     db: Session = Depends(get_db),
@@ -1415,6 +1513,8 @@ def list_users(
             "username": u.username,
             "email": u.email,
             "role": u.role,
+            "role_label": u.role_label or u.role.title(),
+            "permissions": {k: sorted(v) for k, v in user_permissions(u).items()},
             "active": u.is_active,
         }
         for u in users
