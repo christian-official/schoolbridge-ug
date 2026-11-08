@@ -475,7 +475,7 @@ export default function AcademicManagement({ token, classes }: { token: string; 
             </select>
           </label>
           <div className="subject-marks-count"><strong>{selectedSubjectId ? eligibleStudents.length : students.length}</strong><span>{selectedSubjectId ? 'students offering this subject' : 'students in this class'}</span></div>
-          <button type="button" className="primary-button" onClick={() => void saveClassMarks()} disabled={saving || !students.length || !selectedSubjectId}><Save size={15}/>{saving ? 'Saving scores…' : 'Save subject scores'}</button>
+          <button type="button" className="primary-button" onClick={() => void saveClassMarks()} disabled={saving || !eligibleStudents.length || !selectedSubjectId}><Save size={15}/>{saving ? 'Saving scores…' : 'Save subject scores'}</button>
         </div>
         {!students.length && <p className="form-hint">No students are registered in this class yet.</p>}
         {!subjects.length && <p className="form-hint">No subjects are configured for this school type.</p>}
@@ -493,7 +493,7 @@ export default function AcademicManagement({ token, classes }: { token: string; 
               <span className={mark?.verified ? 'student-score-status verified' : mark ? 'student-score-status recorded' : 'student-score-status pending'}>{mark?.verified ? 'Verified' : mark ? 'Recorded' : 'Not entered'}</span>
             </div>
           })}
-          <div className="student-score-footer"><span>Blank scores are skipped. Scores must be between 0 and 100.</span><button type="button" className="primary-button" onClick={() => void saveClassMarks()} disabled={saving}><Save size={15}/>{saving ? 'Saving…' : 'Save scores'}</button></div>
+          <div className="student-score-footer"><span>Blank scores are skipped. Scores must be between 0 and 100.</span><button type="button" className="primary-button" onClick={() => void saveClassMarks()} disabled={saving || !eligibleStudents.length}><Save size={15}/>{saving ? 'Saving…' : 'Save scores'}</button></div>
         </div>}
         <details className="recorded-marks-details"><summary>Recorded scores · by subject and verification status</summary>
           <div className="recorded-marks-filters"><label>Subject<select value={recordedSubjectFilter} onChange={e => setRecordedSubjectFilter(e.target.value)}><option value="all">All subjects</option>{subjects.map(subject => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label><label>Verification status<select value={recordedStatusFilter} onChange={e => setRecordedStatusFilter(e.target.value as 'all' | 'verified' | 'unverified')}><option value="all">All statuses</option><option value="verified">Verified</option><option value="unverified">Unverified</option></select></label></div>
