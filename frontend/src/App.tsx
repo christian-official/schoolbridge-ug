@@ -1031,6 +1031,7 @@ type TeacherAssignment = {assignment_id:number;class_id:number;class:string;subj
 type TeacherStudent = {id:number;first_name:string;last_name:string;admission_number:string;class_id:number}
 type TeacherExam = {id:number;name:string;term:string;year:number;class_id:number|null;assigned_subjects:{id:number;name:string}[]}
 type TeacherMark = {id:number;student_id:number;subject_id:number;exam_id:number;score:number;verified:boolean;student_name:string;admission_number:string;class_id:number|null}
+type TeacherResultStatus = {subject_id:number;submitted_count:number;pending_count:number;verified_count:number;status:'Not verified'|'Verified'|'Not submitted'}
 type TeacherOwnAttendance = {staff_name:string;staff_number:string;today:{attendance_date:string;status:string;check_in_at?:string|null;check_out_at?:string|null};records:{id:number;attendance_date:string;status:string;notes?:string|null;check_in_at?:string|null;check_out_at?:string|null}[]}
 type ClassTeacherAssignment = {assignment_id:number;class_id:number;class:string}
 
@@ -1049,6 +1050,7 @@ function TeacherWorkspace({token,active}:{token:string;active:string}) {
   const [examId,setExamId]=useState('')
   const [resultStudents,setResultStudents]=useState<TeacherStudent[]>([])
   const [resultMarks,setResultMarks]=useState<TeacherMark[]>([])
+  const [resultStatuses,setResultStatuses]=useState<TeacherResultStatus[]>([])
   const [selectedSubjectId,setSelectedSubjectId]=useState('')
   const [resultScores,setResultScores]=useState<Record<number,string>>({})
   const [resultMessage,setResultMessage]=useState('')
@@ -1106,8 +1108,22 @@ function TeacherWorkspace({token,active}:{token:string;active:string}) {
   const teacherExamGroups=Array.from(new Map(visibleTeacherExams.map(exam=>[teacherExamGroupKey(exam),exam])).values())
   const selectedTeacherExam=teacherExams.find(exam=>String(exam.id)===examId)||null
   const assignedSubjects=selectedTeacherExam?.assigned_subjects||[]
-  const currentSubjectSubmittedCount = resultStudents.filter(student => resultMarks.some(mark => mark.student_id === student.id && mark.subject_id === Number(selectedSubjectId))).length
+  const currentSubjectStatus=resultStatuses.find(row=>row.subject_id===Number(selectedSubjectId))
+  const currentSubjectIsVerified=currentSubjectStatus?.status==='Verified'
+  const currentSubjectSubmittedCount = currentSubjectStatus?.submitted_count ?? resultStudents.filter(student => resultMarks.some(mark => mark.student_id === student.id && mark.subject_id === Number(selectedSubjectId))).length
   const currentSubjectProgress = resultStudents.length ? Math.round(currentSubjectSubmittedCount / resultStudents.length * 100) : 0
+  async function refreshTeacherResultStatus(){
+    if(!selectedTeacherExam)return
+    try{
+      const [markRows,statusRows]=await Promise.all([
+        api<TeacherMark[]>('teacher/marks?exam_id='+selectedTeacherExam.id,token),
+        api<TeacherResultStatus[]>('teacher/result-status?exam_id='+selectedTeacherExam.id,token),
+      ])
+      setResultMarks(markRows);setResultStatuses(statusRows)
+      const current=statusRows.find(row=>row.subject_id===Number(selectedSubjectId))
+      if(current?.status==='Verified'){setResultStudents([]);setResultScores({});setResultSubmissionComplete(false);setResultMessage('These results have been verified. The student list is now locked and hidden from your account.')}
+    }catch(error){setResultError(error instanceof Error?error.message:'Unable to refresh result status.')}
+  }
   useEffect(()=>{
     if(active!=='My Results'||!selectedTeacherExam){setResultStudents([]);setResultMarks([]);return}
     let cancelled=false
@@ -1115,10 +1131,12 @@ function TeacherWorkspace({token,active}:{token:string;active:string}) {
     Promise.all([
       api<TeacherStudent[]>('teacher/students?class_id='+selectedTeacherExam.class_id,token),
       api<TeacherMark[]>('teacher/marks?exam_id='+selectedTeacherExam.id,token),
-    ]).then(([studentRows,markRows])=>{
+      api<TeacherResultStatus[]>('teacher/result-status?exam_id='+selectedTeacherExam.id,token),
+    ]).then(([studentRows,markRows,statusRows])=>{
       if(cancelled)return
       setResultStudents(studentRows)
       setResultMarks(markRows)
+      setResultStatuses(statusRows)
     }).catch(e=>{if(!cancelled)setResultError(e.message)})
     return ()=>{cancelled=true}
   },[active,examId,selectedTeacherExam?.class_id,token])
@@ -1161,7 +1179,7 @@ function TeacherWorkspace({token,active}:{token:string;active:string}) {
   </div>
     if(active==='My Results') return <div className="academic-workspace">
     <section className="panel">
-      <div className="panel-heading"><div><h2>Class results entry</h2><p>Your assigned subject and class are loaded automatically. Enter the whole class register and submit once. Blank scores are submitted as <strong>No score (0)</strong> for academic officers to review.</p></div>{selectedTeacherExam&&<button type="button" className="secondary-button" disabled={resultSaving} onClick={()=>api<TeacherMark[]>('teacher/marks?exam_id='+selectedTeacherExam.id,token).then(setResultMarks).catch(e=>setResultError(e instanceof Error?e.message:'Unable to refresh result status.'))}>Refresh status</button>}</div>
+      <div className="panel-heading"><div><h2>Class results entry</h2><p>Your assigned subject and class are loaded automatically. Enter the whole class register and submit once. Blank scores are submitted as <strong>No score (0)</strong> for academic officers to review.</p></div>{selectedTeacherExam&&<button type="button" className="secondary-button" disabled={resultSaving} onClick={()=>void refreshTeacherResultStatus()}>Refresh status</button>}</div>
       {resultError&&<div className="form-error" role="alert">{resultError}</div>}
       {resultMessage&&<div className="success-notice" role="status">{resultMessage}</div>}
       <div className="teacher-exam-selection">
@@ -1170,24 +1188,25 @@ function TeacherWorkspace({token,active}:{token:string;active:string}) {
          <div className="exam-flow-step"><span className="form-section-number">02</span><div><strong>Choose examination</strong><small>Select the term and academic year.</small></div></div>
          <div className="exam-choice-grid">{teacherExamGroups.map(exam=>{const key=teacherExamGroupKey(exam);return <button type="button" key={key} className={selectedTeacherExamGroupKey===key?'exam-choice active':'exam-choice'} aria-pressed={selectedTeacherExamGroupKey===key} onClick={()=>{setSelectedTeacherExamGroupKey(key);setExamId('');setSelectedSubjectId('');setResultSubmissionComplete(false)}}><strong>{teacherExamTypes.includes(exam.name)?exam.name:'Other'}</strong><span>{exam.term} · {exam.year}</span><small>{visibleTeacherExams.filter(row=>teacherExamGroupKey(row)===key).length} assigned class(es)</small></button>})}{!teacherExamGroups.length&&<p className="form-hint">No examinations are available under this category for your assigned classes and subjects.</p>}</div>
          {selectedTeacherExamGroupKey&&<><div className="exam-flow-step"><span className="form-section-number">03</span><div><strong>Choose class</strong><small>Open the assigned class examination.</small></div></div><div className="exam-class-choices">{teacherExams.filter(exam=>teacherExamGroupKey(exam)===selectedTeacherExamGroupKey).map(exam=><button type="button" key={exam.id} className={examId===String(exam.id)?'exam-class-choice active':'exam-class-choice'} aria-pressed={examId===String(exam.id)} onClick={()=>{setExamId(String(exam.id));setSelectedSubjectId(String(exam.assigned_subjects?.[0]?.id||''));setResultSubmissionComplete(false)}}>{assignments.find(row=>row.class_id===exam.class_id)?.class||'Assigned class'}</button>)}</div></>}
-         {selectedTeacherExam&&<><div className="exam-flow-step"><span className="form-section-number">04</span><div><strong>Choose assigned subject</strong><small>Only subjects assigned to you for this examination are shown.</small></div></div><div className="subject-choice-options">{assignedSubjects.map(subject=><button type="button" key={subject.id} className={selectedSubjectId===String(subject.id)?'exam-pill active':'exam-pill'} aria-pressed={selectedSubjectId===String(subject.id)} onClick={()=>{setSelectedSubjectId(String(subject.id));setResultSubmissionComplete(false)}}>{subject.name}</button>)}</div></>}
+         {selectedTeacherExam&&<><div className="exam-flow-step"><span className="form-section-number">04</span><div><strong>Choose assigned subject</strong><small>Only subjects assigned to you for this examination are shown.</small></div></div><div className="subject-choice-options">{assignedSubjects.map(subject=>{const status=resultStatuses.find(row=>row.subject_id===subject.id)?.status||'Not submitted';return <button type="button" key={subject.id} className={selectedSubjectId===String(subject.id)?'exam-pill active':'exam-pill'} aria-pressed={selectedSubjectId===String(subject.id)} onClick={()=>{setSelectedSubjectId(String(subject.id));setResultSubmissionComplete(false)}}>{subject.name} · {status}</button>})}</div></>}
        </div>
-      {selectedTeacherExam&&<p className="form-hint">Class: {assignments.find(row=>row.class_id===selectedTeacherExam.class_id)?.class || 'Assigned class'} · {resultStudents.length} active students loaded.</p>}
+      {selectedTeacherExam&&<p className="form-hint">Class: {assignments.find(row=>row.class_id===selectedTeacherExam.class_id)?.class || 'Assigned class'} · {currentSubjectStatus?.status||'Not submitted'}</p>}
+      {currentSubjectIsVerified&&<section className="teacher-results-complete verified-results-lock" role="status"><div className="teacher-results-complete-icon">✓</div><h3>Results verified and locked</h3><p>The academic officer has verified this subject's results. The student list and individual scores are no longer available in your teacher account.</p><span className="student-score-status verified">Verified</span></section>}
       {!teacherExams.length&&<p className="form-hint">No examinations are available for your assigned subject and class combinations.</p>}
       {selectedTeacherExam&&selectedSubjectId&&<>
         <div className="teacher-results-progress">
           <div><strong>Submission progress</strong><span>{currentSubjectSubmittedCount} of {resultStudents.length} student records submitted · {currentSubjectProgress}%</span></div>
           <div className="teacher-results-progress-track"><span style={{width:(resultSaving?Math.max(currentSubjectProgress,65):currentSubjectProgress)+'%'}}/></div>
         </div>
-        {resultSubmissionComplete ? <section className="teacher-results-complete" role="status">
+        {currentSubjectIsVerified ? null : resultSubmissionComplete ? <section className="teacher-results-complete" role="status">
           <div className="teacher-results-complete-icon">✓</div><h3>Class results submitted</h3>
           <p>{resultStudents.length} student records for {assignedSubjects.find(subject=>String(subject.id)===selectedSubjectId)?.name || 'this subject'} have been sent to the academic officers.</p>
-          <span className="student-score-status recorded">Submitted · Not verified</span>
-          <p className="form-hint">The academic officer will review and verify these results. Once verified, the status will update here automatically when you refresh.</p>
+          <span className="student-score-status recorded">Not verified</span>
+          <p className="form-hint">The academic officer will review these results. After verification, the student list will close and the subject will be labelled Verified.</p>
           <button type="button" className="secondary-button" onClick={()=>{const next=assignedSubjects.find(subject=>String(subject.id)!==selectedSubjectId&&!resultMarks.some(mark=>mark.subject_id===subject.id));if(next)setSelectedSubjectId(String(next.id));setResultSubmissionComplete(false)}}>Continue to another subject / review scores</button>
         </section> : <form className="student-form" onSubmit={saveTeacherMarksBulk}>
           <div className="table-wrap"><table><thead><tr><th>#</th><th>Student</th><th>Admission number</th><th>Score (0–100)</th><th>Status</th></tr></thead><tbody>
-            {resultStudents.map((student,index)=>{const mark=resultMarks.find(row=>row.student_id===student.id&&row.subject_id===Number(selectedSubjectId));return <tr key={student.id}><td>{index+1}</td><td>{student.first_name} {student.last_name}</td><td>{student.admission_number}</td><td><input aria-label={'Score for '+student.first_name+' '+student.last_name} type="number" min="0" max="100" step="0.01" required value={resultScores[student.id]??''} disabled={Boolean(mark?.verified)} onChange={e=>setResultScores(old=>({...old,[student.id]:e.target.value}))}/></td><td>{mark?.verified?'Verified':mark?'Submitted · Not verified':'Not submitted'}</td></tr>})}
+            {resultStudents.map((student,index)=>{const mark=resultMarks.find(row=>row.student_id===student.id&&row.subject_id===Number(selectedSubjectId));return <tr key={student.id}><td>{index+1}</td><td>{student.first_name} {student.last_name}</td><td>{student.admission_number}</td><td><input aria-label={'Score for '+student.first_name+' '+student.last_name} type="number" min="0" max="100" step="0.01" required value={resultScores[student.id]??''} disabled={Boolean(mark?.verified)} onChange={e=>setResultScores(old=>({...old,[student.id]:e.target.value}))}/></td><td>{mark?'Not verified':'Not submitted'}</td></tr>})}
             {!resultStudents.length&&<tr><td colSpan={5}>No active students are registered in this class.</td></tr>}
           </tbody></table></div>
           <div className="form-actions"><button className="primary-button" disabled={resultSaving||!resultStudents.length}>{resultSaving?'Submitting class results...':'Submit all class results'}</button></div>
