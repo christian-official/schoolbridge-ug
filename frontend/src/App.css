@@ -1368,3 +1368,17 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .student-form input[type=file] { max-width:100%; padding:8px; border:1px dashed #cbd6e7; border-radius:8px; background:#fff; color:#43536d; cursor:pointer; }
 .student-form input[type=file]::file-selector-button { margin-right:10px; padding:8px 11px; border:0; border-radius:6px; background:#eaf0ff; color:#3157b7; font:700 11px inherit; cursor:pointer; }
 .student-form input[type=file]::file-selector-button:hover { background:#dce7ff; }
+
+/* Password recovery and account recovery controls */
+.recovery-link { display: block; margin: 14px auto 0; padding: 4px; border: 0; background: transparent; color: #315ee8; font-size: 11px; font-weight: 700; cursor: pointer; }
+.password-recovery h2 { color: #243550; font: 800 19px Manrope,sans-serif; margin: 0 0 8px; }
+.password-recovery > .muted { margin: 0 0 18px; font-size: 11px; line-height: 1.6; }
+.password-recovery form { display: grid; margin-top: 18px; }
+.password-recovery label { color: #52617a; font-size: 11px; font-weight: 700; margin: 0 0 7px; }
+.password-recovery input { border: 1px solid #e5eaf2; border-radius: 8px; padding: 12px; outline: none; margin-bottom: 17px; font-size: 12px; }
+.password-recovery input:focus { border-color: #7893f3; box-shadow: 0 0 0 3px #315ee812; }
+.recovery-secondary { margin-top: 10px; }
+.recovery-back { display: block; margin: 18px auto 0; border: 0; background: transparent; color: #65748b; font-size: 11px; cursor: pointer; }
+.password-reset-result { display: grid; gap: 9px; margin-top: 12px; }
+.password-reset-result code { display: block; padding: 10px; border-radius: 7px; background: #fff; color: #243550; font-size: 13px; overflow-wrap: anywhere; }
+.password-reset-result small { color: #52617a; line-height: 1.5; }
