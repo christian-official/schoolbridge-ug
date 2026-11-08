@@ -159,7 +159,7 @@ function App() {
 
   const [schoolConfig, setSchoolConfig] = useState<any>({ school_type: 'Primary', a_level_combinations: '', o_level_optional_subjects: '', a_level_subsidiary_subjects: '' })
 
-  useEffect(()=>{if(token)api<any>('settings/school-profile',token).then(setSchoolConfig).catch(()=>{})},[token,active])
+  useEffect(()=>{if(token && user?.role==='admin')api<any>('settings/school-profile',token).then(setSchoolConfig).catch(()=>{})},[token,user?.role])
 
   async function loadSchoolData(authToken: string) {
     setDataError('')
