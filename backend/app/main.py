@@ -78,13 +78,17 @@ def user_permissions(user):
     if user.role == "teacher" and not clean:
         clean = {
             "My Classes": {"view"}, "Attendance": {"view", "add"},
-            "My Attendance": {"view"}, "My Results": {"view"},
+            "My Attendance": {"view"}, "My Results": {"view", "add", "edit"},
             "Announcements": {"view"},
         }
     return clean
 
 
 def permission_for_path(path: str):
+    if path.startswith("/api/teacher/my-assignments") or path.startswith("/api/teacher/students"): return "My Classes"
+    if path.startswith("/api/teacher/my-staff-attendance"): return "My Attendance"
+    if path.startswith("/api/teacher/attendance"): return "Attendance"
+    if path.startswith(("/api/teacher/marks", "/api/teacher/exams")): return "My Results"
     if path.startswith("/api/students"): return "Students"
     if path.startswith("/api/staff"): return "Staff"
     if path.startswith(("/api/finance", "/api/fees", "/api/salary", "/api/expenses")): return "Fees & Finance"
@@ -1372,6 +1376,10 @@ async def protect_school_data(request: Request, call_next):
         elif path.startswith("/api/teacher/"):
             if user.role != "teacher":
                 return JSONResponse({"detail": "Teacher account required."}, status_code=403)
+            section = permission_for_path(path)
+            action = action_for_method(request.method)
+            if not section or action not in user_permissions(user).get(section, set()):
+                return JSONResponse({"detail": "Your teacher account is not permitted to perform this action."}, status_code=403)
         elif path.startswith("/api/parent/"):
             if user.role != "parent":
                 return JSONResponse({"detail": "Parent account required."}, status_code=403)
