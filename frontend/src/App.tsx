@@ -104,7 +104,7 @@ function getStaffNavigation(user:User) {
     (item.label === 'Attendance' && (user.permissions?.['Staff Attendance'] || []).includes('view'))
   )
   const role = (user.role_label || '').toLowerCase()
-  const priority = /secretary|office administrator/.test(role)
+  const priority = /teacher/.test(role) && !/head ?teacher|deputy/.test(role)\n    ? ['Overview','My Classes','My Results','Timetable','Attendance','My Attendance','Announcements','My Profile']\n    : /secretary|office administrator/.test(role)
     ? ['Overview','Students','Staff','Parent Access','Announcements','Reports','My Attendance','My Profile']
     : /attendance/.test(role)
       ? ['Overview','Attendance','My Attendance','Staff','Reports','Announcements','My Profile']
@@ -256,6 +256,51 @@ function PersonalDashboard({token,username,onNavigate}:{token:string;username:st
         {!data.available_sections.length&&<p className="form-hint">No school work areas have been assigned. Contact the administrator.</p>}
       </>}
     </section>
+  </div>
+}
+
+function TeacherDashboard({token,username,onNavigate}:{token:string;username:string;onNavigate:(section:string)=>void}) {
+  const [data,setData]=useState<PersonalDashboardData|null>(null)
+  const [error,setError]=useState('')
+  const [loading,setLoading]=useState(true)
+  const [refreshCount,setRefreshCount]=useState(0)
+  useEffect(()=>{
+    let cancelled=false
+    setLoading(true);setError('')
+    api<PersonalDashboardData>('dashboard/my-work',token).then(result=>{if(!cancelled)setData(result)})
+      .catch(e=>{if(!cancelled)setError(e instanceof Error?e.message:'Unable to load your teaching workspace.')})
+      .finally(()=>{if(!cancelled)setLoading(false)})
+    return()=>{cancelled=true}
+  },[token,refreshCount])
+  const sections=(data?.available_sections||[]).filter(section=>section!=='Overview')
+  const shortcuts=[
+    {section:'My Classes',title:'My classes & learners',description:'Open your assigned classes and view the learners linked to your teaching work.',icon:<Users/>,tone:'blue'},
+    {section:'My Results',title:'Marks & results',description:'Select an examination and your registered subjects, submit scores and monitor verification status.',icon:<FileText/>,tone:'purple'},
+    {section:'Timetable',title:'Teaching timetable',description:'View the school timetable and the lessons assigned to you.',icon:<CalendarDays/>,tone:'green'},
+    {section:'Attendance',title:'Class attendance',description:'Record and review attendance for the classes you are authorised to manage.',icon:<CalendarCheck/>,tone:'amber'},
+    {section:'My Attendance',title:'My staff attendance',description:'Check in, check out and review your own recorded shifts.',icon:<Clock/>,tone:'blue'},
+    {section:'Announcements',title:'School announcements',description:'Read important updates shared by the school.',icon:<Megaphone/>,tone:'purple'},
+  ].filter(item=>sections.includes(item.section))
+  return <div className="teacher-workspace-dashboard">
+    <section className="teacher-workspace-hero"><div><p className="eyebrow">TEACHING & LEARNING · PERSONAL WORKSPACE</p><h2>Teacher workspace</h2><p>{data?.staff_name||username} · {data?.role_label||'Teacher'} · Your assigned teaching activities, class responsibilities and academic tools.</p></div><button type="button" className="secondary-button" onClick={()=>setRefreshCount(v=>v+1)} disabled={loading}><RefreshCw size={15}/>{loading?'Refreshing...':'Refresh workspace'}</button></section>
+    {loading&&<p className="form-hint">Loading your assigned teaching work...</p>}
+    {error&&<div className="form-error" role="alert">{error}</div>}
+    {data&&!loading&&<>
+      <section className="teacher-workspace-metrics"><div><small>LESSONS TODAY</small><strong>{data.today_lessons.length}</strong><span>Scheduled teaching periods</span></div><div><small>CLASS RESPONSIBILITIES</small><strong>{data.class_teacher_classes.length}</strong><span>Class-teacher assignments</span></div><div><small>AVAILABLE WORKSPACES</small><strong>{shortcuts.length}</strong><span>Authorised teaching tools</span></div></section>
+      <section className="teacher-workspace-layout">
+        <div className="teacher-workspace-main">
+          <section className="panel"><div className="panel-heading"><div><h3>Today's teaching timetable</h3><p>Your scheduled lessons from the school timetable.</p></div><button type="button" className="secondary-button" onClick={()=>onNavigate('Timetable')}>Open timetable <ArrowUpRight size={15}/></button></div>
+            {data.today_lessons.length?<div className="table-wrap"><table><thead><tr><th>Time</th><th>Class</th><th>Subject</th></tr></thead><tbody>{data.today_lessons.map((lesson,index)=><tr key={index}><td>{lesson.start_time}–{lesson.end_time}</td><td>{lesson.class_name}</td><td>{lesson.subject}</td></tr>)}</tbody></table></div>:<div className="empty-state"><CalendarDays size={26}/><p>No lessons are scheduled for you today.</p></div>}
+          </section>
+          <section className="panel"><div className="panel-heading"><div><h3>Class-teacher responsibilities</h3><p>Classes assigned to you for class-level administration.</p></div><button type="button" className="secondary-button" onClick={()=>onNavigate('My Classes')}>Open my classes <ArrowUpRight size={15}/></button></div>
+            {data.class_teacher_classes.length?<div className="teacher-class-responsibilities">{data.class_teacher_classes.map(item=><button type="button" className="teacher-class-card" key={item.class_id} onClick={()=>onNavigate('My Classes')}><GraduationCap size={20}/><strong>{item.class_name}</strong><span>Class attendance & learner records</span></button>)}</div>:<div className="empty-state"><Users size={25}/><p>No class-teacher responsibility is assigned to your account.</p></div>}
+          </section>
+        </div>
+        <aside className="panel teacher-tools-panel"><div className="panel-heading"><div><h3>Teaching tools</h3><p>Open your assigned work.</p></div></div>
+          {shortcuts.length?<div className="teacher-tool-list">{shortcuts.map(item=><button type="button" className="teacher-tool-link" key={item.section} onClick={()=>onNavigate(item.section)}><span className={`teacher-tool-icon ${item.tone}`}>{item.icon}</span><span><strong>{item.title}</strong><small>{item.description}</small></span><ArrowUpRight size={16}/></button>)}</div>:<div className="empty-state"><Briefcase size={26}/><p>No teaching workspaces have been assigned.</p><small>Contact the administrator if an area is missing.</small></div>}
+        </aside>
+      </section>
+    </>}
   </div>
 }
 
@@ -884,7 +929,7 @@ function App() {
             </>
           )}
 
-                    {active === 'Overview' && user.role !== 'admin' && (isFinanceAccount(user) ? <FinanceAccountDashboard token={token} username={user.username} onNavigate={(section,tab)=>{if(tab)setFinanceTabRequest(tab);setActive(section)}}/> : user.role === 'staff' && /director of studies|\\bdos\\b/i.test(user.role_label||'') ? <DirectorOfStudiesDashboard token={token} onNavigate={setActive} summary={dashboardSummary} summaryAvailable={(user.permissions?.['Overview']||[]).includes('view')} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)}/> : user.role === 'staff' && /^(head ?teacher|principal|school head)$/i.test((user.role_label||'').trim()) ? <RoleSpecificDashboard username={user.username} roleLabel={user.role_label||'Headteacher'} onNavigate={setActive} summary={dashboardSummary} summaryAvailable={(user.permissions?.['Overview']||[]).includes('view')} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)} financeSummary={financeDashboard}/> : user.role === 'staff' && /secretary|office administrator|attendance/i.test(user.role_label||'') ? <RoleSpecificDashboard username={user.username} roleLabel={user.role_label||'Staff'} onNavigate={setActive} summary={dashboardSummary} summaryAvailable={(user.permissions?.['Overview']||[]).includes('view')} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)} financeSummary={financeDashboard}/> : user.role === 'staff' && /teacher/i.test(user.role_label||'') ? <PersonalDashboard token={token} username={user.username} onNavigate={setActive}/> : user.role === 'staff' ? <RoleSpecificDashboard username={user.username} roleLabel={user.role_label||'Staff'} onNavigate={setActive} summary={dashboardSummary} summaryAvailable={(user.permissions?.['Overview']||[]).includes('view')} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)} financeSummary={financeDashboard}/> : <PersonalDashboard token={token} username={user.username} onNavigate={setActive}/>) }
+                    {active === 'Overview' && user.role !== 'admin' && (isFinanceAccount(user) ? <FinanceAccountDashboard token={token} username={user.username} onNavigate={(section,tab)=>{if(tab)setFinanceTabRequest(tab);setActive(section)}}/> : user.role === 'staff' && /director of studies|\\bdos\\b/i.test(user.role_label||'') ? <DirectorOfStudiesDashboard token={token} onNavigate={setActive} summary={dashboardSummary} summaryAvailable={(user.permissions?.['Overview']||[]).includes('view')} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)}/> : user.role === 'staff' && /^(head ?teacher|principal|school head)$/i.test((user.role_label||'').trim()) ? <RoleSpecificDashboard username={user.username} roleLabel={user.role_label||'Headteacher'} onNavigate={setActive} summary={dashboardSummary} summaryAvailable={(user.permissions?.['Overview']||[]).includes('view')} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)} financeSummary={financeDashboard}/> : user.role === 'staff' && /secretary|office administrator|attendance/i.test(user.role_label||'') ? <RoleSpecificDashboard username={user.username} roleLabel={user.role_label||'Staff'} onNavigate={setActive} summary={dashboardSummary} summaryAvailable={(user.permissions?.['Overview']||[]).includes('view')} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)} financeSummary={financeDashboard}/> : user.role === 'staff' && /teacher/i.test(user.role_label||'') && !/head ?teacher|deputy/i.test(user.role_label||'') ? <TeacherDashboard token={token} username={user.username} onNavigate={setActive}/> : user.role === 'staff' ? <RoleSpecificDashboard username={user.username} roleLabel={user.role_label||'Staff'} onNavigate={setActive} summary={dashboardSummary} summaryAvailable={(user.permissions?.['Overview']||[]).includes('view')} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)} financeSummary={financeDashboard}/> : <PersonalDashboard token={token} username={user.username} onNavigate={setActive}/>) }
 
           {active === 'Students' && (
             <section className="panel">
