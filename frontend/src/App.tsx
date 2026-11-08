@@ -886,7 +886,7 @@ function App() {
               </section>
             </div>
           )}
-          {active === 'Examinations' && user.role !== 'parent' && <AcademicManagement token={token} classes={classes} />}
+          {active === 'Examinations' && user.role !== 'parent' && <AcademicManagement token={token} classes={classes} canVerify={user.role === 'admin' || (user.permissions?.['Examinations'] || []).includes('approve')} />}
           {active === 'Attendance' && user.role !== 'parent' && user.role !== 'teacher' && <AttendanceHub token={token} canViewStudents={user.role === 'admin' || (user.permissions?.['Attendance'] || []).includes('view')} canViewStaff={user.role === 'admin' || (user.permissions?.['Staff Attendance'] || []).includes('view')} canEditStudents={user.role === 'admin' || (user.permissions?.['Attendance'] || []).includes('edit')} permissions={user.permissions} isAdmin={user.role === 'admin'} roleLabel={user.role_label || ''} />}
           {active === 'Timetable' && user.role !== 'parent' && <OperationsManagement token={token} active={active} permissions={user.permissions} isAdmin={user.role === 'admin'} roleLabel={user.role_label || ''} />}
           {active === 'My Profile' && user.role !== 'parent' && user.role !== 'admin' && <MyStaffProfile token={token} />}
@@ -1242,7 +1242,10 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
       if(label==='Class Teacher') next['Attendance']=['view','add','edit']
       next['My Classes']=['view'];next['My Attendance']=['view'];next['My Results']=['view','add','edit'];next['Announcements']=['view'];delete next['Timetable']
     }
-    if(['Academic Administrator','Academics Officer','DOS'].includes(label)) next['Timetable']=['view','add','edit','delete']
+    if(['Academic Administrator','Academics Officer','DOS'].includes(label)) {
+      next['Timetable']=['view','add','edit','delete']
+      next['Examinations']=['view','add','edit','approve']
+    }
     if(label==='Attendance Officer'){next['Attendance']=['view','add','edit'];next['Staff Attendance']=['view','add','edit']}
     setRoleLabel(label);setRoleType(label==='Teacher'||label==='Class Teacher'?'teacher':'staff');setPermissions(next)
   }
