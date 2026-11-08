@@ -259,6 +259,75 @@ function PersonalDashboard({token,username,onNavigate}:{token:string;username:st
   </div>
 }
 
+function DirectorOfStudiesDashboard({token,username,onNavigate,summary,summaryAvailable}:{token:string;username:string;onNavigate:(section:string)=>void;summary:DashboardSummary;summaryAvailable:boolean}) {
+  const [data,setData]=useState<PersonalDashboardData|null>(null)
+  const [error,setError]=useState('')
+  const [loading,setLoading]=useState(true)
+  const [refreshCount,setRefreshCount]=useState(0)
+  useEffect(()=>{
+    let cancelled=false
+    setLoading(true);setError('')
+    api<PersonalDashboardData>('dashboard/my-work',token).then(result=>{if(!cancelled)setData(result)})
+      .catch(e=>{if(!cancelled)setError(e instanceof Error?e.message:'Unable to load the academic workspace.')})
+      .finally(()=>{if(!cancelled)setLoading(false)})
+    return ()=>{cancelled=true}
+  },[token,refreshCount])
+  const permissions=data?.available_sections||[]
+  const can=(section:string)=>permissions.includes(section)
+  const workstreams=[
+    {section:'Examinations',eyebrow:'RESULTS & ASSESSMENT',title:'Examination management',description:'Review submitted marks, verify subject results and monitor examination progress.',action:'Open examination desk',icon:<FileText size={21}/>,tone:'violet'},
+    {section:'Timetable',eyebrow:'ACADEMIC PLANNING',title:'Timetable coordination',description:'Review class schedules, lesson allocation and teaching arrangements.',action:'View school timetable',icon:<CalendarDays size={21}/>,tone:'blue'},
+    {section:'Attendance',eyebrow:'LEARNER MONITORING',title:'Student attendance',description:'Monitor class attendance records and follow up attendance gaps.',action:'Review attendance',icon:<CalendarCheck size={21}/>,tone:'green'},
+    {section:'Students',eyebrow:'CLASS OVERSIGHT',title:'Student & class records',description:'Review student records and class organisation within your access.',action:'Open student records',icon:<GraduationCap size={21}/>,tone:'amber'},
+    {section:'Staff',eyebrow:'TEACHING PERSONNEL',title:'Teaching staff',description:'View staff records and the teaching personnel information you are authorised to access.',action:'View staff directory',icon:<Users size={21}/>,tone:'slate'},
+    {section:'Leadership & Duty',eyebrow:'SCHOOL LEADERSHIP',title:'Duties & leadership',description:'Coordinate assigned leadership responsibilities and duty arrangements.',action:'Open leadership desk',icon:<ShieldCheck size={21}/>,tone:'rose'},
+  ].filter(item=>can(item.section))
+  const lessons=data?.today_lessons||[]
+  return <div className="role-dashboard dos-dashboard">
+    <section className="dos-hero">
+      <div className="dos-hero-copy">
+        <p className="eyebrow">ACADEMIC LEADERSHIP · DIRECTOR OF STUDIES</p>
+        <h2>Academic control centre</h2>
+        <p>Good day, {data?.staff_name||username}. Coordinate examinations, teaching programmes, learner progress and academic operations from one place.</p>
+      </div>
+      <div className="dos-hero-actions">
+        <span className="dos-live-indicator"><span/> Academic workspace</span>
+        <button type="button" className="secondary-button" onClick={()=>setRefreshCount(value=>value+1)} disabled={loading}><RefreshCw size={15}/>{loading?'Refreshing...':'Refresh overview'}</button>
+      </div>
+    </section>
+    {loading&&<p className="form-hint">Loading academic overview...</p>}
+    {error&&<div className="form-error" role="alert">{error}</div>}
+    {data&&!loading&&<>
+      {summaryAvailable&&<section className="dos-metric-strip">
+        <div className="dos-metric"><span className="dos-metric-icon"><BookOpen size={20}/></span><div><small>CLASSES</small><strong>{summary.total_classes}</strong><span>School class groups</span></div></div>
+        <div className="dos-metric"><span className="dos-metric-icon"><GraduationCap size={20}/></span><div><small>ACTIVE LEARNERS</small><strong>{summary.active_students.toLocaleString()}</strong><span>Registered students</span></div></div>
+        <div className="dos-metric"><span className="dos-metric-icon"><CalendarCheck size={20}/></span><div><small>PRESENT TODAY</small><strong>{summary.students_present_today.toLocaleString()}</strong><span>Attendance marked present</span></div></div>
+        <div className="dos-metric"><span className="dos-metric-icon"><Users size={20}/></span><div><small>ACTIVE STAFF</small><strong>{summary.active_staff}</strong><span>School personnel</span></div></div>
+      </section>}
+      <div className="dos-content-grid">
+        <section className="panel dos-workstreams">
+          <div className="dos-section-heading"><div><p className="eyebrow">ACADEMIC WORKFLOW</p><h3>Areas requiring your oversight</h3><p>Open a workstream to review and coordinate its records.</p></div><span className="count-pill">{workstreams.length} authorised</span></div>
+          {workstreams.length>0?<div className="dos-workstream-list">{workstreams.map(item=><button type="button" className="dos-workstream" key={item.section} onClick={()=>onNavigate(item.section)}>
+            <span className={'dos-workstream-icon '+item.tone}>{item.icon}</span><span className="dos-workstream-copy"><small>{item.eyebrow}</small><strong>{item.title}</strong><span>{item.description}</span></span><span className="dos-workstream-action">{item.action}<ArrowUpRight size={16}/></span>
+          </button>)}</div>:<div className="empty-state"><ShieldCheck size={28}/><p>No academic workstreams have been assigned.</p><small>Ask the administrator to review your access permissions.</small></div>}
+        </section>
+        <aside className="dos-side-column">
+          <section className="panel dos-schedule-panel">
+            <div className="dos-section-heading"><div><p className="eyebrow">DAILY COORDINATION</p><h3>Today's teaching schedule</h3></div></div>
+            {lessons.length>0?<div className="dos-lesson-list">{lessons.map((lesson,index)=><div className="dos-lesson" key={index}><span className="dos-lesson-time">{lesson.start_time}<small>{lesson.end_time}</small></span><span><strong>{lesson.subject}</strong><small>{lesson.class_name}</small></span></div>)}</div>:<div className="dos-empty-note"><CalendarDays size={22}/><p>No personal lessons are scheduled for today.</p><small>Use timetable coordination to review the school's full schedule.</small>{can('Timetable')&&<button type="button" className="text-action" onClick={()=>onNavigate('Timetable')}>Open timetable <ArrowUpRight size={14}/></button>}</div>}
+          </section>
+          <section className="panel dos-duty-panel">
+            <p className="eyebrow">LEADERSHIP RESPONSIBILITY</p><h3>Today's duty & assignments</h3>
+            {data.today_duty?<div className="dos-duty-note"><ShieldCheck size={19}/><span>{data.today_duty.notes}</span></div>:<p className="muted">No specific duty has been assigned to your account today.</p>}
+            {data.class_teacher_classes.length>0&&<div className="dos-class-tags"><strong>Class responsibilities</strong><div>{data.class_teacher_classes.map(item=><span key={item.class_id}>{item.class_name}</span>)}</div></div>}
+            {can('Leadership & Duty')&&<button type="button" className="text-action" onClick={()=>onNavigate('Leadership & Duty')}>View leadership duties <ArrowUpRight size={14}/></button>}
+          </section>
+        </aside>
+      </div>
+    </>}
+  </div>
+}
+
 function RoleSpecificDashboard({token,username,onNavigate,summary,summaryAvailable}:{token:string;username:string;onNavigate:(section:string)=>void;summary:DashboardSummary;summaryAvailable:boolean}) {
   const [data,setData]=useState<PersonalDashboardData|null>(null)
   const [error,setError]=useState('')
@@ -883,7 +952,7 @@ function App() {
             </>
           )}
 
-                    {active === 'Overview' && user.role !== 'admin' && (isFinanceAccount(user) ? <FinanceAccountDashboard token={token} username={user.username} onNavigate={(section,tab)=>{if(tab)setFinanceTabRequest(tab);setActive(section)}}/> : user.role === 'staff' ? <RoleSpecificDashboard token={token} username={user.username} onNavigate={setActive} summary={dashboardSummary} summaryAvailable={(user.permissions?.['Overview']||[]).includes('view')}/> : <PersonalDashboard token={token} username={user.username} onNavigate={setActive}/>)}
+                    {active === 'Overview' && user.role !== 'admin' && (isFinanceAccount(user) ? <FinanceAccountDashboard token={token} username={user.username} onNavigate={(section,tab)=>{if(tab)setFinanceTabRequest(tab);setActive(section)}}/> : user.role === 'staff' && /director of studies|\\bdos\\b/i.test(user.role_label||'') ? <DirectorOfStudiesDashboard token={token} username={user.username} onNavigate={setActive} summary={dashboardSummary} summaryAvailable={(user.permissions?.['Overview']||[]).includes('view')}/> : user.role === 'staff' ? <RoleSpecificDashboard token={token} username={user.username} onNavigate={setActive} summary={dashboardSummary} summaryAvailable={(user.permissions?.['Overview']||[]).includes('view')}/> : <PersonalDashboard token={token} username={user.username} onNavigate={setActive}/>)}
 
           {active === 'Students' && (
             <section className="panel">
