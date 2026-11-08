@@ -1538,7 +1538,7 @@ async def protect_school_data(request: Request, call_next):
                 return JSONResponse({"detail": "Administrator permission required."}, status_code=403)
             section = permission_for_path(path)
             action = action_for_method(request.method, path)
-            class_teacher_register = path.startswith("/api/attendance") and user.role == "teacher"
+            class_teacher_register = path in {"/api/attendance", "/api/attendance/summary", "/api/attendance/options", "/api/attendance/students"} and user.role == "teacher"
             if class_teacher_register:
                 if path == "/api/attendance/options":
                     allowed = db.query(models.ClassTeacherAssignment.id).filter_by(teacher_id=user.id).first() is not None
