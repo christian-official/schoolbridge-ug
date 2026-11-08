@@ -1024,6 +1024,8 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
   const [subjects,setSubjects]=useState<any[]>([])
   const [catalog,setCatalog]=useState<any>({sections:[],presets:{}})
   const [assignment,setAssignment]=useState({teacher_id:'',class_id:'',subject_id:''})
+  const [classTeacherAssignments,setClassTeacherAssignments]=useState<any[]>([])
+  const [classTeacherForm,setClassTeacherForm]=useState({teacher_id:'',class_id:''})
   const [selectedId,setSelectedId]=useState('')
   const [roleLabel,setRoleLabel]=useState('')
   const [roleType,setRoleType]=useState<'teacher'|'staff'>('staff')
@@ -1035,10 +1037,10 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
   async function load() {
     setLoading(true);setError('')
     try {
-      const [u,st,sub,permissionData]=await Promise.all([
-        api<any[]>('auth/users',token),api<any>('staff?page=1&page_size=100',token),api<any[]>('subjects',token),api<any>('auth/permissions',token)
+      const [u,st,sub,permissionData,classTeacherRows]=await Promise.all([
+        api<any[]>('auth/users',token),api<any>('staff?page=1&page_size=100',token),api<any[]>('subjects',token),api<any>('auth/permissions',token),api<any[]>('class-teacher-assignments',token)
       ])
-      setUsers(u);setStaff(st.items||[]);setSubjects(sub);setCatalog(permissionData)
+      setUsers(u);setStaff(st.items||[]);setSubjects(sub);setCatalog(permissionData);setClassTeacherAssignments(classTeacherRows)
       const first=u.find((item:any)=>item.role!=='admin'&&item.role!=='parent')
       if(first&&!selectedId){setSelectedId(String(first.id));setRoleLabel(first.role_label||first.role);setRoleType(first.role==='teacher'?'teacher':'staff');setPermissions(first.permissions||{})}
     } catch(e) {setError(e instanceof Error?e.message:'Unable to load staff accounts.')}
@@ -1055,7 +1057,8 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
     const next:Record<string,string[]>={}
     sections.forEach((section:string)=>{next[section]=['view']})
     if(label==='Teacher'||label==='Class Teacher') {
-      next['Attendance']=['view','add'];next['My Classes']=['view'];next['My Attendance']=['view'];next['My Results']=['view','add','edit'];next['Announcements']=['view'];next['Timetable']=['view']
+      if(label==='Class Teacher') next['Attendance']=['view','add']
+      next['My Classes']=['view'];next['My Attendance']=['view'];next['My Results']=['view','add','edit'];next['Announcements']=['view'];next['Timetable']=['view']
     }
     setRoleLabel(label);setRoleType(label==='Teacher'||label==='Class Teacher'?'teacher':'staff');setPermissions(next)
   }
@@ -1075,6 +1078,22 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
       setMessage('Staff access settings saved. The staff member should sign in again to refresh their access.')
       await load();onSaved()
     } catch(e) {setError(e instanceof Error?e.message:'Unable to save staff access settings.')}
+    finally {setBusy(false)}
+  }
+  async function assignClassTeacher(e:React.FormEvent) {
+    e.preventDefault()
+    if(!classTeacherForm.teacher_id||!classTeacherForm.class_id){setError('Select a teacher and class for class-teacher responsibility.');return}
+    setBusy(true);setError('');setMessage('')
+    try {
+      await api('class-teacher-assignments',token,{method:'POST',body:JSON.stringify({teacher_id:Number(classTeacherForm.teacher_id),class_id:Number(classTeacherForm.class_id)})})
+      setClassTeacherForm({teacher_id:'',class_id:''});setClassTeacherAssignments(await api<any[]>('class-teacher-assignments',token));setMessage('Class-teacher responsibility assigned. This is separate from subject teaching assignments.')
+    } catch(e) {setError(e instanceof Error?e.message:'Unable to assign class teacher.')}
+    finally {setBusy(false)}
+  }
+  async function removeClassTeacher(id:number) {
+    setBusy(true);setError('');setMessage('')
+    try { await api('class-teacher-assignments/'+id,token,{method:'DELETE'});setClassTeacherAssignments(await api<any[]>('class-teacher-assignments',token));setMessage('Class-teacher responsibility removed.') }
+    catch(e) {setError(e instanceof Error?e.message:'Unable to remove class teacher.')}
     finally {setBusy(false)}
   }
   async function assign(e:React.FormEvent) {
@@ -1114,6 +1133,13 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
       <label>Class *<select required value={assignment.class_id} onChange={e=>setAssignment({...assignment,class_id:e.target.value})}><option value="">Select class</option>{classes.map(item=><option key={item.id} value={item.id}>{item.name}{item.section?' — '+item.section:''}</option>)}</select></label>
       <label>Subject *<select required value={assignment.subject_id} onChange={e=>setAssignment({...assignment,subject_id:e.target.value})}><option value="">Select subject</option>{subjects.map(sub=><option key={sub.id} value={sub.id}>{sub.name}</option>)}</select></label>
     </div><div className="form-actions"><button className="primary-button" disabled={busy||loading||!activeTeachers.length||!subjects.length||!classes.length}>{busy?'Saving...':'Save teacher assignment'}</button></div></form>
+    <h3>Assign class teachers</h3>
+    <p className="form-hint">This is a separate responsibility from teaching individual subjects. Each class has one assigned class teacher, who is authorised to manage that class's attendance register.</p>
+    <form className="student-form" onSubmit={assignClassTeacher}><div className="student-form-grid">
+      <label>Class teacher *<select required value={classTeacherForm.teacher_id} onChange={e=>setClassTeacherForm({...classTeacherForm,teacher_id:e.target.value})}><option value="">Select teacher</option>{activeTeachers.map(u=>{const person=staff.find((p:any)=>p.id===u.staff_id);return <option key={u.id} value={u.id}>{person?person.first_name+' '+person.last_name:u.username}</option>})}</select></label>
+      <label>Responsible class *<select required value={classTeacherForm.class_id} onChange={e=>setClassTeacherForm({...classTeacherForm,class_id:e.target.value})}><option value="">Select class</option>{classes.map(item=><option key={item.id} value={item.id}>{item.name}{item.section?' — '+item.section:''}</option>)}</select></label>
+    </div><div className="form-actions"><button className="primary-button" disabled={busy||loading||!activeTeachers.length||!classes.length}>{busy?'Saving...':'Assign class teacher'}</button></div></form>
+    <div className="table-wrap"><table><thead><tr><th>Class</th><th>Assigned class teacher</th><th>Action</th></tr></thead><tbody>{classTeacherAssignments.map(row=><tr key={row.id}><td>{row.class_name}{row.section?' — '+row.section:''}</td><td>{staff.find((p:any)=>users.find(u=>u.id===row.teacher_id)?.staff_id===p.id)?.first_name || row.teacher_name} {staff.find((p:any)=>users.find(u=>u.id===row.teacher_id)?.staff_id===p.id)?.last_name || ''}</td><td><button type="button" className="secondary-button" disabled={busy} onClick={()=>void removeClassTeacher(row.id)}>Remove</button></td></tr>)}{!classTeacherAssignments.length&&<tr><td colSpan={3}>No class teachers assigned yet.</td></tr>}</tbody></table></div>
     <h3>School login accounts</h3>
     <div className="table-wrap"><table><thead><tr><th>Staff member</th><th>Username</th><th>Job role</th><th>Areas available</th><th>Status</th></tr></thead><tbody>
       {users.map(u=>{const person=staff.find((p:any)=>p.id===u.staff_id);return <tr key={u.id}><td>{person?person.first_name+' '+person.last_name:(u.role==='admin'?'—':'Unlinked staff login')}</td><td>{u.username}</td><td>{u.role==='admin'?'Administrator':u.role==='parent'?'Parent':u.role_label||u.role}</td><td>{Object.keys(u.permissions||{}).length||(u.role==='admin'?'All':'Limited')}</td><td>{u.active?'Active':'Disabled'}</td></tr>})}
