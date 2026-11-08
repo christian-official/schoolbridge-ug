@@ -1409,12 +1409,36 @@ def list_timetable(
     ]
 
 @app.get("/api/timetable/options", tags=["Timetable"])
-def timetable_options(db: Session = Depends(get_db), academic=Depends(require_timetable_editor)):
-    classes = db.query(models.SchoolClass).order_by(models.SchoolClass.name, models.SchoolClass.section).all()
-    subjects = db.query(models.Subject).order_by(models.Subject.name).all()
-    staff = db.query(models.StaffMember).filter_by(category="Teaching", status="active").order_by(
-        models.StaffMember.first_name, models.StaffMember.last_name
-    ).all()
+def timetable_options(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    # View permission is enough to load the class selector; edit rights remain
+    # enforced separately by require_timetable_editor on every write endpoint.
+    if user.role == "teacher":
+        if not user.staff_id:
+            return {"classes": [], "subjects": [], "staff": []}
+        assigned_class_ids = [
+            row[0] for row in db.query(models.TimetableEntry.class_id).filter(
+                models.TimetableEntry.staff_id == user.staff_id
+            ).distinct().all()
+        ]
+        classes_query = db.query(models.SchoolClass).filter(models.SchoolClass.id.in_(assigned_class_ids))
+        subject_ids = [
+            row[0] for row in db.query(models.TimetableEntry.subject_id).filter(
+                models.TimetableEntry.staff_id == user.staff_id,
+                models.TimetableEntry.subject_id.isnot(None),
+            ).distinct().all()
+        ]
+        subjects_query = db.query(models.Subject).filter(models.Subject.id.in_(subject_ids))
+        staff = []
+    else:
+        if user.role != "admin" and "view" not in user_permissions(user).get("Timetable", set()):
+            raise HTTPException(403, "You do not have permission to view timetable options.")
+        classes_query = db.query(models.SchoolClass)
+        subjects_query = db.query(models.Subject)
+        staff = db.query(models.StaffMember).filter_by(category="Teaching", status="active").order_by(
+            models.StaffMember.first_name, models.StaffMember.last_name
+        ).all()
+    classes = classes_query.order_by(models.SchoolClass.name, models.SchoolClass.section).all()
+    subjects = subjects_query.order_by(models.Subject.name).all()
     return {
         "classes": [{"id": row.id, "name": row.name, "section": row.section} for row in classes],
         "subjects": [{"id": row.id, "name": row.name, "code": row.code} for row in subjects],
