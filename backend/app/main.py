@@ -1,5 +1,6 @@
 import os
 import re
+import secrets
 from datetime import date, datetime
 from uuid import uuid4
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
@@ -1007,7 +1008,6 @@ class AssignmentCreate(BaseModel):
 class ParentAccountCreate(BaseModel):
     username: str = Field(min_length=3, max_length=80)
     email: str = Field(min_length=5, max_length=150)
-    password: str = Field(min_length=12, max_length=128)
     student_ids: list[int] = Field(min_length=1, max_length=10)
 
 
@@ -1422,6 +1422,7 @@ def list_users(
 
 @app.post("/api/parent-accounts", tags=["Parent Access"])
 def create_parent_account(data: ParentAccountCreate, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    temporary_password = secrets.token_urlsafe(12)
     student_ids = list(dict.fromkeys(data.student_ids))
     students = db.query(models.Student).filter(models.Student.id.in_(student_ids)).all()
     if len(students) != len(student_ids):
@@ -1429,7 +1430,7 @@ def create_parent_account(data: ParentAccountCreate, db: Session = Depends(get_d
     parent = models.User(
         username=data.username.strip(),
         email=data.email.strip().lower(),
-        hashed_password=password_hash.hash(data.password),
+        hashed_password=password_hash.hash(temporary_password),
         role="parent",
     )
     db.add(parent)
@@ -1442,7 +1443,7 @@ def create_parent_account(data: ParentAccountCreate, db: Session = Depends(get_d
     except IntegrityError:
         db.rollback()
         raise HTTPException(409, "That username or email is already registered, or a parent link already exists.")
-    return {"id": parent.id, "username": parent.username, "email": parent.email, "role": parent.role, "linked_students": len(student_ids)}
+    return {"id": parent.id, "username": parent.username, "email": parent.email, "role": parent.role, "linked_students": len(student_ids), "temporary_password": temporary_password}
 
 
 @app.get("/api/parent-accounts", tags=["Parent Access"])
