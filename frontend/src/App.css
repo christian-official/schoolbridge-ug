@@ -1459,3 +1459,28 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .submitted-results-workspace > .recorded-subject-card { margin-top:16px; }
 .submitted-results-workspace .recorded-subject-heading > div { display:grid; gap:4px; }
 .submitted-results-workspace .recorded-subject-heading > div span { color:#718096; font-size:12px; }
+
+
+/* Examination selection: category first, exam second, class third. */
+.exam-selection-flow { display:grid; gap:13px; margin:16px 0; padding:16px; border:1px solid #e2e8f2; border-radius:14px; background:#f9fbff; }
+.exam-flow-step { display:flex; align-items:center; gap:10px; }
+.exam-flow-step > div { display:grid; gap:2px; }
+.exam-flow-step strong { color:#26364f; font-size:13px; }
+.exam-flow-step small { color:#738097; font-size:12px; }
+.exam-type-tabs,.exam-pill-options,.exam-class-choices { display:flex; flex-wrap:wrap; gap:8px; }
+.exam-type-tab,.exam-pill,.exam-choice,.exam-class-choice { border:1px solid #dce3ee; border-radius:9px; background:#fff; color:#53627a; font-size:12px; font-weight:700; cursor:pointer; transition:background .15s,border-color .15s,color .15s; }
+.exam-type-tab,.exam-pill { padding:9px 12px; }
+.exam-type-tab.active,.exam-pill.active,.exam-choice.active,.exam-class-choice.active { border-color:#4569cb; background:#edf3ff; color:#244bb0; box-shadow:0 0 0 1px #4569cb inset; }
+.exam-choice-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:9px; }
+.exam-choice { display:grid; gap:5px; text-align:left; padding:12px; }
+.exam-choice strong { color:#253650; font-size:13px; }
+.exam-choice span,.exam-choice small { color:#718096; font-size:11px; }
+.exam-class-choice { padding:10px 13px; }
+.exam-create-form { margin-top:14px; }
+.exam-create-meta { display:grid; grid-template-columns:1fr 1fr minmax(150px,.6fr); gap:16px; margin:15px 0; }
+.exam-create-meta > div { display:grid; gap:8px; }
+.exam-create-meta strong,.exam-class-picker strong { color:#34445c; font-size:12px; }
+.exam-class-picker { display:grid; gap:10px; padding:14px; border:1px solid #e1e7f0; border-radius:11px; }
+.exam-class-picker > div:first-child { display:grid; gap:3px; }
+.exam-class-picker small { color:#738097; font-size:11px; }
+@media(max-width:700px) { .exam-create-meta { grid-template-columns:1fr; } .exam-choice-grid { grid-template-columns:1fr; } }
