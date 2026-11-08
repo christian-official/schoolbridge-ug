@@ -60,7 +60,7 @@ PERMISSION_SECTIONS = {
 PERMISSION_ACTIONS = {"view", "add", "edit", "delete", "approve", "print"}
 ADMIN_ONLY_PATHS = {
     "/api/auth/users", "/api/auth/teachers", "/api/auth/permissions",
-    "/api/teacher-assignments", "/api/class-teacher-assignments", "/api/backups/restore",
+    "/api/backups/restore",
 }
 
 
@@ -97,7 +97,7 @@ def permission_for_path(path: str):
     if path.startswith("/api/teacher/attendance"): return "Attendance"
     if path.startswith(("/api/teacher/marks", "/api/teacher/exams", "/api/teacher/result-status")): return "My Results"
     if path.startswith("/api/students"): return "Students"
-    if path.startswith("/api/staff"): return "Staff"
+    if path.startswith(("/api/staff", "/api/teacher-assignments", "/api/class-teacher-assignments")): return "Staff"
     if path.startswith(("/api/finance", "/api/fees", "/api/salary", "/api/expenses")): return "Fees & Finance"
     if path.startswith(("/api/exams", "/api/marks", "/api/grades", "/api/subjects", "/api/grading-scale")): return "Examinations"
     if path.startswith("/api/attendance"): return "Attendance"
@@ -1899,7 +1899,7 @@ def permission_catalog(admin=Depends(require_admin)):
     presets = {
         "Headteacher": ["Overview", "Students", "Staff", "Fees & Finance", "Examinations", "Attendance", "Staff Attendance", "Timetable", "Leadership & Duty", "Parent Access", "Announcements", "Reports"],
         "Deputy Headteacher": ["Overview", "Students", "Staff", "Examinations", "Attendance", "Timetable", "Leadership & Duty", "Announcements", "Reports"],
-        "DOS": ["Overview", "Examinations", "Attendance", "Timetable", "Students", "Reports", "Announcements"],
+        "DOS": ["Overview", "Staff", "Examinations", "Attendance", "Timetable", "Students", "Reports", "Announcements"],
         "Academic Administrator": ["Overview", "Examinations", "Timetable", "Students", "Reports", "Announcements"],
         "Academics Officer": ["Overview", "Examinations", "Timetable", "Students", "Reports"],
         "Bursar": ["Overview", "Fees & Finance", "Students", "Reports"],

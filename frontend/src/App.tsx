@@ -115,7 +115,7 @@ function getStaffNavigation(user:User) {
       : /bursar|accountant|finance|accounts/.test(role)
         ? ['Overview','Fees & Finance','My Attendance','My Profile']
         : /academic|director of studies|\bdos\b|deputy|headteacher|examination/.test(role)
-          ? ['Overview','Examinations','Timetable','Attendance','Students','Reports','Announcements','My Attendance','My Profile']
+          ? ['Overview','Timetable','Staff','Examinations','Attendance','Students','Reports','Announcements','My Attendance','My Profile']
           : ['Overview','Staff','Attendance','Timetable','Leadership & Duty','Announcements','Reports','My Attendance','My Profile']
   return visible.sort((a,b) => {
     const ai=priority.indexOf(a.label), bi=priority.indexOf(b.label)
