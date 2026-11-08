@@ -57,7 +57,7 @@ export default function StaffFinance({token,active,classes=[],refreshKey=0,initi
 
   useEffect(()=>{
     if(active!=='Staff' && active!=='Fees & Finance') return
-    const params=new URLSearchParams({search,page:'1',page_size:'100'})
+    const params=new URLSearchParams({search,page:'1',page_size:active==='Staff'?'5':'100'})
     if(category) params.set('category',category)
     request<Page<Staff>>('staff?'+params.toString(),token).then(r=>{setStaff(r.items);setStaffTotal(r.total)}).catch(e=>setMessage(e.message))
   },[active,search,category,token,refreshKey])
@@ -136,7 +136,7 @@ export default function StaffFinance({token,active,classes=[],refreshKey=0,initi
         setMessage('Staff member registered and login account created. Copy the temporary passcode now; it will not be shown again.')
       }
       setEditingStaff(null);setForm(emptyStaffForm);setShowForm(false)
-      const p=new URLSearchParams({search,page:'1',page_size:'100'});if(category)p.set('category',category);const r=await request<Page<Staff>>('staff?'+p.toString(),token);setStaff(r.items);setStaffTotal(r.total)
+      const p=new URLSearchParams({search,page:'1',page_size:'5'});if(category)p.set('category',category);const r=await request<Page<Staff>>('staff?'+p.toString(),token);setStaff(r.items);setStaffTotal(r.total)
     }
     catch(e){setMessage(e instanceof Error?e.message:'Unable to save staff member.')}
     finally{setSavingStaff(false)}
@@ -208,7 +208,8 @@ export default function StaffFinance({token,active,classes=[],refreshKey=0,initi
       </div></section>
       <div className="form-actions"><button type="button" className="secondary-button" onClick={()=>{setShowForm(false);setEditingStaff(null)}}>Cancel</button><button className="primary-button" disabled={savingStaff}>{savingStaff?'Saving staff...':editingStaff?'Update staff profile':'Register staff member'}</button></div>
     </form>}
-    <div className="table-tools student-tools"><div className="search-box"><Search size={17}/><input placeholder="Search name or staff number..." value={search} onChange={e=>setSearch(e.target.value)}/></div><select className="filter-select" value={category} onChange={e=>setCategory(e.target.value)}><option value="">All staff</option><option>Teaching</option><option>Non-teaching</option></select></div>
+    <div className="table-tools student-tools"><div className="search-box"><Search size={17}/><input placeholder="Search name or staff number..." value={search} onChange={e=>setSearch(e.target.value)}/></div><div className="staff-category-options" role="group" aria-label="Filter staff category">{[{label:'All staff',value:''},{label:'Teaching',value:'Teaching'},{label:'Non-teaching',value:'Non-teaching'}].map(option=><button key={option.value||'all'} type="button" className={category===option.value?'staff-category-option active':'staff-category-option'} onClick={()=>setCategory(option.value)}>{option.label}</button>)}</div></div>
+    <p className="staff-list-count">Showing {staff.length} of {staffTotal} staff members{search.trim()?' matching your search':'. Search to find other staff members.'}</p>
     <div className="table-wrap"><table><thead><tr><th>Staff member</th><th>Staff number</th><th>Category</th><th>Position</th><th>Department</th><th>Phone</th><th>Salary (UGX)</th><th>Status</th><th>Actions</th></tr></thead><tbody>{staff.map(s=><tr key={s.id}><td>{s.first_name} {s.last_name}</td><td>{s.staff_number}</td><td>{s.category}</td><td>{s.position||'—'}{s.subjects?' · '+s.subjects:''}</td><td>{s.department||'—'}</td><td>{s.phone||'—'}</td><td>{s.salary_amount?.toLocaleString()||'—'} {s.salary_frequency||''}</td><td>{s.status||'active'}</td><td><button type="button" className="secondary-button" onClick={()=>{setEditingStaff(s.id);setForm({full_name:[s.first_name,s.last_name].filter(Boolean).join(' '),category:s.category,position:s.position||'',department:s.department||'',subjects:s.subjects||'',phone:s.phone||'',email:s.email||'',salary_amount:s.salary_amount==null?'':String(s.salary_amount),salary_frequency:s.salary_frequency||'Monthly'});setShowForm(true)}}>Edit</button>{s.status!=='archived'&&<button type="button" className="secondary-button" onClick={()=>void archiveStaff(s.id)}>Archive</button>}</td></tr>)}</tbody></table></div>
     {!staff.length&&<div className="empty-state"><Users size={30}/><p>No staff members match this search.</p></div>}
   </section>
