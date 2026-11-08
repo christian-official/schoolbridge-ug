@@ -139,6 +139,11 @@ export default function OperationsManagement({ token, active, permissions = {}, 
 
   const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
   const staffCategories = Array.from(new Set(staff.map(person => person.category || 'Other'))).sort((a, b) => a === 'Teaching' ? -1 : b === 'Teaching' ? 1 : a.localeCompare(b))
+  const timetableDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
+  const timetableClassId = Number(selectedTimetableClass || classes[0]?.id || 0)
+  const timetableClassEntries = entries.filter(entry => entry.class_id === timetableClassId)
+  const timetableSlots = Array.from(new Set(timetableClassEntries.map(entry => entry.start_time + '–' + entry.end_time))).sort()
+  const timetableClass = classes.find(item => item.id === timetableClassId)
 
   return <div className="academic-workspace">
     <section className="panel">
@@ -183,23 +188,16 @@ export default function OperationsManagement({ token, active, permissions = {}, 
         </details>}
         <div className="panel-heading"><div><h3>Weekly timetable</h3><p>Displayed as a weekday grid, with no room column.</p></div><span className="timetable-count">{entries.length} lessons</span></div>
         <label className="date-field">Class timetable<select value={selectedTimetableClass || (classes[0] ? String(classes[0].id) : '')} onChange={e=>setSelectedTimetableClass(e.target.value)}><option value="">Choose class</option>{classes.map(item=><option key={item.id} value={item.id}>{item.name}{item.section ? ' — '+item.section : ''}</option>)}</select></label>
-        {(() => {
-          const classId = Number(selectedTimetableClass || classes[0]?.id || 0)
-          const classEntries = entries.filter(entry => entry.class_id === classId)
-          const slots = Array.from(new Set(classEntries.map(entry => entry.start_time + '–' + entry.end_time))).sort()
-          const days = ['Mon','Tue','Wed','Thu','Fri']
-          const chosenClass = classes.find(item => item.id === classId)
-          return <div className="timetable-class-block">
-            {chosenClass && <div className="timetable-class-heading"><h3>{chosenClass.name}{chosenClass.section ? ' — ' + chosenClass.section : ''}</h3><span>{classEntries.length} lessons this week</span></div>}
-            <div className="table-wrap"><table className="class-timetable-table timetable-week-grid"><thead><tr><th>Period</th>{days.map(day=><th key={day}>{day}</th>)}</tr></thead><tbody>
-              {slots.map(slot => <tr key={slot}><th>{slot}</th>{days.map((day,index) => {
-                const entry = classEntries.find(row => row.day_of_week === index + 1 && row.start_time + '–' + row.end_time === slot)
-                return <td key={day}>{entry ? <div className="timetable-lesson-card"><strong>{entry.subject_name || 'Lesson'}</strong><span>{entry.teacher_name || 'Teacher not assigned'}</span><small>{entry.start_time}–{entry.end_time}</small>{canEditTimetable && <div className="timetable-card-actions"><button type="button" className="secondary-button" disabled={saving} onClick={() => beginEdit(entry)}>Edit</button><button type="button" className="secondary-button" disabled={saving} onClick={() => void removeEntry(entry.id)}><Trash2 size={13}/> Remove</button></div>}</div> : <span className="timetable-empty-cell">—</span>}</td>
-              })}</tr>)}
-              {!slots.length && <tr><td colSpan={6}>No lessons scheduled for this class.</td></tr>}
-            </tbody></table></div>
-          </div>
-        })()}
+        <div className="timetable-class-block">
+          {timetableClass && <div className="timetable-class-heading"><h3>{timetableClass.name}{timetableClass.section ? ' — ' + timetableClass.section : ''}</h3><span>{timetableClassEntries.length} lessons this week</span></div>}
+          <div className="table-wrap"><table className="class-timetable-table timetable-week-grid"><thead><tr><th>Period</th>{timetableDays.map(day=><th key={day}>{day}</th>)}</tr></thead><tbody>
+            {timetableSlots.map(slot=><tr key={slot}><th>{slot}</th>{timetableDays.map((day,index)=>{
+              const entry=timetableClassEntries.find(row=>row.day_of_week===index+1&&row.start_time+'–'+row.end_time===slot)
+              return <td key={day}>{entry ? <div className="timetable-lesson-card"><strong>{entry.subject_name||'Lesson'}</strong><span>{entry.teacher_name||'Teacher not assigned'}</span><small>{entry.start_time}–{entry.end_time}</small>{canEditTimetable&&<div className="timetable-card-actions"><button type="button" className="secondary-button" disabled={saving} onClick={()=>beginEdit(entry)}>Edit</button><button type="button" className="secondary-button" disabled={saving} onClick={()=>void removeEntry(entry.id)}><Trash2 size={13}/> Remove</button></div>}</div> : <span className="timetable-empty-cell">—</span>}</td>
+            })}</tr>)}
+            {!timetableSlots.length&&<tr><td colSpan={6}>No lessons scheduled for this class.</td></tr>}
+          </tbody></table></div>
+        </div>
         {!classes.length && <p className="form-hint">No timetable classes are available.</p>}
         {!canEditTimetable && <p className="form-hint">View-only timetable access. Changes can be made only by the Academics Administrator or a designated academic officer.</p>}
       </>
