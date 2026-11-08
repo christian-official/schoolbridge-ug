@@ -1064,7 +1064,7 @@ function TeacherWorkspace({token,active}:{token:string;active:string}) {
       </form>}
     </section>
   </div>
-  return <section className="panel teacher-class-attendance"><div className="panel-heading"><div><h2>Class attendance</h2><p>Mark the whole class register and submit it once. Only your separately assigned class-teacher responsibilities appear here.</p></div></div>{message&&<div className="notice">{message}</div>}<div className="student-form-grid"><label>My responsible class<select value={classId} onChange={e=>{setClassId(e.target.value);setStatuses({})}}><option value="">Choose class</option>{classTeacherAssignments.map(a=><option key={a.assignment_id} value={a.class_id}>{a.class}</option>)}</select></label><label>Attendance date<input type="date" value={attendanceDate} onChange={e=>setAttendanceDate(e.target.value)}/></label></div><div className="table-wrap"><table><thead><tr><th>#</th><th>Student</th><th>Admission number</th><th>Status</th></tr></thead><tbody>{students.map((student,index)=><tr key={student.id}><td>{index+1}</td><td>{student.first_name} {student.last_name}</td><td>{student.admission_number}</td><td><select value={statuses[student.id]||'Present'} onChange={e=>setStatuses(old=>({...old,[student.id]:e.target.value}))}><option>Present</option><option>Absent</option><option>Late</option><option>Excused</option></select></td></tr>)}</tbody></table></div>{students.length>0&&<div className="form-actions"><button type="button" className="primary-button" disabled={busy!==null} onClick={()=>void saveClassAttendance()}>{busy!==null?'Saving register...':'Submit class attendance'}</button></div>}{!students.length&&<div className="empty-state"><Users size={30}/><p>{classTeacherAssignments.length?'Choose one of your assigned classes to load its active students.':'No class has been assigned to you as class teacher. Subject teaching assignments do not grant class attendance access.'}</p></div>}</section>
+  return <section className="panel teacher-class-attendance"><div className="panel-heading"><div><h2>Class attendance</h2><p>Mark the whole class register and submit it once. Only your separately assigned class-teacher responsibilities appear here.</p></div></div>{message&&<div className="notice">{message}</div>}<div className="teacher-attendance-controls"><div><strong>Choose your responsible class</strong><div className="teacher-class-picks">{classTeacherAssignments.map(a=><button type="button" key={a.assignment_id} className={String(classId)===String(a.class_id)?"teacher-class-pick active":"teacher-class-pick"} aria-pressed={String(classId)===String(a.class_id)} onClick={()=>{setClassId(String(a.class_id));setStatuses({})}}>{a.class}</button>)}</div></div><label className="teacher-attendance-date">Attendance date<input type="date" value={attendanceDate} onChange={e=>setAttendanceDate(e.target.value)}/></label></div><div className="table-wrap"><table><thead><tr><th>#</th><th>Student</th><th>Admission number</th><th>Status</th></tr></thead><tbody>{students.map((student,index)=><tr key={student.id}><td>{index+1}</td><td>{student.first_name} {student.last_name}</td><td>{student.admission_number}</td><td><div className="attendance-choice-group" role="group" aria-label={"Attendance status for "+student.first_name+" "+student.last_name}>{["Present","Absent","Late","Excused"].map(status=><button type="button" key={status} className={(statuses[student.id]||"Present")===status?"attendance-choice active status-"+status.toLowerCase():"attendance-choice"} aria-pressed={(statuses[student.id]||"Present")===status} onClick={()=>setStatuses(old=>({...old,[student.id]:status}))}>{status}</button>)}</div></td></tr>)}</tbody></table></div>{students.length>0&&<div className="form-actions"><button type="button" className="primary-button" disabled={busy!==null} onClick={()=>void saveClassAttendance()}>{busy!==null?'Saving register...':'Submit class attendance'}</button></div>}{!students.length&&<div className="empty-state"><Users size={30}/><p>{classTeacherAssignments.length?'Choose one of your assigned classes to load its active students.':'No class has been assigned to you as class teacher. Subject teaching assignments do not grant class attendance access.'}</p></div>}</section>
 }
 function SchoolProfileSettings({token,onSaved}:{token:string;onSaved:()=>void}) {
   const [form,setForm]=useState({name:'',address:'',phone:'',email:'',motto:'',school_type:'Secondary',a_level_combinations:'',o_level_optional_subjects:'',a_level_subsidiary_subjects:'',report_logo:''})
@@ -1170,6 +1170,7 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
   const [otherLoginSearch,setOtherLoginSearch]=useState('')
   const [showAllStaffLogins,setShowAllStaffLogins]=useState(false)
   const [showAllOtherLogins,setShowAllOtherLogins]=useState(false)
+  const [accountTab,setAccountTab]=useState<'access'|'assignments'|'staff'|'other'>('staff')
   async function load() {
     setLoading(true);setError('')
     try {
@@ -1270,7 +1271,14 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
   return <section className="panel settings-panel">
     <div className="panel-heading"><div><h2>Staff accounts & access</h2><p>Staff login details are created automatically when you register a staff member in the Staff directory.</p></div><button type="button" className="secondary-button" onClick={()=>void load()} disabled={loading||busy}>{loading?'Loading...':'Refresh'}</button></div>
     {error&&<div className="form-error" role="alert">{error}</div>}{message&&<div className="success-notice" role="status">{message}</div>}
-    <div className="form-hint">To add an employee and create their login, open the Staff tab and choose Register staff member. SchoolBridge generates the username and temporary passcode automatically.</div>
+    <div className="form-hint">Register employees from the Staff directory. This workspace manages access, assignments and existing accounts.</div>
+    <div className="account-management-tabs" role="tablist" aria-label="User and permission settings">
+      <button type="button" role="tab" aria-selected={accountTab==="access"} className={accountTab==="access"?"active":""} onClick={()=>setAccountTab("access")}>Access & roles</button>
+      <button type="button" role="tab" aria-selected={accountTab==="assignments"} className={accountTab==="assignments"?"active":""} onClick={()=>setAccountTab("assignments")}>Teacher assignments</button>
+      <button type="button" role="tab" aria-selected={accountTab==="staff"} className={accountTab==="staff"?"active":""} onClick={()=>setAccountTab("staff")}>Staff logins <span>{editableUsers.length}</span></button>
+      <button type="button" role="tab" aria-selected={accountTab==="other"} className={accountTab==="other"?"active":""} onClick={()=>setAccountTab("other")}>Other accounts <span>{otherAccounts.length}</span></button>
+    </div>
+    {accountTab==='access'&&<div className="account-tab-panel">
     <h3>Manage a staff member's access</h3>
     {loading?<p className="form-hint">Loading staff accounts...</p>:!editableUsers.length?<p className="form-hint">No staff login accounts yet. Register a staff member first.</p>:<>
       <div className="student-form-grid">
@@ -1287,6 +1295,8 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
       <div className="form-actions"><button type="button" className="secondary-button" onClick={()=>void resetSelectedPassword()} disabled={busy||!selectedId}>{busy?'Working...':'Reset login passcode'}</button></div>
       {resetPasscode&&<div className="success-notice password-reset-result" role="status"><strong>Temporary passcode for {resetPasscode.username}</strong><code>{resetPasscode.password}</code><button type="button" className="secondary-button" onClick={()=>void navigator.clipboard.writeText('Username: '+resetPasscode.username+'\nTemporary passcode: '+resetPasscode.password)}>Copy login details</button><small>Shown once. Share it privately; the staff member must change it at their next sign-in.</small></div>}
     </>}
+    </div>}
+    {accountTab==='assignments'&&<div className="account-tab-panel">
     <h3>Assign classes and subjects to teachers</h3>
     <form className="student-form" onSubmit={assign}><div className="student-form-grid">
       <label>Teacher *<select required value={assignment.teacher_id} onChange={e=>setAssignment({...assignment,teacher_id:e.target.value})}><option value="">Select teacher</option>{activeTeachers.map(u=>{const person=staff.find((p:any)=>p.id===u.staff_id);return <option key={u.id} value={u.id}>{person?person.first_name+' '+person.last_name:u.username}</option>})}</select></label>
@@ -1300,6 +1310,8 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
       <label>Responsible class *<select required value={classTeacherForm.class_id} onChange={e=>setClassTeacherForm({...classTeacherForm,class_id:e.target.value})}><option value="">Select class</option>{classes.map(item=><option key={item.id} value={item.id}>{item.name}{item.section?' — '+item.section:''}</option>)}</select></label>
     </div><div className="form-actions"><button className="primary-button" disabled={busy||loading||!activeTeachers.length||!classes.length}>{busy?'Saving...':'Assign class teacher'}</button></div></form>
     <div className="table-wrap"><table><thead><tr><th>Class</th><th>Assigned class teacher</th><th>Action</th></tr></thead><tbody>{classTeacherAssignments.map(row=><tr key={row.id}><td>{row.class_name}{row.section?' — '+row.section:''}</td><td>{staff.find((p:any)=>users.find(u=>u.id===row.teacher_id)?.staff_id===p.id)?.first_name || row.teacher_name} {staff.find((p:any)=>users.find(u=>u.id===row.teacher_id)?.staff_id===p.id)?.last_name || ''}</td><td><button type="button" className="secondary-button" disabled={busy} onClick={()=>void removeClassTeacher(row.id)}>Remove</button></td></tr>)}{!classTeacherAssignments.length&&<tr><td colSpan={3}>No class teachers assigned yet.</td></tr>}</tbody></table></div>
+    </div>}
+    {accountTab==='staff'&&<div className="account-tab-panel">
     <h3>School staff login accounts</h3>
     <p className="form-hint">Staff accounts are listed separately from administrator and parent accounts. Search to find any staff login; only the first 8 are shown until you search or choose to view all.</p>
     <div className="table-tools student-tools"><div className="search-box"><Search size={17}/><input aria-label="Search staff login accounts" placeholder="Search staff name, staff number or username..." value={staffLoginSearch} onChange={e=>{setStaffLoginSearch(e.target.value);setShowAllStaffLogins(false)}}/></div><span className="count-pill">{staffLoginMatches.length} staff accounts</span></div>
@@ -1309,6 +1321,8 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
     </tbody></table></div>
     {!staffLoginSearch.trim()&&staffLoginMatches.length>8&&<button type="button" className="secondary-button" onClick={()=>setShowAllStaffLogins(v=>!v)}>{showAllStaffLogins?'Show fewer':'Show all '+staffLoginMatches.length+' staff accounts'}</button>}
     {resetPasscode&&<div className="success-notice password-reset-result" role="status"><strong>Temporary password for {resetPasscode.username}</strong><code>{resetPasscode.password}</code><button type="button" className="secondary-button" onClick={()=>void navigator.clipboard.writeText('Username: '+resetPasscode.username+'\\nTemporary password: '+resetPasscode.password)}>Copy login details</button><small>Shown once. Share it privately. The staff member must change it at their next sign-in.</small></div>}
+    </div>}
+    {accountTab==='other'&&<div className="account-tab-panel">
     <h3>Other system accounts</h3>
     <p className="form-hint">Administrator and parent accounts are kept separate from staff logins.</p>
     <div className="table-tools student-tools"><div className="search-box"><Search size={17}/><input aria-label="Search administrator and parent accounts" placeholder="Search administrator or parent accounts..." value={otherLoginSearch} onChange={e=>{setOtherLoginSearch(e.target.value);setShowAllOtherLogins(false)}}/></div><span className="count-pill">{otherLoginMatches.length} accounts</span></div>
@@ -1317,6 +1331,7 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
       {!otherLoginMatches.length&&<tr><td colSpan={4}>No administrator or parent accounts match this search.</td></tr>}
     </tbody></table></div>
     {!otherLoginSearch.trim()&&otherLoginMatches.length>8&&<button type="button" className="secondary-button" onClick={()=>setShowAllOtherLogins(v=>!v)}>{showAllOtherLogins?'Show fewer':'Show all '+otherLoginMatches.length+' accounts'}</button>}
+    </div>}
   </section>
 }
 function BackupSettings({token}:{token:string}) {
