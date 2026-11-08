@@ -2315,6 +2315,8 @@ def staff_self_check_in(db: Session = Depends(get_db), user=Depends(get_current_
         )
         db.add(record)
     record.check_in_at = local_now
+    # Keep the shift note in sync even when today's attendance row already existed.
+    record.notes = "On shift"
     # A successful self check-in confirms presence; authorised attendance staff
     # may later revise the status to Late, Excused or another valid value.
     record.status = "Present"
