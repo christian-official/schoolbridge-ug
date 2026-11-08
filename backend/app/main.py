@@ -1875,6 +1875,9 @@ def assign_class_teacher(data: ClassTeacherAssignmentCreate, db: Session = Depen
     else:
         assignment = models.ClassTeacherAssignment(**data.model_dump())
         db.add(assignment)
+    permissions = user_permissions(teacher)
+    permissions["Attendance"] = {"view", "add"}
+    teacher.permissions_json = json.dumps({key: sorted(value) for key, value in permissions.items()})
     write_audit(db, admin, "class_teacher_assigned", "class", data.class_id, f"Teacher account {teacher.username}")
     db.commit()
     db.refresh(assignment)
@@ -1886,8 +1889,15 @@ def remove_class_teacher(assignment_id: int, db: Session = Depends(get_db), admi
     assignment = db.get(models.ClassTeacherAssignment, assignment_id)
     if not assignment:
         raise HTTPException(404, "Class teacher assignment not found.")
-    write_audit(db, admin, "class_teacher_removed", "class", assignment.class_id, f"Assignment {assignment.id}")
+    teacher = db.get(models.User, assignment.teacher_id)
+    class_id = assignment.class_id
+    write_audit(db, admin, "class_teacher_removed", "class", class_id, f"Assignment {assignment.id}")
     db.delete(assignment)
+    db.flush()
+    if teacher and not db.query(models.ClassTeacherAssignment.id).filter_by(teacher_id=teacher.id).first():
+        permissions = user_permissions(teacher)
+        permissions.pop("Attendance", None)
+        teacher.permissions_json = json.dumps({key: sorted(value) for key, value in permissions.items()})
     db.commit()
     return {"message": "Class teacher assignment removed."}
 
