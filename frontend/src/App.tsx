@@ -97,6 +97,7 @@ function isFinanceAccount(user:User) {
 function getStaffNavigation(user:User) {
   const allItems = [...menu, ...teacherMenu.filter(item => !menu.some(base => base.label === item.label))]
   const visible = allItems.filter(item =>
+    item.label === 'Overview' ||
     item.label === 'My Profile' ||
     item.label === 'My Attendance' ||
     (user.permissions?.[item.label] || []).includes('view') ||
@@ -109,7 +110,7 @@ function getStaffNavigation(user:User) {
       ? ['Overview','Attendance','My Attendance','Staff','Reports','Announcements','My Profile']
       : /bursar|accountant|finance|accounts/.test(role)
         ? ['Overview','Fees & Finance','My Attendance','My Profile']
-        : /academic|director of studies|\\bdos\\b|deputy|headteacher|examination/.test(role)
+        : /academic|director of studies|\bdos\b|deputy|headteacher|examination/.test(role)
           ? ['Overview','Examinations','Timetable','Attendance','Students','Reports','Announcements','My Attendance','My Profile']
           : ['Overview','Staff','Attendance','Timetable','Leadership & Duty','Announcements','Reports','My Attendance','My Profile']
   return visible.sort((a,b) => {
@@ -276,7 +277,7 @@ function RoleSpecificDashboard({token,username,onNavigate}:{token:string;usernam
     ? {eyebrow:'ADMINISTRATION WORKSPACE',title:'Office & records overview',description:'Keep school records, communication and authorised administration work organised.',priority:['Students','Staff','Parent Access','Announcements','Reports'],empty:'No office tasks are assigned for today.'}
     : /attendance/.test(role)
       ? {eyebrow:'ATTENDANCE WORKSPACE',title:'Attendance operations',description:'Review the attendance areas assigned to your account and keep daily records up to date.',priority:['Attendance','Staff Attendance','Reports','Students','Announcements'],empty:'No attendance activity is scheduled for today.'}
-      : /academic|director of studies|\\bdos\\b|deputy|headteacher|examination/.test(role)
+      : /academic|director of studies|\bdos\b|deputy|headteacher|examination/.test(role)
         ? {eyebrow:'ACADEMIC OPERATIONS',title:'Academic oversight',description:'Access the academic review and coordination work authorised for your role.',priority:['Examinations','Timetable','Attendance','Students','Reports','Announcements'],empty:'No lessons or duty assignments are scheduled for today.'}
         : /ict|information technology|computer/.test(role)
           ? {eyebrow:'SYSTEMS WORKSPACE',title:'ICT & systems overview',description:'Open the school work areas assigned to your account and coordinate your daily responsibilities.',priority:['Staff','Announcements','Reports','Timetable','My Attendance'],empty:'No duty has been assigned to you for today.'}
