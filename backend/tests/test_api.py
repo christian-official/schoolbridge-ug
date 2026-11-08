@@ -757,11 +757,13 @@ def test_parent_portal_only_exposes_linked_child_records_and_audience_announceme
     with TestClient(app) as client:
         created = client.post("/api/parent-accounts", headers=admin_headers, json={
             "username": "amina-parent", "email": "parent@example.invalid",
-            "password": "ParentPassword123!", "student_ids": [child_id],
+            "student_ids": [child_id],
         })
         assert created.status_code == 200, created.text
+        temporary_password = created.json()["temporary_password"]
+        assert temporary_password
         parent_login = client.post("/api/auth/login", data={
-            "username": "amina-parent", "password": "ParentPassword123!",
+            "username": "amina-parent", "password": temporary_password,
         })
         assert parent_login.status_code == 200
         parent_headers = {"Authorization": f"Bearer {parent_login.json()['access_token']}"}
