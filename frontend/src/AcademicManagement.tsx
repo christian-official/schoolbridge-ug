@@ -4,12 +4,16 @@ import { BookOpen, Plus, RefreshCw, Save, Printer } from 'lucide-react'
 type SchoolClass = { id: number; name?: string; section?: string }
 type Subject = { id: number; name: string; code?: string | null }
 type Student = { id: number; first_name: string; middle_name?: string | null; last_name: string; admission_number: string; class_id?: number | null; academic_level?: string | null; combination?: string | null; optional_subjects?: string | null; subsidiary_subjects?: string | null }
-type Exam = { id: number; name: string; term: string; year: number; class_id: number | null }
+type Exam = { id: number; name: string; exam_type: string; term: string; year: number; class_id: number | null }
 type Mark = { id: number; student_id: number; subject_id: number; exam_id: number; score: number; verified: boolean }
 type GradeBand = { id?: number; grade: string; min_score: number; max_score: number; remark: string }
 type SchoolProfile = { name?: string; address?: string | null; phone?: string | null; email?: string | null; motto?: string | null; school_type?: string; a_level_combinations?: string | null; o_level_optional_subjects?: string | null; a_level_subsidiary_subjects?: string | null; report_logo?: string | null; report_template?: string | null }
 type ReportTemplateConfig = { title?: string; footer?: string }
 type Page<T> = { items: T[]; total: number; pages?: number }
+
+const EXAM_TYPES = ['Beginning of Term', 'Mid-Term', 'End of Term', 'Mock', 'Promotional', 'Other'] as const
+
+function examGroupKey(exam: Exam) { return [exam.exam_type || 'Other', exam.name, exam.term, exam.year].join('::') }
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 
@@ -109,8 +113,10 @@ export default function AcademicManagement({ token, classes, canVerify = false }
   const [historyMarks, setHistoryMarks] = useState<Mark[]>([])
   const [historyError, setHistoryError] = useState('')
   const [selectedExamId, setSelectedExamId] = useState('')
+  const [activeExamType, setActiveExamType] = useState<string>('All exams')
+  const [selectedExamGroupKey, setSelectedExamGroupKey] = useState('')
   const [activeAcademicTab, setActiveAcademicTab] = useState<'marks' | 'submitted' | 'results' | 'grading' | 'history'>('marks')
-  const [examForm, setExamForm] = useState({ name: '', class_id: '', term: 'Term 1', year: String(new Date().getFullYear()) })
+  const [examForm, setExamForm] = useState<{name:string;exam_type:string;class_ids:number[];term:string;year:string}>({ name: '', exam_type: 'End of Term', class_ids: [], term: 'Term 1', year: String(new Date().getFullYear()) })
   const [showExamForm, setShowExamForm] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -137,7 +143,8 @@ export default function AcademicManagement({ token, classes, canVerify = false }
       if (selectedExamId && examRows.some(exam => String(exam.id) === selectedExamId)) {
         setSelectedExamId(selectedExamId)
       } else {
-        setSelectedExamId(examRows.length ? String(examRows[0].id) : '')
+        setSelectedExamId('')
+        setSelectedExamGroupKey('')
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to load examinations.')
@@ -246,22 +253,34 @@ export default function AcademicManagement({ token, classes, canVerify = false }
 
   async function createExam(event: FormEvent) {
     event.preventDefault()
-    if (!examForm.name.trim() || !examForm.class_id || !examForm.year.trim()) {
-      setError('Complete the examination name, class and academic year before saving.')
+    if (!examForm.name.trim() || !examForm.class_ids.length || !examForm.year.trim()) {
+      setError('Enter the examination name and select at least one class.')
       return
     }
     setSaving(true); setError(''); setMessage('')
     try {
-      const created = await request<Exam>('exams', token, {
-        method: 'POST',
-        body: JSON.stringify({ ...examForm, name: examForm.name.trim(), class_id: Number(examForm.class_id), year: Number(examForm.year) }),
-      })
+      const existing = exams.filter(exam => exam.name.trim().toLowerCase() === examForm.name.trim().toLowerCase() && exam.exam_type === examForm.exam_type && exam.term === examForm.term && exam.year === Number(examForm.year))
+      const existingClassIds = new Set(existing.map(exam => exam.class_id))
+      const classIdsToCreate = examForm.class_ids.filter(classId => !existingClassIds.has(classId))
+      const skipped = examForm.class_ids.length - classIdsToCreate.length
+      const created: Exam[] = []
+      for (const classId of classIdsToCreate) {
+        const row = await request<Exam>('exams', token, {
+          method: 'POST',
+          body: JSON.stringify({ name: examForm.name.trim(), exam_type: examForm.exam_type, term: examForm.term, year: Number(examForm.year), class_id: classId }),
+        })
+        created.push(row)
+      }
       const next = await request<Exam[]>('exams', token)
       setExams(next)
-      setSelectedExamId(String(created.id))
+      setActiveExamType(examForm.exam_type)
+      if (created.length) {
+        setSelectedExamGroupKey(examGroupKey(created[0]))
+        setSelectedExamId(String(created[0].id))
+      }
       setShowExamForm(false)
-      setExamForm(old => ({ ...old, name: '' }))
-      setMessage('Examination created for the selected class.')
+      setExamForm(old => ({ ...old, name: '', class_ids: [] }))
+      setMessage(`Examination created for ${created.length} class(es).${skipped ? ` ${skipped} already existed and were not duplicated.` : ''}`)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to create examination.')
     } finally {
@@ -438,26 +457,43 @@ export default function AcademicManagement({ token, classes, canVerify = false }
       </div>
       {error && <div className="form-error" role="alert">{error}</div>}
       {message && <div className="success-notice" role="status">{message}</div>}
-      <div className="finance-toolbar">
-        <label className="academic-exam-select">Selected examination
-          <select value={selectedExamId} onChange={e => setSelectedExamId(e.target.value)}>
-            <option value="">Choose an examination</option>
-            {exams.map(exam => <option key={exam.id} value={exam.id}>{exam.name} · {exam.term} {exam.year} · {classes.find(item => item.id === exam.class_id)?.name || 'Unassigned class'}</option>)}
-          </select>
-        </label>
+      <div className="exam-selection-flow">
+        <div className="exam-flow-step"><span className="form-section-number">01</span><div><strong>Choose exam type</strong><small>Filter the examination list by category.</small></div></div>
+        <nav className="exam-type-tabs" aria-label="Examination types">
+          {['All exams', ...EXAM_TYPES].map(type => <button type="button" key={type} className={activeExamType === type ? 'exam-type-tab active' : 'exam-type-tab'} onClick={() => { setActiveExamType(type); setSelectedExamGroupKey(''); setSelectedExamId('') }}>{type}</button>)}
+        </nav>
+        <div className="exam-flow-step"><span className="form-section-number">02</span><div><strong>Choose examination</strong><small>Select the exam name, term and academic year.</small></div></div>
+        <div className="exam-choice-grid">
+          {Array.from(new Map(exams.filter(exam => activeExamType === 'All exams' || (exam.exam_type || 'Other') === activeExamType).map(exam => [examGroupKey(exam), exam])).values()).map(exam => {
+            const key = examGroupKey(exam)
+            return <button type="button" key={key} className={selectedExamGroupKey === key ? 'exam-choice active' : 'exam-choice'} onClick={() => { setSelectedExamGroupKey(key); setSelectedExamId('') }}>
+              <strong>{exam.name}</strong><span>{exam.term} · {exam.year}</span><small>{exams.filter(row => examGroupKey(row) === key).length} class(es)</small>
+            </button>
+          })}
+          {!exams.some(exam => activeExamType === 'All exams' || (exam.exam_type || 'Other') === activeExamType) && <p className="form-hint">No examinations have been created under this type yet.</p>}
+        </div>
+        {selectedExamGroupKey && <><div className="exam-flow-step"><span className="form-section-number">03</span><div><strong>Choose class</strong><small>Open the examination for the class you want to work with.</small></div></div>
+          <div className="exam-class-choices">{exams.filter(exam => examGroupKey(exam) === selectedExamGroupKey).map(exam => {
+            const item = classes.find(row => row.id === exam.class_id)
+            return <button type="button" key={exam.id} className={selectedExamId === String(exam.id) ? 'exam-class-choice active' : 'exam-class-choice'} onClick={() => setSelectedExamId(String(exam.id))}>{item?.name || 'Unassigned class'}{item?.section ? ' · ' + item.section : ''}</button>
+          })}</div>
+        </>}
         <button type="button" className="primary-button" onClick={() => setShowExamForm(value => !value)}><Plus size={16}/>{showExamForm ? 'Close form' : 'Create examination'}</button>
       </div>
-      {showExamForm && <form className="student-form registration-form" onSubmit={createExam}>
+      {showExamForm && <form className="student-form registration-form exam-create-form" onSubmit={createExam}>
         <div className="form-section">
-          <div className="form-section-heading"><span className="form-section-number">01</span><div><h3>Examination details</h3><p>Each examination belongs to one class, term and academic year.</p></div></div>
-          <div className="student-form-grid">
-            <label>Examination name *<input required maxLength={100} value={examForm.name} onChange={e => setExamForm({ ...examForm, name: e.target.value })} placeholder="e.g. Beginning of Term Examination"/></label>
-            <label>Class *<select required value={examForm.class_id} onChange={e => setExamForm({ ...examForm, class_id: e.target.value })}><option value="">Choose class</option>{classes.map(item => <option key={item.id} value={item.id}>{item.name}{item.section ? ' — ' + item.section : ''}</option>)}</select></label>
-            <label>Term *<select value={examForm.term} onChange={e => setExamForm({ ...examForm, term: e.target.value })}><option>Term 1</option><option>Term 2</option><option>Term 3</option></select></label>
+          <div className="form-section-heading"><span className="form-section-number">01</span><div><h3>Create examination</h3><p>Enter the exam name, then select every class that will sit this examination.</p></div></div>
+          <label>Examination name *<input required maxLength={100} value={examForm.name} onChange={e => setExamForm({ ...examForm, name: e.target.value })} placeholder="e.g. End of Term One Examination"/></label>
+          <div className="exam-create-meta">
+            <div><strong>Exam type</strong><div className="exam-pill-options">{EXAM_TYPES.map(type => <button type="button" key={type} className={examForm.exam_type === type ? 'exam-pill active' : 'exam-pill'} onClick={() => setExamForm({ ...examForm, exam_type: type })}>{type}</button>)}</div></div>
+            <div><strong>Term</strong><div className="exam-pill-options">{['Term 1','Term 2','Term 3'].map(term => <button type="button" key={term} className={examForm.term === term ? 'exam-pill active' : 'exam-pill'} onClick={() => setExamForm({ ...examForm, term })}>{term}</button>)}</div></div>
             <label>Academic year *<input required type="number" min="2000" max="2100" value={examForm.year} onChange={e => setExamForm({ ...examForm, year: e.target.value })}/></label>
           </div>
+          <div className="exam-class-picker"><div><strong>Input classes *</strong><small>{examForm.class_ids.length} selected · one examination record will be created for each selected class.</small></div>
+            <div className="exam-class-choices">{classes.map(item => { const id = item.id; const chosen = examForm.class_ids.includes(id); return <button type="button" key={id} className={chosen ? 'exam-class-choice active' : 'exam-class-choice'} onClick={() => setExamForm(old => ({ ...old, class_ids: chosen ? old.class_ids.filter(value => value !== id) : [...old.class_ids, id] }))}>{item.name}{item.section ? ' · ' + item.section : ''}</button> })}</div>
+          </div>
         </div>
-        <div className="form-actions"><button type="button" className="secondary-button" onClick={() => setShowExamForm(false)}>Cancel</button><button className="primary-button" disabled={saving || !classes.length}>{saving ? 'Saving...' : 'Create examination'}</button></div>
+        <div className="form-actions"><button type="button" className="secondary-button" onClick={() => setShowExamForm(false)}>Cancel</button><button className="primary-button" disabled={saving || !classes.length || !examForm.class_ids.length}>{saving ? 'Saving...' : 'Create for selected classes'}</button></div>
       </form>}
     </section>
 
