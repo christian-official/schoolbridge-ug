@@ -2249,6 +2249,20 @@ def my_staff_attendance(db: Session = Depends(get_db), user=Depends(get_current_
     }
 
 
+@app.get("/api/me/staff-attendance", tags=["Staff Attendance"])
+def get_my_staff_attendance(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    staff_member = get_linked_staff_member(db, user)
+    if not staff_member:
+        raise HTTPException(404, "Your login is not linked to a staff profile.")
+    records = db.query(models.StaffAttendance).filter(
+        models.StaffAttendance.staff_id == staff_member.id
+    ).order_by(models.StaffAttendance.attendance_date.desc(), models.StaffAttendance.id.desc()).limit(60).all()
+    return {"records": [{
+        "id": row.id, "attendance_date": row.attendance_date, "status": row.status,
+        "notes": row.notes, "check_in_at": row.check_in_at, "check_out_at": row.check_out_at,
+    } for row in records]}
+
+
 @app.post("/api/me/staff-attendance/check-in", tags=["Staff Attendance"])
 def staff_self_check_in(db: Session = Depends(get_db), user=Depends(get_current_user)):
     staff_member = get_linked_staff_member(db, user)
@@ -2267,8 +2281,9 @@ def staff_self_check_in(db: Session = Depends(get_db), user=Depends(get_current_
         )
         db.add(record)
     record.check_in_at = local_now
-    if not record.status:
-        record.status = "Present"
+    # A successful self check-in confirms presence; authorised attendance staff
+    # may later revise the status to Late, Excused or another valid value.
+    record.status = "Present"
     write_audit(db, user, "staff_self_check_in", "staff_attendance", staff_member.id,
                 f"Checked in at {local_now.strftime('%H:%M')} on {local_now.date()}.")
     db.commit()
