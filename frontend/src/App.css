@@ -196,10 +196,11 @@ td strong { color: #34445e; font-size: 11px; }
 }
 
 @media print {
-  body * { visibility: hidden !important; }
-  .receipt-print, .receipt-print * { visibility: visible !important; }
-  .receipt-print { position: absolute !important; inset: 0 auto auto 0 !important; width: 100% !important; max-width: none !important; box-shadow: none !important; border: 0 !important; }
-  .receipt-print button { display: none !important; }
+  body[data-schoolbridge-print="receipt"] * { visibility: hidden !important; }
+  body[data-schoolbridge-print="receipt"] .receipt-print,
+  body[data-schoolbridge-print="receipt"] .receipt-print * { visibility: visible !important; }
+  body[data-schoolbridge-print="receipt"] .receipt-print { position: absolute !important; inset: 0 auto auto 0 !important; width: 100% !important; max-width: none !important; box-shadow: none !important; border: 0 !important; }
+  body[data-schoolbridge-print="receipt"] .receipt-print button { display: none !important; }
 }
 
 .backup-action { padding: 20px 0; border-bottom: 1px solid var(--border, #e5e7eb); }
@@ -1335,12 +1336,11 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 /* Print only the parent credential handover slip when requested. */
 @media print {
-  body:has(.parent-passcode-handover) * { visibility:hidden !important; }
-  .parent-passcode-handover,
-  .parent-passcode-handover * { visibility:visible !important; }
-  .parent-passcode-handover button { display:none !important; }
-  .parent-passcode-handover { position:absolute !important; inset:0 auto auto 0 !important; width:100% !important; padding:18px !important; border:1px solid #9aa8bd !important; background:#fff !important; color:#17243b !important; }
-  .student-form input[type=file]::file-selector-button { padding:8px 12px; border:0; border-radius:6px; background:#eaf0ff; color:#3157b7; font-weight:700; cursor:pointer; }
+  body[data-schoolbridge-print="handover"] * { visibility:hidden !important; }
+  body[data-schoolbridge-print="handover"] .parent-passcode-handover,
+  body[data-schoolbridge-print="handover"] .parent-passcode-handover * { visibility:visible !important; }
+  body[data-schoolbridge-print="handover"] .parent-passcode-handover button { display:none !important; }
+  body[data-schoolbridge-print="handover"] .parent-passcode-handover { position:absolute !important; inset:0 auto auto 0 !important; width:100% !important; padding:18px !important; border:1px solid #9aa8bd !important; background:#fff !important; color:#17243b !important; }
 }
 
 .student-form input[type=file] { max-width:100%; padding:8px; border:1px dashed #cbd6e7; border-radius:8px; background:#fff; color:#43536d; cursor:pointer; }
