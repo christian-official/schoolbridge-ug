@@ -181,3 +181,61 @@
 @media(max-width:900px){
   .redesigned-app-shell .sidebar{padding:16px 14px 14px!important}
 }
+
+
+/* Keep the desktop workspace locked to the viewport: only the main panel scrolls. */
+@media(min-width:761px){
+  .redesigned-app-shell{
+    display:flex;
+    align-items:stretch;
+    height:100vh;
+    min-height:100vh;
+    overflow:hidden;
+  }
+  .redesigned-app-shell>.sidebar{
+    position:sticky;
+    top:0;
+    align-self:flex-start;
+    flex:0 0 274px;
+    width:274px;
+    height:100vh;
+    min-height:100vh;
+    max-height:100vh;
+    overflow:hidden;
+  }
+  .redesigned-app-shell>.sidebar .sidebar-management{
+    min-height:0;
+    overflow-y:auto;
+    overscroll-behavior:contain;
+  }
+  .redesigned-app-shell>.main-area{
+    flex:1 1 0;
+    width:calc(100% - 274px);
+    height:100vh;
+    min-height:0;
+    overflow-y:auto;
+    overflow-x:hidden;
+    overscroll-behavior:contain;
+  }
+  .redesigned-app-shell>.main-area>.topbar{
+    position:sticky;
+    top:0;
+    z-index:8;
+  }
+}
+@media(max-width:760px){
+  .redesigned-app-shell{
+    height:auto;
+    min-height:100vh;
+    overflow:visible;
+  }
+  .redesigned-app-shell>.main-area{
+    height:auto;
+    min-height:100vh;
+    overflow:visible;
+  }
+  .redesigned-app-shell>.sidebar{
+    height:100vh;
+    max-height:100vh;
+  }
+}
