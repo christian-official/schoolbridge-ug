@@ -1102,12 +1102,13 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
       if(label==='Class Teacher') next['Attendance']=['view','add']
       next['My Classes']=['view'];next['My Attendance']=['view'];next['My Results']=['view','add','edit'];next['Announcements']=['view'];next['Timetable']=['view']
     }
+    if(['Academic Administrator','Academics Officer','DOS'].includes(label)) next['Timetable']=['view','add','edit','delete']
     setRoleLabel(label);setRoleType(label==='Teacher'||label==='Class Teacher'?'teacher':'staff');setPermissions(next)
   }
   function toggleSection(section:string,checked:boolean) {
     setPermissions(current=>{
       const next={...current}
-      if(checked) next[section]=section==='My Results'?['view','add','edit']:section==='Attendance'&&roleType==='teacher'?['view','add']:['view']
+      if(checked) next[section]=section==='My Results'?['view','add','edit']:section==='Attendance'&&roleType==='teacher'?['view','add']:section==='Timetable'&&['Academic Administrator','Academics Officer','DOS'].includes(roleLabel)?['view','add','edit','delete']:['view']
       else delete next[section]
       return next
     })
