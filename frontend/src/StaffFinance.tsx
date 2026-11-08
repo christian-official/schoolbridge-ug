@@ -98,7 +98,7 @@ export default function StaffFinance({token,active,classes=[],refreshKey=0,initi
 
   useEffect(()=>{
     if(active!=='Fees & Finance'||!feeSetup.class_id)return
-    request<{fees:{term:string;amount:number}[]}>('classes/'+feeSetup.class_id+'/fees?year='+feeSetup.year,token)
+    request<{fees:{term:string;amount:number;boarding_amount?:number;day_amount?:number}[]}>('classes/'+feeSetup.class_id+'/fees?year='+feeSetup.year,token)
       .then(data=>setFeeSetup(old=>{const fee=data.fees.find(x=>x.term===old.term);return {...old,boarding_amount:String(fee?.boarding_amount??fee?.amount??0),day_amount:String(fee?.day_amount??fee?.amount??0)}}))
       .catch(e=>setMessage(e.message))
   },[active,feeSetup.class_id,feeSetup.term,feeSetup.year,token])
