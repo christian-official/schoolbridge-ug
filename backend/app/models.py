@@ -111,6 +111,10 @@ class User(Base):
     permissions_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     staff_id: Mapped[int | None] = mapped_column(ForeignKey("staff_members.id"), unique=True, nullable=True, index=True)
     is_active: Mapped[bool] = mapped_column(default=True)
+    reset_code_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    reset_expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    reset_requested_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    must_change_password: Mapped[bool] = mapped_column(default=False, nullable=False)
 
 
 class TeacherAssignment(Base):
