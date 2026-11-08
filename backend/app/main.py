@@ -695,7 +695,8 @@ def delete_class(class_id: int, db: Session = Depends(get_db)):
     linked_students = db.query(models.Student).filter(models.Student.class_id == class_id).count()
     linked_fees = db.query(models.ClassFee).filter(models.ClassFee.class_id == class_id).count()
     linked_assignments = db.query(models.TeacherAssignment).filter(models.TeacherAssignment.class_id == class_id).count()
-    if linked_students or linked_fees or linked_assignments:
+    linked_class_teacher = db.query(models.ClassTeacherAssignment).filter(models.ClassTeacherAssignment.class_id == class_id).count()
+    if linked_students or linked_fees or linked_assignments or linked_class_teacher:
         raise HTTPException(
             409,
             "This class cannot be removed because it has linked students, class fee records or teacher assignments. Remove or reassign those records first."
@@ -2271,6 +2272,8 @@ def my_dashboard_work(db: Session = Depends(get_db), user=Depends(get_current_us
     today = date.today()
     staff_id = user.staff_id
     staff = db.get(models.StaffMember, staff_id) if staff_id else None
+    if staff is None and user.email:
+        staff = db.query(models.StaffMember).filter(func.lower(models.StaffMember.email) == user.email.lower()).first()
     permissions = user_permissions(user)
     today_lessons = []
     class_teacher_classes = []
