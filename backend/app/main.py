@@ -1447,9 +1447,11 @@ def create_parent_account(data: ParentAccountCreate, db: Session = Depends(get_d
         raise HTTPException(409, "That username or email is already registered, or a parent link already exists.")
     email_sent = False
     email_error = None
-    smtp_host = os.getenv("SCHOOLBRIDGE_SMTP_HOST", "").strip()
-    smtp_from = os.getenv("SCHOOLBRIDGE_SMTP_FROM", "").strip()
-    if smtp_host and smtp_from:
+    smtp_host = os.getenv("SCHOOLBRIDGE_SMTP_HOST", "smtp.gmail.com").strip()
+    smtp_user = os.getenv("SCHOOLBRIDGE_SMTP_USERNAME", "").strip()
+    smtp_password = os.getenv("SCHOOLBRIDGE_SMTP_PASSWORD", "")
+    smtp_from = os.getenv("SCHOOLBRIDGE_SMTP_FROM", smtp_user).strip()
+    if smtp_host and smtp_user and smtp_password and smtp_from:
         try:
             message = EmailMessage()
             message["Subject"] = "Your SchoolBridge parent account"
@@ -1461,8 +1463,6 @@ def create_parent_account(data: ParentAccountCreate, db: Session = Depends(get_d
                 "Sign in using the SchoolBridge portal and change your passcode after signing in. Keep these details private.\n"
             )
             smtp_port = int(os.getenv("SCHOOLBRIDGE_SMTP_PORT", "587"))
-            smtp_user = os.getenv("SCHOOLBRIDGE_SMTP_USERNAME", "").strip()
-            smtp_password = os.getenv("SCHOOLBRIDGE_SMTP_PASSWORD", "")
             with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as server:
                 server.ehlo()
                 if os.getenv("SCHOOLBRIDGE_SMTP_USE_TLS", "true").lower() not in ("0", "false", "no"):
@@ -1475,7 +1475,7 @@ def create_parent_account(data: ParentAccountCreate, db: Session = Depends(get_d
         except Exception:
             email_error = "Email delivery could not be completed. Use the displayed local handover details."
     else:
-        email_error = "Email delivery is not configured on this school server."
+        email_error = "Email delivery needs the school's SMTP username and app password in server settings."
     return {"id": parent.id, "username": parent.username, "email": parent.email, "role": parent.role, "linked_students": len(student_ids), "temporary_password": temporary_password, "email_sent": email_sent, "email_error": email_error}
 
 
