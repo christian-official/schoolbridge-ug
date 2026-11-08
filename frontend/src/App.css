@@ -1544,3 +1544,5 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .staff-subject-choice-grid .permission-choice>span{font-size:12px}
 .staff-subject-choice-grid .permission-choice.active{background:#edf4ff;border-color:#5276d5}
 .staff-subject-picker .field-error{display:block;margin-top:9px;color:#b42318;font-size:11px;font-weight:650}
+
+.staff-shift-note{display:block;margin-top:5px;color:#66758b;font-size:11px;font-weight:600;line-height:1.4}
