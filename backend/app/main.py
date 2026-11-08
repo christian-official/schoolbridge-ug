@@ -59,7 +59,7 @@ PERMISSION_SECTIONS = {
 PERMISSION_ACTIONS = {"view", "add", "edit", "delete", "approve", "print"}
 ADMIN_ONLY_PATHS = {
     "/api/auth/users", "/api/auth/teachers", "/api/auth/permissions",
-    "/api/parent-accounts", "/api/teacher-assignments",
+    "/api/teacher-assignments",
 }
 
 
@@ -88,7 +88,7 @@ def permission_for_path(path: str):
     if path.startswith("/api/students"): return "Students"
     if path.startswith("/api/staff"): return "Staff"
     if path.startswith(("/api/finance", "/api/fees", "/api/salary", "/api/expenses")): return "Fees & Finance"
-    if path.startswith(("/api/exams", "/api/marks", "/api/grades", "/api/subjects")): return "Examinations"
+    if path.startswith(("/api/exams", "/api/marks", "/api/grades", "/api/subjects", "/api/grading-scale")): return "Examinations"
     if path.startswith("/api/attendance"): return "Attendance"
     if path.startswith("/api/staff-attendance"): return "Staff Attendance"
     if path.startswith("/api/timetable"): return "Timetable"
@@ -96,7 +96,7 @@ def permission_for_path(path: str):
     if path.startswith("/api/parent-accounts"): return "Parent Access"
     if path.startswith("/api/announcements"): return "Announcements"
     if path.startswith("/api/reports"): return "Reports"
-    if path.startswith("/api/settings"): return "Settings"
+    if path.startswith(("/api/settings", "/api/backups", "/api/audit-logs")): return "Settings"
     if path.startswith("/api/dashboard"): return "Overview"
     if path.startswith("/api/classes"): return "Students"
     return None
