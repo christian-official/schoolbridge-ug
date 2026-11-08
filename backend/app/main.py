@@ -59,7 +59,7 @@ PERMISSION_SECTIONS = {
 PERMISSION_ACTIONS = {"view", "add", "edit", "delete", "approve", "print"}
 ADMIN_ONLY_PATHS = {
     "/api/auth/users", "/api/auth/teachers", "/api/auth/permissions",
-    "/api/teacher-assignments",
+    "/api/teacher-assignments", "/api/backups/restore",
 }
 
 
@@ -107,6 +107,8 @@ def permission_for_path(path: str):
 
 
 def action_for_method(method: str, path: str = ""):
+    if path.endswith("/archive") and method == "POST":
+        return "delete"
     if method in {"PATCH", "PUT"} and (path.endswith("/verification") or "/approve" in path):
         return "approve"
     return {"GET": "view", "POST": "add", "PUT": "edit", "PATCH": "edit", "DELETE": "delete"}.get(method, "view")
