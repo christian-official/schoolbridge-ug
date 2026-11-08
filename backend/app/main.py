@@ -1633,10 +1633,10 @@ def send_password_recovery_email(user, code: str) -> bool:
     message["From"] = smtp_from
     message["To"] = recipient
     message.set_content(
-        "A password reset was requested for your SchoolBridge account.\n\\n"
-        f"Your verification code is: {code}\\n"
+        "A password reset was requested for your SchoolBridge account.\n\n"
+        f"Your verification code is: {code}\n"
         "This code expires in 15 minutes and can only be used once. "
-        "If you did not request this, you can ignore this email.\\n"
+        "If you did not request this, you can ignore this email.\n"
     )
     port = int(os.getenv("SCHOOLBRIDGE_SMTP_PORT", "587"))
     with smtplib.SMTP(smtp_host, port, timeout=15) as server:
@@ -1660,6 +1660,7 @@ def request_password_reset(data: PasswordResetRequest, db: Session = Depends(get
             user.reset_code_hash = password_hash.hash(code)
             user.reset_expires_at = now + timedelta(minutes=15)
             user.reset_requested_at = now
+            user.reset_attempts = 0
             db.commit()
             try:
                 delivered = send_password_recovery_email(user, code)
@@ -1676,15 +1677,18 @@ def request_password_reset(data: PasswordResetRequest, db: Session = Depends(get
 def confirm_password_reset(data: PasswordResetConfirm, db: Session = Depends(get_db)):
     user = find_password_recovery_account(db, data.identifier)
     now = datetime.utcnow()
-    if not user or not user.is_active or not user.reset_code_hash or not user.reset_expires_at or user.reset_expires_at < now:
+    if not user or not user.is_active or not user.reset_code_hash or not user.reset_expires_at or user.reset_expires_at < now or user.reset_attempts >= 5:
         raise HTTPException(400, "The verification code is invalid or has expired. Request a new code.")
     if not password_hash.verify(data.code, user.reset_code_hash):
+        user.reset_attempts += 1
+        db.commit()
         raise HTTPException(400, "The verification code is invalid or has expired. Request a new code.")
     if password_hash.verify(data.new_password, user.hashed_password):
         raise HTTPException(400, "Choose a password different from your current password.")
     user.hashed_password = password_hash.hash(data.new_password)
     user.reset_code_hash = None
     user.reset_expires_at = None
+    user.reset_attempts = 0
     user.must_change_password = False
     db.commit()
     return {"message": "Password reset successfully. You can now sign in with your new password."}
@@ -1715,6 +1719,7 @@ def admin_reset_user_password(user_id: int, db: Session = Depends(get_db), admin
     target.reset_code_hash = None
     target.reset_expires_at = None
     target.reset_requested_at = None
+    target.reset_attempts = 0
     write_audit(db, admin, "staff_password_reset", "user", target.id, "Administrator issued a one-time temporary passcode.")
     db.commit()
     return {"message": "Temporary passcode generated. It is shown only once; the staff member must change it after signing in.", "username": target.username, "temporary_password": temporary_password}
@@ -3051,6 +3056,7 @@ def update_my_password(data: MyPasswordUpdate, user=Depends(get_current_user), d
     user.must_change_password = False
     user.reset_code_hash = None
     user.reset_expires_at = None
+    user.reset_attempts = 0
     db.commit()
     return {"message": "Password updated successfully."}
 
