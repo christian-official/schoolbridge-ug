@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
+type AttendanceRecord = { id:number; attendance_date:string; status:string; notes?:string|null; check_in_at?:string|null; check_out_at?:string|null }
 type Profile = {
   first_name: string; last_name: string; staff_number: string; position?: string | null; department?: string | null; subjects?: string | null; phone?: string | null;
   email?: string | null;
@@ -26,16 +27,31 @@ export default function MyStaffProfile({ token }: { token: string }) {
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(true)
+  const [attendance, setAttendance] = useState<AttendanceRecord[]>([])
+  const [attendanceBusy, setAttendanceBusy] = useState(false)
+  const [attendanceMessage, setAttendanceMessage] = useState('')
+  const [attendanceError, setAttendanceError] = useState('')
   const [saving, setSaving] = useState(false)
   async function load() {
     setLoading(true); setError('')
     try {
-      const data = await request<Profile>('me/staff-profile', token)
+      const [data, attendanceData] = await Promise.all([request<Profile>('me/staff-profile', token), request<{records:AttendanceRecord[]}>('me/staff-attendance', token)])
       setProfile(data); setFirstName(data.first_name); setPhone(data.phone || ''); setEmail(data.email || '')
+      setAttendance(attendanceData.records || [])
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to load your profile.') }
     finally { setLoading(false) }
   }
   useEffect(() => { void load() }, [token])
+  async function recordAttendance(action: 'check-in' | 'check-out') {
+    setAttendanceBusy(true); setAttendanceError(''); setAttendanceMessage('')
+    try {
+      const result = await request<{message:string}>(`me/staff-attendance/${action}`, token, { method: 'POST' })
+      setAttendanceMessage(result.message)
+      const updated = await request<{records:AttendanceRecord[]}>('me/staff-attendance', token)
+      setAttendance(updated.records || [])
+    } catch (e) { setAttendanceError(e instanceof Error ? e.message : 'Unable to record attendance.') }
+    finally { setAttendanceBusy(false) }
+  }
   async function saveProfile(event: React.FormEvent) {
     event.preventDefault(); setSaving(true); setError(''); setMessage('')
     try {
@@ -59,6 +75,9 @@ export default function MyStaffProfile({ token }: { token: string }) {
       {error && <div className="form-error" role="alert">{error}</div>}
       {message && <div className="success-notice" role="status">{message}</div>}
       {loading ? <p className="form-hint">Loading your profile…</p> : profile && <>
+        <section className="staff-self-checkin-card"><div><strong>Daily staff attendance</strong><span>Check in when you arrive and check out when you leave. Your time is sent to the authorised attendance office.</span>{attendance[0] && <small>Today: {attendance[0].status} · In {attendance[0].check_in_at?.slice(11,16) || '—'} · Out {attendance[0].check_out_at?.slice(11,16) || '—'}</small>}</div><div className="form-actions"><button type="button" className="primary-button" disabled={attendanceBusy || !!attendance[0]?.check_in_at && attendance[0]?.attendance_date === new Date().toLocaleDateString('en-CA',{timeZone:'Africa/Kampala'})} onClick={() => void recordAttendance('check-in')}>{attendanceBusy ? 'Sending…' : 'Check in'}</button><button type="button" className="secondary-button" disabled={attendanceBusy || !attendance[0]?.check_in_at || !!attendance[0]?.check_out_at || attendance[0]?.attendance_date !== new Date().toLocaleDateString('en-CA',{timeZone:'Africa/Kampala'})} onClick={() => void recordAttendance('check-out')}>Check out</button></div></section>
+        {attendanceError && <div className="form-error" role="alert">{attendanceError}</div>}{attendanceMessage && <div className="success-notice" role="status">{attendanceMessage}</div>}
+        <section className="panel"><div className="panel-heading"><div><h3>My attendance history</h3><p>Stored daily check-in records and attendance decisions.</p></div></div><div className="table-wrap"><table><thead><tr><th>Date</th><th>Check in</th><th>Check out</th><th>Status</th></tr></thead><tbody>{attendance.map(row => <tr key={row.id}><td>{row.attendance_date}</td><td>{row.check_in_at?.slice(11,16) || '—'}</td><td>{row.check_out_at?.slice(11,16) || '—'}</td><td><span className={'attendance-status-pill status-' + row.status.toLowerCase()}>{row.status}</span></td></tr>)}{!attendance.length && <tr><td colSpan={4}>No attendance records yet.</td></tr>}</tbody></table></div></section>
         <form className="student-form" onSubmit={saveProfile}>
           <div className="student-form-grid">
             <label>First name<input required value={firstName} onChange={e=>setFirstName(e.target.value)} /></label>
