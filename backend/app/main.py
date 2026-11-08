@@ -564,6 +564,7 @@ class TimetableEntryCreate(BaseModel):
 
 class ExamCreate(BaseModel):
     name: str = Field(min_length=2, max_length=100)
+    exam_type: str = Field(default="Other", min_length=2, max_length=40)
     term: str = Field(pattern="^(Term 1|Term 2|Term 3)$")
     year: int = Field(ge=2000, le=2100)
     class_id: int
@@ -615,6 +616,7 @@ class AttendanceOut(AttendanceCreate):
 class ExamOut(BaseModel):
     id: int
     name: str
+    exam_type: str = "Other"
     term: str
     year: int
     class_id: int | None = None
