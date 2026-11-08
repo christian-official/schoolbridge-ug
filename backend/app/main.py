@@ -1481,7 +1481,7 @@ async def protect_school_data(request: Request, call_next):
     if request.method == "OPTIONS":
         return await call_next(request)
 
-    if not path.startswith("/api/") or path in public_paths:
+    if not path.startswith("/api/") or path in public_paths or path in {"/api/auth/password-reset/request", "/api/auth/password-reset/confirm"}:
         return await call_next(request)
 
     from starlette.responses import JSONResponse
@@ -1511,6 +1511,9 @@ async def protect_school_data(request: Request, call_next):
             return JSONResponse(
                 {"detail": "Account is unavailable."}, status_code=401
             )
+
+        if user.must_change_password and path not in {"/api/auth/me", "/api/me/password"}:
+            return JSONResponse({"detail": "Password change required. Set a new password before continuing."}, status_code=403)
 
         if path == "/api/auth/me" or path.startswith("/api/me/") or path == "/api/dashboard/my-work":
             # Self-service profile, password and personal dashboard endpoints
@@ -1587,7 +1590,104 @@ def login(
         "token_type": "bearer",
         "role": user.role,
         "username": user.username,
+        "must_change_password": bool(user.must_change_password),
     }
+
+
+class PasswordResetRequest(BaseModel):
+    identifier: str = Field(min_length=1, max_length=160)
+
+
+class PasswordResetConfirm(BaseModel):
+    identifier: str = Field(min_length=1, max_length=160)
+    code: str = Field(min_length=6, max_length=6, pattern=r"^\\d{6}$")
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+def find_password_recovery_account(db: Session, identifier: str):
+    value = identifier.strip().lower()
+    matches = db.query(models.User).filter(or_(
+        func.lower(models.User.username) == value,
+        func.lower(models.User.email) == value,
+    )).all()
+    staff_matches = db.query(models.User).join(
+        models.StaffMember, models.User.staff_id == models.StaffMember.id
+    ).filter(or_(
+        func.lower(models.StaffMember.last_name) == value,
+        func.lower(models.StaffMember.staff_number) == value,
+    )).all()
+    unique = {item.id: item for item in matches + staff_matches}
+    return next(iter(unique.values())) if len(unique) == 1 else None
+
+
+def send_password_recovery_email(user, code: str) -> bool:
+    smtp_host = os.getenv("SCHOOLBRIDGE_SMTP_HOST", "smtp.gmail.com").strip()
+    smtp_user = os.getenv("SCHOOLBRIDGE_SMTP_USERNAME", "").strip()
+    smtp_password = os.getenv("SCHOOLBRIDGE_SMTP_PASSWORD", "")
+    smtp_from = os.getenv("SCHOOLBRIDGE_SMTP_FROM", smtp_user).strip()
+    recipient = (user.email or "").strip()
+    if not (smtp_host and smtp_user and smtp_password and smtp_from and recipient and not recipient.endswith(".schoolbridge.local")):
+        return False
+    message = EmailMessage()
+    message["Subject"] = "SchoolBridge password recovery code"
+    message["From"] = smtp_from
+    message["To"] = recipient
+    message.set_content(
+        "A password reset was requested for your SchoolBridge account.\\n\\n"
+        f"Your verification code is: {code}\\n"
+        "This code expires in 15 minutes and can only be used once. "
+        "If you did not request this, you can ignore this email.\\n"
+    )
+    port = int(os.getenv("SCHOOLBRIDGE_SMTP_PORT", "587"))
+    with smtplib.SMTP(smtp_host, port, timeout=15) as server:
+        server.ehlo()
+        if os.getenv("SCHOOLBRIDGE_SMTP_USE_TLS", "true").lower() not in ("0", "false", "no"):
+            server.starttls()
+            server.ehlo()
+        server.login(smtp_user, smtp_password)
+        server.send_message(message)
+    return True
+
+
+@app.post("/api/auth/password-reset/request", tags=["Authentication"])
+def request_password_reset(data: PasswordResetRequest, db: Session = Depends(get_db)):
+    # Always return the same response so account names and email addresses cannot be enumerated.
+    user = find_password_recovery_account(db, data.identifier)
+    now = datetime.utcnow()
+    if user and user.is_active and user.email and not user.email.endswith(".schoolbridge.local"):
+        if not user.reset_requested_at or (now - user.reset_requested_at).total_seconds() >= 60:
+            code = f"{secrets.randbelow(1000000):06d}"
+            user.reset_code_hash = password_hash.hash(code)
+            user.reset_expires_at = now + timedelta(minutes=15)
+            user.reset_requested_at = now
+            db.commit()
+            try:
+                delivered = send_password_recovery_email(user, code)
+            except Exception:
+                delivered = False
+            if not delivered:
+                user.reset_code_hash = None
+                user.reset_expires_at = None
+                db.commit()
+    return {"message": "If the account exists and has a registered email address, a verification code will be sent."}
+
+
+@app.post("/api/auth/password-reset/confirm", tags=["Authentication"])
+def confirm_password_reset(data: PasswordResetConfirm, db: Session = Depends(get_db)):
+    user = find_password_recovery_account(db, data.identifier)
+    now = datetime.utcnow()
+    if not user or not user.is_active or not user.reset_code_hash or not user.reset_expires_at or user.reset_expires_at < now:
+        raise HTTPException(400, "The verification code is invalid or has expired. Request a new code.")
+    if not password_hash.verify(data.code, user.reset_code_hash):
+        raise HTTPException(400, "The verification code is invalid or has expired. Request a new code.")
+    if password_hash.verify(data.new_password, user.hashed_password):
+        raise HTTPException(400, "Choose a password different from your current password.")
+    user.hashed_password = password_hash.hash(data.new_password)
+    user.reset_code_hash = None
+    user.reset_expires_at = None
+    user.must_change_password = False
+    db.commit()
+    return {"message": "Password reset successfully. You can now sign in with your new password."}
 
 
 @app.get("/api/auth/me", tags=["Authentication"])
@@ -1600,7 +1700,24 @@ def current_account(user=Depends(get_current_user)):
         "role_label": user.role_label or user.role.title(),
         "permissions": {k: sorted(v) for k, v in user_permissions(user).items()},
         "active": user.is_active,
+        "must_change_password": bool(user.must_change_password),
     }
+
+
+@app.post("/api/auth/users/{user_id}/reset-password", tags=["User Management"])
+def admin_reset_user_password(user_id: int, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    target = db.get(models.User, user_id)
+    if not target or target.role not in {"teacher", "staff"}:
+        raise HTTPException(404, "Staff login account not found.")
+    temporary_password = secrets.token_urlsafe(10)
+    target.hashed_password = password_hash.hash(temporary_password)
+    target.must_change_password = True
+    target.reset_code_hash = None
+    target.reset_expires_at = None
+    target.reset_requested_at = None
+    write_audit(db, admin, "staff_password_reset", "user", target.id, "Administrator issued a one-time temporary passcode.")
+    db.commit()
+    return {"message": "Temporary passcode generated. It is shown only once; the staff member must change it after signing in.", "username": target.username, "temporary_password": temporary_password}
 
 
 @app.post("/api/auth/teachers", tags=["User Management"])
@@ -2931,6 +3048,9 @@ def update_my_password(data: MyPasswordUpdate, user=Depends(get_current_user), d
     if password_hash.verify(data.new_password, user.hashed_password):
         raise HTTPException(400, "Choose a password different from your current password.")
     user.hashed_password = password_hash.hash(data.new_password)
+    user.must_change_password = False
+    user.reset_code_hash = None
+    user.reset_expires_at = None
     db.commit()
     return {"message": "Password updated successfully."}
 
