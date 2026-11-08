@@ -87,7 +87,7 @@ async function fetchClassStudents(token: string, classId: number | null): Promis
   return [first, ...remaining].flatMap(page => page.items)
 }
 
-export default function AcademicManagement({ token, classes }: { token: string; classes: SchoolClass[] }) {
+export default function AcademicManagement({ token, classes, canVerify = false }: { token: string; classes: SchoolClass[]; canVerify?: boolean }) {
   const [exams, setExams] = useState<Exam[]>([])
   const [subjects, setSubjects] = useState<Subject[]>([])
   const [students, setStudents] = useState<Student[]>([])
@@ -109,7 +109,7 @@ export default function AcademicManagement({ token, classes }: { token: string; 
   const [historyMarks, setHistoryMarks] = useState<Mark[]>([])
   const [historyError, setHistoryError] = useState('')
   const [selectedExamId, setSelectedExamId] = useState('')
-  const [activeAcademicTab, setActiveAcademicTab] = useState<'marks' | 'results' | 'grading' | 'history'>('marks')
+  const [activeAcademicTab, setActiveAcademicTab] = useState<'marks' | 'submitted' | 'results' | 'grading' | 'history'>('marks')
   const [examForm, setExamForm] = useState({ name: '', class_id: '', term: 'Term 1', year: String(new Date().getFullYear()) })
   const [showExamForm, setShowExamForm] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -456,7 +456,7 @@ export default function AcademicManagement({ token, classes }: { token: string; 
           <div className="stat-card"><span>Verified marks</span><strong className="stat-value">{marks.filter(mark => mark.verified).length} / {marks.length}</strong></div>
         </div>
       </section>
-      <nav className="academic-tabs" aria-label="Academic workspace tabs">{([["marks", "Marks entry"], ["results", "Class performance"], ["grading", "Grading scale"], ["history", "Report cards"]] as const).map(([key, label]) => <button key={key} type="button" className={activeAcademicTab === key ? "academic-tab active" : "academic-tab"} aria-current={activeAcademicTab === key ? "page" : undefined} onClick={() => setActiveAcademicTab(key)}>{label}</button>)}</nav>
+      <nav className="academic-tabs" aria-label="Academic workspace tabs">{([["marks", "Marks entry"], ["submitted", "Submitted results"], ["results", "Class performance"], ["grading", "Grading scale"], ["history", "Report cards"]] as const).map(([key, label]) => <button key={key} type="button" className={activeAcademicTab === key ? "academic-tab active" : "academic-tab"} aria-current={activeAcademicTab === key ? "page" : undefined} onClick={() => setActiveAcademicTab(key)}>{label}{key === 'submitted' && marks.filter(mark => !mark.verified).length > 0 ? <span className="academic-tab-count">{marks.filter(mark => !mark.verified).length}</span> : null}</button>)}</nav>
 
 
       {activeAcademicTab === 'marks' && (
@@ -518,6 +518,28 @@ export default function AcademicManagement({ token, classes }: { token: string; 
           </div>
         </details>
       </section>
+      )}
+
+      {activeAcademicTab === 'submitted' && (
+        <section className="panel submitted-results-workspace">
+          <div className="panel-heading">
+            <div><h2>Submitted results awaiting verification</h2><p>Teacher submissions for the selected examination appear here. Review the scores, then verify the whole subject at once.</p></div>
+            <span className="count-pill">{marks.filter(mark => !mark.verified).length} pending scores</span>
+          </div>
+          {!selectedExam && <p className="form-hint">Select an examination to review submitted results.</p>}
+          {selectedExam && subjects.filter(subject => marks.some(mark => mark.subject_id === subject.id && !mark.verified)).map(subject => {
+            const pending = marks.filter(mark => mark.subject_id === subject.id && !mark.verified && students.some(student => student.id === mark.student_id && studentOffersSubject(student, subject))).sort((x, y) => studentName(studentById.get(x.student_id)).localeCompare(studentName(studentById.get(y.student_id))));
+            if (!pending.length) return null;
+            return <section className="recorded-subject-card" key={subject.id}>
+              <div className="recorded-subject-heading"><div><h3>{subject.name}</h3><span>{selectedClass?.name || 'Class'} · {selectedExam.name} · {selectedExam.term} {selectedExam.year}</span></div><span className="recorded-count pending-count">{pending.length} pending</span></div>
+              <div className="table-wrap"><table><thead><tr><th>Student</th><th>Admission number</th><th>Submitted score</th><th>Verification status</th></tr></thead><tbody>
+                {pending.map(mark => <tr key={mark.id}><td>{studentName(studentById.get(mark.student_id))}</td><td>{studentById.get(mark.student_id)?.admission_number || '—'}</td><td><strong>{mark.score === 0 ? 'No score (0)' : Math.round(mark.score)}</strong></td><td><span className="student-score-status recorded">Awaiting verification</span></td></tr>)}
+              </tbody></table></div>
+              {canVerify ? <div className="form-actions"><button type="button" className="primary-button subject-verification-action" disabled={saving} onClick={() => void setSubjectVerification(subject.id, true)}>Verify all {subject.name} results</button></div> : <p className="form-hint">View-only: an authorised academic officer must verify these results.</p>}
+            </section>;
+          })}
+          {selectedExam && !marks.some(mark => !mark.verified) && <p className="empty-state">There are no submitted results awaiting verification for this examination.</p>}
+        </section>
       )}
 
       {activeAcademicTab === 'results' && (
