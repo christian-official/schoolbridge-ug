@@ -1404,3 +1404,24 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   position: relative;
   z-index: 1;
 }
+
+
+/* Tabbed account management and clickable teacher attendance. */
+.account-management-tabs { display:flex; flex-wrap:wrap; gap:7px; margin:18px 0 16px; padding:6px; border:1px solid #e3e9f2; border-radius:11px; background:#f7f9fc; }
+.account-management-tabs button { display:inline-flex; align-items:center; gap:7px; min-height:38px; padding:8px 12px; border:1px solid transparent; border-radius:8px; background:transparent; color:#65748b; font-size:12px; font-weight:800; cursor:pointer; }
+.account-management-tabs button.active { border-color:#d8e2f5; background:#fff; color:#294b9b; box-shadow:0 2px 7px #233b6410; }
+.account-management-tabs button span { display:inline-grid; min-width:20px; height:20px; place-items:center; padding:0 5px; border-radius:20px; background:#e9eef8; color:#405b91; font-size:10px; }
+.account-tab-panel { display:grid; gap:13px; min-width:0; }
+.teacher-attendance-controls { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:end; gap:16px; margin:14px 0; }
+.teacher-attendance-controls > div > strong { display:block; margin-bottom:8px; color:#43536d; font-size:12px; }
+.teacher-class-picks { display:flex; flex-wrap:wrap; gap:8px; }
+.teacher-class-pick { min-height:38px; padding:8px 13px; border:1px solid #dce4ef; border-radius:9px; background:#fff; color:#43536d; font-size:12px; font-weight:750; cursor:pointer; }
+.teacher-class-pick.active { border-color:#315ee8; background:#edf2ff; color:#2449a5; box-shadow:0 0 0 2px #315ee814; }
+.teacher-attendance-date { display:grid; gap:6px; min-width:170px; color:#52617a; font-size:12px; font-weight:750; }
+.attendance-choice-group { display:flex; flex-wrap:wrap; gap:5px; min-width:250px; }
+.attendance-choice { min-height:29px; padding:5px 8px; border:1px solid #dce4ef; border-radius:7px; background:#fff; color:#66748a; font-size:10px; font-weight:750; cursor:pointer; }
+.attendance-choice.active { border-color:#315ee8; background:#edf2ff; color:#2449a5; box-shadow:0 0 0 1px #315ee822; }
+.attendance-choice.active.status-absent { border-color:#e4aaaa; background:#fff0f0; color:#a52a2a; }
+.attendance-choice.active.status-late { border-color:#e8cf9b; background:#fff6e6; color:#94600a; }
+.attendance-choice.active.status-excused { border-color:#cbd3df; background:#f0f2f5; color:#586477; }
+@media(max-width:700px) { .teacher-attendance-controls { grid-template-columns:1fr; } .teacher-attendance-date { width:100%; } .attendance-choice-group { min-width:0; } .account-management-tabs { overflow-x:auto; flex-wrap:nowrap; } .account-management-tabs button { white-space:nowrap; } }
