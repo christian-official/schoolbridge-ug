@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { BookOpen, Plus, RefreshCw, Save, Printer } from 'lucide-react'
 
 type SchoolClass = { id: number; name?: string; section?: string }
-type Subject = { id: number; name: string }
-type Student = { id: number; first_name: string; middle_name?: string | null; last_name: string; admission_number: string; class_id?: number | null }
+type Subject = { id: number; name: string; code?: string | null }
+type Student = { id: number; first_name: string; middle_name?: string | null; last_name: string; admission_number: string; class_id?: number | null; academic_level?: string | null; combination?: string | null; optional_subjects?: string | null; subsidiary_subjects?: string | null }
 type Exam = { id: number; name: string; term: string; year: number; class_id: number | null }
 type Mark = { id: number; student_id: number; subject_id: number; exam_id: number; score: number; verified: boolean }
 type GradeBand = { id?: number; grade: string; min_score: number; max_score: number; remark: string }
@@ -29,6 +29,54 @@ async function request<T>(path: string, token: string, options: RequestInit = {}
 
 function studentName(student?: Student) {
   return student ? [student.first_name, student.middle_name, student.last_name].filter(Boolean).join(' ') : 'Unknown student'
+}
+
+function normaliseSubjectText(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().replace(/\\s+/g, ' ')
+}
+
+const aLevelSubjectAliases: Record<string, string> = {
+  p: 'physics', phy: 'physics', phys: 'physics',
+  c: 'chemistry', chem: 'chemistry',
+  b: 'biology', bio: 'biology',
+  m: 'mathematics', math: 'mathematics', maths: 'mathematics', mat: 'mathematics',
+  e: 'economics', econ: 'economics',
+  g: 'geography', geo: 'geography',
+  h: 'history', hist: 'history',
+  l: 'literature', lit: 'literature',
+  d: 'divinity', div: 'divinity',
+  a: 'agriculture', agr: 'agriculture',
+  gp: 'general paper',
+}
+
+function studentOffersSubject(student: Student, subject: Subject) {
+  if ((student.academic_level || '').toLowerCase().replace(/[^a-z]/g, '') !== 'alevel') return true
+  const sources = [student.combination, student.optional_subjects, student.subsidiary_subjects].filter((value): value is string => !!value?.trim())
+  if (!sources.length) return false
+
+  const subjectName = normaliseSubjectText(subject.name)
+  const subjectCode = normaliseSubjectText(subject.code || '')
+  const allText = normaliseSubjectText(sources.join(' '))
+  if (subjectName && allText.includes(subjectName)) return true
+  if (subjectCode && new RegExp('(^| )' + subjectCode.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\function studentName(student?: Student) {
+  return student ? [student.first_name, student.middle_name, student.last_name].filter(Boolean).join(' ') : 'Unknown student'
+}
+') + '( |$)', 'i').test(allText)) return true
+
+  const tokens = sources.flatMap(source => source.match(/[A-Za-z]+/g) || [])
+  for (const token of tokens) {
+    const key = token.toLowerCase()
+    const mapped = aLevelSubjectAliases[key]
+    if (mapped && (subjectName === mapped || subjectName.includes(mapped) || (subjectCode && subjectCode === key))) return true
+    // A compact combination such as PCB or BCM represents individual subject codes.
+    if (/^[A-Z]{2,5}$/.test(token)) {
+      for (const letter of token) {
+        const letterSubject = aLevelSubjectAliases[letter.toLowerCase()]
+        if (letterSubject && (subjectName === letterSubject || subjectName.includes(letterSubject))) return true
+      }
+    }
+  }
+  return false
 }
 
 async function fetchClassStudents(token: string, classId: number | null): Promise<Student[]> {
@@ -143,6 +191,11 @@ export default function AcademicManagement({ token, classes }: { token: string; 
     return () => { cancelled = true }
   }, [historyStudentId, token])
 
+  const eligibleStudents = useMemo(() => {
+    const subject = subjects.find(item => String(item.id) === selectedSubjectId)
+    return subject ? students.filter(student => studentOffersSubject(student, subject)) : students
+  }, [students, subjects, selectedSubjectId])
+
   const studentById = useMemo(() => new Map(students.map(student => [student.id, student])), [students])
   const results = useMemo(() => {
     const totals = new Map<number, { total: number; count: number }>()
@@ -220,7 +273,7 @@ export default function AcademicManagement({ token, classes }: { token: string; 
   }
 
   async function saveClassMarks() {
-    if (!selectedExam || !students.length || !selectedSubjectId) {
+    if (!selectedExam || !eligibleStudents.length || !selectedSubjectId) {
       setError('Select a subject before entering marks.')
       return
     }
@@ -229,7 +282,7 @@ export default function AcademicManagement({ token, classes }: { token: string; 
     setSaving(true); setError(''); setMessage('')
     let saved = 0
     try {
-      for (const student of students) {
+      for (const student of eligibleStudents) {
         const key = String(student.id) + ':' + selectedSubjectId
         const raw = markDrafts[key]
         if (raw === undefined || raw.trim() === '') continue
@@ -424,15 +477,16 @@ export default function AcademicManagement({ token, classes }: { token: string; 
               {subjects.map(subject => <option key={subject.id} value={subject.id}>{subject.name}</option>)}
             </select>
           </label>
-          <div className="subject-marks-count"><strong>{students.length}</strong><span>students in this class</span></div>
+          <div className="subject-marks-count"><strong>{selectedSubjectId ? eligibleStudents.length : students.length}</strong><span>{selectedSubjectId ? 'students offering this subject' : 'students in this class'}</span></div>
           <button type="button" className="primary-button" onClick={() => void saveClassMarks()} disabled={saving || !students.length || !selectedSubjectId}><Save size={15}/>{saving ? 'Saving scores…' : 'Save subject scores'}</button>
         </div>
         {!students.length && <p className="form-hint">No students are registered in this class yet.</p>}
         {!subjects.length && <p className="form-hint">No subjects are configured for this school type.</p>}
         {!!students.length && !selectedSubjectId && <div className="subject-marks-empty"><BookOpen size={25}/><strong>Choose a subject to begin</strong><span>The student list and score boxes will appear here.</span></div>}
-        {!!students.length && !!selectedSubjectId && <div className="student-score-list">
+        {!!students.length && !!selectedSubjectId && !eligibleStudents.length && <div className="subject-marks-empty"><BookOpen size={25}/><strong>No students offer this subject</strong><span>Check each A-Level student's combination and subsidiary/optional subjects.</span></div>}
+        {!!students.length && !!selectedSubjectId && !!eligibleStudents.length && <div className="student-score-list">
           <div className="student-score-list-heading"><span>STUDENT</span><span>ADMISSION NUMBER</span><span>SCORE / 100</span><span>STATUS</span></div>
-          {students.map((student, index) => {
+          {eligibleStudents.map((student, index) => {
             const mark = marks.find(row => row.student_id === student.id && String(row.subject_id) === selectedSubjectId)
             const key = String(student.id) + ':' + selectedSubjectId
             return <div className="student-score-row" key={student.id}>
@@ -448,10 +502,10 @@ export default function AcademicManagement({ token, classes }: { token: string; 
           <div className="recorded-marks-filters"><label>Subject<select value={recordedSubjectFilter} onChange={e => setRecordedSubjectFilter(e.target.value)}><option value="all">All subjects</option>{subjects.map(subject => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label><label>Verification status<select value={recordedStatusFilter} onChange={e => setRecordedStatusFilter(e.target.value as 'all' | 'verified' | 'unverified')}><option value="all">All statuses</option><option value="verified">Verified</option><option value="unverified">Unverified</option></select></label></div>
           <div className="recorded-subject-groups">
             {subjects.filter(subject => marks.some(mark => mark.subject_id === subject.id) && (recordedSubjectFilter === 'all' || String(subject.id) === recordedSubjectFilter)).map(subject => {
-              const subjectMarks = marks.filter(mark => mark.subject_id === subject.id && (recordedStatusFilter === 'all' || (recordedStatusFilter === 'verified' ? mark.verified : !mark.verified))).sort((a, b) => studentName(studentById.get(a.student_id)).localeCompare(studentName(studentById.get(b.student_id))));
+              const subjectMarks = marks.filter(mark => mark.subject_id === subject.id && students.some(student => student.id === mark.student_id && studentOffersSubject(student, subject)) && (recordedStatusFilter === 'all' || (recordedStatusFilter === 'verified' ? mark.verified : !mark.verified))).sort((a, b) => studentName(studentById.get(a.student_id)).localeCompare(studentName(studentById.get(b.student_id))));
               const verifiedMarks = subjectMarks.filter(mark => mark.verified);
               const unverifiedMarks = subjectMarks.filter(mark => !mark.verified);
-              const renderMarkRows = (rows: Mark[]) => rows.map(mark => <tr key={mark.id}><td>{studentName(studentById.get(mark.student_id))}</td><td><strong>{Math.round(mark.score)}</strong></td><td><select aria-label={'Verification status for ' + studentName(studentById.get(mark.student_id))} value={mark.verified ? 'verified' : 'unverified'} disabled={saving} onChange={e => void setMarkVerification(mark, e.target.value === 'verified')}><option value="unverified">Unverified</option><option value="verified">Verified</option></select></td></tr>);
+              const renderMarkRows = (rows: Mark[]) => rows.map(mark => <tr key={mark.id}><td>{studentName(studentById.get(mark.student_id))}</td><td><strong>{Math.round(mark.score)}</strong></td><td><button type="button" className={mark.verified ? 'secondary-button' : 'primary-button'} aria-label={(mark.verified ? 'Unlock score for ' : 'Verify score for ') + studentName(studentById.get(mark.student_id))} disabled={saving} onClick={() => void setMarkVerification(mark, !mark.verified)}>{mark.verified ? 'Unlock' : 'Verify'}</button></td></tr>);
               return <section className="recorded-subject-card" key={subject.id}>
                 <div className="recorded-subject-heading"><h3>{subject.name}</h3><span>{subjectMarks.length} recorded</span></div>
                 <div className="recorded-status-columns">
