@@ -200,7 +200,7 @@ export default function OperationsManagement({ token, active, permissions = {}, 
         </div>
         {!classes.length && <p className="form-hint">No timetable classes are available.</p>}
         {!canEditTimetable && <p className="form-hint">View-only timetable access. Changes can be made only by the Academics Administrator or a designated academic officer.</p>}
-      </>
+      </>}
     </section>
   </div>
 }
