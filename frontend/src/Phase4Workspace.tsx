@@ -44,7 +44,7 @@ export default function Phase4Workspace({ token, role, active, permissions }: { 
 
   async function loadAdminParents() {
     const [studentData, parentData] = await Promise.all([
-      api<{ items: StudentOption[] }>('students/search?page=1&page_size=100', token),
+      api<{ items: StudentOption[] }>('students/search?page=1&page_size=5&search='+encodeURIComponent(studentSearch.trim()), token),
       api<any[]>('parent-accounts', token),
     ])
     setStudents(studentData.items || [])
@@ -57,7 +57,7 @@ export default function Phase4Workspace({ token, role, active, permissions }: { 
     if (role !== 'parent' && active === 'Parent Access') {
       setBusy(true)
       Promise.all([
-        api<{ items: StudentOption[] }>('students/search?page=1&page_size=100', token),
+        api<{ items: StudentOption[] }>('students/search?page=1&page_size=5&search='+encodeURIComponent(studentSearch.trim()), token),
         api<any[]>('parent-accounts', token),
       ]).then(([studentData, parentData]) => {
         if (!cancelled) { setStudents(studentData.items || []); setParents(parentData) }
@@ -80,7 +80,7 @@ export default function Phase4Workspace({ token, role, active, permissions }: { 
         .finally(() => { if (!cancelled) setBusy(false) })
     }
     return () => { cancelled = true }
-  }, [token, role, active])
+  }, [token, role, active, studentSearch])
 
   useEffect(() => {
     if (role !== 'parent' || active !== 'My Children' || selectedChildId === null) return
