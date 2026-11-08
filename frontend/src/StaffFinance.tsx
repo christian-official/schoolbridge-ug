@@ -16,7 +16,7 @@ async function request<T>(path:string, token:string, options:RequestInit={}):Pro
   return data as T
 }
 
-export default function StaffFinance({token,active,classes=[],refreshKey=0,initialTab='overview'}:{token:string;active:string;classes?:{id:number;name?:string;section?:string}[];refreshKey?:number;initialTab?:'overview'|'payments'|'balances'}) {
+export default function StaffFinance({token,active,classes=[],refreshKey=0,initialTab='overview',canAddStaff=false}:{token:string;active:string;classes?:{id:number;name?:string;section?:string}[];refreshKey?:number;initialTab?:'overview'|'payments'|'balances';canAddStaff?:boolean}) {
   const [staff,setStaff]=useState<Staff[]>([])
   const [staffTotal,setStaffTotal]=useState(0)
   const [search,setSearch]=useState('')
@@ -40,6 +40,7 @@ export default function StaffFinance({token,active,classes=[],refreshKey=0,initi
   const [charges,setCharges]=useState<Charge[]>([])
   const [studentMatches,setStudentMatches]=useState<StudentMatch[]>([])
   const [selectedPaymentStudent,setSelectedPaymentStudent]=useState<StudentMatch|null>(null)
+  const [selectedStudentCharges,setSelectedStudentCharges]=useState<Charge[]>([])
   const [allOutstanding,setAllOutstanding]=useState<Charge[]>([])
   const [financeTab,setFinanceTab]=useState<'overview'|'payments'|'balances'|'expenses'|'fees'>('overview')
   useEffect(()=>{setMessage('')},[active,financeTab])
@@ -60,6 +61,24 @@ export default function StaffFinance({token,active,classes=[],refreshKey=0,initi
     if(category) params.set('category',category)
     request<Page<Staff>>('staff?'+params.toString(),token).then(r=>{setStaff(r.items);setStaffTotal(r.total)}).catch(e=>setMessage(e.message))
   },[active,search,category,token,refreshKey])
+
+  async function choosePaymentStudent(student:StudentMatch){
+    setSelectedPaymentStudent(student)
+    setStudentMatches([])
+    setFeeSearch('')
+    setShowPaymentForm(true)
+    setSelectedStudentCharges([])
+    setPayment({charge_id:'',amount:'',method:'Cash',reference:''})
+    setMessage('Loading this student’s fee charges...')
+    try {
+      const rows=await request<Charge[]>('finance/charges?search='+encodeURIComponent(student.admission_number),token)
+      const ownRows=rows.filter(row=>row.student_id===student.id)
+      setSelectedStudentCharges(ownRows)
+      setMessage(ownRows.length?'Student selected. Choose the term charge below.':'This student is registered, but no fee charge exists yet. Set the class fee structure or assign the term fee first.')
+    } catch(error) {
+      setMessage(error instanceof Error?error.message:'Unable to load this student’s fee charges.')
+    }
+  }
 
   async function refreshFinance(){
     const params=new URLSearchParams({search:feeSearch,outstanding_only:String(outstandingOnly)})
@@ -161,13 +180,13 @@ export default function StaffFinance({token,active,classes=[],refreshKey=0,initi
   }
   async function pay(e:FormEvent){
     e.preventDefault();setMessage('');setSavingPayment(true)
-    try { const saved=await request<{receipt_number:string;amount:number;payment_date:string}>('finance/payments',token,{method:'POST',body:JSON.stringify({charge_id:Number(payment.charge_id),amount:Number(payment.amount),method:payment.method,reference:payment.reference||null})});const charge=charges.find(c=>c.id===Number(payment.charge_id));if(charge)setReceipt({receipt_number:saved.receipt_number,charge,amount:saved.amount,method:payment.method,date:saved.payment_date});setPayment({charge_id:'',amount:'',method:'Cash',reference:''});setShowPaymentForm(false);setSelectedPaymentStudent(null);setMessage('Payment recorded. Receipt generated.');await refreshFinance() }
+    try { const saved=await request<{receipt_number:string;amount:number;payment_date:string}>('finance/payments',token,{method:'POST',body:JSON.stringify({charge_id:Number(payment.charge_id),amount:Number(payment.amount),method:payment.method,reference:payment.reference||null})});const charge=selectedStudentCharges.find(c=>c.id===Number(payment.charge_id));if(charge)setReceipt({receipt_number:saved.receipt_number,charge,amount:saved.amount,method:payment.method,date:saved.payment_date});setPayment({charge_id:'',amount:'',method:'Cash',reference:''});setShowPaymentForm(false);setSelectedPaymentStudent(null);setSelectedStudentCharges([]);setStudentMatches([]);setMessage('Payment recorded. Receipt generated.');await refreshFinance() }
     catch(e){setMessage(e instanceof Error?e.message:'Unable to record payment.')}
     finally{setSavingPayment(false)}
   }
 
   if(active==='Staff') return <section className="panel">
-    <div className="panel-heading"><div><h2>Staff directory</h2><p>{staffTotal} staff members · teaching and non-teaching</p></div><button className="primary-button add-student-button" onClick={()=>{if(showForm){setShowForm(false);setEditingStaff(null)}else{setEditingStaff(null);setForm(emptyStaffForm);setMessage('');setShowForm(true)}}}><Plus size={16}/>{showForm?'Close form':'Add staff member'}</button></div>
+    <div className="panel-heading"><div><h2>Staff directory</h2><p>{staffTotal} staff members · teaching and non-teaching</p></div>{canAddStaff&&<button className="primary-button add-student-button" onClick={()=>{if(showForm){setShowForm(false);setEditingStaff(null)}else{setEditingStaff(null);setForm(emptyStaffForm);setMessage('');setShowForm(true)}}}><Plus size={16}/>{showForm?'Close form':'Add staff member'}</button>}</div>
     {message&&<div className="success-notice">{message}</div>}
     {newStaffLogin&&<div className="success-notice staff-login-handover"><strong>Staff login created — hand these details to {newStaffLogin.name}</strong><p>Username: <b>{newStaffLogin.username}</b></p><p>Email / account ID: <b>{newStaffLogin.email}</b></p><p>Temporary passcode: <b>{newStaffLogin.temporary_passcode}</b></p><p>Ask the staff member to change the passcode after signing in. This passcode is shown only once.</p><button type="button" className="secondary-button" onClick={()=>{void navigator.clipboard?.writeText('SchoolBridge login\\nUsername: '+newStaffLogin.username+'\\nTemporary passcode: '+newStaffLogin.temporary_passcode)}}>Copy login details</button><button type="button" className="secondary-button" onClick={()=>setNewStaffLogin(null)}>I have saved these details</button></div>}
     {showForm&&<form className="student-form registration-form" onSubmit={addStaff}>
@@ -212,17 +231,17 @@ export default function StaffFinance({token,active,classes=[],refreshKey=0,initi
     {financeTab==='payments'&&<>
     <div className="panel-heading"><div><h2>Find a student</h2><p>Search the student register by name or admission number, then select the student to continue.</p></div></div>
     <div className="table-tools"><div className="search-box"><Search size={17}/><input placeholder="Enter student name or admission number..." value={feeSearch} onChange={e=>{setFeeSearch(e.target.value);setSelectedPaymentStudent(null);setShowPaymentForm(false);setPayment({charge_id:'',amount:'',method:'Cash',reference:''})}}/></div></div>
-    {feeSearch.trim()&&<div className="finance-search-results"><div className="panel-heading"><div><h3>Matching students</h3><p>{studentMatches.length} students found</p></div></div><div className="table-wrap"><table><thead><tr><th>Student</th><th>Admission no.</th><th>Class ID</th><th>Status</th><th>Next step</th></tr></thead><tbody>{studentMatches.map(student=><tr key={student.id} className="clickable-row" onClick={async()=>{setSelectedPaymentStudent(student);setShowPaymentForm(true);setPayment({charge_id:'',amount:'',method:'Cash',reference:''});setMessage('Loading this student’s fee charges...');try{const rows=await request<Charge[]>('finance/charges?search='+encodeURIComponent(student.admission_number),token);setCharges(rows);setMessage(rows.length?'Student selected. Choose the term charge below.':'This student is registered, but no fee charge exists yet. Set the class fee structure or assign the term fee first.')}catch(e){setMessage(e instanceof Error?e.message:'Unable to load this student’s fee charges.')}}} style={{cursor:'pointer'}}><td>{[student.first_name,student.middle_name,student.last_name].filter(Boolean).join(' ')}</td><td>{student.admission_number}</td><td>{classes.find(cls=>cls.id===student.class_id)?.name||'—'} {classes.find(cls=>cls.id===student.class_id)?.section||''}</td><td>{student.status||'active'}</td><td><button type="button" className="secondary-button" onClick={e=>{e.stopPropagation();void (async()=>{setSelectedPaymentStudent(student);setShowPaymentForm(true);setPayment({charge_id:'',amount:'',method:'Cash',reference:''});try{const rows=await request<Charge[]>('finance/charges?search='+encodeURIComponent(student.admission_number),token);setCharges(rows);setMessage(rows.length?'Student selected. Choose the term charge below.':'This student is registered, but no fee charge exists yet. Set the class fee structure or assign the term fee first.')}catch(err){setMessage(err instanceof Error?err.message:'Unable to load this student’s fee charges.')}})()}}>Select student</button></td></tr>)}</tbody></table></div>{!studentMatches.length&&<p className="empty-state">No registered students match this search.</p>}</div>}
-    <div className="panel-heading"><div><h2>Record a payment</h2><p>Choose a student above to open their payment form. Partial payments are supported; overpayments are blocked.</p></div></div>
+    {!selectedPaymentStudent&&feeSearch.trim()&&<div className="finance-search-results"><div className="panel-heading"><div><h3>Matching students</h3><p>{studentMatches.length} students found · Select any row to continue</p></div></div><div className="table-wrap"><table><thead><tr><th>Student</th><th>Admission no.</th><th>Class</th><th>Status</th></tr></thead><tbody>{studentMatches.map(student=><tr key={student.id} className="clickable-row" onClick={()=>void choosePaymentStudent(student)} style={{cursor:'pointer'}}><td>{[student.first_name,student.middle_name,student.last_name].filter(Boolean).join(' ')}</td><td>{student.admission_number}</td><td>{classes.find(cls=>cls.id===student.class_id)?.name||'—'} {classes.find(cls=>cls.id===student.class_id)?.section||''}</td><td>{student.status||'active'}</td></tr>)}</tbody></table></div>{!studentMatches.length&&<p className="empty-state">No registered students match this search.</p>}</div>}
+    <div className="panel-heading"><div><h2>Record a payment</h2><p>{selectedPaymentStudent?'Confirm the selected student and record the payment.':'Search for a student, then select their result to continue.'}</p></div>{selectedPaymentStudent&&<button type="button" className="secondary-button" onClick={()=>{setSelectedPaymentStudent(null);setSelectedStudentCharges([]);setShowPaymentForm(false);setPayment({charge_id:'',amount:'',method:'Cash',reference:''});setMessage('Search for another student.')}}>Change student</button>}</div>
     {showPaymentForm&&selectedPaymentStudent&&<form className="student-form registration-form" onSubmit={pay}>
       <div className="form-heading"><div><h3>Receive a student payment</h3><p>Selected: {[selectedPaymentStudent.first_name,selectedPaymentStudent.middle_name,selectedPaymentStudent.last_name].filter(Boolean).join(' ')} · {selectedPaymentStudent.admission_number}. Confirm the term charge before recording money received.</p></div></div>
       <section className="form-section"><div className="form-section-heading"><span className="form-section-number">01</span><div><h4>Payment allocation</h4><p>Always confirm the student's name, admission number and term.</p></div></div><div className="student-form-grid">
-        <label className="field-span-full">Student term charge *<select required value={payment.charge_id} onChange={e=>setPayment({...payment,charge_id:e.target.value})}><option value="">Select an outstanding charge</option>{charges.filter(c=>c.student_id===selectedPaymentStudent.id&&c.balance>0).map(c=><option key={c.id} value={c.id}>{c.term} {c.year} · Balance UGX {c.balance.toLocaleString()}</option>)}</select><small className="field-hint">{charges.some(c=>c.student_id===selectedPaymentStudent.id&&c.balance>0)?'Select the term whose balance you are paying.':'No outstanding fee charge is available for this student yet.'}</small></label>
+        <label className="field-span-full">Student term charge *<select required value={payment.charge_id} onChange={e=>setPayment({...payment,charge_id:e.target.value})}><option value="">Select an outstanding charge</option>{selectedStudentCharges.filter(c=>c.balance>0).map(c=><option key={c.id} value={c.id}>{c.term} {c.year} · Balance UGX {c.balance.toLocaleString()}</option>)}</select><small className="field-hint">{selectedStudentCharges.some(c=>c.balance>0)?'Select the term whose balance you are paying.':'No outstanding fee charge is available for this student yet.'}</small></label>
         <label>Amount received (UGX) *<input type="number" min="1" step="1" required value={payment.amount} onChange={e=>setPayment({...payment,amount:e.target.value})} placeholder="Enter amount received"/></label>
         <label>Payment method<select value={payment.method} onChange={e=>setPayment({...payment,method:e.target.value})}><option>Cash</option><option>Bank</option><option>Mobile Money</option><option>Cheque</option></select></label>
         <label className="field-span-full">Reference / transaction ID<input value={payment.reference} onChange={e=>setPayment({...payment,reference:e.target.value})} placeholder="Optional bank or mobile money reference"/></label>
       </div></section>
-      <div className="form-actions"><button className="primary-button" disabled={savingPayment||!charges.some(c=>c.student_id===selectedPaymentStudent.id&&c.balance>0)||!payment.charge_id||Number(payment.amount)<=0}>{savingPayment?'Recording payment...':'Record payment and issue receipt'}</button></div>
+      <div className="form-actions"><button className="primary-button" disabled={savingPayment||!selectedStudentCharges.some(c=>c.balance>0)||!payment.charge_id||Number(payment.amount)<=0}>{savingPayment?'Recording payment...':'Record payment and issue receipt'}</button></div>
     </form>}
     {receipt&&<section className="panel receipt-print"><div className="panel-heading"><div><h2>{schoolProfile.name||'SchoolBridge'}</h2><p>Official fee payment receipt · {schoolProfile.phone||''} {schoolProfile.email||''}</p></div><button className="secondary-button" type="button" onClick={()=>window.print()}>Print receipt</button></div><div className="receipt-details"><strong>Receipt: {receipt.receipt_number}</strong><p>Student: {receipt.charge.student_name}</p><p>Admission number: {receipt.charge.admission_number}</p><p>Class: {receipt.charge.class_name||'—'} {receipt.charge.stream||''}</p><p>Fee: {receipt.charge.term} {receipt.charge.year}</p><p>Amount received: UGX {receipt.amount.toLocaleString()}</p><p>Payment method: {receipt.method}</p><p>Date: {receipt.date}</p></div></section>}
     </>}
