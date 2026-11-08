@@ -2559,7 +2559,7 @@ def update_my_staff_profile(data: MyStaffProfileUpdate, user=Depends(get_current
     staff = db.get(models.StaffMember, user.staff_id)
     if not staff:
         raise HTTPException(404, "Staff profile not found.")
-    email = data.email.strip().lower() if data.email else None
+    email = data.email.strip().lower() if data.email and data.email.strip() else user.email
     if email:
         duplicate = db.query(models.User).filter(models.User.email == email, models.User.id != user.id).first()
         if duplicate:
