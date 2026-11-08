@@ -336,7 +336,7 @@ function RoleSpecificDashboard({token,username,onNavigate,summary,summaryAvailab
           <StatCard title="Students present" value={summary.students_present_today} icon={<CalendarCheck/>} note="Marked present today"/>
           <StatCard title="Active students" value={summary.active_students} icon={<GraduationCap/>} note="Current student records"/>
           <StatCard title="Active staff" value={summary.active_staff} icon={<Users/>} note="Teaching and non-teaching"/>
-        </>:/academic|director of studies|\\bdos\\b|deputy|headteacher|examination/.test(role)?<>
+        </>:/academic|director of studies|\bdos\b|deputy|headteacher|examination/.test(role)?<>
           <StatCard title="Total classes" value={summary.total_classes} icon={<BookOpen/>} note="Classes and streams"/>
           <StatCard title="Students present" value={summary.students_present_today} icon={<CalendarCheck/>} note="Marked present today"/>
           <StatCard title="Active staff" value={summary.active_staff} icon={<Users/>} note="Teaching and non-teaching"/>
