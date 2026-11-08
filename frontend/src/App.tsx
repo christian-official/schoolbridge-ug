@@ -810,12 +810,14 @@ function AcademicSettings({token,onSaved}:{token:string;onSaved:()=>void}) {
 
 type TeacherAssignment = {assignment_id:number;class_id:number;class:string;subject_id:number;subject:string}
 type TeacherStudent = {id:number;first_name:string;last_name:string;admission_number:string;class_id:number}
-type TeacherExam = {id:number;name:string;term:string;year:number;class_id:number|null}
+type TeacherExam = {id:number;name:string;term:string;year:number;class_id:number|null;assigned_subjects:{id:number;name:string}[]}
 type TeacherMark = {id:number;student_id:number;subject_id:number;exam_id:number;score:number;verified:boolean;student_name:string;admission_number:string;class_id:number|null}
 type TeacherOwnAttendance = {staff_name:string;staff_number:string;records:{id:number;attendance_date:string;status:string;notes?:string|null}[]}
+type ClassTeacherAssignment = {assignment_id:number;class_id:number;class:string}
 
 function TeacherWorkspace({token,active}:{token:string;active:string}) {
   const [assignments,setAssignments]=useState<TeacherAssignment[]>([])
+  const [classTeacherAssignments,setClassTeacherAssignments]=useState<ClassTeacherAssignment[]>([])
   const [students,setStudents]=useState<TeacherStudent[]>([])
   const [classId,setClassId]=useState('')
   const [statuses,setStatuses]=useState<Record<number,string>>({})
@@ -826,7 +828,8 @@ function TeacherWorkspace({token,active}:{token:string;active:string}) {
   const [examId,setExamId]=useState('')
   const [resultStudents,setResultStudents]=useState<TeacherStudent[]>([])
   const [resultMarks,setResultMarks]=useState<TeacherMark[]>([])
-  const [resultForm,setResultForm]=useState({student_id:'',subject_id:'',score:''})
+  const [selectedSubjectId,setSelectedSubjectId]=useState('')
+  const [resultScores,setResultScores]=useState<Record<number,string>>({})
   const [resultMessage,setResultMessage]=useState('')
   const [resultError,setResultError]=useState('')
   const [resultSaving,setResultSaving]=useState(false)
@@ -834,14 +837,14 @@ function TeacherWorkspace({token,active}:{token:string;active:string}) {
   const [ownAttendanceError,setOwnAttendanceError]=useState('')
   const [ownAttendanceLoading,setOwnAttendanceLoading]=useState(false)
 
-  useEffect(()=>{api<TeacherAssignment[]>('teacher/my-assignments',token).then(rows=>{setAssignments(rows);if(rows.length)setClassId(String(rows[0].class_id))}).catch(e=>setMessage(e.message))},[token])
+  useEffect(()=>{Promise.all([api<TeacherAssignment[]>('teacher/my-assignments',token),api<ClassTeacherAssignment[]>('teacher/my-class-teacher-assignments',token)]).then(([rows,classRows])=>{setAssignments(rows);setClassTeacherAssignments(classRows);if(classRows.length)setClassId(String(classRows[0].class_id))}).catch(e=>setMessage(e.message))},[token])
   useEffect(()=>{if(active!=='Attendance'||!classId)return;api<TeacherStudent[]>('teacher/students?class_id='+classId,token).then(setStudents).catch(e=>setMessage(e.message))},[active,classId,token])
   useEffect(()=>{
     if(active!=='My Results')return
     api<TeacherExam[]>('teacher/exams',token).then(rows=>{
       setTeacherExams(rows)
-      if(rows.length)setExamId(String(rows[0].id))
-      else setExamId('')
+      if(rows.length){setExamId(String(rows[0].id));setSelectedSubjectId(String(rows[0].assigned_subjects?.[0]?.id||''))}
+      else {setExamId('');setSelectedSubjectId('')}
     }).catch(e=>setResultError(e.message))
   },[active,token])
   useEffect(()=>{
@@ -857,7 +860,7 @@ function TeacherWorkspace({token,active}:{token:string;active:string}) {
     return ()=>{cancelled=true}
   },[active,token])
     const selectedTeacherExam=teacherExams.find(exam=>String(exam.id)===examId)||null
-  const assignedSubjects=assignments.filter(row=>row.class_id===selectedTeacherExam?.class_id)
+  const assignedSubjects=selectedTeacherExam?.assigned_subjects||[]
   useEffect(()=>{
     if(active!=='My Results'||!selectedTeacherExam){setResultStudents([]);setResultMarks([]);return}
     let cancelled=false
@@ -873,19 +876,20 @@ function TeacherWorkspace({token,active}:{token:string;active:string}) {
     return ()=>{cancelled=true}
   },[active,examId,selectedTeacherExam?.class_id,token])
   async function record(student:TeacherStudent) {setBusy(student.id);setMessage('');try{await api('teacher/attendance',token,{method:'POST',body:JSON.stringify({student_id:student.id,attendance_date:attendanceDate,status:statuses[student.id]||'Present'})});setMessage('Attendance saved for '+student.first_name+' '+student.last_name+'.')}catch(e){setMessage(e instanceof Error?e.message:'Unable to save attendance.')}finally{setBusy(null)}}
-  async function saveTeacherMark(e:React.FormEvent){
+  useEffect(()=>{if(!selectedSubjectId){setResultScores({});return}const next:Record<number,string>={};resultStudents.forEach(student=>{const mark=resultMarks.find(row=>row.student_id===student.id&&row.subject_id===Number(selectedSubjectId));if(mark)next[student.id]=String(mark.score)});setResultScores(next)},[selectedSubjectId,resultStudents,resultMarks])
+  async function saveTeacherMarksBulk(e:React.FormEvent){
     e.preventDefault()
-    if(!selectedTeacherExam||!resultForm.student_id||!resultForm.subject_id||resultForm.score===''){setResultError('Choose the student and assigned subject, then enter a score.');return}
-    const score=Number(resultForm.score)
-    if(!Number.isFinite(score)||score<0||score>100){setResultError('Scores must be between 0 and 100.');return}
+    if(!selectedTeacherExam||!selectedSubjectId){setResultError('Choose an examination and one of your assigned subjects.');return}
+    const missing=resultStudents.filter(student=>resultScores[student.id]===undefined||resultScores[student.id].trim()==='')
+    if(missing.length){setResultError('Enter a score for every student before submitting the class results.');return}
+    const records=resultStudents.map(student=>({student_id:student.id,score:Number(resultScores[student.id])}))
+    if(records.some(row=>!Number.isFinite(row.score)||row.score<0||row.score>100)){setResultError('Every score must be between 0 and 100.');return}
     setResultSaving(true);setResultError('');setResultMessage('')
     try{
-      await api('teacher/marks',token,{method:'PUT',body:JSON.stringify({exam_id:selectedTeacherExam.id,student_id:Number(resultForm.student_id),subject_id:Number(resultForm.subject_id),score})})
+      const result=await api<{saved:number}>('teacher/marks/bulk',token,{method:'POST',body:JSON.stringify({exam_id:selectedTeacherExam.id,subject_id:Number(selectedSubjectId),records})})
       const rows=await api<TeacherMark[]>('teacher/marks?exam_id='+selectedTeacherExam.id,token)
-      setResultMarks(rows)
-      setResultForm({student_id:'',subject_id:'',score:''})
-      setResultMessage('Mark saved successfully.')
-    }catch(e){setResultError(e instanceof Error?e.message:'Unable to save mark.')}
+      setResultMarks(rows);setResultMessage(result.saved+' marks submitted for the whole class.')
+    }catch(e){setResultError(e instanceof Error?e.message:'Unable to submit class results.')}
     finally{setResultSaving(false)}
   }
   if(active==='My Classes') return <section className="panel"><div className="panel-heading"><div><h2>My assigned classes</h2><p>Only classes and subjects assigned to your teacher account appear here.</p></div></div>{message&&<div className="notice">{message}</div>}<div className="class-grid">{assignments.map(a=><div className="class-card" key={a.assignment_id}><BookOpen size={22}/><strong>{a.class}</strong><span>{a.subject}</span></div>)}</div>{!assignments.length&&<div className="empty-state"><GraduationCap size={30}/><p>No classes have been assigned to your account yet.</p></div>}</section>
@@ -906,34 +910,31 @@ function TeacherWorkspace({token,active}:{token:string;active:string}) {
   </div>
     if(active==='My Results') return <div className="academic-workspace">
     <section className="panel">
-      <div className="panel-heading"><div><h2>My examination results</h2><p>Enter or correct marks only for your assigned subjects and classes.</p></div></div>
+      <div className="panel-heading"><div><h2>Class results entry</h2><p>Your assigned subject and class are loaded automatically. Enter the whole class register and submit once.</p></div></div>
       {resultError&&<div className="form-error" role="alert">{resultError}</div>}
       {resultMessage&&<div className="success-notice" role="status">{resultMessage}</div>}
-      <label className="academic-exam-select">Examination
-        <select value={examId} onChange={e=>{setExamId(e.target.value);setResultForm({student_id:'',subject_id:'',score:''})}}>
+      <div className="student-form-grid">
+        <label>Examination<select value={examId} onChange={e=>{const next=teacherExams.find(row=>String(row.id)===e.target.value);setExamId(e.target.value);setSelectedSubjectId(String(next?.assigned_subjects?.[0]?.id||''))}}>
           <option value="">Choose an assigned examination</option>
           {teacherExams.map(exam=><option key={exam.id} value={exam.id}>{exam.name} · {exam.term} {exam.year}</option>)}
-        </select>
-      </label>
-      {!teacherExams.length&&<p className="form-hint">No examinations have been created for your assigned classes yet.</p>}
-      {selectedTeacherExam&&<>
-        <p className="form-hint">Assigned subjects: {assignedSubjects.map(row=>row.subject).join(', ')||'None'}</p>
-        <form className="student-form" onSubmit={saveTeacherMark}>
-          <div className="student-form-grid">
-            <label>Student *<select required value={resultForm.student_id} onChange={e=>setResultForm({...resultForm,student_id:e.target.value})}><option value="">Select student</option>{resultStudents.map(student=><option key={student.id} value={student.id}>{student.first_name} {student.last_name} · {student.admission_number}</option>)}</select></label>
-            <label>Assigned subject *<select required value={resultForm.subject_id} onChange={e=>setResultForm({...resultForm,subject_id:e.target.value})}><option value="">Select subject</option>{assignedSubjects.map(row=><option key={row.subject_id} value={row.subject_id}>{row.subject}</option>)}</select></label>
-            <label>Score (0–100) *<input required type="number" min="0" max="100" step="0.01" value={resultForm.score} onChange={e=>setResultForm({...resultForm,score:e.target.value})}/></label>
-          </div>
-          <div className="form-actions"><button className="primary-button" disabled={resultSaving||!assignedSubjects.length||!resultStudents.length}>{resultSaving?'Saving...':'Save mark'}</button></div>
-        </form>
-        <div className="table-wrap"><table><thead><tr><th>Student</th><th>Admission number</th><th>Subject</th><th>Score</th><th>Verification</th><th>Action</th></tr></thead><tbody>
-          {resultMarks.filter(mark=>assignedSubjects.some(row=>row.subject_id===mark.subject_id)).map(mark=><tr key={mark.id}><td>{mark.student_name}</td><td>{mark.admission_number}</td><td>{assignedSubjects.find(row=>row.subject_id===mark.subject_id)?.subject}</td><td>{mark.score.toFixed(2)}</td><td>{mark.verified?'Verified':'Pending administrator review'}</td><td><button type="button" className="secondary-button" disabled={mark.verified} onClick={()=>setResultForm({student_id:String(mark.student_id),subject_id:String(mark.subject_id),score:String(mark.score)})}>{mark.verified?'Locked':'Edit'}</button></td></tr>)}
-          {!resultMarks.length&&<tr><td colSpan={6}>No marks have been entered for this examination yet.</td></tr>}
+        </select></label>
+        <label>Assigned subject<select value={selectedSubjectId} onChange={e=>setSelectedSubjectId(e.target.value)}>
+          <option value="">Choose subject</option>
+          {assignedSubjects.map(subject=><option key={subject.id} value={subject.id}>{subject.name}</option>)}
+        </select></label>
+      </div>
+      {selectedTeacherExam&&<p className="form-hint">Class: {assignments.find(row=>row.class_id===selectedTeacherExam.class_id)?.class || 'Assigned class'} · {resultStudents.length} active students loaded.</p>}
+      {!teacherExams.length&&<p className="form-hint">No examinations are available for your assigned subject and class combinations.</p>}
+      {selectedTeacherExam&&selectedSubjectId&&<form className="student-form" onSubmit={saveTeacherMarksBulk}>
+        <div className="table-wrap"><table><thead><tr><th>#</th><th>Student</th><th>Admission number</th><th>Score (0–100)</th><th>Status</th></tr></thead><tbody>
+          {resultStudents.map((student,index)=>{const mark=resultMarks.find(row=>row.student_id===student.id&&row.subject_id===Number(selectedSubjectId));return <tr key={student.id}><td>{index+1}</td><td>{student.first_name} {student.last_name}</td><td>{student.admission_number}</td><td><input aria-label={'Score for '+student.first_name+' '+student.last_name} type="number" min="0" max="100" step="0.01" required value={resultScores[student.id]??''} disabled={Boolean(mark?.verified)} onChange={e=>setResultScores(old=>({...old,[student.id]:e.target.value}))}/></td><td>{mark?.verified?'Verified · locked':mark?'Saved · editable':'Not yet entered'}</td></tr>})}
+          {!resultStudents.length&&<tr><td colSpan={5}>No active students are registered in this class.</td></tr>}
         </tbody></table></div>
-      </>}
+        <div className="form-actions"><button className="primary-button" disabled={resultSaving||!resultStudents.length}>{resultSaving?'Submitting class results...':'Submit all class results'}</button></div>
+      </form>}
     </section>
   </div>
-  return <section className="panel"><div className="panel-heading"><div><h2>Class attendance</h2><p>Record attendance for students in your assigned classes.</p></div></div>{message&&<div className="notice">{message}</div>}<div className="student-form-grid"><label>Assigned class<select value={classId} onChange={e=>setClassId(e.target.value)}><option value="">Choose class</option>{assignments.map(a=><option key={a.assignment_id} value={a.class_id}>{a.class} — {a.subject}</option>)}</select></label><label>Attendance date<input type="date" value={attendanceDate} onChange={e=>setAttendanceDate(e.target.value)}/></label></div><div className="table-wrap"><table><thead><tr><th>Student</th><th>Admission number</th><th>Status</th><th>Action</th></tr></thead><tbody>{students.map(student=><tr key={student.id}><td>{student.first_name} {student.last_name}</td><td>{student.admission_number}</td><td><select value={statuses[student.id]||'Present'} onChange={e=>setStatuses(old=>({...old,[student.id]:e.target.value}))}><option>Present</option><option>Absent</option><option>Late</option><option>Excused</option></select></td><td><button className="primary-button" disabled={busy===student.id} onClick={()=>void record(student)}>{busy===student.id?'Saving...':'Save'}</button></td></tr>)}</tbody></table></div>{!students.length&&<div className="empty-state"><Users size={30}/><p>Select one of your assigned classes to load its active students.</p></div>}</section>
+  return <section className="panel"><div className="panel-heading"><div><h2>Class attendance</h2><p>Only your separately assigned class-teacher responsibilities appear here.</p></div></div>{message&&<div className="notice">{message}</div>}<div className="student-form-grid"><label>My responsible class<select value={classId} onChange={e=>setClassId(e.target.value)}><option value="">Choose class</option>{classTeacherAssignments.map(a=><option key={a.assignment_id} value={a.class_id}>{a.class}</option>)}</select></label><label>Attendance date<input type="date" value={attendanceDate} onChange={e=>setAttendanceDate(e.target.value)}/></label></div><div className="table-wrap"><table><thead><tr><th>Student</th><th>Admission number</th><th>Status</th><th>Action</th></tr></thead><tbody>{students.map(student=><tr key={student.id}><td>{student.first_name} {student.last_name}</td><td>{student.admission_number}</td><td><select value={statuses[student.id]||'Present'} onChange={e=>setStatuses(old=>({...old,[student.id]:e.target.value}))}><option>Present</option><option>Absent</option><option>Late</option><option>Excused</option></select></td><td><button className="primary-button" disabled={busy===student.id} onClick={()=>void record(student)}>{busy===student.id?'Saving...':'Save'}</button></td></tr>)}</tbody></table></div>{!classTeacherAssignments.length&&<div className="empty-state"><Users size={30}/><p>No class has been assigned to you as class teacher. Subject teaching assignments do not grant class attendance access.</p></div>}</section>
 }
 function SchoolProfileSettings({token,onSaved}:{token:string;onSaved:()=>void}) {
   const [form,setForm]=useState({name:'',address:'',phone:'',email:'',motto:'',school_type:'Secondary',a_level_combinations:'',o_level_optional_subjects:'',a_level_subsidiary_subjects:'',report_logo:''})
