@@ -1376,13 +1376,10 @@ def list_timetable(
         .outerjoin(models.Subject, models.TimetableEntry.subject_id == models.Subject.id)
         .outerjoin(models.StaffMember, models.TimetableEntry.staff_id == models.StaffMember.id)
     )
-    if user.role == "teacher":
-        staff_id = user.staff_id
-        if staff_id:
-            query = query.filter(models.TimetableEntry.staff_id == staff_id)
-        else:
-            query = query.filter(models.TimetableEntry.id == -1)
-    elif user.role != "admin" and "view" not in user_permissions(user).get("Timetable", set()):
+    # Timetable view permission grants access to the complete class timetable,
+    # not only the lessons personally taught by the signed-in teacher. This lets
+    # teachers and read-only staff see every subject, teacher and period in a class.
+    if user.role != "admin" and "view" not in user_permissions(user).get("Timetable", set()):
         raise HTTPException(403, "You do not have permission to view the timetable.")
     if class_id:
         query = query.filter(models.TimetableEntry.class_id == class_id)
@@ -1410,30 +1407,14 @@ def list_timetable(
 
 @app.get("/api/timetable/options", tags=["Timetable"])
 def timetable_options(db: Session = Depends(get_db), user=Depends(get_current_user)):
-    # View permission is enough to load the class selector; edit rights remain
-    # enforced separately by require_timetable_editor on every write endpoint.
-    if user.role == "teacher":
-        if not user.staff_id:
-            return {"classes": [], "subjects": [], "staff": []}
-        assigned_class_ids = [
-            row[0] for row in db.query(models.TimetableEntry.class_id).filter(
-                models.TimetableEntry.staff_id == user.staff_id
-            ).distinct().all()
-        ]
-        classes_query = db.query(models.SchoolClass).filter(models.SchoolClass.id.in_(assigned_class_ids))
-        subject_ids = [
-            row[0] for row in db.query(models.TimetableEntry.subject_id).filter(
-                models.TimetableEntry.staff_id == user.staff_id,
-                models.TimetableEntry.subject_id.isnot(None),
-            ).distinct().all()
-        ]
-        subjects_query = db.query(models.Subject).filter(models.Subject.id.in_(subject_ids))
-        staff = []
-    else:
-        if user.role != "admin" and "view" not in user_permissions(user).get("Timetable", set()):
-            raise HTTPException(403, "You do not have permission to view timetable options.")
-        classes_query = db.query(models.SchoolClass)
-        subjects_query = db.query(models.Subject)
+    # Any account with Timetable:view can browse the complete class timetable.
+    # The edit form and write endpoints remain restricted to academic officers.
+    if user.role != "admin" and "view" not in user_permissions(user).get("Timetable", set()):
+        raise HTTPException(403, "You do not have permission to view timetable options.")
+    classes_query = db.query(models.SchoolClass)
+    subjects_query = db.query(models.Subject)
+    staff = []
+    if user.role == "admin" or is_academic_officer(user):
         staff = db.query(models.StaffMember).filter_by(category="Teaching", status="active").order_by(
             models.StaffMember.first_name, models.StaffMember.last_name
         ).all()
