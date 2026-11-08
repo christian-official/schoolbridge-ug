@@ -1059,7 +1059,7 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
       next['Attendance']=['view','add']
       next['My Classes']=['view']
       next['My Attendance']=['view']
-      next['My Results']=['view']
+      next['My Results']=['view','add','edit']
       next['Announcements']=['view']
     }
     setRoleLabel(label)
