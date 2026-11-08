@@ -261,18 +261,19 @@ function PersonalDashboard({token,username,onNavigate}:{token:string;username:st
 
 type DosExamRecord = {id:number;name:string;exam_type?:string;term?:string;year?:number;class_id:number;class_name?:string}
 type DosMarkRecord = {id:number;verified:boolean;subject_id:number;score:number}
-function DirectorOfStudiesDashboard({token,username,onNavigate,summary,summaryAvailable,availableSections}:{token:string;username:string;onNavigate:(section:string)=>void;summary:DashboardSummary;summaryAvailable:boolean;availableSections:string[]}) {
+function DirectorOfStudiesDashboard({token,onNavigate,summary,summaryAvailable,availableSections}:{token:string;onNavigate:(section:string)=>void;summary:DashboardSummary;summaryAvailable:boolean;availableSections:string[]}) {
   const [exams,setExams]=useState<{exam:DosExamRecord;marks:DosMarkRecord[]}[]>([])
   const [loading,setLoading]=useState(true)
   const [error,setError]=useState('')
   const [refreshCount,setRefreshCount]=useState(0)
   const can=(section:string)=>availableSections.includes(section)
+  const canViewExaminations=can('Examinations')
   useEffect(()=>{
     let cancelled=false
     setLoading(true);setError('')
     const load=async()=>{
       try{
-        const rows=can('Examinations')?await api<DosExamRecord[]>('exams',token):[]
+        const rows=canViewExaminations?await api<DosExamRecord[]>('exams',token):[]
         const recent=rows.slice(-8).reverse()
         const records=await Promise.all(recent.map(async exam=>({exam,marks:await api<DosMarkRecord[]>(`marks?exam_id=${exam.id}`,token)})))
         if(!cancelled)setExams(records)
@@ -281,7 +282,7 @@ function DirectorOfStudiesDashboard({token,username,onNavigate,summary,summaryAv
     }
     void load()
     return()=>{cancelled=true}
-  },[token,refreshCount,availableSections.join('|')])
+  },[token,refreshCount,canViewExaminations])
   const allMarks=exams.flatMap(item=>item.marks)
   const pending=allMarks.filter(mark=>!mark.verified).length
   const verified=allMarks.filter(mark=>mark.verified).length
@@ -946,7 +947,7 @@ function App() {
             </>
           )}
 
-                    {active === 'Overview' && user.role !== 'admin' && (isFinanceAccount(user) ? <FinanceAccountDashboard token={token} username={user.username} onNavigate={(section,tab)=>{if(tab)setFinanceTabRequest(tab);setActive(section)}}/> : user.role === 'staff' && /director of studies|\\bdos\\b/i.test(user.role_label||'') ? <DirectorOfStudiesDashboard token={token} username={user.username} onNavigate={setActive} summary={dashboardSummary} summaryAvailable={(user.permissions?.['Overview']||[]).includes('view')} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)}/> : user.role === 'staff' ? <RoleSpecificDashboard token={token} username={user.username} onNavigate={setActive} summary={dashboardSummary} summaryAvailable={(user.permissions?.['Overview']||[]).includes('view')}/> : <PersonalDashboard token={token} username={user.username} onNavigate={setActive}/>)}
+                    {active === 'Overview' && user.role !== 'admin' && (isFinanceAccount(user) ? <FinanceAccountDashboard token={token} username={user.username} onNavigate={(section,tab)=>{if(tab)setFinanceTabRequest(tab);setActive(section)}}/> : user.role === 'staff' && /director of studies|\\bdos\\b/i.test(user.role_label||'') ? <DirectorOfStudiesDashboard token={token} onNavigate={setActive} summary={dashboardSummary} summaryAvailable={(user.permissions?.['Overview']||[]).includes('view')} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)}/> : user.role === 'staff' ? <RoleSpecificDashboard token={token} username={user.username} onNavigate={setActive} summary={dashboardSummary} summaryAvailable={(user.permissions?.['Overview']||[]).includes('view')}/> : <PersonalDashboard token={token} username={user.username} onNavigate={setActive}/>)}
 
           {active === 'Students' && (
             <section className="panel">
