@@ -2505,9 +2505,11 @@ def save_teacher_marks_bulk(data: BulkMarkCreate, db: Session = Depends(get_db),
     if len(students) != len(student_ids):
         raise HTTPException(422, "Every submitted student must be active and belong to this examination's class.")
     existing = db.query(models.Mark).filter(
-        models.Mark.exam_id == exam.id, models.Mark.subject_id == subject.id,
-        models.Mark.student_id.in_(student_ids)
+        models.Mark.exam_id == exam.id, models.Mark.subject_id == subject.id
     ).all()
+    if any(row.verified for row in existing):
+        raise HTTPException(409, "These results have been verified and locked. Teachers can no longer submit or change this subject's results.")
+    existing = [row for row in existing if row.student_id in set(student_ids)]
     by_student = {row.student_id: row for row in existing}
     verified = {row.student_id: row for row in existing if row.verified}
     changed_verified = [entry.student_id for entry in data.records
