@@ -286,12 +286,12 @@ function RoleSpecificDashboard({token,username,onNavigate}:{token:string;usernam
             : /store|procurement|purchas/.test(role)
               ? {eyebrow:'SUPPLIES WORKSPACE',title:'Stores & procurement overview',description:'Access the operational areas assigned to your account and keep track of daily responsibilities.',priority:['Staff','Fees & Finance','Reports','Announcements','My Attendance'],empty:'No stores or procurement duty has been assigned for today.'}
               : {eyebrow:'SCHOOL OPERATIONS',title:'Your operations overview',description:'A role-focused workspace showing only the school areas and duties assigned to your account.',priority:['Staff','Attendance','Staff Attendance','Timetable','Leadership & Duty','Announcements','Reports','Students'],empty:'No duty has been assigned to you for today.'}
-  const sections=(data?.available_sections||[]).filter(section=>section!=='Overview')
+  const sections=(data?.available_sections||[]).filter(section=>section!=='Overview' && section!=='Reports')
   const orderedSections=[...sections].sort((a,b)=>{
     const ai=profile.priority.indexOf(a),bi=profile.priority.indexOf(b)
     return (ai<0?999:ai)-(bi<0?999:bi)
   })
-  const workCount=(data?.today_duty?1:0)+((sections.includes('Timetable')||sections.includes('Examinations'))?(data?.today_lessons.length||0):0)
+  const workCount=(data?.today_duty?1:0)+(sections.includes('Timetable')?(data?.today_lessons.length||0):0)
   const iconFor=(section:string)=>{
     if(/student/i.test(section))return <GraduationCap/>
     if(/staff|attendance/i.test(section))return <Users/>
@@ -342,7 +342,7 @@ function RoleSpecificDashboard({token,username,onNavigate}:{token:string;usernam
         </div>
         <div className="panel hybrid-workspaces-panel">
           <div className="panel-heading"><div><h3>Your workspaces</h3><p>Choose an area to continue working.</p></div><span className="count-pill">{sections.length} available</span></div>
-          {orderedSections.length>0?<div className="hybrid-workspace-list">{orderedSections.map(section=><button type="button" className="hybrid-workspace-link" key={section} onClick={()=>onNavigate(section)}><span className="hybrid-workspace-icon">{iconFor(section)}</span><span><strong>{section}</strong><small>{detailFor(section)}</small></span><ArrowUpRight size={17}/></button>)}</div>:<div className="empty-state"><Briefcase size={28}/><p>No school work areas have been assigned to this account.</p><small>Contact the administrator if you need access to a school workspace.</small></div>}
+          {orderedSections.length>0?<div className="hybrid-workspace-list">{orderedSections.map(section=><button type="button" className="hybrid-workspace-link" key={section} onClick={()=>onNavigate(section==='Staff Attendance'?'Attendance':section)}><span className="hybrid-workspace-icon">{iconFor(section)}</span><span><strong>{section}</strong><small>{detailFor(section)}</small></span><ArrowUpRight size={17}/></button>)}</div>:<div className="empty-state"><Briefcase size={28}/><p>No school work areas have been assigned to this account.</p><small>Contact the administrator if you need access to a school workspace.</small></div>}
         </div>
       </section>
     </>}
