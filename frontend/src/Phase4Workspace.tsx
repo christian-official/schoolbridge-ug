@@ -13,7 +13,7 @@ async function api<T>(path: string, token: string, options: RequestInit = {}): P
   return result as T
 }
 
-type StudentOption = { id: number; first_name: string; middle_name?: string | null; last_name: string; admission_number: string; class_id?: number | null }
+type StudentOption = { id: number; first_name: string; middle_name?: string | null; last_name: string; admission_number: string; class_id?: number | null; guardian_name?: string | null; guardian_relationship?: string | null; guardian_phone?: string | null }
 type ParentChild = { id: number; name: string; admission_number: string; status: string; class_name: string; stream: string; fees_charged: number; fees_paid: number; balance: number }
 type Announcement = { id: number; title: string; message: string; audience: string; published: boolean; created_at: string }
 type ChildResult = { exam: string; term: string; year: number; subject: string; score: number }
@@ -24,6 +24,7 @@ export default function Phase4Workspace({ token, role, active }: { token: string
   const [students, setStudents] = useState<StudentOption[]>([])
   const [parents, setParents] = useState<any[]>([])
   const [selectedStudentIds, setSelectedStudentIds] = useState<number[]>([])
+  const [studentSearch, setStudentSearch] = useState('')
   const [account, setAccount] = useState({ username: '', email: '', password: '' })
   const [savingAccount, setSavingAccount] = useState(false)
   const [children, setChildren] = useState<ParentChild[]>([])
@@ -123,10 +124,24 @@ export default function Phase4Workspace({ token, role, active }: { token: string
       {error && <div className="form-error" role="alert">{error}</div>}{message && <div className="success-notice" role="status">{message}</div>}
       <form className="student-form" onSubmit={createParentAccount}>
         <div className="student-form-grid">
+          <label>Find student by name or admission number<input type="search" value={studentSearch} onChange={e => setStudentSearch(e.target.value)} placeholder="Search registered students"/></label>
+          <label>Parent / guardian name<input readOnly value={[...new Set(students.filter(student => selectedStudentIds.includes(student.id)).map(student => student.guardian_name).filter(Boolean))].join(', ')} placeholder="Automatically taken from student registration"/><small>Loaded from the selected student's registration record.</small></label>
           <label>Parent username *<input required minLength={3} value={account.username} onChange={e => setAccount({ ...account, username: e.target.value })}/></label>
           <label>Parent email *<input required type="email" value={account.email} onChange={e => setAccount({ ...account, email: e.target.value })}/></label>
           <label>Temporary password *<input required type="password" minLength={12} autoComplete="new-password" value={account.password} onChange={e => setAccount({ ...account, password: e.target.value })}/><small>Use at least 12 characters and share it securely with the parent.</small></label>
-          <label className="phase4-student-picker">Link students *<select multiple required value={selectedStudentIds.map(String)} onChange={e => setSelectedStudentIds(Array.from(e.target.selectedOptions, option => Number(option.value)))}>{students.map(student => <option key={student.id} value={student.id}>{student.first_name} {student.middle_name || ''} {student.last_name} · {student.admission_number}</option>)}</select><small>Hold Ctrl (Windows) or Command (Mac) to select multiple students.</small></label>
+        </div>
+        <div className="phase4-student-picker">
+          <strong>Choose registered student(s) to link *</strong>
+          <small>Student and guardian details are already stored in registration. Tick the student(s) belonging to this parent.</small>
+          <div className="phase4-student-options">
+            {students.filter(student => (student.first_name + ' ' + (student.middle_name || '') + ' ' + student.last_name + ' ' + student.admission_number).toLowerCase().includes(studentSearch.trim().toLowerCase())).map(student => <label className="subject-choice" key={student.id}>
+              <input type="checkbox" checked={selectedStudentIds.includes(student.id)} onChange={e => setSelectedStudentIds(current => e.target.checked ? [...current, student.id] : current.filter(id => id !== student.id))}/>
+              <span><strong>{student.first_name} {student.middle_name || ''} {student.last_name}</strong> · {student.admission_number}<small>Guardian: {student.guardian_name || 'Not recorded'}{student.guardian_relationship ? ' · ' + student.guardian_relationship : ''}{student.guardian_phone ? ' · ' + student.guardian_phone : ''}</small></span>
+            </label>)}
+            {!students.length && <p className="form-hint">No registered students are available.</p>}
+            {students.length > 0 && !students.some(student => (student.first_name + ' ' + (student.middle_name || '') + ' ' + student.last_name + ' ' + student.admission_number).toLowerCase().includes(studentSearch.trim().toLowerCase())) && <p className="form-hint">No students match that search.</p>}
+          </div>
+          <small>{selectedStudentIds.length} student(s) selected.</small>
         </div>
         <div className="form-actions"><button className="primary-button" disabled={savingAccount}>{savingAccount ? 'Creating account...' : 'Create parent account'}</button></div>
       </form>
