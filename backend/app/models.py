@@ -109,6 +109,7 @@ class User(Base):
     role: Mapped[str] = mapped_column(String(20), default="teacher")
     role_label: Mapped[str | None] = mapped_column(String(80), nullable=True)
     permissions_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    staff_id: Mapped[int | None] = mapped_column(ForeignKey("staff_members.id"), unique=True, nullable=True, index=True)
     is_active: Mapped[bool] = mapped_column(default=True)
 
 
