@@ -2260,6 +2260,7 @@ def get_parent_liaison_thread(thread_id: int, db: Session = Depends(get_db), use
             item.read_at = datetime.utcnow()
     db.commit()
     return {
+        "current_user_id": user.id,
         "id": thread.id, "student_id": thread.student_id, "subject": thread.subject,
         "category": thread.category, "status": thread.status,
         "student_name": " ".join(part for part in [
