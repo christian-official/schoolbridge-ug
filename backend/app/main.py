@@ -1922,9 +1922,11 @@ def teacher_my_staff_attendance(
 ):
     if teacher.role != "teacher":
         raise HTTPException(403, "Teacher account required.")
-    staff_member = db.query(models.StaffMember).filter(
-        func.lower(models.StaffMember.email) == teacher.email.lower()
-    ).first()
+    staff_member = db.get(models.StaffMember, teacher.staff_id) if teacher.staff_id else None
+    if staff_member is None:
+        staff_member = db.query(models.StaffMember).filter(
+            func.lower(models.StaffMember.email) == teacher.email.lower()
+        ).first()
     if not staff_member:
         raise HTTPException(
             404,
