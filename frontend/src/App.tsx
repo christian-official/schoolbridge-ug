@@ -9,6 +9,7 @@ import StaffFinance from './StaffFinance'
 import AcademicManagement from './AcademicManagement'
 import AttendanceManagement from './AttendanceManagement'
 import OperationsManagement from './OperationsManagement'
+import Phase4Workspace from './Phase4Workspace'
 import './App.css'
 
 type User = {
@@ -62,12 +63,19 @@ const menu = [
   { label: 'Staff Attendance', icon: Users },
   { label: 'Timetable', icon: CalendarDays },
   { label: 'Leadership & Duty', icon: ShieldCheck },
+  { label: 'Parent Access', icon: Users },
+  { label: 'Announcements', icon: FileText },
 ]
 const teacherMenu = [
   { label: 'My Classes', icon: BookOpen },
   { label: 'Attendance', icon: CalendarDays },
   { label: 'My Attendance', icon: Users },
   { label: 'My Results', icon: FileText },
+  { label: 'Announcements', icon: FileText },
+]
+const parentMenu = [
+  { label: 'My Children', icon: GraduationCap },
+  { label: 'Announcements', icon: FileText },
 ]
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
@@ -381,6 +389,7 @@ function App() {
       const profile = await api<User>('auth/me', authToken)
       setUser(profile)
       if(profile.role==='teacher') setActive('My Classes')
+      else if(profile.role==='parent') setActive('My Children')
       else await loadSchoolData(authToken)
     } catch (error) {
       sessionStorage.removeItem('sb_token')
@@ -469,7 +478,7 @@ function App() {
         </div>
         <div className="school-label">SCHOOL MANAGEMENT</div>
         <nav>
-          {(user.role === 'teacher' ? teacherMenu : menu).map(item => {
+          {(user.role === 'teacher' ? teacherMenu : user.role === 'parent' ? parentMenu : menu).map(item => {
             const Icon = item.icon
             return (
               <button key={item.label} className={`nav-item ${active === item.label ? 'active' : ''}`} onClick={() => { setActive(item.label); setMobileMenu(false) }}>
@@ -518,6 +527,7 @@ function App() {
           {dataError && <div className="notice">{dataError} <button onClick={() => void loadSchoolData(token)}>Retry</button></div>}
 
           {(active === 'My Classes' || active === 'Attendance' || active === 'My Attendance' || active === 'My Results') && user.role === 'teacher' && <TeacherWorkspace token={token} active={active} />}
+          {((active === 'Parent Access' || active === 'Announcements') && user.role === 'admin' || active === 'Announcements' && user.role === 'teacher' || (active === 'My Children' || active === 'Announcements') && user.role === 'parent') && <Phase4Workspace token={token} role={user.role} active={active} />}
 
           {active === 'Overview' && (
             <>
