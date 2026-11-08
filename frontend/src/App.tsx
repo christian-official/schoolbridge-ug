@@ -753,7 +753,7 @@ function App() {
           )}
           {active === 'Examinations' && user.role !== 'parent' && <AcademicManagement token={token} classes={classes} />}
           {active === 'Attendance' && user.role !== 'parent' && user.role !== 'teacher' && <AttendanceHub token={token} canViewStudents={user.role === 'admin' || (user.permissions?.['Attendance'] || []).includes('view')} canViewStaff={user.role === 'admin' || (user.permissions?.['Staff Attendance'] || []).includes('view')} />}
-          {active === 'Timetable' && user.role !== 'parent' && <OperationsManagement token={token} active={active} />}
+          {active === 'Timetable' && user.role !== 'parent' && <OperationsManagement token={token} active={active} permissions={user.permissions} isAdmin={user.role === 'admin'} roleLabel={user.role_label || ''} />}
           {active === 'My Profile' && user.role !== 'parent' && user.role !== 'admin' && <MyStaffProfile token={token} />}
           {active === 'Leadership & Duty' && user.role !== 'parent' && <LeadershipDuty token={token} />}
           {active === 'Settings' && settingsSection === 'home' && (
