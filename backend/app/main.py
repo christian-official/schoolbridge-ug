@@ -2133,8 +2133,20 @@ def assign_teacher(
     if not db.get(models.SchoolClass, data.class_id):
         raise HTTPException(404, "Class not found.")
 
-    if not db.get(models.Subject, data.subject_id):
+    subject = db.get(models.Subject, data.subject_id)
+    if not subject:
         raise HTTPException(404, "Subject not found.")
+
+    if not teacher.staff_id:
+        raise HTTPException(422, "This teacher login is not linked to a staff registration profile.")
+    staff_profile = db.get(models.StaffMember, teacher.staff_id)
+    registered_subjects = {
+        name.strip().casefold()
+        for name in (staff_profile.subjects or "").split(",")
+        if name.strip()
+    } if staff_profile else set()
+    if subject.name.strip().casefold() not in registered_subjects:
+        raise HTTPException(422, "This subject was not registered under the selected teacher. Update the teacher's registered subjects first.")
 
     assignment = models.TeacherAssignment(**data.model_dump())
     db.add(assignment)
