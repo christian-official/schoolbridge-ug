@@ -91,7 +91,7 @@ export default function StaffFinance({token,active,classes=[],refreshKey=0,initi
     setSummary(s);setCharges(rows);setAllOutstanding(balances)
   }
   useEffect(()=>{if(active==='Fees & Finance'){refreshFinance().catch(e=>setMessage(e.message));request<any>('settings/school-profile',token).then(setSchoolProfile).catch(()=>{})}},[active,feeSearch,feeClass,outstandingOnly,token,refreshKey])
-  useEffect(()=>{if(active!=='Fees & Finance'||financeTab!=='payments'||!feeSearch.trim()){setStudentMatches([]);return}const params=new URLSearchParams({search:feeSearch,page:'1',page_size:'30'});request<Page<StudentMatch>>('students/search?'+params.toString(),token).then(r=>setStudentMatches(r.items)).catch(e=>setMessage(e.message))},[active,financeTab,feeSearch,token,refreshKey])
+  useEffect(()=>{if(active!=='Fees & Finance'||financeTab!=='payments'||!feeSearch.trim()){setStudentMatches([]);return}const params=new URLSearchParams({search:feeSearch,page:'1',page_size:'5'});request<Page<StudentMatch>>('students/search?'+params.toString(),token).then(r=>setStudentMatches(r.items)).catch(e=>setMessage(e.message))},[active,financeTab,feeSearch,token,refreshKey])
 
   useEffect(()=>{
     if(active!=='Fees & Finance'||!feeSetup.class_id)return
