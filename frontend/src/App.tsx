@@ -104,7 +104,9 @@ function getStaffNavigation(user:User) {
     (item.label === 'Attendance' && (user.permissions?.['Staff Attendance'] || []).includes('view'))
   )
   const role = (user.role_label || '').toLowerCase()
-  const priority = /teacher/.test(role)
+  const priority = /school administrator|system administrator|^administrator$/.test(role)
+    ? ['Overview','Students','Staff','Examinations','Attendance','Fees & Finance','Timetable','Leadership & Duty','Parent Access','Announcements','Reports','My Attendance','My Profile']
+    : /teacher/.test(role)
     ? ['Overview','My Classes','My Results','Timetable','Attendance','My Attendance','Announcements','My Profile']
     : /secretary|office administrator/.test(role)
     ? ['Overview','Students','Staff','Parent Access','Announcements','Reports','My Attendance','My Profile']
@@ -303,6 +305,87 @@ function TeacherDashboard({token,username,onNavigate}:{token:string;username:str
         </aside>
       </section>
     </>}
+  </div>
+}
+
+type AdminExamRecord = {id:number;name:string;exam_type?:string;term?:string;year?:number;class_id:number;class_name?:string}
+type AdminMarkRecord = {id:number;verified:boolean;score:number;subject_id:number}
+function AdministratorDashboard({token,username,onNavigate,summary,financeSummary,availableSections}:{token:string;username:string;onNavigate:(section:string)=>void;summary:DashboardSummary;financeSummary:FinanceDashboardSummary;availableSections:string[]}) {
+  const [examRecords,setExamRecords]=useState<{exam:AdminExamRecord;marks:AdminMarkRecord[]}[]>([])
+  const [loading,setLoading]=useState(true)
+  const [error,setError]=useState('')
+  const [refreshCount,setRefreshCount]=useState(0)
+  const can=(section:string)=>availableSections.includes(section)
+  useEffect(()=>{
+    let cancelled=false
+    const load=async()=>{
+      setLoading(true);setError('')
+      try{
+        const exams=can('Examinations')?await api<AdminExamRecord[]>('exams',token):[]
+        const recent=exams.slice(-6).reverse()
+        const records=await Promise.all(recent.map(async exam=>({exam,marks:await api<AdminMarkRecord[]>(`marks?exam_id=${exam.id}`,token)})))
+        if(!cancelled)setExamRecords(records)
+      }catch(e){if(!cancelled)setError(e instanceof Error?e.message:'Some academic indicators could not be loaded.')}
+      finally{if(!cancelled)setLoading(false)}
+    }
+    void load()
+    return()=>{cancelled=true}
+  },[token,refreshCount,availableSections.join('|')])
+  const allMarks=examRecords.flatMap(item=>item.marks)
+  const pending=allMarks.filter(mark=>!mark.verified).length
+  const verified=allMarks.filter(mark=>mark.verified).length
+  const attendanceRate=summary.active_students>0?Math.round(summary.students_present_today/summary.active_students*100):0
+  const absent=Math.max(0,summary.active_students-summary.students_present_today)
+  const performance=examRecords.map(({exam,marks})=>({
+    label:exam.exam_type||exam.name||'Exam',
+    average:marks.length?Math.round(marks.reduce((total,mark)=>total+Number(mark.score||0),0)/marks.length):0,
+    count:marks.length,
+    pending:marks.filter(mark=>!mark.verified).length
+  })).filter(item=>item.count>0).reverse()
+  const priorities=[
+    {section:'Students',title:'Learner records',description:'Admissions, student profiles and class organisation.',icon:<GraduationCap/>},
+    {section:'Staff',title:'Staff management',description:'Teaching and non-teaching staff records and accounts.',icon:<Users/>},
+    {section:'Examinations',title:'Academic oversight',description:'Examination cycles, submitted results and verification.',icon:<BookOpen/>},
+    {section:'Attendance',title:'Attendance control',description:'School-wide learner attendance and follow-up.',icon:<CalendarCheck/>},
+    {section:'Fees & Finance',title:'Finance overview',description:'Collections, outstanding balances and payment activity.',icon:<TrendingUp/>},
+    {section:'Parent Access',title:'Parent access',description:'Parent accounts and linked learners.',icon:<Contact/>},
+    {section:'Announcements',title:'School communication',description:'Publish and review school announcements.',icon:<Megaphone/>},
+    {section:'Reports',title:'School reports',description:'Open authorised management reports.',icon:<FolderOpen/>}
+  ].filter(item=>can(item.section))
+  const alerts=[
+    ...(pending>0?[{title:'Results awaiting verification',detail:`${pending} submitted score records need academic review.`,section:'Examinations',tone:'amber'}]:[]),
+    ...(absent>0?[{title:'Learners not marked present',detail:`${absent} of ${summary.active_students} active learners are not currently recorded present today.`,section:'Attendance',tone:'blue'}]:[]),
+    ...(!can('Fees & Finance')?[{title:'Finance access not assigned',detail:'Financial figures are hidden because this account has no finance permission.',section:'',tone:'slate'}]:[])
+  ]
+  return <div className="administrator-command-dashboard">
+    <section className="admin-command-hero">
+      <div><span className="admin-live-label"><i/> SCHOOL-WIDE MANAGEMENT</span><h2>Administrator command centre</h2><p>Welcome, {username}. A live overview of enrolment, attendance, academic performance and school finances.</p></div>
+      <div className="admin-hero-actions"><span className="admin-role-pill"><ShieldCheck size={15}/> School Administrator</span><button type="button" className="secondary-button" onClick={()=>setRefreshCount(v=>v+1)} disabled={loading}><RefreshCw size={15}/>{loading?'Updating':'Refresh dashboard'}</button></div>
+    </section>
+    <section className="admin-kpi-grid">
+      <div className="admin-kpi-card"><span className="admin-kpi-icon blue"><GraduationCap/></span><div><small>TOTAL LEARNERS</small><strong>{summary.active_students.toLocaleString('en-UG')}</strong><span>Currently enrolled</span></div></div>
+      <div className="admin-kpi-card"><span className="admin-kpi-icon violet"><Users/></span><div><small>ACTIVE STAFF</small><strong>{summary.active_staff.toLocaleString('en-UG')}</strong><span>Teaching & non-teaching</span></div></div>
+      <div className="admin-kpi-card"><span className="admin-kpi-icon green"><CalendarCheck/></span><div><small>ATTENDANCE TODAY</small><strong>{attendanceRate}%</strong><span>{summary.students_present_today} learners present</span></div></div>
+      <div className="admin-kpi-card"><span className="admin-kpi-icon amber"><BookOpen/></span><div><small>SCHOOL CLASSES</small><strong>{summary.total_classes.toLocaleString('en-UG')}</strong><span>Active classes & streams</span></div></div>
+    </section>
+    <section className="admin-dashboard-main-grid">
+      <div className="admin-dashboard-primary">
+        <article className="admin-dashboard-panel admin-attendance-panel">
+          <div className="admin-panel-heading"><div><span className="admin-section-kicker">SCHOOL-WIDE ATTENDANCE</span><h3>Today's attendance</h3></div><button type="button" className="admin-text-link" onClick={()=>onNavigate('Attendance')}>Open register <ArrowUpRight size={15}/></button></div>
+          <div className="admin-attendance-content"><div className="admin-attendance-ring" style={{'--attendance-rate':`${attendanceRate}%`} as React.CSSProperties}><div><strong>{attendanceRate}%</strong><small>Present</small></div></div><div className="admin-attendance-breakdown"><div><span><i className="present-dot"/>Present</span><strong>{summary.students_present_today}</strong></div><div><span><i className="absent-dot"/>Not marked present</span><strong>{absent}</strong></div><div><span><i className="class-dot"/>Active learners</span><strong>{summary.active_students}</strong></div></div></div>
+        </article>
+        <article className="admin-dashboard-panel admin-performance-panel">
+          <div className="admin-panel-heading"><div><span className="admin-section-kicker">ACADEMIC PERFORMANCE</span><h3>Examination performance trend</h3><p>Average recorded marks across recent examinations</p></div>{can('Examinations')&&<button type="button" className="admin-text-link" onClick={()=>onNavigate('Examinations')}>View exams <ArrowUpRight size={15}/></button>}</div>
+          {loading?<p className="admin-muted-state">Loading examination performance…</p>:error?<p className="admin-muted-state">{error}</p>:performance.length?<div className="admin-performance-chart">{performance.map((item,index)=><div className="admin-performance-column" key={`${item.label}-${index}`}><div className="admin-performance-bar-track"><div className="admin-performance-bar" style={{height:`${Math.max(4,Math.min(100,item.average))}%`}}/><strong>{item.average}%</strong></div><span>{item.label}</span></div>)}</div>:<div className="admin-muted-state">No recorded examination marks are available yet.</div>}
+        </article>
+        {can('Fees & Finance')&&<article className="admin-dashboard-panel admin-finance-panel"><div className="admin-panel-heading"><div><span className="admin-section-kicker">FINANCIAL OVERVIEW</span><h3>School finances</h3></div><button type="button" className="admin-text-link" onClick={()=>onNavigate('Fees & Finance')}>Open finance <ArrowUpRight size={15}/></button></div><div className="admin-finance-grid"><div><small>FEES EXPECTED</small><strong>UGX {Number(financeSummary.fees_expected||0).toLocaleString('en-UG')}</strong></div><div><small>COLLECTED</small><strong>UGX {Number(financeSummary.fees_collected||0).toLocaleString('en-UG')}</strong></div><div><small>OUTSTANDING</small><strong>UGX {Number(financeSummary.outstanding||0).toLocaleString('en-UG')}</strong></div></div><div className="admin-finance-progress"><span style={{width:`${financeSummary.fees_expected>0?Math.min(100,financeSummary.fees_collected/financeSummary.fees_expected*100):0}%`}}/></div><small className="admin-finance-caption">Collection progress against expected fees</small></article>}
+      </div>
+      <aside className="admin-dashboard-side">
+        <article className="admin-dashboard-panel admin-alert-panel"><div className="admin-panel-heading"><div><span className="admin-section-kicker">ACTION REQUIRED</span><h3>Alerts & approvals</h3></div><span className="admin-alert-count">{alerts.length}</span></div>{alerts.length?alerts.map((alert,index)=><button type="button" className="admin-alert-item" key={index} onClick={()=>alert.section&&onNavigate(alert.section)} disabled={!alert.section}><span className={`admin-alert-symbol ${alert.tone}`}><ShieldCheck size={17}/></span><span><strong>{alert.title}</strong><small>{alert.detail}</small></span><ArrowUpRight size={15}/></button>):<div className="admin-clear-state"><ShieldCheck size={25}/><strong>All clear</strong><span>No pending management alerts were detected.</span></div>}</article>
+        <article className="admin-dashboard-panel admin-priority-panel"><div className="admin-panel-heading"><div><span className="admin-section-kicker">MANAGEMENT WORKSPACES</span><h3>Quick access</h3></div></div><div className="admin-priority-list">{priorities.map(item=><button type="button" key={item.section} onClick={()=>onNavigate(item.section)}><span>{item.icon}</span><span><strong>{item.title}</strong><small>{item.description}</small></span><ArrowUpRight size={15}/></button>)}</div></article>
+        <div className="admin-results-status"><div><span>RESULTS VERIFIED</span><strong>{verified}</strong></div><div><span>AWAITING REVIEW</span><strong>{pending}</strong></div></div>
+      </aside>
+    </section>
   </div>
 }
 
@@ -886,8 +969,8 @@ function App() {
           <div className="welcome-row">
             <div>
               <p className="eyebrow">SCHOOL MANAGEMENT SYSTEM</p>
-              <h1>{active === 'Overview' ? 'Dashboard overview' : active}</h1>
-              <p className="muted">Welcome back, {user.username}. {isFinanceAccount(user) ? 'Here is your finance workspace at a glance.' : 'Here is your assigned school workspace.'}</p>
+              <h1>{active === 'Overview' ? (user.role === 'admin' || /school administrator|system administrator|^administrator$/i.test(user.role_label||'') ? 'Administrator command centre' : /director of studies|\\bdos\\b/i.test(user.role_label||'') ? 'Director of Studies control centre' : /secretary|office administrator/i.test(user.role_label||'') ? 'Administration & records centre' : /attendance/i.test(user.role_label||'') ? 'Attendance operations centre' : /teacher/i.test(user.role_label||'') ? 'Teacher workspace' : isFinanceAccount(user) ? 'Finance dashboard' : 'School workspace') : active}</h1>
+              <p className="muted">Welcome back, {user.username}. {active === 'Overview' && (user.role === 'admin' || /school administrator|system administrator|^administrator$/i.test(user.role_label||'')) ? 'Your school-wide management overview.' : isFinanceAccount(user) ? 'Here is your finance workspace at a glance.' : 'Here is your assigned school workspace.'}</p>
             </div>
             <div className="date-chip"><CalendarDays size={17} /> {new Date().toLocaleDateString('en-UG', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
           </div>
@@ -898,19 +981,9 @@ function App() {
           {active === 'My Attendance' && user.role !== 'teacher' && user.role !== 'parent' && user.role !== 'admin' && <StaffSelfAttendance token={token} />}
           {((active === 'Parent Access' || active === 'Announcements') && user.role !== 'parent' || (active === 'My Children' || active === 'Announcements') && user.role === 'parent') && <Phase4Workspace token={token} role={user.role} active={active} permissions={user.permissions} />}
 
-          {active === 'Overview' && user.role === 'admin' && (
-            <RoleSpecificDashboard
-              username={user.username}
-              roleLabel="Administrator"
-              onNavigate={setActive}
-              summary={dashboardSummary}
-              summaryAvailable={true}
-              availableSections={['Students','Staff','Fees & Finance','Examinations','Attendance','Timetable','Leadership & Duty','Parent Access','Announcements','Reports']}
-              financeSummary={financeDashboard}
-            />
-          )}
+          {active === 'Overview' && user.role === 'admin' && <AdministratorDashboard token={token} username={user.username} onNavigate={setActive} summary={dashboardSummary} financeSummary={financeDashboard} availableSections={['Students','Staff','Fees & Finance','Examinations','Attendance','Timetable','Leadership & Duty','Parent Access','Announcements','Reports']}/>} 
 
-                    {active === 'Overview' && user.role !== 'admin' && (isFinanceAccount(user) ? <FinanceAccountDashboard token={token} username={user.username} onNavigate={(section,tab)=>{if(tab)setFinanceTabRequest(tab);setActive(section)}}/> : user.role === 'staff' && /director of studies|\\bdos\\b/i.test(user.role_label||'') ? <DirectorOfStudiesDashboard token={token} onNavigate={setActive} summary={dashboardSummary} summaryAvailable={(user.permissions?.['Overview']||[]).includes('view')} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)}/> : user.role === 'staff' && /secretary|office administrator|attendance/i.test(user.role_label||'') ? <RoleSpecificDashboard username={user.username} roleLabel={user.role_label||'Staff'} onNavigate={setActive} summary={dashboardSummary} summaryAvailable={(user.permissions?.['Overview']||[]).includes('view')} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)} financeSummary={financeDashboard}/> : user.role === 'staff' && /teacher/i.test(user.role_label||'') ? <TeacherDashboard token={token} username={user.username} onNavigate={setActive}/> : user.role === 'staff' ? <RoleSpecificDashboard username={user.username} roleLabel={user.role_label||'Staff'} onNavigate={setActive} summary={dashboardSummary} summaryAvailable={(user.permissions?.['Overview']||[]).includes('view')} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)} financeSummary={financeDashboard}/> : <PersonalDashboard token={token} username={user.username} onNavigate={setActive}/>) }
+                    {active === 'Overview' && user.role !== 'admin' && (user.role === 'staff' && /school administrator|system administrator|^administrator$/i.test(user.role_label||'') ? <AdministratorDashboard token={token} username={user.username} onNavigate={setActive} summary={dashboardSummary} financeSummary={financeDashboard} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)}/> : isFinanceAccount(user) ? <FinanceAccountDashboard token={token} username={user.username} onNavigate={(section,tab)=>{if(tab)setFinanceTabRequest(tab);setActive(section)}}/> : user.role === 'staff' && /director of studies|\\bdos\\b/i.test(user.role_label||'') ? <DirectorOfStudiesDashboard token={token} onNavigate={setActive} summary={dashboardSummary} summaryAvailable={(user.permissions?.['Overview']||[]).includes('view')} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)}/> : user.role === 'staff' && /secretary|office administrator|attendance/i.test(user.role_label||'') ? <RoleSpecificDashboard username={user.username} roleLabel={user.role_label||'Staff'} onNavigate={setActive} summary={dashboardSummary} summaryAvailable={(user.permissions?.['Overview']||[]).includes('view')} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)} financeSummary={financeDashboard}/> : user.role === 'staff' && /teacher/i.test(user.role_label||'') ? <TeacherDashboard token={token} username={user.username} onNavigate={setActive}/> : user.role === 'staff' ? <RoleSpecificDashboard username={user.username} roleLabel={user.role_label||'Staff'} onNavigate={setActive} summary={dashboardSummary} summaryAvailable={(user.permissions?.['Overview']||[]).includes('view')} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)} financeSummary={financeDashboard}/> : <PersonalDashboard token={token} username={user.username} onNavigate={setActive}/>) }
 
           {active === 'Students' && (
             <section className="panel">
