@@ -106,7 +106,9 @@ def permission_for_path(path: str):
     return None
 
 
-def action_for_method(method: str):
+def action_for_method(method: str, path: str = ""):
+    if method in {"PATCH", "PUT"} and (path.endswith("/verification") or "/approve" in path):
+        return "approve"
     return {"GET": "view", "POST": "add", "PUT": "edit", "PATCH": "edit", "DELETE": "delete"}.get(method, "view")
 
 
@@ -117,7 +119,7 @@ def require_admin(request: Request, user=Depends(get_current_user)):
     if path in ADMIN_ONLY_PATHS or path.startswith("/api/auth/"):
         raise HTTPException(403, "Administrator permission required.")
     section = permission_for_path(path)
-    action = action_for_method(request.method)
+    action = action_for_method(request.method, path)
     if not section or action not in user_permissions(user).get(section, set()):
         raise HTTPException(403, "You do not have permission to perform this action.")
     return user
