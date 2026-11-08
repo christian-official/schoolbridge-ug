@@ -1382,3 +1382,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .password-reset-result { display: grid; gap: 9px; margin-top: 12px; }
 .password-reset-result code { display: block; padding: 10px; border-radius: 7px; background: #fff; color: #243550; font-size: 13px; overflow-wrap: anywhere; }
 .password-reset-result small { color: #52617a; line-height: 1.5; }
+
+
+/* Keep teacher attendance and academic selectors interactive above table layers. */
+.academic-workspace select,
+.academic-workspace input,
+.recorded-marks-filters select {
+  pointer-events: auto !important;
+  position: relative;
+  z-index: 2;
+}
+.subject-verification-action { margin: 8px 0 12px; }
