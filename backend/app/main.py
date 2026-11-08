@@ -849,6 +849,26 @@ def get_current_user(
     return user
 
 
+@app.get("/api/attendance/options", tags=["Attendance"])
+def attendance_options(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    if user.role == "teacher":
+        class_ids = [row.class_id for row in db.query(models.ClassTeacherAssignment.class_id).filter_by(teacher_id=user.id).all()]
+        classes = db.query(models.SchoolClass).filter(models.SchoolClass.id.in_(class_ids or [-1])).order_by(
+            models.SchoolClass.name, models.SchoolClass.section
+        ).all()
+    else:
+        classes = db.query(models.SchoolClass).order_by(models.SchoolClass.name, models.SchoolClass.section).all()
+    return [{"id": row.id, "name": row.name, "section": row.section} for row in classes]
+
+
+@app.get("/api/attendance/students", tags=["Attendance"])
+def attendance_students(class_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    require_class_attendance_access(db, user, class_id, "view")
+    return db.query(models.Student).filter(
+        models.Student.class_id == class_id, models.Student.status == "active"
+    ).order_by(models.Student.last_name, models.Student.first_name).all()
+
+
 @app.post("/api/attendance", response_model=AttendanceOut, tags=["Attendance"])
 def record_attendance(data: AttendanceCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
     student = db.get(models.Student, data.student_id)
@@ -1518,10 +1538,13 @@ async def protect_school_data(request: Request, call_next):
                 return JSONResponse({"detail": "Administrator permission required."}, status_code=403)
             section = permission_for_path(path)
             action = action_for_method(request.method, path)
-            class_teacher_register = path in {"/api/attendance", "/api/attendance/summary"} and user.role == "teacher"
+            class_teacher_register = path.startswith("/api/attendance") and user.role == "teacher"
             if class_teacher_register:
-                class_id = request.query_params.get("class_id")
-                allowed = bool(class_id and is_assigned_class_teacher(db, user.id, int(class_id)))
+                if path == "/api/attendance/options":
+                    allowed = db.query(models.ClassTeacherAssignment.id).filter_by(teacher_id=user.id).first() is not None
+                else:
+                    class_id = request.query_params.get("class_id")
+                    allowed = bool(class_id and is_assigned_class_teacher(db, user.id, int(class_id)))
                 if not allowed:
                     return JSONResponse({"detail": "Only the assigned class teacher may access this register."}, status_code=403)
             elif not section or action not in user_permissions(user).get(section, set()):
