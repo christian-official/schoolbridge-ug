@@ -1379,7 +1379,7 @@ async def protect_school_data(request: Request, call_next):
             if user.role != "teacher":
                 return JSONResponse({"detail": "Teacher account required."}, status_code=403)
             section = permission_for_path(path)
-            action = action_for_method(request.method)
+            action = action_for_method(request.method, path)
             if not section or action not in user_permissions(user).get(section, set()):
                 return JSONResponse({"detail": "Your teacher account is not permitted to perform this action."}, status_code=403)
         elif path.startswith("/api/parent/"):
@@ -1391,7 +1391,7 @@ async def protect_school_data(request: Request, call_next):
             if path in ADMIN_ONLY_PATHS or path.startswith("/api/auth/"):
                 return JSONResponse({"detail": "Administrator permission required."}, status_code=403)
             section = permission_for_path(path)
-            action = action_for_method(request.method)
+            action = action_for_method(request.method, path)
             if not section or action not in user_permissions(user).get(section, set()):
                 return JSONResponse({"detail": "You do not have permission to access this section or perform this action."}, status_code=403)
 
