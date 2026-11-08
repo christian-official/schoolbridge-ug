@@ -303,6 +303,8 @@ export default function AcademicManagement({ token, classes }: { token: string; 
   async function setSubjectVerification(subjectId: number, verified: boolean) {
     if (!selectedExam) { setError('Choose an examination first.'); return }
     const subject = subjects.find(row => row.id === subjectId)
+    const action = verified ? 'verify and lock' : 'unlock for correction'
+    if (!window.confirm(`Are you sure you want to ${action} every recorded ${subject?.name || 'subject'} score for this examination?`)) return
     setSaving(true); setError(''); setMessage('')
     try {
       const params = new URLSearchParams({ exam_id: String(selectedExam.id), subject_id: String(subjectId), verified: String(verified) })
