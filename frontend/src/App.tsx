@@ -7,7 +7,8 @@ import {
 } from 'lucide-react'
 import StaffFinance from './StaffFinance'
 import AcademicManagement from './AcademicManagement'
-import AttendanceManagement from './AttendanceManagement'
+import AttendanceHub from './AttendanceHub'
+import MyStaffProfile from './MyStaffProfile'
 import OperationsManagement from './OperationsManagement'
 import Phase4Workspace from './Phase4Workspace'
 import './App.css'
@@ -62,7 +63,6 @@ const menu = [
   { label: 'Fees & Finance', icon: FileText },
   { label: 'Examinations', icon: FileText },
   { label: 'Attendance', icon: CalendarDays },
-  { label: 'Staff Attendance', icon: Users },
   { label: 'Timetable', icon: CalendarDays },
   { label: 'Leadership & Duty', icon: ShieldCheck },
   { label: 'Parent Access', icon: Users },
@@ -74,6 +74,7 @@ const teacherMenu = [
   { label: 'My Attendance', icon: Users },
   { label: 'My Results', icon: FileText },
   { label: 'Announcements', icon: FileText },
+  { label: 'My Profile', icon: Users },
 ]
 const parentMenu = [
   { label: 'My Children', icon: GraduationCap },
@@ -464,7 +465,7 @@ function App() {
           <p className="muted">Sign in to your school workspace.</p>
           <form onSubmit={login}>
             <label htmlFor="username">Username</label>
-            <input id="username" value={username} onChange={e => setUsername(e.target.value)} placeholder="Enter your username" required />
+            <input id="username" value={username} onChange={e => setUsername(e.target.value)} placeholder="Enter staff number or surname" required />
             <label htmlFor="password">Password</label>
             <input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter your password" required />
             {loginError && <p className="error">{loginError}</p>}
@@ -488,7 +489,7 @@ function App() {
         </div>
         <div className="school-label">SCHOOL MANAGEMENT</div>
         <nav>
-          {(user.role === 'parent' ? parentMenu : user.role === 'admin' ? menu : [...menu, ...teacherMenu.filter(item => !menu.some(base => base.label === item.label))].filter(item => (user.permissions?.[item.label] || []).includes('view'))).map(item => {
+          {(user.role === 'parent' ? parentMenu : user.role === 'admin' ? menu : [...menu, ...teacherMenu.filter(item => !menu.some(base => base.label === item.label))].filter(item => item.label === 'My Profile' || (user.permissions?.[item.label] || []).includes('view') || (item.label === 'Attendance' && (user.permissions?.['Staff Attendance'] || []).includes('view')))).map(item => {
             const Icon = item.icon
             return (
               <button key={item.label} className={`nav-item ${active === item.label ? 'active' : ''}`} onClick={() => { setActive(item.label); setMobileMenu(false) }}>
@@ -710,8 +711,9 @@ function App() {
             </div>
           )}
           {active === 'Examinations' && user.role !== 'parent' && <AcademicManagement token={token} classes={classes} />}
-          {active === 'Attendance' && user.role !== 'parent' && user.role !== 'teacher' && <AttendanceManagement token={token} />}
-          {(active === 'Staff Attendance' || active === 'Timetable') && user.role !== 'parent' && <OperationsManagement token={token} active={active} />}
+          {active === 'Attendance' && user.role !== 'parent' && user.role !== 'teacher' && <AttendanceHub token={token} />}
+          {active === 'Timetable' && user.role !== 'parent' && <OperationsManagement token={token} active={active} />}
+          {active === 'My Profile' && user.role !== 'parent' && user.role !== 'admin' && <MyStaffProfile token={token} />}
           {active === 'Leadership & Duty' && user.role !== 'parent' && <LeadershipDuty token={token} />}
           {active === 'Settings' && settingsSection === 'home' && (
             <section className="settings-hub">
