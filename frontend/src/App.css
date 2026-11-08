@@ -1433,3 +1433,13 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   .dashboard-heading-actions { justify-content: flex-start; width: 100%; }
   .panel-heading:has(.dashboard-heading-actions) { align-items: flex-start; flex-direction: column; }
 }
+
+
+/* Keep the SchoolBridge workspace frame fixed while tabs change; long pages scroll inside it. */
+.main-area { min-width: 0; min-height: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+.main-area > .topbar { flex: 0 0 76px; }
+.main-area > .content { flex: 1 1 auto; width: 100%; height: calc(100vh - 76px); min-height: 0; overflow-y: auto; overflow-x: hidden; box-sizing: border-box; }
+@media (max-width: 760px) {
+  .main-area { height: 100dvh; }
+  .main-area > .content { height: calc(100dvh - 76px); padding: 22px 16px 18px; }
+}
