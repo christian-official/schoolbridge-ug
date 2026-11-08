@@ -74,6 +74,7 @@ const teacherMenu = [
   { label: 'Attendance', icon: CalendarDays },
   { label: 'My Attendance', icon: Users },
   { label: 'My Results', icon: FileText },
+  { label: 'Timetable', icon: CalendarDays },
   { label: 'Announcements', icon: FileText },
   { label: 'My Profile', icon: Users },
 ]
