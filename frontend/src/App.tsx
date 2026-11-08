@@ -1193,7 +1193,7 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
     sections.forEach((section:string)=>{next[section]=['view']})
     if(label==='Teacher'||label==='Class Teacher') {
       if(label==='Class Teacher') next['Attendance']=['view','add','edit']
-      next['My Classes']=['view'];next['My Attendance']=['view'];next['My Results']=['view','add','edit'];next['Announcements']=['view'];next['Timetable']=['view']
+      next['My Classes']=['view'];next['My Attendance']=['view'];next['My Results']=['view','add','edit'];next['Announcements']=['view'];delete next['Timetable']
     }
     if(['Academic Administrator','Academics Officer','DOS'].includes(label)) next['Timetable']=['view','add','edit','delete']
     if(label==='Attendance Officer'){next['Attendance']=['view','add','edit'];next['Staff Attendance']=['view','add','edit']}
