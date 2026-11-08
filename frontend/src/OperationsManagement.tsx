@@ -147,7 +147,7 @@ export default function OperationsManagement({ token, active, permissions = {}, 
 
   return <div className="academic-workspace">
     <section className="panel">
-      <div className="panel-heading"><div><h2>{active === 'Staff Attendance' ? 'Staff attendance register' : 'School timetable'}</h2><p>{active === 'Staff Attendance' ? 'Record daily attendance for active teaching and non-teaching staff.' : 'Build and maintain a weekly timetable for each class.'}</p></div><button type="button" className="secondary-button" onClick={() => { void loadSetup(); if (active === 'Staff Attendance') void loadStaffAttendance(); else void loadTimetable() }} disabled={loading || saving}><RefreshCw size={15}/> Refresh</button></div>
+      <div className="panel-heading"><div><h2>{active === 'Staff Attendance' ? 'Staff attendance register' : 'School timetable'}</h2><p>{active === 'Staff Attendance' ? 'Record daily attendance for active teaching and non-teaching staff.' : 'Build and maintain a weekly timetable for each class.'}</p></div><button type="button" className="secondary-button" onClick={() => { void loadSetup(); if (active === 'Staff Attendance') void loadStaffAttendance() }} disabled={loading || saving}><RefreshCw size={15}/> Refresh</button></div>
       {error && <div className="form-error" role="alert">{error}</div>}
       {message && <div className="success-notice" role="status">{message}</div>}
       {active === 'Staff Attendance' ? <>
