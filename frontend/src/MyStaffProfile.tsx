@@ -18,9 +18,6 @@ async function request<T>(path: string, token: string, options: RequestInit = {}
 export default function MyStaffProfile({ token }: { token: string }) {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [firstName, setFirstName] = useState('')
-  const [position, setPosition] = useState('')
-  const [department, setDepartment] = useState('')
-  const [subjects, setSubjects] = useState('')
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
   const [currentPassword, setCurrentPassword] = useState('')
@@ -34,7 +31,7 @@ export default function MyStaffProfile({ token }: { token: string }) {
     setLoading(true); setError('')
     try {
       const data = await request<Profile>('me/staff-profile', token)
-      setProfile(data); setFirstName(data.first_name); setPosition(data.position || ''); setDepartment(data.department || ''); setSubjects(data.subjects || ''); setPhone(data.phone || ''); setEmail(data.email || '')
+      setProfile(data); setFirstName(data.first_name); setPhone(data.phone || ''); setEmail(data.email || '')
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to load your profile.') }
     finally { setLoading(false) }
   }
@@ -42,7 +39,7 @@ export default function MyStaffProfile({ token }: { token: string }) {
   async function saveProfile(event: React.FormEvent) {
     event.preventDefault(); setSaving(true); setError(''); setMessage('')
     try {
-      const result = await request<{message:string;profile:Profile}>('me/staff-profile', token, { method: 'PATCH', body: JSON.stringify({ first_name: firstName, position, department, subjects, phone, email }) })
+      const result = await request<{message:string;profile:Profile}>('me/staff-profile', token, { method: 'PATCH', body: JSON.stringify({ first_name: firstName, phone, email }) })
       setProfile(result.profile); setMessage(result.message)
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to update your profile.') }
     finally { setSaving(false) }
@@ -58,7 +55,7 @@ export default function MyStaffProfile({ token }: { token: string }) {
   }
   return <div className="academic-workspace">
     <section className="panel">
-      <div className="panel-heading"><div><h2>My staff profile</h2><p>Update your contact details and keep your sign-in password secure.</p></div></div>
+      <div className="panel-heading"><div><h2>My staff profile</h2><p>Only your first name, phone number and email address can be edited. Your surname and staff number remain fixed.</p></div></div>
       {error && <div className="form-error" role="alert">{error}</div>}
       {message && <div className="success-notice" role="status">{message}</div>}
       {loading ? <p className="form-hint">Loading your profile…</p> : profile && <>
@@ -68,9 +65,6 @@ export default function MyStaffProfile({ token }: { token: string }) {
             <label>Surname (locked)<input value={profile.last_name} readOnly disabled /></label>
             <label>Staff number (locked)<input value={profile.staff_number} readOnly disabled /></label>
             <label>Login username<input value={profile.username} readOnly disabled /></label>
-            <label>Position<input value={position} onChange={e=>setPosition(e.target.value)} maxLength={100} /></label>
-            <label>Department<input value={department} onChange={e=>setDepartment(e.target.value)} maxLength={100} /></label>
-            <label>Subjects taught<input value={subjects} onChange={e=>setSubjects(e.target.value)} maxLength={500} /></label>
             <label>Phone number<input type="tel" value={phone} onChange={e=>setPhone(e.target.value)} /></label>
             <label>Email address<input type="email" value={email} onChange={e=>setEmail(e.target.value)} /></label>
           </div>
