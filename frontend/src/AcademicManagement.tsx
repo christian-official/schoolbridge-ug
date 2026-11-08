@@ -300,15 +300,18 @@ export default function AcademicManagement({ token, classes }: { token: string; 
     finally { setSaving(false) }
   }
 
-  async function setMarkVerification(mark: Mark, verified: boolean) {
+  async function setSubjectVerification(subjectId: number, verified: boolean) {
+    if (!selectedExam) { setError('Choose an examination first.'); return }
+    const subject = subjects.find(row => row.id === subjectId)
     setSaving(true); setError(''); setMessage('')
     try {
-      await request<Mark>(`marks/${mark.id}/verification?verified=${verified}`, token, { method: 'PATCH' })
-      const next = await request<Mark[]>(`marks?exam_id=${selectedExam?.id}`, token)
+      const params = new URLSearchParams({ exam_id: String(selectedExam.id), subject_id: String(subjectId), verified: String(verified) })
+      const result = await request<{records:number;changed:number}>(`marks/verification/batch?${params.toString()}`, token, { method: 'PATCH' })
+      const next = await request<Mark[]>(`marks?exam_id=${selectedExam.id}`, token)
       setMarks(next)
-      setMessage(verified ? 'Mark verified and locked against further edits.' : 'Mark unlocked for correction.')
+      setMessage((verified ? 'All ' : 'All ') + result.records + ' recorded ' + (subject?.name || 'subject') + ' scores ' + (verified ? 'verified and locked.' : 'unlocked for correction.') )
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Unable to update mark verification.')
+      setError(e instanceof Error ? e.message : 'Unable to update subject score verification.')
     } finally { setSaving(false) }
   }
 
@@ -492,17 +495,19 @@ export default function AcademicManagement({ token, classes }: { token: string; 
               const subjectMarks = marks.filter(mark => mark.subject_id === subject.id && students.some(student => student.id === mark.student_id && studentOffersSubject(student, subject)) && (recordedStatusFilter === 'all' || (recordedStatusFilter === 'verified' ? mark.verified : !mark.verified))).sort((a, b) => studentName(studentById.get(a.student_id)).localeCompare(studentName(studentById.get(b.student_id))));
               const verifiedMarks = subjectMarks.filter(mark => mark.verified);
               const unverifiedMarks = subjectMarks.filter(mark => !mark.verified);
-              const renderMarkRows = (rows: Mark[]) => rows.map(mark => <tr key={mark.id}><td>{studentName(studentById.get(mark.student_id))}</td><td><strong>{Math.round(mark.score)}</strong></td><td><button type="button" className={mark.verified ? 'secondary-button' : 'primary-button'} aria-label={(mark.verified ? 'Unlock score for ' : 'Verify score for ') + studentName(studentById.get(mark.student_id))} disabled={saving} onClick={() => void setMarkVerification(mark, !mark.verified)}>{mark.verified ? 'Unlock' : 'Verify'}</button></td></tr>);
+              const renderMarkRows = (rows: Mark[]) => rows.map(mark => <tr key={mark.id}><td>{studentName(studentById.get(mark.student_id))}</td><td><strong>{Math.round(mark.score)}</strong></td></tr>);
               return <section className="recorded-subject-card" key={subject.id}>
                 <div className="recorded-subject-heading"><h3>{subject.name}</h3><span>{subjectMarks.length} recorded</span></div>
                 <div className="recorded-status-columns">
                   <div className="recorded-status-group">
                     <div className="recorded-status-heading"><strong>Verified scores</strong><span className="recorded-count verified-count">{verifiedMarks.length}</span></div>
-                    <div className="table-wrap"><table><thead><tr><th>Student</th><th>Score</th><th>Action</th></tr></thead><tbody>{renderMarkRows(verifiedMarks)}{!verifiedMarks.length && <tr><td colSpan={3}>No verified scores.</td></tr>}</tbody></table></div>
+                    {verifiedMarks.length>0&&<button type="button" className="secondary-button subject-verification-action" disabled={saving} onClick={()=>void setSubjectVerification(subject.id,false)}>Unlock all {subject.name} scores</button>}
+                    <div className="table-wrap"><table><thead><tr><th>Student</th><th>Score</th></tr></thead><tbody>{renderMarkRows(verifiedMarks)}{!verifiedMarks.length && <tr><td colSpan={2}>No verified scores.</td></tr>}</tbody></table></div>
                   </div>
                   <div className="recorded-status-group">
                     <div className="recorded-status-heading"><strong>Unverified scores</strong><span className="recorded-count pending-count">{unverifiedMarks.length}</span></div>
-                    <div className="table-wrap"><table><thead><tr><th>Student</th><th>Score</th><th>Action</th></tr></thead><tbody>{renderMarkRows(unverifiedMarks)}{!unverifiedMarks.length && <tr><td colSpan={3}>No unverified scores.</td></tr>}</tbody></table></div>
+                    {unverifiedMarks.length>0&&<button type="button" className="primary-button subject-verification-action" disabled={saving} onClick={()=>void setSubjectVerification(subject.id,true)}>Verify all {subject.name} scores</button>}
+                    <div className="table-wrap"><table><thead><tr><th>Student</th><th>Score</th></tr></thead><tbody>{renderMarkRows(unverifiedMarks)}{!unverifiedMarks.length && <tr><td colSpan={2}>No unverified scores.</td></tr>}</tbody></table></div>
                   </div>
                 </div>
               </section>;
