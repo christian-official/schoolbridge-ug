@@ -887,17 +887,24 @@ function App() {
           {active === 'Timetable' && user.role !== 'parent' && <OperationsManagement token={token} active={active} permissions={user.permissions} isAdmin={user.role === 'admin'} roleLabel={user.role_label || ''} />}
           {active === 'My Profile' && user.role !== 'parent' && user.role !== 'admin' && <MyStaffProfile token={token} />}
           {active === 'Leadership & Duty' && user.role !== 'parent' && <LeadershipDuty token={token} />}
-          {active === 'Settings' && <nav className="settings-main-tabs" aria-label="School settings sections">
-            {[['home','Home'],['school','School profile'],['classes','Classes'],['admission','Admissions'],['academic','Academic year'],['curriculum','Curriculum'],['users','Users & permissions'],['backups','Backups'],['audit','Audit log']].map(([key,label])=><button type="button" key={key} className={settingsSection===key?'active':''} aria-current={settingsSection===key?'page':undefined} onClick={()=>setSettingsSection(key)}>{label}</button>)}
-          </nav>}
           {active === 'Settings' && settingsSection === 'home' && (
             <section className="settings-hub">
               <div className="panel-heading"><div><h2>School settings</h2><p>Choose a category to configure how SchoolBridge works for this school.</p></div></div>
-              <div className="settings-home-summary"><strong>School settings</strong><p>Use the tabs above to move between school identity, academic setup, user access, backups and audit records. Each section opens only when selected.</p></div>
+              <div className="settings-category-grid">
+                <button className="settings-category" onClick={() => setSettingsSection('school')}><span className="settings-category-icon"><GraduationCap /></span><strong>School Profile</strong><small>School name, contacts and identity</small><ArrowUpRight /></button>
+                <button className="settings-category" onClick={() => setSettingsSection('classes')}><span className="settings-category-icon"><BookOpen /></span><strong>Classes & Streams</strong><small>Create classes, streams and manage class fees</small><ArrowUpRight /></button>
+                <button className="settings-category" onClick={() => setSettingsSection('admission')}><span className="settings-category-icon"><Users /></span><strong>Admission Numbers</strong><small>Set the format for student admission numbers</small><ArrowUpRight /></button>
+                <button className="settings-category" onClick={() => setSettingsSection('academic')}><span className="settings-category-icon"><CalendarDays /></span><strong>Academic Year & Terms</strong><small>Set the active academic year and term</small><ArrowUpRight /></button>
+                <button className="settings-category" onClick={() => setSettingsSection('curriculum')}><span className="settings-category-icon"><BookOpen /></span><strong>Academic & Curriculum</strong><small>Configure A-Level combinations, O-Level optional and subsidiary subjects</small><ArrowUpRight /></button>
+                <button className="settings-category" onClick={() => setSettingsSection('users')}><span className="settings-category-icon"><ShieldCheck /></span><strong>Users & Permissions</strong><small>Teaching and non-teaching staff roles, tabs and actions</small><ArrowUpRight /></button>
+                <button className="settings-category" onClick={() => setSettingsSection('backups')}><span className="settings-category-icon"><Settings /></span><strong>Backups & Restore</strong><small>Protect and restore school records</small><ArrowUpRight /></button>
+                <button className="settings-category" onClick={() => setSettingsSection('audit')}><span className="settings-category-icon"><ShieldCheck /></span><strong>Audit Log</strong><small>Review important changes and financial actions</small><ArrowUpRight /></button>
+              </div>
             </section>
           )}
           {active === 'Settings' && settingsSection !== 'home' && (
             <div className="settings-detail">
+              <button className="settings-back" onClick={() => setSettingsSection('home')}>← All settings</button>
               
               {settingsSection === 'admission' && (
             <section className="panel settings-panel">
