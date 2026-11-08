@@ -17,6 +17,8 @@ type User = {
   username: string
   email: string
   role: string
+  role_label?: string
+  permissions?: Record<string, string[]>
   active: boolean
 }
 
@@ -390,7 +392,11 @@ function App() {
       setUser(profile)
       if(profile.role==='teacher') setActive('My Classes')
       else if(profile.role==='parent') setActive('My Children')
-      else await loadSchoolData(authToken)
+      else if(profile.role==='admin') await loadSchoolData(authToken)
+      else {
+        const firstAllowed = menu.find(item => (profile.permissions?.[item.label] || []).includes('view'))
+        setActive(firstAllowed?.label || 'Overview')
+      }
     } catch (error) {
       sessionStorage.removeItem('sb_token')
       setToken('')
@@ -478,7 +484,7 @@ function App() {
         </div>
         <div className="school-label">SCHOOL MANAGEMENT</div>
         <nav>
-          {(user.role === 'teacher' ? teacherMenu : user.role === 'parent' ? parentMenu : menu).map(item => {
+          {(user.role === 'parent' ? parentMenu : user.role === 'admin' ? menu : [...menu, ...teacherMenu.filter(item => !menu.some(base => base.label === item.label))].filter(item => (user.permissions?.[item.label] || []).includes('view'))).map(item => {
             const Icon = item.icon
             return (
               <button key={item.label} className={`nav-item ${active === item.label ? 'active' : ''}`} onClick={() => { setActive(item.label); setMobileMenu(false) }}>
@@ -699,10 +705,10 @@ function App() {
               </section>
             </div>
           )}
-          {active === 'Examinations' && user.role === 'admin' && <AcademicManagement token={token} classes={classes} />}
-          {active === 'Attendance' && user.role === 'admin' && <AttendanceManagement token={token} />}
-          {(active === 'Staff Attendance' || active === 'Timetable') && user.role === 'admin' && <OperationsManagement token={token} active={active} />}
-          {active === 'Leadership & Duty' && user.role === 'admin' && <LeadershipDuty token={token} />}
+          {active === 'Examinations' && user.role !== 'parent' && <AcademicManagement token={token} classes={classes} />}
+          {active === 'Attendance' && user.role !== 'parent' && user.role !== 'teacher' && <AttendanceManagement token={token} />}
+          {(active === 'Staff Attendance' || active === 'Timetable') && user.role !== 'parent' && <OperationsManagement token={token} active={active} />}
+          {active === 'Leadership & Duty' && user.role !== 'parent' && <LeadershipDuty token={token} />}
           {active === 'Settings' && settingsSection === 'home' && (
             <section className="settings-hub">
               <div className="panel-heading"><div><h2>School settings</h2><p>Choose a category to configure how SchoolBridge works for this school.</p></div></div>
