@@ -323,112 +323,49 @@ function DirectorOfStudiesDashboard({token,onNavigate,summary,summaryAvailable,a
   </div>
 }
 
-function RoleSpecificDashboard({token,username,onNavigate,summary,summaryAvailable}:{token:string;username:string;onNavigate:(section:string)=>void;summary:DashboardSummary;summaryAvailable:boolean}) {
-  const [data,setData]=useState<PersonalDashboardData|null>(null)
-  const [error,setError]=useState('')
-  const [loading,setLoading]=useState(true)
-  const [refreshCount,setRefreshCount]=useState(0)
-  useEffect(()=>{
-    let cancelled=false
-    setLoading(true);setError('')
-    api<PersonalDashboardData>('dashboard/my-work',token).then(result=>{if(!cancelled)setData(result)})
-      .catch(e=>{if(!cancelled)setError(e instanceof Error?e.message:'Unable to load your assigned work.')})
-      .finally(()=>{if(!cancelled)setLoading(false)})
-    return ()=>{cancelled=true}
-  },[token,refreshCount])
-  const role=(data?.role_label||'').toLowerCase()
-  const profile=/secretary|office administrator/.test(role)
-    ? {eyebrow:'ADMINISTRATION WORKSPACE',title:'Office & records overview',description:'Keep school records, communication and authorised administration work organised.',priority:['Students','Staff','Parent Access','Announcements','Reports'],empty:'No office tasks are assigned for today.'}
-    : /attendance/.test(role)
-      ? {eyebrow:'ATTENDANCE WORKSPACE',title:'Attendance operations',description:'Review the attendance areas assigned to your account and keep daily records up to date.',priority:['Attendance','Staff Attendance','Reports','Students','Announcements'],empty:'No attendance activity is scheduled for today.'}
-      : /academic|director of studies|\bdos\b|deputy|headteacher|examination/.test(role)
-        ? {eyebrow:'ACADEMIC OPERATIONS',title:'Academic oversight',description:'Access the academic review and coordination work authorised for your role.',priority:['Examinations','Timetable','Attendance','Students','Reports','Announcements'],empty:'No lessons or duty assignments are scheduled for today.'}
-        : /ict|information technology|computer/.test(role)
-          ? {eyebrow:'SYSTEMS WORKSPACE',title:'ICT & systems overview',description:'Open the school work areas assigned to your account and coordinate your daily responsibilities.',priority:['Staff','Announcements','Reports','Timetable','My Attendance'],empty:'No duty has been assigned to you for today.'}
-          : /librar/.test(role)
-            ? {eyebrow:'LIBRARY WORKSPACE',title:'Library operations',description:'Your authorised school work areas and daily responsibilities are gathered here.',priority:['Students','Staff','Announcements','Reports','My Attendance'],empty:'No library duty has been assigned for today.'}
-            : /store|procurement|purchas/.test(role)
-              ? {eyebrow:'SUPPLIES WORKSPACE',title:'Stores & procurement overview',description:'Access the operational areas assigned to your account and keep track of daily responsibilities.',priority:['Staff','Fees & Finance','Reports','Announcements','My Attendance'],empty:'No stores or procurement duty has been assigned for today.'}
-              : {eyebrow:'SCHOOL OPERATIONS',title:'Your operations overview',description:'A role-focused workspace showing only the school areas and duties assigned to your account.',priority:['Staff','Attendance','Staff Attendance','Timetable','Leadership & Duty','Announcements','Reports','Students'],empty:'No duty has been assigned to you for today.'}
-  const sections=(data?.available_sections||[]).filter(section=>section!=='Overview' && section!=='Reports')
-  const orderedSections=[...sections].sort((a,b)=>{
-    const ai=profile.priority.indexOf(a),bi=profile.priority.indexOf(b)
-    return (ai<0?999:ai)-(bi<0?999:bi)
-  })
-  const workCount=(data?.today_duty?1:0)+(sections.includes('Timetable')?(data?.today_lessons.length||0):0)
-  const iconFor=(section:string)=>{
-    if(/student/i.test(section))return <GraduationCap/>
-    if(/staff|attendance/i.test(section))return <Users/>
-    if(/finance/i.test(section))return <TrendingUp/>
-    if(/exam|report/i.test(section))return <FileText/>
-    if(/timetable/i.test(section))return <CalendarDays/>
-    if(/leadership|duty/i.test(section))return <ShieldCheck/>
-    if(/announcement/i.test(section))return <Megaphone/>
-    if(/parent/i.test(section))return <Contact/>
-    return <FolderOpen/>
-  }
-  const detailFor=(section:string)=>{
-    const descriptions:Record<string,string>={
-      Students:'Open student records and the student services your account can access.',
-      Staff:'View and manage staff records according to your assigned permissions.',
-      'Parent Access':'Manage parent accounts and authorised student links.',
-      Announcements:'Read and manage school announcements.',
-      Reports:'Open the reports available to your account.',
-      Attendance:'Open the attendance registers assigned to your role.',
-      'Staff Attendance':'Review staff attendance where authorised.',
-      Timetable:'View the timetable and related coordination tools.',
-      Examinations:'Review submitted results and authorised examination records.',
-      'Leadership & Duty':'Open assigned leadership and duty coordination tools.',
-      'Fees & Finance':'Open the finance workspace allowed for your account.',
-    }
-    return descriptions[section]||'Open this authorised school workspace.'
-  }
-  return <div className="role-dashboard hybrid-role-dashboard">
-    <section className="dashboard-role-heading hybrid-role-heading">
-      <div><p className="eyebrow">{profile.eyebrow}</p><h2>{profile.title}</h2><p>{data?.staff_name||username} · {data?.role_label||'Staff account'} · {profile.description}</p></div>
-      <div className="dashboard-heading-actions"><span className="count-pill">{workCount} assigned items today</span><button type="button" className="secondary-button" onClick={()=>setRefreshCount(value=>value+1)} disabled={loading}>{loading?'Refreshing...':'Refresh data'}</button></div>
+function RoleSpecificDashboard({username,roleLabel,onNavigate,summary,summaryAvailable,availableSections,financeSummary}:{username:string;roleLabel:string;onNavigate:(section:string)=>void;summary:DashboardSummary;summaryAvailable:boolean;availableSections:string[];financeSummary:FinanceDashboardSummary}) {
+  const role=roleLabel.toLowerCase().trim()
+  const can=(section:string)=>availableSections.includes(section)
+  const open=(section:string)=>onNavigate(section==='Staff Attendance'?'Attendance':section)
+  const actions=[
+    {section:'Students',title:'Learner records',description:'Review enrolment, student profiles and class records.',icon:<GraduationCap/>,tone:'blue'},
+    {section:'Staff',title:'Staff directory',description:'Review teaching and non-teaching staff records.',icon:<Users/>,tone:'purple'},
+    {section:'Fees & Finance',title:'Finance oversight',description:'Review collections, balances and school expenditure.',icon:<TrendingUp/>,tone:'green'},
+    {section:'Examinations',title:'Academic performance',description:'Monitor examination cycles and results governance.',icon:<FileText/>,tone:'amber'},
+    {section:'Attendance',title:'Attendance operations',description:'Review student attendance registers and follow-up.',icon:<CalendarCheck/>,tone:'blue'},
+    {section:'Staff Attendance',title:'Staff attendance',description:'Review staff check-in and check-out records.',icon:<Clock/>,tone:'purple'},
+    {section:'Timetable',title:'School timetable',description:'Review the school teaching programme.',icon:<CalendarDays/>,tone:'green'},
+    {section:'Leadership & Duty',title:'Leadership & duty',description:'Review leadership assignments and duty records.',icon:<ShieldCheck/>,tone:'amber'},
+    {section:'Parent Access',title:'Parent access',description:'Manage parent accounts and linked learners.',icon:<Contact/>,tone:'blue'},
+    {section:'Announcements',title:'School communication',description:'Publish and review school announcements.',icon:<Megaphone/>,tone:'purple'},
+    {section:'Reports',title:'School reports',description:'Open reports available to your account.',icon:<FolderOpen/>,tone:'green'},
+  ].filter(item=>can(item.section))
+  const isHeadteacher=/^(head ?teacher|principal|school head)$/.test(role)
+  const isSecretary=/secretary|office administrator/.test(role)
+  const isAttendance=/attendance/.test(role)
+  const title=isHeadteacher?'Executive command centre':isSecretary?'Administration & records centre':isAttendance?'Attendance operations centre':'School operations overview'
+  const eyebrow=isHeadteacher?'SCHOOL LEADERSHIP · EXECUTIVE OVERSIGHT':isSecretary?'SCHOOL ADMINISTRATION · RECORDS & COMMUNICATION':isAttendance?'SCHOOL OPERATIONS · ATTENDANCE CONTROL':'SCHOOL OPERATIONS'
+  const description=isHeadteacher?'A school-wide view of enrolment, attendance, staffing, academic activity and authorised financial oversight.':isSecretary?'A central workspace for student records, staff administration, parent access and school communication.':isAttendance?'A focused workspace for monitoring daily learner attendance and staff presence.':'A role-focused overview of the school work areas assigned to your account.'
+  const priority=isHeadteacher?['Students','Staff','Fees & Finance','Examinations','Attendance','Timetable','Leadership & Duty','Announcements','Reports']:isSecretary?['Students','Staff','Parent Access','Announcements','Reports']:['Attendance','Staff Attendance','Students','Reports','Announcements']
+  const orderedActions=[...actions].sort((a,b)=>{const ai=priority.indexOf(a.section),bi=priority.indexOf(b.section);return (ai<0?999:ai)-(bi<0?999:bi)})
+  return <div className={`role-dashboard command-dashboard ${isHeadteacher?'headteacher-dashboard':isSecretary?'secretary-dashboard':isAttendance?'attendance-officer-dashboard':'operations-dashboard'}`}>
+    <section className="command-hero">
+      <div><p className="eyebrow">{eyebrow}</p><h2>{title}</h2><p>{username} · {roleLabel||'School staff'} · {description}</p></div>
+      <span className="command-role-chip"><ShieldCheck size={16}/>{roleLabel||'Staff account'}</span>
     </section>
-    {loading&&<p className="form-hint">Loading your assigned work...</p>}
-    {error&&<div className="form-error" role="alert">{error}</div>}
-    {data&&!loading&&<>
-      {summaryAvailable&&<section className="stats-grid hybrid-role-metrics">
-        {/secretary|office administrator/.test(role)?<>
-          <StatCard title="Active students" value={summary.active_students} icon={<GraduationCap/>} note="Current student records"/>
-          <StatCard title="New admissions" value={summary.new_admissions_this_year} icon={<UserPlus/>} note={`Academic year ${summary.academic_year}`}/>
-          <StatCard title="Active staff" value={summary.active_staff} icon={<Users/>} note="Teaching and non-teaching"/>
-        </>:/attendance/.test(role)?<>
-          <StatCard title="Students present" value={summary.students_present_today} icon={<CalendarCheck/>} note="Marked present today"/>
-          <StatCard title="Active students" value={summary.active_students} icon={<GraduationCap/>} note="Current student records"/>
-          <StatCard title="Active staff" value={summary.active_staff} icon={<Users/>} note="Teaching and non-teaching"/>
-        </>:/academic|director of studies|\bdos\b|deputy|headteacher|examination/.test(role)?<>
-          <StatCard title="Total classes" value={summary.total_classes} icon={<BookOpen/>} note="Classes and streams"/>
-          <StatCard title="Students present" value={summary.students_present_today} icon={<CalendarCheck/>} note="Marked present today"/>
-          <StatCard title="Active staff" value={summary.active_staff} icon={<Users/>} note="Teaching and non-teaching"/>
-        </>:<>
-          <StatCard title="Active staff" value={summary.active_staff} icon={<Users/>} note="Teaching and non-teaching"/>
-          <StatCard title="Total classes" value={summary.total_classes} icon={<BookOpen/>} note="Classes and streams"/>
-          <StatCard title="Students present" value={summary.students_present_today} icon={<CalendarCheck/>} note="Marked present today"/>
-        </>}
-      </section>}
-      <section className="hybrid-dashboard-summary">
-        <div className="hybrid-summary-card"><span className="hybrid-summary-icon"><Clock size={19}/></span><div><small>TODAY'S RESPONSIBILITIES</small><strong>{workCount}</strong><span>Assigned items</span></div></div>
-        <div className="hybrid-summary-card"><span className="hybrid-summary-icon"><Building2 size={19}/></span><div><small>YOUR ROLE</small><strong className="hybrid-role-value">{data.role_label||'Staff'}</strong><span>School staff workspace</span></div></div>
-        <div className="hybrid-summary-card"><span className="hybrid-summary-icon"><FolderOpen size={19}/></span><div><small>AUTHORISED AREAS</small><strong>{sections.length}</strong><span>Available workspaces</span></div></div>
-      </section>
-      <section className="hybrid-dashboard-grid">
-        <div className="panel hybrid-main-panel">
-          <div className="panel-heading"><div><h3>My work today</h3><p>Your assigned duties and scheduled activities.</p></div></div>
-          {data.today_duty&&<div className="quick-action"><span className="quick-icon purple"><ShieldCheck/></span><span><strong>Today's assigned duty</strong><small>{data.today_duty.notes}</small></span></div>}
-          {sections.includes('Timetable')&&data.today_lessons.length>0&&<><h4>Today's timetable</h4><div className="table-wrap"><table><thead><tr><th>Time</th><th>Class</th><th>Subject</th></tr></thead><tbody>{data.today_lessons.map((lesson,index)=><tr key={index}><td>{lesson.start_time}–{lesson.end_time}</td><td>{lesson.class_name}</td><td>{lesson.subject}</td></tr>)}</tbody></table></div></>}
-          {workCount===0&&<div className="empty-state"><CalendarCheck size={29}/><p>{profile.empty}</p><small>Your authorised workspaces are shown alongside.</small></div>}
-          {data.class_teacher_classes.length>0&&<><h4>Class responsibilities</h4><div className="class-grid">{data.class_teacher_classes.map(item=><div className="class-card" key={item.class_id}><Users size={20}/><strong>{item.class_name}</strong><span>Class attendance responsibility</span></div>)}</div></>}
-        </div>
-        <div className="panel hybrid-workspaces-panel">
-          <div className="panel-heading"><div><h3>Your workspaces</h3><p>Choose an area to continue working.</p></div><span className="count-pill">{sections.length} available</span></div>
-          {orderedSections.length>0?<div className="hybrid-workspace-list">{orderedSections.map(section=><button type="button" className="hybrid-workspace-link" key={section} onClick={()=>onNavigate(section==='Staff Attendance'?'Attendance':section)}><span className="hybrid-workspace-icon">{iconFor(section)}</span><span><strong>{section}</strong><small>{detailFor(section)}</small></span><ArrowUpRight size={17}/></button>)}</div>:<div className="empty-state"><Briefcase size={28}/><p>No school work areas have been assigned to this account.</p><small>Contact the administrator if you need access to a school workspace.</small></div>}
-        </div>
-      </section>
-    </>}
+    {summaryAvailable&&<section className="command-metrics">
+      {isHeadteacher?<><StatCard title="Active learners" value={summary.active_students} icon={<GraduationCap/>} note="Current enrolment"/><StatCard title="School classes" value={summary.total_classes} icon={<BookOpen/>} note="Classes and streams"/><StatCard title="Present today" value={summary.students_present_today} icon={<CalendarCheck/>} note="Learners marked present"/><StatCard title="Active staff" value={summary.active_staff} icon={<Users/>} note="Teaching and non-teaching"/></>:isSecretary?<><StatCard title="Active learners" value={summary.active_students} icon={<GraduationCap/>} note="Current student records"/><StatCard title="New admissions" value={summary.new_admissions_this_year} icon={<UserPlus/>} note={`Academic year ${summary.academic_year}`}/><StatCard title="Active staff" value={summary.active_staff} icon={<Users/>} note="School staff records"/></>:isAttendance?<><StatCard title="Present today" value={summary.students_present_today} icon={<CalendarCheck/>} note="Learners marked present"/><StatCard title="Active learners" value={summary.active_students} icon={<GraduationCap/>} note="Current enrolment"/><StatCard title="Active staff" value={summary.active_staff} icon={<Users/>} note="Staff in the school directory"/></>:<><StatCard title="Active learners" value={summary.active_students} icon={<GraduationCap/>} note="Current enrolment"/><StatCard title="School classes" value={summary.total_classes} icon={<BookOpen/>} note="Classes and streams"/><StatCard title="Active staff" value={summary.active_staff} icon={<Users/>} note="School staff"/></>}</section>}
+    {isHeadteacher&&can('Fees & Finance')&&<section className="command-finance-strip"><div><small>FEES COLLECTED</small><strong>UGX {Number(financeSummary.fees_collected||0).toLocaleString('en-UG')}</strong></div><div><small>OUTSTANDING FEES</small><strong>UGX {Number(financeSummary.outstanding||0).toLocaleString('en-UG')}</strong></div><div><small>EXPECTED FEES</small><strong>UGX {Number(financeSummary.fees_expected||0).toLocaleString('en-UG')}</strong></div><button type="button" className="secondary-button" onClick={()=>open('Fees & Finance')}>Open finance oversight <ArrowUpRight size={15}/></button></section>}
+    <section className="command-content">
+      <div className="command-main-panel">
+        <div className="panel-heading"><div><h3>{isHeadteacher?'School-wide priorities':isSecretary?'Administration desk':isAttendance?'Daily attendance control':'Your school work areas'}</h3><p>{isHeadteacher?'Management areas available under your current permissions.':isSecretary?'Choose an authorised records or communication function.':isAttendance?'Open the relevant register to review and update attendance.':'Open an authorised area to continue.'}</p></div><span className="count-pill">{orderedActions.length} authorised areas</span></div>
+        {orderedActions.length>0?<div className="command-action-grid">{orderedActions.map(item=><button type="button" className="command-action-card" key={item.section} onClick={()=>open(item.section)}><span className={`command-action-icon ${item.tone}`}>{item.icon}</span><span><strong>{item.title}</strong><small>{item.description}</small></span><ArrowUpRight size={17}/></button>)}</div>:<div className="empty-state"><Briefcase size={28}/><p>No work areas have been assigned to this account.</p><small>Contact the school administrator if access is required.</small></div>}
+      </div>
+      <aside className="command-side-panel">
+        <div className="panel-heading"><div><h3>{isHeadteacher?'Leadership brief':isSecretary?'Office workflow':isAttendance?'Attendance workflow':'Account information'}</h3><p>{isHeadteacher?'Your executive-level school snapshot.':isSecretary?'Core administrative responsibilities.':isAttendance?'Your daily attendance responsibilities.':'Your account access.'}</p></div></div>
+        {isHeadteacher?<><div className="command-brief-item"><strong>School leadership</strong><span>Review enrolment, staffing and academic activity from one management view.</span></div><div className="command-brief-item"><strong>Operational control</strong><span>Use only the work areas enabled by your administrator.</span></div><div className="command-brief-item"><strong>Financial visibility</strong><span>{can('Fees & Finance')?'Financial summary is available above.':'Finance information is not assigned to this account.'}</span></div></>:isSecretary?<><div className="command-brief-item"><strong>Student records</strong><span>Maintain authorised learner information and admission records.</span></div><div className="command-brief-item"><strong>Parent communication</strong><span>Use Parent Access and Announcements when those permissions are enabled.</span></div><div className="command-brief-item"><strong>Staff administration</strong><span>Keep staff directory information organised within your assigned access.</span></div></>:isAttendance?<><div className="command-brief-item"><strong>Learner register</strong><span>Open Attendance to review the daily student register.</span></div><div className="command-brief-item"><strong>Staff presence</strong><span>{can('Staff Attendance')?'Staff attendance records are available to your account.':'Staff attendance access has not been assigned.'}</span></div><div className="command-brief-item"><strong>Follow-up</strong><span>Use authorised student and report areas for attendance follow-up.</span></div></>:<div className="command-brief-item"><strong>Access control</strong><span>Your dashboard shortcuts follow your assigned permissions.</span></div>}
+      </aside>
+    </section>
   </div>
 }
 
@@ -947,7 +884,7 @@ function App() {
             </>
           )}
 
-                    {active === 'Overview' && user.role !== 'admin' && (isFinanceAccount(user) ? <FinanceAccountDashboard token={token} username={user.username} onNavigate={(section,tab)=>{if(tab)setFinanceTabRequest(tab);setActive(section)}}/> : user.role === 'staff' && /director of studies|\\bdos\\b/i.test(user.role_label||'') ? <DirectorOfStudiesDashboard token={token} onNavigate={setActive} summary={dashboardSummary} summaryAvailable={(user.permissions?.['Overview']||[]).includes('view')} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)}/> : user.role === 'staff' ? <RoleSpecificDashboard token={token} username={user.username} onNavigate={setActive} summary={dashboardSummary} summaryAvailable={(user.permissions?.['Overview']||[]).includes('view')}/> : <PersonalDashboard token={token} username={user.username} onNavigate={setActive}/>)}
+                    {active === 'Overview' && user.role !== 'admin' && (isFinanceAccount(user) ? <FinanceAccountDashboard token={token} username={user.username} onNavigate={(section,tab)=>{if(tab)setFinanceTabRequest(tab);setActive(section)}}/> : user.role === 'staff' && /director of studies|\\bdos\\b/i.test(user.role_label||'') ? <DirectorOfStudiesDashboard token={token} onNavigate={setActive} summary={dashboardSummary} summaryAvailable={(user.permissions?.['Overview']||[]).includes('view')} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)}/> : user.role === 'staff' && /^(head ?teacher|principal|school head)$/i.test((user.role_label||'').trim()) ? <RoleSpecificDashboard username={user.username} roleLabel={user.role_label||'Headteacher'} onNavigate={setActive} summary={dashboardSummary} summaryAvailable={(user.permissions?.['Overview']||[]).includes('view')} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)} financeSummary={financeDashboard}/> : user.role === 'staff' && /secretary|office administrator|attendance/i.test(user.role_label||'') ? <RoleSpecificDashboard username={user.username} roleLabel={user.role_label||'Staff'} onNavigate={setActive} summary={dashboardSummary} summaryAvailable={(user.permissions?.['Overview']||[]).includes('view')} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)} financeSummary={financeDashboard}/> : user.role === 'staff' && /teacher/i.test(user.role_label||'') ? <PersonalDashboard token={token} username={user.username} onNavigate={setActive}/> : user.role === 'staff' ? <RoleSpecificDashboard username={user.username} roleLabel={user.role_label||'Staff'} onNavigate={setActive} summary={dashboardSummary} summaryAvailable={(user.permissions?.['Overview']||[]).includes('view')} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)} financeSummary={financeDashboard}/> : <PersonalDashboard token={token} username={user.username} onNavigate={setActive}/>) }
 
           {active === 'Students' && (
             <section className="panel">
