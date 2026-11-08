@@ -1901,3 +1901,24 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 @media(max-width:1050px){.attendance-overview-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.attendance-rate-card{grid-column:1/-1}.secretary-office-layout,.attendance-control-lower{grid-template-columns:1fr}}
 @media(max-width:760px){.secretary-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.secretary-office-hero,.attendance-control-hero{align-items:flex-start;flex-direction:column}.secretary-office-actions{grid-template-columns:1fr}.attendance-overview-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.attendance-rate-card{grid-column:1/-1}}
 @media(max-width:460px){.secretary-stat-grid{gap:8px}.secretary-stat-grid>div{padding:12px}.attendance-overview-grid{grid-template-columns:1fr}.attendance-rate-card{grid-column:auto}.attendance-rate-legend{flex-direction:column}}
+
+
+/* Director of Studies: academic staffing and programme coordination */
+.dos-responsibility-strip{background:linear-gradient(120deg,#102f4f 0%,#164e63 58%,#0f766e 100%);color:#fff;border-radius:20px;padding:22px 24px;margin:18px 0;overflow:hidden;position:relative}
+.dos-responsibility-heading{display:flex;align-items:center;justify-content:space-between;gap:20px}
+.dos-responsibility-heading .eyebrow{color:#a5f3fc!important;margin:0 0 7px;font-size:10px;font-weight:800;letter-spacing:.13em}
+.dos-responsibility-heading h3{color:#fff;margin:0;font-size:20px}
+.dos-responsibility-heading p:not(.eyebrow){color:#dbeafe;margin:7px 0 0;max-width:650px;font-size:13px}
+.dos-academic-illustration{display:flex;align-items:center;gap:9px;transform:rotate(-5deg);padding:8px 10px;border:1px solid #ffffff35;border-radius:16px;background:#ffffff12}
+.dos-academic-illustration span{width:46px;height:46px;border-radius:13px;background:#ffffff20;display:grid;place-items:center;color:#cffafe}
+.dos-responsibility-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:20px}
+.dos-responsibility-card{display:flex;align-items:center;gap:12px;text-align:left;padding:14px;border:1px solid #ffffff35;border-radius:14px;background:#ffffff12;color:#fff;cursor:pointer;min-width:0;transition:background .18s,transform .18s}
+.dos-responsibility-card:hover{background:#ffffff22;transform:translateY(-2px)}
+.dos-responsibility-card>span:nth-child(2){display:grid;gap:5px;flex:1;min-width:0}
+.dos-responsibility-card strong{font-size:13px;color:#fff}
+.dos-responsibility-card small{font-size:11px;line-height:1.45;color:#dbeafe}
+.dos-responsibility-icon{width:42px;height:42px;flex:0 0 42px;border-radius:12px;display:grid;place-items:center}
+.dos-responsibility-icon.staff{background:#dbeafe;color:#1d4ed8}
+.dos-responsibility-icon.assignment{background:#ede9fe;color:#6d28d9}
+.dos-responsibility-icon.timetable{background:#ccfbf1;color:#0f766e}
+@media(max-width:760px){.dos-responsibility-heading{align-items:flex-start}.dos-academic-illustration{display:none}.dos-responsibility-actions{grid-template-columns:1fr}}

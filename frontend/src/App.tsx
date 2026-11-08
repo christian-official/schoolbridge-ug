@@ -421,14 +421,22 @@ function DirectorOfStudiesDashboard({token,onNavigate,summary,summaryAvailable,a
     {section:'Examinations',eyebrow:'ASSESSMENT GOVERNANCE',title:'Examination & results control',description:'Track examination cycles, review submitted results and verify or return academic records.',action:'Open examination control',icon:<FileText size={20}/>,tone:'violet'},
     {section:'Attendance',eyebrow:'SCHOOL-WIDE MONITORING',title:'Attendance oversight',description:'Review learner attendance records, identify gaps and follow up attendance performance.',action:'Open attendance reports',icon:<CalendarCheck size={20}/>,tone:'green'},
     {section:'Students',eyebrow:'ENROLMENT & CLASS RECORDS',title:'Learner population',description:'Review enrolment, student records and class organisation across the school.',action:'Review student records',icon:<GraduationCap size={20}/>,tone:'amber'},
-    {section:'Staff',eyebrow:'ACADEMIC PERSONNEL',title:'Teaching workforce',description:'Review staff records and the teaching personnel information available to your account.',action:'Review staff records',icon:<Users size={20}/>,tone:'slate'},
-    {section:'Timetable',eyebrow:'SCHOOL PROGRAMME',title:'Academic programme',description:'Inspect the school timetable and review how teaching periods are organised.',action:'Review school timetable',icon:<CalendarDays size={20}/>,tone:'blue'},
+    {section:'Staff',eyebrow:'ACADEMIC PERSONNEL',title:'Teaching workforce',description:'Register teaching staff and coordinate teacher class and subject assignments.',action:'Manage teaching staff',icon:<Users size={20}/>,tone:'slate'},
+    {section:'Timetable',eyebrow:'SCHOOL PROGRAMME',title:'Academic programme',description:'Form the school timetable and organise teaching periods, classes and subject allocations.',action:'Form school timetable',icon:<CalendarDays size={20}/>,tone:'blue'},
     {section:'Leadership & Duty',eyebrow:'SCHOOL GOVERNANCE',title:'Leadership & duty records',description:'Review school leadership structures and duty arrangements where authorised.',action:'Open leadership records',icon:<ShieldCheck size={20}/>,tone:'rose'},
   ].filter(item=>can(item.section))
   return <div className="dos-dashboard">
     <section className="dos-hero">
       <div className="dos-hero-copy"><p className="eyebrow">SCHOOL MANAGEMENT · ACADEMIC ADMINISTRATION</p><h2>Director of Studies control centre</h2><p>School-wide academic oversight: examination governance, learner attendance, enrolment and teaching programme monitoring.</p></div>
       <div className="dos-hero-actions"><span className="dos-live-indicator"><span/> Academic oversight</span><button type="button" className="secondary-button" onClick={()=>setRefreshCount(v=>v+1)} disabled={loading}><RefreshCw size={15}/>{loading?'Refreshing...':'Refresh overview'}</button></div>
+    </section>
+    <section className="dos-responsibility-strip">
+      <div className="dos-responsibility-heading"><div><p className="eyebrow">CORE DOS RESPONSIBILITIES</p><h3>Academic staffing & programme coordination</h3><p>Manage the teaching programme from staff registration through class allocation and timetable formation.</p></div><div className="dos-academic-illustration" aria-hidden="true"><span><Users size={24}/></span><span><CalendarDays size={25}/></span><span><BookOpen size={22}/></span></div></div>
+      <div className="dos-responsibility-actions">
+        {can('Staff')&&<button type="button" className="dos-responsibility-card" onClick={()=>onNavigate('Staff')}><span className="dos-responsibility-icon staff"><UserPlus size={21}/></span><span><strong>Register & manage teachers</strong><small>Maintain teaching staff records and registered teaching subjects.</small></span><ArrowUpRight size={17}/></button>}
+        {can('Staff')&&<button type="button" className="dos-responsibility-card" onClick={()=>onNavigate('Staff')}><span className="dos-responsibility-icon assignment"><Users size={21}/></span><span><strong>Assign teachers to classes</strong><small>Coordinate teacher class and subject assignments using registered subjects.</small></span><ArrowUpRight size={17}/></button>}
+        {can('Timetable')&&<button type="button" className="dos-responsibility-card" onClick={()=>onNavigate('Timetable')}><span className="dos-responsibility-icon timetable"><CalendarDays size={21}/></span><span><strong>Form the school timetable</strong><small>Build and organise the school teaching timetable and periods.</small></span><ArrowUpRight size={17}/></button>}
+      </div>
     </section>
     {summaryAvailable&&<section className="dos-metric-strip">
       <div className="dos-metric"><span className="dos-metric-icon"><BookOpen size={20}/></span><div><small>SCHOOL CLASSES</small><strong>{summary.total_classes}</strong><span>Across the school</span></div></div>
