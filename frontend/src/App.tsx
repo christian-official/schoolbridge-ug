@@ -105,7 +105,8 @@ function getStaffNavigation(user:User) {
   )
   const role = (user.role_label || '').toLowerCase()
   const priority = /teacher/.test(role) && !/head ?teacher|deputy/.test(role)
-    ? ['Overview','My Classes','My Results','Timetable','Attendance','My Attendance','Announcements','My Profile']\n    : /secretary|office administrator/.test(role)
+    ? ['Overview','My Classes','My Results','Timetable','Attendance','My Attendance','Announcements','My Profile']
+    : /secretary|office administrator/.test(role)
     ? ['Overview','Students','Staff','Parent Access','Announcements','Reports','My Attendance','My Profile']
     : /attendance/.test(role)
       ? ['Overview','Attendance','My Attendance','Staff','Reports','Announcements','My Profile']
