@@ -363,6 +363,14 @@ function AdministratorDashboard({token,username: _username,onNavigate,summary,fi
       <div><span className="admin-live-label"><i/> SCHOOL-WIDE MANAGEMENT</span><h2>Welcome, Administrator!</h2><p>Manage your school efficiently. Live enrolment, attendance, academic and financial indicators.</p></div>
       <div className="admin-hero-actions"><span className="admin-role-pill"><ShieldCheck size={15}/> School Administrator</span><button type="button" className="secondary-button" onClick={()=>setRefreshCount(v=>v+1)} disabled={loading}><RefreshCw size={15}/>{loading?'Updating':'Refresh dashboard'}</button></div>
     </section>
+    <section className="dos-responsibility-strip admin-teaching-shortcuts">
+      <div className="dos-responsibility-heading"><div><p className="eyebrow">TEACHING & TIMETABLE MANAGEMENT</p><h3>Academic staffing and timetable shortcuts</h3><p>Quickly register teaching staff, coordinate their class assignments and organise the school timetable.</p></div><div className="dos-academic-illustration" aria-hidden="true"><span><Users size={24}/></span><span><CalendarDays size={25}/></span><span><BookOpen size={22}/></span></div></div>
+      <div className="dos-responsibility-actions">
+        {can('Staff')&&<button type="button" className="dos-responsibility-card" onClick={()=>onNavigate('Staff')}><span className="dos-responsibility-icon staff"><UserPlus size={21}/></span><span><strong>Register & manage teachers</strong><small>Maintain teaching staff records and registered teaching subjects.</small></span><ArrowUpRight size={17}/></button>}
+        {can('Staff')&&<button type="button" className="dos-responsibility-card" onClick={()=>onNavigate('Staff')}><span className="dos-responsibility-icon assignment"><Users size={21}/></span><span><strong>Assign teachers to classes</strong><small>Coordinate teacher class and subject assignments using registered subjects.</small></span><ArrowUpRight size={17}/></button>}
+        {can('Timetable')&&<button type="button" className="dos-responsibility-card" onClick={()=>onNavigate('Timetable')}><span className="dos-responsibility-icon timetable"><CalendarDays size={21}/></span><span><strong>Form the school timetable</strong><small>Build and organise the school teaching timetable and periods.</small></span><ArrowUpRight size={17}/></button>}
+      </div>
+    </section>
     <section className="admin-kpi-grid">
       <div className="admin-kpi-card"><span className="admin-kpi-icon blue"><GraduationCap/></span><div><small>TOTAL LEARNERS</small><strong>{summary.active_students.toLocaleString('en-UG')}</strong><span>Currently enrolled</span></div></div>
       <div className="admin-kpi-card"><span className="admin-kpi-icon violet"><Users/></span><div><small>ACTIVE STAFF</small><strong>{summary.active_staff.toLocaleString('en-UG')}</strong><span>Teaching & non-teaching</span></div></div>
