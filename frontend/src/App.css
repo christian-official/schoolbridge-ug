@@ -1393,3 +1393,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   z-index: 2;
 }
 .subject-verification-action { margin: 8px 0 12px; }
+
+.teacher-class-attendance select {
+  pointer-events: auto !important;
+  position: relative;
+  z-index: 2;
+  cursor: pointer;
+}
+.teacher-class-attendance .table-wrap {
+  position: relative;
+  z-index: 1;
+}
