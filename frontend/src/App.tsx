@@ -4,6 +4,7 @@ import {
   FileText, Settings, LogOut,
   Search, Plus, Menu, X, ArrowUpRight, UserPlus,
   CalendarDays, TrendingUp, ShieldCheck, LoaderCircle, RefreshCw,
+  ClipboardList, Contact, Megaphone, Briefcase, Clock, FolderOpen, CalendarCheck, Building2,
 } from 'lucide-react'
 import StaffFinance from './StaffFinance'
 import AcademicManagement from './AcademicManagement'
@@ -91,6 +92,30 @@ function isFinanceAccount(user:User) {
   const financeOnlyAccess = (permissions['Fees & Finance'] || []).includes('view') &&
     !['My Classes','My Results','My Attendance','Attendance','Examinations','Timetable','Leadership & Duty'].some(section => (permissions[section] || []).includes('view'))
   return financeRole || financeOnlyAccess
+}
+
+function getStaffNavigation(user:User) {
+  const allItems = [...menu, ...teacherMenu.filter(item => !menu.some(base => base.label === item.label))]
+  const visible = allItems.filter(item =>
+    item.label === 'My Profile' ||
+    item.label === 'My Attendance' ||
+    (user.permissions?.[item.label] || []).includes('view') ||
+    (item.label === 'Attendance' && (user.permissions?.['Staff Attendance'] || []).includes('view'))
+  )
+  const role = (user.role_label || '').toLowerCase()
+  const priority = /secretary|office administrator/.test(role)
+    ? ['Overview','Students','Staff','Parent Access','Announcements','Reports','My Attendance','My Profile']
+    : /attendance/.test(role)
+      ? ['Overview','Attendance','My Attendance','Staff','Reports','Announcements','My Profile']
+      : /bursar|accountant|finance|accounts/.test(role)
+        ? ['Overview','Fees & Finance','My Attendance','My Profile']
+        : /academic|director of studies|\\bdos\\b|deputy|headteacher|examination/.test(role)
+          ? ['Overview','Examinations','Timetable','Attendance','Students','Reports','Announcements','My Attendance','My Profile']
+          : ['Overview','Staff','Attendance','Timetable','Leadership & Duty','Announcements','Reports','My Attendance','My Profile']
+  return visible.sort((a,b) => {
+    const ai=priority.indexOf(a.label), bi=priority.indexOf(b.label)
+    return (ai<0?999:ai)-(bi<0?999:bi)
+  })
 }
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
@@ -230,6 +255,96 @@ function PersonalDashboard({token,username,onNavigate}:{token:string;username:st
         {!data.available_sections.length&&<p className="form-hint">No school work areas have been assigned. Contact the administrator.</p>}
       </>}
     </section>
+  </div>
+}
+
+function RoleSpecificDashboard({token,username,onNavigate}:{token:string;username:string;onNavigate:(section:string)=>void}) {
+  const [data,setData]=useState<PersonalDashboardData|null>(null)
+  const [error,setError]=useState('')
+  const [loading,setLoading]=useState(true)
+  const [refreshCount,setRefreshCount]=useState(0)
+  useEffect(()=>{
+    let cancelled=false
+    setLoading(true);setError('')
+    api<PersonalDashboardData>('dashboard/my-work',token).then(result=>{if(!cancelled)setData(result)})
+      .catch(e=>{if(!cancelled)setError(e instanceof Error?e.message:'Unable to load your assigned work.')})
+      .finally(()=>{if(!cancelled)setLoading(false)})
+    return ()=>{cancelled=true}
+  },[token,refreshCount])
+  const role=(data?.role_label||'').toLowerCase()
+  const profile=/secretary|office administrator/.test(role)
+    ? {eyebrow:'ADMINISTRATION WORKSPACE',title:'Office & records overview',description:'Keep school records, communication and authorised administration work organised.',priority:['Students','Staff','Parent Access','Announcements','Reports'],empty:'No office tasks are assigned for today.'}
+    : /attendance/.test(role)
+      ? {eyebrow:'ATTENDANCE WORKSPACE',title:'Attendance operations',description:'Review the attendance areas assigned to your account and keep daily records up to date.',priority:['Attendance','Staff Attendance','Reports','Students','Announcements'],empty:'No attendance activity is scheduled for today.'}
+      : /academic|director of studies|\\bdos\\b|deputy|headteacher|examination/.test(role)
+        ? {eyebrow:'ACADEMIC OPERATIONS',title:'Academic oversight',description:'Access the academic review and coordination work authorised for your role.',priority:['Examinations','Timetable','Attendance','Students','Reports','Announcements'],empty:'No lessons or duty assignments are scheduled for today.'}
+        : /ict|information technology|computer/.test(role)
+          ? {eyebrow:'SYSTEMS WORKSPACE',title:'ICT & systems overview',description:'Open the school work areas assigned to your account and coordinate your daily responsibilities.',priority:['Staff','Announcements','Reports','Timetable','My Attendance'],empty:'No duty has been assigned to you for today.'}
+          : /librar/.test(role)
+            ? {eyebrow:'LIBRARY WORKSPACE',title:'Library operations',description:'Your authorised school work areas and daily responsibilities are gathered here.',priority:['Students','Staff','Announcements','Reports','My Attendance'],empty:'No library duty has been assigned for today.'}
+            : /store|procurement|purchas/.test(role)
+              ? {eyebrow:'SUPPLIES WORKSPACE',title:'Stores & procurement overview',description:'Access the operational areas assigned to your account and keep track of daily responsibilities.',priority:['Staff','Fees & Finance','Reports','Announcements','My Attendance'],empty:'No stores or procurement duty has been assigned for today.'}
+              : {eyebrow:'SCHOOL OPERATIONS',title:'Your operations overview',description:'A role-focused workspace showing only the school areas and duties assigned to your account.',priority:['Staff','Attendance','Staff Attendance','Timetable','Leadership & Duty','Announcements','Reports','Students'],empty:'No duty has been assigned to you for today.'}
+  const sections=(data?.available_sections||[]).filter(section=>section!=='Overview')
+  const orderedSections=[...sections].sort((a,b)=>{
+    const ai=profile.priority.indexOf(a),bi=profile.priority.indexOf(b)
+    return (ai<0?999:ai)-(bi<0?999:bi)
+  })
+  const workCount=(data?.today_duty?1:0)+((sections.includes('Timetable')||sections.includes('Examinations'))?(data?.today_lessons.length||0):0)
+  const iconFor=(section:string)=>{
+    if(/student/i.test(section))return <GraduationCap/>
+    if(/staff|attendance/i.test(section))return <Users/>
+    if(/finance/i.test(section))return <TrendingUp/>
+    if(/exam|report/i.test(section))return <FileText/>
+    if(/timetable/i.test(section))return <CalendarDays/>
+    if(/leadership|duty/i.test(section))return <ShieldCheck/>
+    if(/announcement/i.test(section))return <Megaphone/>
+    if(/parent/i.test(section))return <Contact/>
+    return <FolderOpen/>
+  }
+  const detailFor=(section:string)=>{
+    const descriptions:Record<string,string>={
+      Students:'Open student records and the student services your account can access.',
+      Staff:'View and manage staff records according to your assigned permissions.',
+      'Parent Access':'Manage parent accounts and authorised student links.',
+      Announcements:'Read and manage school announcements.',
+      Reports:'Open the reports available to your account.',
+      Attendance:'Open the attendance registers assigned to your role.',
+      'Staff Attendance':'Review staff attendance where authorised.',
+      Timetable:'View the timetable and related coordination tools.',
+      Examinations:'Review submitted results and authorised examination records.',
+      'Leadership & Duty':'Open assigned leadership and duty coordination tools.',
+      'Fees & Finance':'Open the finance workspace allowed for your account.',
+    }
+    return descriptions[section]||'Open this authorised school workspace.'
+  }
+  return <div className="role-dashboard hybrid-role-dashboard">
+    <section className="dashboard-role-heading hybrid-role-heading">
+      <div><p className="eyebrow">{profile.eyebrow}</p><h2>{profile.title}</h2><p>{data?.staff_name||username} · {data?.role_label||'Staff account'} · {profile.description}</p></div>
+      <div className="dashboard-heading-actions"><span className="count-pill">{workCount} assigned items today</span><button type="button" className="secondary-button" onClick={()=>setRefreshCount(value=>value+1)} disabled={loading}>{loading?'Refreshing...':'Refresh data'}</button></div>
+    </section>
+    {loading&&<p className="form-hint">Loading your assigned work...</p>}
+    {error&&<div className="form-error" role="alert">{error}</div>}
+    {data&&!loading&&<>
+      <section className="hybrid-dashboard-summary">
+        <div className="hybrid-summary-card"><span className="hybrid-summary-icon"><Clock size={19}/></span><div><small>TODAY'S RESPONSIBILITIES</small><strong>{workCount}</strong><span>Assigned items</span></div></div>
+        <div className="hybrid-summary-card"><span className="hybrid-summary-icon"><Building2 size={19}/></span><div><small>YOUR ROLE</small><strong className="hybrid-role-value">{data.role_label||'Staff'}</strong><span>School staff workspace</span></div></div>
+        <div className="hybrid-summary-card"><span className="hybrid-summary-icon"><FolderOpen size={19}/></span><div><small>AUTHORISED AREAS</small><strong>{sections.length}</strong><span>Available workspaces</span></div></div>
+      </section>
+      <section className="hybrid-dashboard-grid">
+        <div className="panel hybrid-main-panel">
+          <div className="panel-heading"><div><h3>My work today</h3><p>Your assigned duties and scheduled activities.</p></div></div>
+          {data.today_duty&&<div className="quick-action"><span className="quick-icon purple"><ShieldCheck/></span><span><strong>Today's assigned duty</strong><small>{data.today_duty.notes}</small></span></div>}
+          {sections.includes('Timetable')&&data.today_lessons.length>0&&<><h4>Today's timetable</h4><div className="table-wrap"><table><thead><tr><th>Time</th><th>Class</th><th>Subject</th></tr></thead><tbody>{data.today_lessons.map((lesson,index)=><tr key={index}><td>{lesson.start_time}–{lesson.end_time}</td><td>{lesson.class_name}</td><td>{lesson.subject}</td></tr>)}</tbody></table></div></>}
+          {workCount===0&&<div className="empty-state"><CalendarCheck size={29}/><p>{profile.empty}</p><small>Your authorised workspaces are shown alongside.</small></div>}
+          {data.class_teacher_classes.length>0&&<><h4>Class responsibilities</h4><div className="class-grid">{data.class_teacher_classes.map(item=><div className="class-card" key={item.class_id}><Users size={20}/><strong>{item.class_name}</strong><span>Class attendance responsibility</span></div>)}</div></>}
+        </div>
+        <div className="panel hybrid-workspaces-panel">
+          <div className="panel-heading"><div><h3>Your workspaces</h3><p>Choose an area to continue working.</p></div><span className="count-pill">{sections.length} available</span></div>
+          {orderedSections.length>0?<div className="hybrid-workspace-list">{orderedSections.map(section=><button type="button" className="hybrid-workspace-link" key={section} onClick={()=>onNavigate(section)}><span className="hybrid-workspace-icon">{iconFor(section)}</span><span><strong>{section}</strong><small>{detailFor(section)}</small></span><ArrowUpRight size={17}/></button>)}</div>:<div className="empty-state"><Briefcase size={28}/><p>No school work areas have been assigned to this account.</p><small>Contact the administrator if you need access to a school workspace.</small></div>}
+        </div>
+      </section>
+    </>}
   </div>
 }
 
@@ -567,7 +682,7 @@ function App() {
       else if(profile.role==='parent') setActive('My Children')
       else if(profile.role==='admin') await loadSchoolData(authToken,profile)
       else {
-        const allowedItems = [...menu, ...teacherMenu.filter(item => !menu.some(base => base.label === item.label))].filter(item => item.label === 'My Attendance' || (profile.permissions?.[item.label] || []).includes('view'))
+        const allowedItems = getStaffNavigation(profile)
         setActive(allowedItems[0]?.label || 'Overview')
         await loadSchoolData(authToken,profile)
       }
@@ -663,7 +778,7 @@ function App() {
         </div>
         <div className="school-label">SCHOOL MANAGEMENT</div>
         <nav>
-          {(user.role === 'parent' ? parentMenu : user.role === 'admin' ? menu : [...menu, ...teacherMenu.filter(item => !menu.some(base => base.label === item.label))].filter(item => isFinanceAccount(user) ? ['Overview','Fees & Finance','My Attendance','My Profile'].includes(item.label) : item.label === 'My Profile' || item.label === 'My Attendance' || (user.permissions?.[item.label] || []).includes('view') || (item.label === 'Attendance' && (user.permissions?.['Staff Attendance'] || []).includes('view')))).map(item => {
+          {(user.role === 'parent' ? parentMenu : user.role === 'admin' ? menu : isFinanceAccount(user) ? getStaffNavigation(user).filter(item => ['Overview','Fees & Finance','My Attendance','My Profile'].includes(item.label)) : getStaffNavigation(user)).map(item => {
             const Icon = item.icon
             return (
               <button key={item.label} className={`nav-item ${active === item.label ? 'active' : ''}`} onClick={() => { setActive(item.label); setMobileMenu(false) }}>
@@ -748,7 +863,7 @@ function App() {
             </>
           )}
 
-                    {active === 'Overview' && user.role !== 'admin' && (isFinanceAccount(user) ? <FinanceAccountDashboard token={token} username={user.username} onNavigate={(section,tab)=>{if(tab)setFinanceTabRequest(tab);setActive(section)}}/> : <PersonalDashboard token={token} username={user.username} onNavigate={setActive}/>)}
+                    {active === 'Overview' && user.role !== 'admin' && (isFinanceAccount(user) ? <FinanceAccountDashboard token={token} username={user.username} onNavigate={(section,tab)=>{if(tab)setFinanceTabRequest(tab);setActive(section)}}/> : user.role === 'staff' ? <RoleSpecificDashboard token={token} username={user.username} onNavigate={setActive}/> : <PersonalDashboard token={token} username={user.username} onNavigate={setActive}/>)}
 
           {active === 'Students' && (
             <section className="panel">
