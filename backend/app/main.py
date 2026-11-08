@@ -106,6 +106,23 @@ def permission_for_path(path: str):
     return None
 
 
+def is_assigned_class_teacher(db: Session, teacher_id: int, class_id: int) -> bool:
+    return db.query(models.ClassTeacherAssignment.id).filter_by(
+        teacher_id=teacher_id, class_id=class_id
+    ).first() is not None
+
+
+def require_class_attendance_access(db: Session, user, class_id: int, action: str = "view"):
+    if user.role == "admin":
+        return
+    if user.role == "teacher":
+        if not is_assigned_class_teacher(db, user.id, class_id):
+            raise HTTPException(403, "Only the teacher assigned as this class teacher may manage its attendance.")
+        return
+    if action not in user_permissions(user).get("Attendance", set()):
+        raise HTTPException(403, "You do not have permission to access class attendance.")
+
+
 def action_for_method(method: str, path: str = ""):
     if path.endswith("/archive") and method == "POST":
         return "delete"
@@ -819,9 +836,7 @@ def record_attendance(data: AttendanceCreate, db: Session = Depends(get_db), use
     student = db.get(models.Student, data.student_id)
     if not student:
         raise HTTPException(404, "Student not found.")
-    if user.role != "admin":
-        if user.role != "teacher" or not db.query(models.TeacherAssignment).filter_by(teacher_id=user.id, class_id=student.class_id).first():
-            raise HTTPException(403, "You are not assigned to this student's class.")
+    require_class_attendance_access(db, user, student.class_id, "add")
     item = models.Attendance(**data.model_dump())
     db.add(item)
     try:
@@ -841,10 +856,9 @@ def list_attendance(
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    if user.role == "teacher" and (not class_id or not db.query(models.TeacherAssignment).filter_by(teacher_id=user.id, class_id=class_id).first()):
-        raise HTTPException(403, "You are not assigned to this class.")
-    if user.role not in {"admin", "teacher"}:
-        raise HTTPException(403, "Administrator or teacher permission required.")
+    if not class_id:
+        raise HTTPException(422, "Choose a class to view its attendance register.")
+    require_class_attendance_access(db, user, class_id, "view")
     query = db.query(models.Attendance).join(
         models.Student, models.Student.id == models.Attendance.student_id
     )
@@ -865,10 +879,9 @@ def attendance_summary(
     user=Depends(get_current_user),
 ):
     attendance_date = attendance_date or date.today()
-    if user.role == "teacher" and (not class_id or not db.query(models.TeacherAssignment).filter_by(teacher_id=user.id, class_id=class_id).first()):
-        raise HTTPException(403, "You are not assigned to this class.")
-    if user.role not in {"admin", "teacher"}:
-        raise HTTPException(403, "Administrator or teacher permission required.")
+    if not class_id:
+        raise HTTPException(422, "Choose a class to view its attendance summary.")
+    require_class_attendance_access(db, user, class_id, "view")
     students_query = db.query(models.Student).filter(models.Student.status == "active")
     if class_id:
         students_query = students_query.filter(models.Student.class_id == class_id)
@@ -1147,11 +1160,7 @@ def save_attendance_register(
     selected_class = db.get(models.SchoolClass, data.class_id)
     if not selected_class:
         raise HTTPException(404, "Class not found.")
-    if user.role != "admin":
-        if user.role != "teacher" or not db.query(models.TeacherAssignment).filter_by(
-            teacher_id=user.id, class_id=data.class_id
-        ).first():
-            raise HTTPException(403, "You are not assigned to this class.")
+    require_class_attendance_access(db, user, data.class_id, "add")
     student_ids = [entry.student_id for entry in data.records]
     if len(student_ids) != len(set(student_ids)):
         raise HTTPException(422, "A student can appear only once in a class register.")
@@ -1271,13 +1280,13 @@ def list_timetable(
 ):
     query = db.query(models.TimetableEntry)
     if user.role == "teacher":
-        assigned_class_ids = [
-            row.class_id for row in db.query(models.TeacherAssignment.class_id)
-            .filter_by(teacher_id=user.id).distinct().all()
-        ]
-        query = query.filter(models.TimetableEntry.class_id.in_(assigned_class_ids or [-1]))
-    elif user.role != "admin":
-        raise HTTPException(403, "Administrator or teacher permission required.")
+        staff_id = user.staff_id
+        if staff_id:
+            query = query.filter(models.TimetableEntry.staff_id == staff_id)
+        else:
+            query = query.filter(models.TimetableEntry.id == -1)
+    elif user.role != "admin" and "view" not in user_permissions(user).get("Timetable", set()):
+        raise HTTPException(403, "You do not have permission to view the timetable.")
     if class_id:
         query = query.filter(models.TimetableEntry.class_id == class_id)
     return query.order_by(
@@ -2795,11 +2804,7 @@ def teacher_record_attendance(data: AttendanceCreate, db: Session = Depends(get_
     student = db.get(models.Student, data.student_id)
     if not student:
         raise HTTPException(404, "Student not found.")
-    assigned = db.query(models.TeacherAssignment).filter_by(
-        teacher_id=teacher.id, class_id=student.class_id
-    ).first()
-    if not assigned:
-        raise HTTPException(403, "You cannot record attendance for this student's class.")
+    require_class_attendance_access(db, teacher, student.class_id, "add")
     item = models.Attendance(**data.model_dump())
     db.add(item)
     try:
