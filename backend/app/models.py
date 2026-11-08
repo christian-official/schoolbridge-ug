@@ -125,6 +125,16 @@ class TeacherAssignment(Base):
     subject_id: Mapped[int] = mapped_column(ForeignKey("subjects.id"))
 
 
+class ClassTeacherAssignment(Base):
+    __tablename__ = "class_teacher_assignments"
+    __table_args__ = (UniqueConstraint("class_id", name="uq_class_teacher_class"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    teacher_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    class_id: Mapped[int] = mapped_column(ForeignKey("classes.id"), index=True)
+    assigned_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class SchoolSettings(Base):
     __tablename__ = "school_settings"
 
