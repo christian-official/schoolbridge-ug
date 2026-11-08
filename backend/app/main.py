@@ -2275,6 +2275,7 @@ def get_parent_liaison_thread(thread_id: int, db: Session = Depends(get_db), use
         "messages": [{
             "id": item.id, "sender_id": item.sender_id,
             "sender_name": (db.get(models.User, item.sender_id).username if db.get(models.User, item.sender_id) else "User"),
+            "sender_role": (db.get(models.User, item.sender_id).role if db.get(models.User, item.sender_id) else "unknown"),
             "message": item.message, "created_at": item.created_at,
             "read_at": item.read_at,
         } for item in messages],

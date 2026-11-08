@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { MessageSquareText, Send, PlusCircle, GraduationCap, CheckCheck } from 'lucide-react'
+import { MessageSquareText, Send, PlusCircle, GraduationCap, CheckCheck, LockKeyhole, Unlock } from 'lucide-react'
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 async function api<T>(path: string, token: string, options: RequestInit = {}): Promise<T> {
@@ -13,7 +13,7 @@ async function api<T>(path: string, token: string, options: RequestInit = {}): P
 }
 type Recipient = { student_id: number; student_name: string; admission_number: string; class_name: string; parents: { id: number; username: string; email: string }[] }
 type LiaisonThread = { id: number; student_id: number; student_name: string; parent_name: string; subject: string; category: string; status: string; updated_at: string; last_message: string; last_sender_id: number | null }
-type LiaisonDetail = { current_user_id: number; id: number; student_id: number; student_name: string; subject: string; category: string; status: string; messages: { id: number; sender_id: number; sender_name: string; message: string; created_at: string; read_at: string | null }[] }
+type LiaisonDetail = { current_user_id: number; id: number; student_id: number; student_name: string; subject: string; category: string; status: string; messages: { id: number; sender_id: number; sender_name: string; sender_role: string; message: string; created_at: string; read_at: string | null }[] }
 
 export default function ParentLiaisonWorkspace({ token, role }: { token: string; role: string }) {
   const isParent = role === 'parent'
@@ -81,6 +81,21 @@ export default function ParentLiaisonWorkspace({ token, role }: { token: string;
     finally { setBusy(false) }
   }
 
+  async function updateStatus() {
+    if (!detail) return
+    const nextStatus = detail.status === 'Open' ? 'Closed' : 'Open'
+    const prompt = nextStatus === 'Closed'
+      ? 'Close this conversation? The parent will still be able to read the messages, but will not be able to reply unless an authorised staff member reopens it.'
+      : 'Reopen this conversation so the parent can reply again?'
+    if (!window.confirm(prompt)) return
+    setBusy(true); setError(''); setNotice('')
+    try {
+      await api('parent-liaison/threads/' + detail.id + '/status?status=' + nextStatus, token, { method: 'PATCH' })
+      await loadThreads(detail.id)
+      setNotice(nextStatus === 'Closed' ? 'Conversation closed. Its full history has been retained.' : 'Conversation reopened. The parent can now reply.')
+    } catch (e) { setError(e instanceof Error ? e.message : 'Unable to update conversation status.') }
+    finally { setBusy(false) }
+  }
   async function sendReply(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!detail || !reply.trim()) return
@@ -133,13 +148,13 @@ export default function ParentLiaisonWorkspace({ token, role }: { token: string;
           {threads.map(item => <button type="button" key={item.id} className={selectedId === item.id ? 'parent-liaison-thread active' : 'parent-liaison-thread'} onClick={() => void openThread(item.id)}>
             <span className="parent-liaison-thread-icon"><GraduationCap size={17}/></span>
             <span className="parent-liaison-thread-copy"><strong>{item.subject}</strong><small>{item.student_name} · {isParent ? 'School' : item.parent_name}</small><span>{item.last_message || 'No messages yet'}</span></span>
-            <small className="parent-liaison-thread-date">{new Date(item.updated_at).toLocaleDateString('en-UG', { day: 'numeric', month: 'short' })}</small>
+            <span className={item.status === 'Open' ? 'parent-liaison-status-mini open' : 'parent-liaison-status-mini closed'}>{item.status}</span><small className="parent-liaison-thread-date">{new Date(item.updated_at).toLocaleDateString('en-UG', { day: 'numeric', month: 'short' })}</small>
           </button>)}
           {!threads.length && <div className="empty-state">{busy ? 'Loading communications…' : 'No Parent Liaison records yet.'}</div>}
         </aside>
         <section className="parent-liaison-conversation">
           {detail ? <>
-            <header className="parent-liaison-conversation-head"><div><strong>{detail.subject}</strong><span>{detail.student_name} · {detail.category}</span></div><span className={detail.status === 'Open' ? 'attendance-status-pill status-present' : 'attendance-status-pill'}>{detail.status}</span></header>
+            <header className="parent-liaison-conversation-head">  <div><strong>{detail.subject}</strong><span>{detail.student_name} · {detail.category}</span>    <small className={detail.status === 'Open' ? 'parent-liaison-awaiting' : 'parent-liaison-closed-note'}>{detail.status === 'Open' ? (detail.messages.some(message => message.sender_role === 'parent') ? 'Parent has responded' : 'Awaiting parent response') : (detail.messages.some(message => message.sender_role === 'parent') ? 'Closed · parent response received' : 'Closed · no parent response received')}</small>  </div>  <div className="parent-liaison-head-actions"><span className={detail.status === 'Open' ? 'parent-liaison-status-pill open' : 'parent-liaison-status-pill closed'}>{detail.status}</span>    {!isParent && <button type="button" className={detail.status === 'Open' ? 'parent-liaison-close-button' : 'parent-liaison-reopen-button'} onClick={() => void updateStatus()} disabled={busy}>{detail.status === 'Open' ? <><LockKeyhole size={14}/> Close conversation</> : <><Unlock size={14}/> Reopen conversation</>}</button>}  </div></header>
             <div className="parent-liaison-messages">
               {detail.messages.map(item => <article key={item.id} className={item.sender_id === detail.current_user_id ? 'parent-liaison-message sent' : 'parent-liaison-message received'}>
                 <div className="parent-liaison-message-meta"><strong>{item.sender_name}</strong><time>{new Date(item.created_at).toLocaleString('en-UG', { dateStyle: 'medium', timeStyle: 'short' })}</time></div>
@@ -147,8 +162,8 @@ export default function ParentLiaisonWorkspace({ token, role }: { token: string;
                 {item.read_at && <small><CheckCheck size={12}/> Read</small>}
               </article>)}
             </div>
-            {detail.status === 'Open' && <form className="parent-liaison-reply" onSubmit={sendReply}><textarea rows={2} value={reply} onChange={e => setReply(e.target.value)} placeholder="Write a reply…" required maxLength={5000}/><button className="primary-button" disabled={busy || !reply.trim()}><Send size={15}/> Send reply</button></form>}
-            {detail.status !== 'Open' && <p className="form-hint">This communication has been closed.</p>}
+            {detail.status === 'Open' && <form className="parent-liaison-reply" onSubmit={sendReply}><div className="parent-liaison-compose-box"><textarea rows={3} value={reply} onChange={e => setReply(e.target.value)} placeholder={isParent ? 'Write your response to the school…' : 'Write a school-related reply…'} required maxLength={5000} aria-label="Message text"/><div className="parent-liaison-compose-footer"><span>{reply.length}/5000 characters</span><button className="primary-button" disabled={busy || !reply.trim()}><Send size={15}/> {busy ? 'Sending…' : 'Send message'}</button></div></div></form>}
+            {detail.status !== 'Open' && <div className="parent-liaison-closed-banner"><LockKeyhole size={16}/><div><strong>This conversation is closed</strong><span>{isParent ? 'You can still read the full conversation. Contact the school office if you need to follow up.' : (detail.messages.some(message => message.sender_role === 'parent') ? 'The parent responded before this conversation was closed.' : 'The conversation was closed before the parent replied. No response has been recorded.')}</span></div></div>}
           </> : <div className="parent-liaison-empty"><MessageSquareText size={30}/><strong>Select a communication</strong><span>School-related messages will appear here.</span></div>}
         </section>
       </div>

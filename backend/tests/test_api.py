@@ -950,6 +950,30 @@ def test_parent_liaison_is_staff_initiated_and_student_linked():
         )
         assert parent_cannot_start.status_code == 403
 
+        # Closing before the parent replies preserves history and blocks replies.
+        closed = client.patch(
+            f"/api/parent-liaison/threads/{thread_id}/status?status=Closed",
+            headers=teacher_headers,
+        )
+        assert closed.status_code == 200
+        assert closed.json()["status"] == "Closed"
+        closed_detail = client.get(f"/api/parent-liaison/threads/{thread_id}", headers=parent_headers)
+        assert closed_detail.status_code == 200
+        assert closed_detail.json()["status"] == "Closed"
+        assert len(closed_detail.json()["messages"]) == 1
+        blocked_reply = client.post(
+            f"/api/parent-liaison/threads/{thread_id}/messages",
+            headers=parent_headers,
+            json={"message": "A late response while closed."},
+        )
+        assert blocked_reply.status_code == 409
+
+        reopened = client.patch(
+            f"/api/parent-liaison/threads/{thread_id}/status?status=Open",
+            headers=teacher_headers,
+        )
+        assert reopened.status_code == 200
+        assert reopened.json()["status"] == "Open"
         reply = client.post(
             f"/api/parent-liaison/threads/{thread_id}/messages",
             headers=parent_headers,
