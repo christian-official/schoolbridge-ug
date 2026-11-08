@@ -1312,6 +1312,18 @@ async def protect_school_data(request: Request, call_next):
                     {"detail": "Teacher permission required."},
                     status_code=403,
                 )
+        elif path.startswith("/api/parent/"):
+            if user.role != "parent":
+                return JSONResponse(
+                    {"detail": "Parent permission required."},
+                    status_code=403,
+                )
+        elif path == "/api/announcements":
+            if user.role not in {"admin", "teacher", "parent"}:
+                return JSONResponse(
+                    {"detail": "School account permission required."},
+                    status_code=403,
+                )
         elif user.role != "admin":
             return JSONResponse(
                 {"detail": "Administrator permission required."},
