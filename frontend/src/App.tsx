@@ -1166,6 +1166,10 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
   const [loading,setLoading]=useState(true)
   const [busy,setBusy]=useState(false)
   const [resetPasscode,setResetPasscode]=useState<{username:string;password:string}|null>(null)
+  const [staffLoginSearch,setStaffLoginSearch]=useState('')
+  const [otherLoginSearch,setOtherLoginSearch]=useState('')
+  const [showAllStaffLogins,setShowAllStaffLogins]=useState(false)
+  const [showAllOtherLogins,setShowAllOtherLogins]=useState(false)
   async function load() {
     setLoading(true);setError('')
     try {
@@ -1214,14 +1218,14 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
     } catch(e) {setError(e instanceof Error?e.message:'Unable to save staff access settings.')}
     finally {setBusy(false)}
   }
-  async function resetSelectedPassword() {
-    if(!selectedId)return
-    if(!window.confirm('Issue a new temporary passcode for this staff member? Their existing password will stop working immediately.'))return
+  async function resetSelectedPassword() { if(!selectedId)return; const account=users.find(u=>String(u.id)===selectedId); await resetAccountPassword(selectedId,account?.username||'staff account') }
+  async function resetAccountPassword(id:string,username:string) {
+    if(!window.confirm('Issue a new temporary password for '+username+'? The existing password will stop working immediately.'))return
     setBusy(true);setError('');setMessage('');setResetPasscode(null)
     try {
-      const result=await api<{username:string;temporary_password:string;message:string}>('auth/users/'+selectedId+'/reset-password',token,{method:'POST'})
-      setResetPasscode({username:result.username,password:result.temporary_password})
-      setMessage(result.message)
+      const result=await api<{username:string;temporary_password:string;message:string}>('auth/users/'+id+'/reset-password',token,{method:'POST'})
+      setResetPasscode({username:result.username||username,password:result.temporary_password})
+      setMessage(result.message||'Temporary password generated. Share it privately.')
     } catch(e) {setError(e instanceof Error?e.message:'Unable to reset this staff password.')}
     finally {setBusy(false)}
   }
@@ -1253,6 +1257,15 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
   }
   const activeTeachers=users.filter(u=>u.role==='teacher'&&u.active)
   const editableUsers=users.filter(u=>u.role!=='admin'&&u.role!=='parent')
+  const otherAccounts=users.filter(u=>u.role==='admin'||u.role==='parent')
+  const staffLoginMatches=editableUsers.filter(u=>{
+    const person=staff.find((p:any)=>p.id===u.staff_id)
+    const haystack=[person?.first_name,person?.last_name,person?.staff_number,u.username,u.email,u.role_label,u.role].filter(Boolean).join(' ').toLowerCase()
+    return haystack.includes(staffLoginSearch.trim().toLowerCase())
+  })
+  const otherLoginMatches=otherAccounts.filter(u=>[u.username,u.email,u.role_label,u.role].filter(Boolean).join(' ').toLowerCase().includes(otherLoginSearch.trim().toLowerCase()))
+  const visibleStaffLogins=showAllStaffLogins||staffLoginSearch.trim()?staffLoginMatches:staffLoginMatches.slice(0,8)
+  const visibleOtherLogins=showAllOtherLogins||otherLoginSearch.trim()?otherLoginMatches:otherLoginMatches.slice(0,8)
   const presetNames=Object.keys(catalog.presets||{})
   return <section className="panel settings-panel">
     <div className="panel-heading"><div><h2>Staff accounts & access</h2><p>Staff login details are created automatically when you register a staff member in the Staff directory.</p></div><button type="button" className="secondary-button" onClick={()=>void load()} disabled={loading||busy}>{loading?'Loading...':'Refresh'}</button></div>
@@ -1287,11 +1300,23 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
       <label>Responsible class *<select required value={classTeacherForm.class_id} onChange={e=>setClassTeacherForm({...classTeacherForm,class_id:e.target.value})}><option value="">Select class</option>{classes.map(item=><option key={item.id} value={item.id}>{item.name}{item.section?' — '+item.section:''}</option>)}</select></label>
     </div><div className="form-actions"><button className="primary-button" disabled={busy||loading||!activeTeachers.length||!classes.length}>{busy?'Saving...':'Assign class teacher'}</button></div></form>
     <div className="table-wrap"><table><thead><tr><th>Class</th><th>Assigned class teacher</th><th>Action</th></tr></thead><tbody>{classTeacherAssignments.map(row=><tr key={row.id}><td>{row.class_name}{row.section?' — '+row.section:''}</td><td>{staff.find((p:any)=>users.find(u=>u.id===row.teacher_id)?.staff_id===p.id)?.first_name || row.teacher_name} {staff.find((p:any)=>users.find(u=>u.id===row.teacher_id)?.staff_id===p.id)?.last_name || ''}</td><td><button type="button" className="secondary-button" disabled={busy} onClick={()=>void removeClassTeacher(row.id)}>Remove</button></td></tr>)}{!classTeacherAssignments.length&&<tr><td colSpan={3}>No class teachers assigned yet.</td></tr>}</tbody></table></div>
-    <h3>School login accounts</h3>
-    <div className="table-wrap"><table><thead><tr><th>Staff member</th><th>Username</th><th>Job role</th><th>Areas available</th><th>Status</th></tr></thead><tbody>
-      {users.map(u=>{const person=staff.find((p:any)=>p.id===u.staff_id);return <tr key={u.id}><td>{person?person.first_name+' '+person.last_name:(u.role==='admin'?'—':'Unlinked staff login')}</td><td>{u.username}</td><td>{u.role==='admin'?'Administrator':u.role==='parent'?'Parent':u.role_label||u.role}</td><td>{Object.keys(u.permissions||{}).length||(u.role==='admin'?'All':'Limited')}</td><td>{u.active?'Active':'Disabled'}</td></tr>})}
-      {!users.length&&<tr><td colSpan={5}>No user accounts found.</td></tr>}
+    <h3>School staff login accounts</h3>
+    <p className="form-hint">Staff accounts are listed separately from administrator and parent accounts. Search to find any staff login; only the first 8 are shown until you search or choose to view all.</p>
+    <div className="table-tools student-tools"><div className="search-box"><Search size={17}/><input aria-label="Search staff login accounts" placeholder="Search staff name, staff number or username..." value={staffLoginSearch} onChange={e=>{setStaffLoginSearch(e.target.value);setShowAllStaffLogins(false)}}/></div><span className="count-pill">{staffLoginMatches.length} staff accounts</span></div>
+    <div className="table-wrap"><table><thead><tr><th>Staff member</th><th>Username</th><th>Job role</th><th>Areas available</th><th>Status</th><th>Actions</th></tr></thead><tbody>
+      {visibleStaffLogins.map(u=>{const person=staff.find((p:any)=>p.id===u.staff_id);return <tr key={u.id}><td>{person?person.first_name+' '+person.last_name:'Unlinked staff login'}</td><td>{u.username}</td><td>{u.role_label||u.role}</td><td>{Object.keys(u.permissions||{}).length||'Limited'}</td><td>{u.active?'Active':'Disabled'}</td><td><button type="button" className="secondary-button" disabled={busy} onClick={()=>{setSelectedId(String(u.id));setResetPasscode(null);setRoleLabel(u.role_label||u.role);setRoleType(u.role==='teacher'?'teacher':'staff');setPermissions(u.permissions||{});void resetAccountPassword(String(u.id),u.username)}}>Reset password</button></td></tr>})}
+      {!staffLoginMatches.length&&<tr><td colSpan={6}>No staff login accounts match this search.</td></tr>}
     </tbody></table></div>
+    {!staffLoginSearch.trim()&&staffLoginMatches.length>8&&<button type="button" className="secondary-button" onClick={()=>setShowAllStaffLogins(v=>!v)}>{showAllStaffLogins?'Show fewer':'Show all '+staffLoginMatches.length+' staff accounts'}</button>}
+    {resetPasscode&&<div className="success-notice password-reset-result" role="status"><strong>Temporary password for {resetPasscode.username}</strong><code>{resetPasscode.password}</code><button type="button" className="secondary-button" onClick={()=>void navigator.clipboard.writeText('Username: '+resetPasscode.username+'\\nTemporary password: '+resetPasscode.password)}>Copy login details</button><small>Shown once. Share it privately. The staff member must change it at their next sign-in.</small></div>}
+    <h3>Other system accounts</h3>
+    <p className="form-hint">Administrator and parent accounts are kept separate from staff logins.</p>
+    <div className="table-tools student-tools"><div className="search-box"><Search size={17}/><input aria-label="Search administrator and parent accounts" placeholder="Search administrator or parent accounts..." value={otherLoginSearch} onChange={e=>{setOtherLoginSearch(e.target.value);setShowAllOtherLogins(false)}}/></div><span className="count-pill">{otherLoginMatches.length} accounts</span></div>
+    <div className="table-wrap"><table><thead><tr><th>Account type</th><th>Username</th><th>Email</th><th>Status</th></tr></thead><tbody>
+      {visibleOtherLogins.map(u=><tr key={u.id}><td>{u.role==='admin'?'Administrator':'Parent'}</td><td>{u.username}</td><td>{u.email||'—'}</td><td>{u.active?'Active':'Disabled'}</td></tr>)}
+      {!otherLoginMatches.length&&<tr><td colSpan={4}>No administrator or parent accounts match this search.</td></tr>}
+    </tbody></table></div>
+    {!otherLoginSearch.trim()&&otherLoginMatches.length>8&&<button type="button" className="secondary-button" onClick={()=>setShowAllOtherLogins(v=>!v)}>{showAllOtherLogins?'Show fewer':'Show all '+otherLoginMatches.length+' accounts'}</button>}
   </section>
 }
 function BackupSettings({token}:{token:string}) {
