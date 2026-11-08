@@ -1408,9 +1408,18 @@ def login(
     data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
+    login_name = data.username.strip()
     user = db.query(models.User).filter(
-        models.User.username == data.username
+        models.User.username == login_name
     ).first()
+    if user is None:
+        surname_matches = db.query(models.User).join(
+            models.StaffMember, models.User.staff_id == models.StaffMember.id
+        ).filter(func.lower(models.StaffMember.last_name) == login_name.lower()).all()
+        if len(surname_matches) == 1:
+            user = surname_matches[0]
+        elif len(surname_matches) > 1:
+            raise HTTPException(401, "More than one staff member has that surname. Please sign in using your staff number.")
 
     if not user or not user.is_active:
         raise HTTPException(401, "Incorrect username or password.")
@@ -2510,6 +2519,69 @@ class OtherExpenseCreate(BaseModel):
     amount: int = Field(gt=0)
     expense_date: date = Field(default_factory=date.today)
     reference: str | None = Field(default=None, max_length=80)
+
+
+class MyStaffProfileUpdate(BaseModel):
+    first_name: str = Field(min_length=1, max_length=80)
+    phone: str | None = Field(default=None, max_length=30)
+    email: str | None = Field(default=None, max_length=150)
+
+
+class MyPasswordUpdate(BaseModel):
+    current_password: str = Field(min_length=1)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+@app.get("/api/me/staff-profile", tags=["Staff"])
+def get_my_staff_profile(user=Depends(get_current_user), db: Session = Depends(get_db)):
+    if not user.staff_id:
+        raise HTTPException(404, "This account is not linked to a staff profile.")
+    staff = db.get(models.StaffMember, user.staff_id)
+    if not staff:
+        raise HTTPException(404, "Staff profile not found.")
+    return {
+        "id": staff.id, "first_name": staff.first_name, "last_name": staff.last_name,
+        "staff_number": staff.staff_number, "phone": staff.phone, "email": staff.email,
+        "position": staff.position, "department": staff.department, "category": staff.category,
+        "username": user.username,
+    }
+
+
+@app.patch("/api/me/staff-profile", tags=["Staff"])
+def update_my_staff_profile(data: MyStaffProfileUpdate, user=Depends(get_current_user), db: Session = Depends(get_db)):
+    if not user.staff_id:
+        raise HTTPException(404, "This account is not linked to a staff profile.")
+    staff = db.get(models.StaffMember, user.staff_id)
+    if not staff:
+        raise HTTPException(404, "Staff profile not found.")
+    email = data.email.strip().lower() if data.email else None
+    if email:
+        duplicate = db.query(models.User).filter(models.User.email == email, models.User.id != user.id).first()
+        if duplicate:
+            raise HTTPException(409, "That email address is already used by another account.")
+        user.email = email
+    staff.first_name = data.first_name.strip()
+    staff.phone = data.phone.strip() if data.phone else None
+    staff.email = email
+    db.commit()
+    db.refresh(staff)
+    return {"message": "Profile updated. Your surname and staff number remain unchanged.", "profile": {
+        "id": staff.id, "first_name": staff.first_name, "last_name": staff.last_name,
+        "staff_number": staff.staff_number, "phone": staff.phone, "email": staff.email,
+        "position": staff.position, "department": staff.department, "category": staff.category,
+        "username": user.username,
+    }}
+
+
+@app.put("/api/me/password", tags=["Authentication"])
+def update_my_password(data: MyPasswordUpdate, user=Depends(get_current_user), db: Session = Depends(get_db)):
+    if not password_hash.verify(data.current_password, user.hashed_password):
+        raise HTTPException(400, "Your current password is incorrect.")
+    if password_hash.verify(data.new_password, user.hashed_password):
+        raise HTTPException(400, "Choose a password different from your current password.")
+    user.hashed_password = password_hash.hash(data.new_password)
+    db.commit()
+    return {"message": "Password updated successfully."}
 
 
 @app.patch("/api/staff/{staff_id}", tags=["Staff"])
