@@ -1484,3 +1484,24 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .exam-class-picker > div:first-child { display:grid; gap:3px; }
 .exam-class-picker small { color:#738097; font-size:11px; }
 @media(max-width:700px) { .exam-create-meta { grid-template-columns:1fr; } .exam-choice-grid { grid-template-columns:1fr; } }
+
+/* Submitted results subject navigation and staff attendance check-in calendar */
+.submitted-subject-tabs{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0 22px}
+.submitted-subject-tab{display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:150px;padding:12px 15px;border:1px solid var(--border-color,#d8dee8);border-radius:12px;background:var(--surface,#fff);color:inherit;cursor:pointer;text-align:left}
+.submitted-subject-tab strong{font-size:14px}.submitted-subject-tab span,.submitted-subject-tab small{font-size:12px;color:var(--muted,#687386)}
+.submitted-subject-tab.active{border-color:var(--primary,#3159a6);background:var(--primary-soft,#eef3ff);box-shadow:0 0 0 1px var(--primary,#3159a6) inset}
+.staff-attendance-calendar{margin:16px 0;padding:15px;border:1px solid var(--border-color,#d8dee8);border-radius:14px}
+.staff-attendance-calendar-heading{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.staff-attendance-calendar-heading span{font-size:12px;color:var(--muted,#687386)}
+.staff-attendance-calendar-days{display:flex;gap:8px;flex-wrap:wrap}
+.staff-calendar-day{display:flex;flex-direction:column;gap:4px;align-items:flex-start;padding:9px 12px;border:1px solid var(--border-color,#d8dee8);border-radius:10px;background:var(--surface,#fff);color:inherit;cursor:pointer}
+.staff-calendar-day strong{font-size:13px}.staff-calendar-day span{font-size:11px;color:var(--muted,#687386)}
+.staff-calendar-day.active{border-color:var(--primary,#3159a6);background:var(--primary-soft,#eef3ff)}
+.staff-self-checkin-card{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:18px;margin:16px 0;border:1px solid var(--border-color,#d8dee8);border-radius:14px;background:var(--surface,#fff)}
+.staff-self-checkin-card>div{display:flex;flex-direction:column;gap:5px}.staff-self-checkin-card>div>span,.staff-self-checkin-card small{font-size:12px;color:var(--muted,#687386)}.staff-self-checkin-card strong{font-size:20px}
+.teacher-results-progress{margin:16px 0;padding:14px;border:1px solid var(--border-color,#d8dee8);border-radius:12px}
+.teacher-results-progress>div:first-child{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px}.teacher-results-progress span{font-size:12px;color:var(--muted,#687386)}
+.teacher-results-progress-track{height:9px;overflow:hidden;border-radius:20px;background:var(--border-color,#e4e8ef)}.teacher-results-progress-track span{display:block;height:100%;border-radius:20px;background:var(--primary,#3159a6);transition:width .25s ease}
+.teacher-results-complete{display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:24px;border:1px solid var(--border-color,#d8dee8);border-radius:14px;background:var(--surface,#fff)}
+.teacher-results-complete h3,.teacher-results-complete p{margin:0}.teacher-results-complete-icon{display:grid;place-items:center;width:42px;height:42px;border-radius:50%;background:#e8f5ed;color:#18794e;font-size:24px;font-weight:700}
+@media(max-width:700px){.submitted-subject-tab{flex:1 1 140px}.staff-attendance-calendar-heading{align-items:flex-start}.teacher-results-progress>div:first-child{flex-direction:column}}

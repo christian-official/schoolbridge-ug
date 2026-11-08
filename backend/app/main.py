@@ -4,7 +4,8 @@ import re
 import secrets
 import smtplib
 from email.message import EmailMessage
-from datetime import date, datetime
+from datetime import date, datetime, time
+from zoneinfo import ZoneInfo
 from uuid import uuid4
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
@@ -545,6 +546,8 @@ class StaffAttendanceEntry(BaseModel):
     staff_id: int
     status: str = Field(pattern="^(Present|Absent|Late|Excused)$")
     notes: str | None = Field(default=None, max_length=255)
+    check_in_time: str | None = Field(default=None, pattern="^([01][0-9]|2[0-3]):[0-5][0-9]$")
+    check_out_time: str | None = Field(default=None, pattern="^([01][0-9]|2[0-3]):[0-5][0-9]$")
 
 
 class StaffAttendanceRegisterUpdate(BaseModel):
@@ -1326,13 +1329,29 @@ def staff_attendance_roster(db: Session = Depends(get_db), admin=Depends(require
 @app.get("/api/staff-attendance", tags=["Attendance"])
 def list_staff_attendance(
     attendance_date: date | None = None,
+    month: str | None = None,
     db: Session = Depends(get_db),
     admin=Depends(require_admin),
 ):
     query = db.query(models.StaffAttendance)
     if attendance_date:
         query = query.filter(models.StaffAttendance.attendance_date == attendance_date)
-    return query.order_by(models.StaffAttendance.attendance_date.desc(), models.StaffAttendance.id.desc()).all()
+    elif month:
+        try:
+            month_start = datetime.strptime(month, "%Y-%m").date()
+        except ValueError:
+            raise HTTPException(422, "Month must use YYYY-MM format.")
+        next_month = date(month_start.year + (month_start.month == 12), 1 if month_start.month == 12 else month_start.month + 1, 1)
+        query = query.filter(
+            models.StaffAttendance.attendance_date >= month_start,
+            models.StaffAttendance.attendance_date < next_month,
+        )
+    rows = query.order_by(models.StaffAttendance.attendance_date.desc(), models.StaffAttendance.id.desc()).all()
+    return [{
+        "id": row.id, "staff_id": row.staff_id, "attendance_date": row.attendance_date,
+        "status": row.status, "notes": row.notes,
+        "check_in_at": row.check_in_at, "check_out_at": row.check_out_at,
+    } for row in rows]
 
 
 @app.get("/api/staff-attendance/summary", tags=["Attendance"])
@@ -1384,12 +1403,18 @@ def save_staff_attendance_register(
         if record:
             record.status = entry.status
             record.notes = entry.notes
+            if "check_in_time" in entry.model_fields_set:
+                record.check_in_at = datetime.combine(data.attendance_date, time.fromisoformat(entry.check_in_time)) if entry.check_in_time else None
+            if "check_out_time" in entry.model_fields_set:
+                record.check_out_at = datetime.combine(data.attendance_date, time.fromisoformat(entry.check_out_time)) if entry.check_out_time else None
         else:
             db.add(models.StaffAttendance(
                 staff_id=entry.staff_id,
                 attendance_date=data.attendance_date,
                 status=entry.status,
                 notes=entry.notes,
+                check_in_at=datetime.combine(data.attendance_date, time.fromisoformat(entry.check_in_time)) if entry.check_in_time else None,
+                check_out_at=datetime.combine(data.attendance_date, time.fromisoformat(entry.check_out_time)) if entry.check_out_time else None,
             ))
     write_audit(db, admin, "staff_attendance_register_saved", "staff_attendance", 0,
                 f"{len(staff_ids)} staff records; {data.attendance_date}")
@@ -2185,6 +2210,92 @@ def my_class_teacher_assignments(db: Session = Depends(get_db), teacher=Depends(
     } for assignment, school_class in rows]
 
 
+def get_linked_staff_member(db: Session, user):
+    staff_member = db.get(models.StaffMember, user.staff_id) if user.staff_id else None
+    if staff_member is None:
+        staff_member = db.query(models.StaffMember).filter(
+            func.lower(models.StaffMember.email) == (user.email or "").lower()
+        ).first()
+    if staff_member is None and user.username:
+        staff_member = db.query(models.StaffMember).filter(
+            func.lower(models.StaffMember.staff_number) == user.username.lower()
+        ).first()
+    return staff_member
+
+
+@app.get("/api/me/staff-attendance", tags=["Staff Attendance"])
+def my_staff_attendance(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    staff_member = get_linked_staff_member(db, user)
+    if not staff_member:
+        raise HTTPException(404, "Your login is not linked to a staff profile. Ask the administrator to link your staff account.")
+    records = db.query(models.StaffAttendance).filter(
+        models.StaffAttendance.staff_id == staff_member.id
+    ).order_by(models.StaffAttendance.attendance_date.desc(), models.StaffAttendance.id.desc()).limit(90).all()
+    today_local = datetime.now(ZoneInfo("Africa/Kampala")).date()
+    today_record = next((row for row in records if row.attendance_date == today_local), None)
+    return {
+        "staff_name": f"{staff_member.first_name} {staff_member.last_name}",
+        "staff_number": staff_member.staff_number,
+        "today": {
+            "attendance_date": today_local,
+            "status": today_record.status if today_record else "Not checked in",
+            "check_in_at": today_record.check_in_at if today_record else None,
+            "check_out_at": today_record.check_out_at if today_record else None,
+        },
+        "records": [{
+            "id": row.id, "attendance_date": row.attendance_date, "status": row.status,
+            "notes": row.notes, "check_in_at": row.check_in_at, "check_out_at": row.check_out_at,
+        } for row in records],
+    }
+
+
+@app.post("/api/me/staff-attendance/check-in", tags=["Staff Attendance"])
+def staff_self_check_in(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    staff_member = get_linked_staff_member(db, user)
+    if not staff_member or staff_member.status != "active":
+        raise HTTPException(404, "Your active staff profile could not be found.")
+    local_now = datetime.now(ZoneInfo("Africa/Kampala")).replace(tzinfo=None, microsecond=0)
+    record = db.query(models.StaffAttendance).filter_by(
+        staff_id=staff_member.id, attendance_date=local_now.date()
+    ).first()
+    if record and record.check_in_at:
+        raise HTTPException(409, "You have already checked in today.")
+    if record is None:
+        record = models.StaffAttendance(
+            staff_id=staff_member.id, attendance_date=local_now.date(),
+            status="Present", notes="Staff self check-in",
+        )
+        db.add(record)
+    record.check_in_at = local_now
+    if not record.status:
+        record.status = "Present"
+    write_audit(db, user, "staff_self_check_in", "staff_attendance", staff_member.id,
+                f"Checked in at {local_now.strftime('%H:%M')} on {local_now.date()}.")
+    db.commit()
+    db.refresh(record)
+    return {"message": "Check-in recorded and sent to the attendance office.", "check_in_at": record.check_in_at, "status": record.status}
+
+
+@app.post("/api/me/staff-attendance/check-out", tags=["Staff Attendance"])
+def staff_self_check_out(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    staff_member = get_linked_staff_member(db, user)
+    if not staff_member or staff_member.status != "active":
+        raise HTTPException(404, "Your active staff profile could not be found.")
+    local_now = datetime.now(ZoneInfo("Africa/Kampala")).replace(tzinfo=None, microsecond=0)
+    record = db.query(models.StaffAttendance).filter_by(
+        staff_id=staff_member.id, attendance_date=local_now.date()
+    ).first()
+    if not record or not record.check_in_at:
+        raise HTTPException(409, "Check in before recording your check-out.")
+    if record.check_out_at:
+        raise HTTPException(409, "You have already checked out today.")
+    record.check_out_at = local_now
+    write_audit(db, user, "staff_self_check_out", "staff_attendance", staff_member.id,
+                f"Checked out at {local_now.strftime('%H:%M')} on {local_now.date()}.")
+    db.commit()
+    return {"message": "Check-out time recorded.", "check_out_at": record.check_out_at, "status": record.status}
+
+
 @app.get("/api/teacher/my-staff-attendance", tags=["Teacher Workspace"])
 def teacher_my_staff_attendance(
     db: Session = Depends(get_db),
@@ -2192,11 +2303,7 @@ def teacher_my_staff_attendance(
 ):
     if teacher.role != "teacher":
         raise HTTPException(403, "Teacher account required.")
-    staff_member = db.get(models.StaffMember, teacher.staff_id) if teacher.staff_id else None
-    if staff_member is None:
-        staff_member = db.query(models.StaffMember).filter(
-            func.lower(models.StaffMember.email) == teacher.email.lower()
-        ).first()
+    staff_member = get_linked_staff_member(db, teacher)
     if not staff_member:
         raise HTTPException(
             404,
@@ -2217,6 +2324,8 @@ def teacher_my_staff_attendance(
                 "attendance_date": row.attendance_date,
                 "status": row.status,
                 "notes": row.notes,
+                "check_in_at": row.check_in_at,
+                "check_out_at": row.check_out_at,
             }
             for row in records
         ],

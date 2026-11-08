@@ -116,6 +116,7 @@ export default function AcademicManagement({ token, classes, canVerify = false }
   const [activeExamType, setActiveExamType] = useState<string>('All exams')
   const [selectedExamGroupKey, setSelectedExamGroupKey] = useState('')
   const [activeAcademicTab, setActiveAcademicTab] = useState<'marks' | 'submitted' | 'results' | 'grading' | 'history'>('marks')
+  const [submittedSubjectId, setSubmittedSubjectId] = useState('')
   const [examForm, setExamForm] = useState<{name:string;exam_type:string;class_ids:number[];term:string;year:string}>({ name: '', exam_type: 'End of Term', class_ids: [], term: 'Term 1', year: String(new Date().getFullYear()) })
   const [showExamForm, setShowExamForm] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -575,22 +576,37 @@ export default function AcademicManagement({ token, classes, canVerify = false }
       {activeAcademicTab === 'submitted' && (
         <section className="panel submitted-results-workspace">
           <div className="panel-heading">
-            <div><h2>Submitted results awaiting verification</h2><p>Teacher submissions for the selected examination appear here. Review the scores, then verify the whole subject at once.</p></div>
-            <div className="dashboard-heading-actions"><span className="count-pill">{marks.filter(mark => !mark.verified).length} pending scores</span>{canVerify && marks.some(mark => !mark.verified) && <button type="button" className="primary-button" disabled={saving} onClick={() => void verifyAllExamResults()}>Verify all submitted results</button>}</div>
+            <div><h2>Submitted results</h2><p>Choose a subject to review its submitted scores and current verification status.</p></div>
+            <div className="dashboard-heading-actions"><span className="count-pill">{marks.filter(mark => !mark.verified).length} not verified</span>{canVerify && marks.some(mark => !mark.verified) && <button type="button" className="primary-button" disabled={saving} onClick={() => void verifyAllExamResults()}>Verify all submitted results</button>}</div>
           </div>
           {!selectedExam && <p className="form-hint">Select an examination to review submitted results.</p>}
-          {selectedExam && subjects.filter(subject => marks.some(mark => mark.subject_id === subject.id && !mark.verified)).map(subject => {
-            const pending = marks.filter(mark => mark.subject_id === subject.id && !mark.verified && students.some(student => student.id === mark.student_id && studentOffersSubject(student, subject))).sort((x, y) => studentName(studentById.get(x.student_id)).localeCompare(studentName(studentById.get(y.student_id))));
-            if (!pending.length) return null;
-            return <section className="recorded-subject-card" key={subject.id}>
-              <div className="recorded-subject-heading"><div><h3>{subject.name}</h3><span>{selectedClass?.name || 'Class'} · {selectedExam.name} · {selectedExam.term} {selectedExam.year}</span></div><span className="recorded-count pending-count">{pending.length} pending</span></div>
-              <div className="table-wrap"><table><thead><tr><th>Student</th><th>Admission number</th><th>Submitted score</th><th>Verification status</th></tr></thead><tbody>
-                {pending.map(mark => <tr key={mark.id}><td>{studentName(studentById.get(mark.student_id))}</td><td>{studentById.get(mark.student_id)?.admission_number || '—'}</td><td><strong>{mark.score === 0 ? 'No score (0)' : Math.round(mark.score)}</strong></td><td><span className="student-score-status recorded">Awaiting verification</span></td></tr>)}
-              </tbody></table></div>
-              {canVerify ? <div className="form-actions"><button type="button" className="primary-button subject-verification-action" disabled={saving} onClick={() => void setSubjectVerification(subject.id, true)}>Verify all {subject.name} results</button></div> : <p className="form-hint">View-only: an authorised academic officer must verify these results.</p>}
-            </section>;
-          })}
-          {selectedExam && !marks.some(mark => !mark.verified) && <p className="empty-state">There are no submitted results awaiting verification for this examination.</p>}
+          {selectedExam && <>
+            <div className="submitted-subject-tabs" role="tablist" aria-label="Submitted results by subject">
+              {subjects.filter(subject => marks.some(mark => mark.subject_id === subject.id && students.some(student => student.id === mark.student_id && studentOffersSubject(student, subject)))).map(subject => {
+                const subjectMarks = marks.filter(mark => mark.subject_id === subject.id && students.some(student => student.id === mark.student_id && studentOffersSubject(student, subject)))
+                const verifiedCount = subjectMarks.filter(mark => mark.verified).length
+                const pendingCount = subjectMarks.length - verifiedCount
+                const activeId = submittedSubjectId || String(subjects.find(row => marks.some(mark => mark.subject_id === row.id))?.id || '')
+                return <button type="button" role="tab" aria-selected={String(subject.id) === activeId} className={String(subject.id) === activeId ? 'submitted-subject-tab active' : 'submitted-subject-tab'} key={subject.id} onClick={() => setSubmittedSubjectId(String(subject.id))}>
+                  <strong>{subject.name}</strong><span>{subjectMarks.length} submitted</span><small>{verifiedCount} verified · {pendingCount} not verified</small>
+                </button>
+              })}
+            </div>
+            {(() => {
+              const subject = subjects.find(row => String(row.id) === submittedSubjectId) || subjects.find(row => marks.some(mark => mark.subject_id === row.id))
+              if (!subject) return <p className="empty-state">No subject results have been submitted for this examination yet.</p>
+              const subjectMarks = marks.filter(mark => mark.subject_id === subject.id && students.some(student => student.id === mark.student_id && studentOffersSubject(student, subject))).sort((a,b) => studentName(studentById.get(a.student_id)).localeCompare(studentName(studentById.get(b.student_id))))
+              const pendingCount = subjectMarks.filter(mark => !mark.verified).length
+              return <section className="recorded-subject-card" key={subject.id}>
+                <div className="recorded-subject-heading"><div><h3>{subject.name}</h3><span>{selectedClass?.name || 'Class'} · {selectedExam.name} · {selectedExam.term} {selectedExam.year}</span></div><span className="recorded-count">{subjectMarks.length} submitted</span></div>
+                <div className="table-wrap"><table><thead><tr><th>Student</th><th>Admission number</th><th>Submitted score</th><th>Status</th></tr></thead><tbody>
+                  {subjectMarks.map(mark => <tr key={mark.id}><td>{studentName(studentById.get(mark.student_id))}</td><td>{studentById.get(mark.student_id)?.admission_number || '—'}</td><td><strong>{mark.score === 0 ? 'No score (0)' : Math.round(mark.score)}</strong></td><td><span className={mark.verified ? 'student-score-status verified' : 'student-score-status recorded'}>{mark.verified ? 'Verified' : 'Submitted · Not verified'}</span></td></tr>)}
+                  {!subjectMarks.length && <tr><td colSpan={4}>No submitted scores for this subject.</td></tr>}
+                </tbody></table></div>
+                {canVerify && pendingCount > 0 ? <div className="form-actions"><button type="button" className="primary-button subject-verification-action" disabled={saving} onClick={() => void setSubjectVerification(subject.id, true)}>Verify all {subject.name} results</button></div> : !canVerify && pendingCount > 0 ? <p className="form-hint">View-only: an authorised academic officer must verify these results.</p> : <p className="success-notice">All submitted {subject.name} results are verified.</p>}
+              </section>
+            })()}
+          </>}
         </section>
       )}
 

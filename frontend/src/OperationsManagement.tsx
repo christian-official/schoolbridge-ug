@@ -14,7 +14,7 @@ async function request<T>(path: string, token: string, options: RequestInit = {}
 const today = () => { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}` }
 
 type Staff = { id: number; first_name: string; last_name: string; staff_number: string; category: string; status: string }
-type StaffAttendance = { id: number; staff_id: number; attendance_date: string; status: string; notes?: string }
+type StaffAttendance = { id: number; staff_id: number; attendance_date: string; status: string; notes?: string; check_in_at?: string | null; check_out_at?: string | null }
 type StaffAttendanceSummary = { total_staff: number; marked: number; unmarked: number; present: number; absent: number; late: number; excused: number }
 type SchoolClass = { id: number; name: string; section?: string }
 type Subject = { id: number; name: string; code?: string | null }
@@ -29,6 +29,8 @@ export default function OperationsManagement({ token, active, permissions = {}, 
   const [staffStatuses, setStaffStatuses] = useState<Record<number, string>>({})
   const [staffDate, setStaffDate] = useState(today())
   const [staffRows, setStaffRows] = useState<StaffAttendance[]>([])
+  const [staffMonthRows, setStaffMonthRows] = useState<StaffAttendance[]>([])
+  const [staffTimeDrafts, setStaffTimeDrafts] = useState<Record<number, { checkIn: string; checkOut: string }>>({})
   const [staffSummary, setStaffSummary] = useState<StaffAttendanceSummary | null>(null)
   const [entries, setEntries] = useState<TimetableEntry[]>([])
   const [selectedTimetableClass, setSelectedTimetableClass] = useState('')
@@ -71,8 +73,13 @@ export default function OperationsManagement({ token, active, permissions = {}, 
       ])
       setStaffRows(rows); setStaffSummary(totals)
       const values: Record<number, string> = {}
-      staff.forEach(person => { values[person.id] = rows.find(row => row.staff_id === person.id)?.status || '' })
-      setStaffStatuses(values)
+      const times: Record<number, { checkIn: string; checkOut: string }> = {}
+      staff.forEach(person => {
+        const record = rows.find(row => row.staff_id === person.id)
+        values[person.id] = record?.status || ''
+        times[person.id] = { checkIn: record?.check_in_at?.slice(11, 16) || '', checkOut: record?.check_out_at?.slice(11, 16) || '' }
+      })
+      setStaffStatuses(values); setStaffTimeDrafts(times)
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to load staff attendance.') }
   }
 
@@ -83,6 +90,12 @@ export default function OperationsManagement({ token, active, permissions = {}, 
 
   useEffect(() => { void loadSetup() }, [token, active, canEditTimetable])
   useEffect(() => { if (active === 'Staff Attendance' && staff.length) void loadStaffAttendance() }, [active, staff.length, staffDate])
+  useEffect(() => {
+    if (active !== 'Staff Attendance') return
+    request<StaffAttendance[]>(`staff-attendance?month=${staffDate.slice(0, 7)}`, token)
+      .then(setStaffMonthRows)
+      .catch(e => setError(e instanceof Error ? e.message : 'Unable to load the attendance calendar.'))
+  }, [active, staffDate.slice(0, 7), token])
 
   async function saveStaffRegister() {
     if (staff.some(person => !staffStatuses[person.id])) { setError('Select an attendance status for every staff member before saving the register.'); return }
@@ -90,7 +103,7 @@ export default function OperationsManagement({ token, active, permissions = {}, 
     try {
       const result = await request<{ saved: number }>('staff-attendance/register', token, {
         method: 'PUT',
-        body: JSON.stringify({ attendance_date: staffDate, records: staff.map(person => ({ staff_id: person.id, status: staffStatuses[person.id] })) }),
+        body: JSON.stringify({ attendance_date: staffDate, records: staff.map(person => ({ staff_id: person.id, status: staffStatuses[person.id], check_in_time: staffTimeDrafts[person.id]?.checkIn || null, check_out_time: staffTimeDrafts[person.id]?.checkOut || null })) }),
       })
       setMessage(`${result.saved} staff attendance records saved for ${staffDate}.`)
       await loadStaffAttendance()
@@ -160,18 +173,31 @@ export default function OperationsManagement({ token, active, permissions = {}, 
           <div className="stat-card"><span>Late / Excused</span><strong className="stat-value">{staffSummary.late + staffSummary.excused}</strong></div>
           <div className="stat-card"><span>Not marked</span><strong className="stat-value">{staffSummary.unmarked}</strong></div>
         </div>}
-        {loading ? <p className="form-hint">Loading staff...</p> : <div className="table-wrap"><table><thead><tr><th>Staff member</th><th>Staff number</th><th>Category</th><th>Status</th></tr></thead><tbody>
+        <div className="staff-attendance-calendar">
+          <div className="staff-attendance-calendar-heading"><strong>Attendance calendar · {new Date(staffDate + 'T00:00:00').toLocaleDateString('en-UG', { month: 'long', year: 'numeric' })}</strong><span>{staffMonthRows.length} saved daily records</span></div>
+          <div className="staff-attendance-calendar-days">
+            {[...new Set(staffMonthRows.map(row => row.attendance_date))].sort((a,b) => b.localeCompare(a)).map(day => {
+              const dayRows = staffMonthRows.filter(row => row.attendance_date === day)
+              const present = dayRows.filter(row => row.status === 'Present').length
+              return <button type="button" key={day} className={staffDate === day ? 'staff-calendar-day active' : 'staff-calendar-day'} onClick={() => setStaffDate(day)}>
+                <strong>{new Date(day + 'T00:00:00').toLocaleDateString('en-UG', { day: 'numeric', month: 'short' })}</strong><span>{dayRows.length} recorded · {present} present</span>
+              </button>
+            })}
+            {!staffMonthRows.length && <span className="form-hint">No attendance records have been saved for this month yet.</span>}
+          </div>
+        </div>
+        {loading ? <p className="form-hint">Loading staff...</p> : <div className="table-wrap"><table><thead><tr><th>Staff member</th><th>Staff number</th><th>Category</th><th>Check in</th><th>Check out</th><th>Status</th></tr></thead><tbody>
           {staffCategories.map(category => <Fragment key={category}>
             <tr className="staff-category-row"><td colSpan={4}>{category} staff <span>{staff.filter(person => (person.category || 'Other') === category).length}</span></td></tr>
-            {staff.filter(person => (person.category || 'Other') === category).map(person => <tr key={person.id}><td><strong>{person.first_name} {person.last_name}</strong></td><td>{person.staff_number}</td><td>{person.category || 'Other'}</td><td>{canEditStaffAttendance ? <div className="attendance-choice-group" role="group" aria-label={'Attendance for ' + person.first_name + ' ' + person.last_name}>{(['Present', 'Absent', 'Late', 'Excused'] as const).map(status => <button key={status} type="button" className={'attendance-choice attendance-' + status.toLowerCase() + (staffStatuses[person.id] === status ? ' selected' : '')} aria-pressed={staffStatuses[person.id] === status} onClick={() => setStaffStatuses(current => ({ ...current, [person.id]: status }))}>{status}</button>)}</div> : <span className="attendance-status-pill">{staffStatuses[person.id] || 'Not marked'}</span>}</td></tr>)}
+            {staff.filter(person => (person.category || 'Other') === category).map(person => <tr key={person.id}><td><strong>{person.first_name} {person.last_name}</strong></td><td>{person.staff_number}</td><td>{person.category || 'Other'}</td><td>{canEditStaffAttendance ? <input aria-label={'Check-in time for ' + person.first_name} type="time" value={staffTimeDrafts[person.id]?.checkIn || ''} onChange={event => setStaffTimeDrafts(current => ({ ...current, [person.id]: { checkIn: event.target.value, checkOut: current[person.id]?.checkOut || '' } }))}/> : staffTimeDrafts[person.id]?.checkIn || '—'}</td><td>{canEditStaffAttendance ? <input aria-label={'Check-out time for ' + person.first_name} type="time" value={staffTimeDrafts[person.id]?.checkOut || ''} onChange={event => setStaffTimeDrafts(current => ({ ...current, [person.id]: { checkIn: current[person.id]?.checkIn || '', checkOut: event.target.value } }))}/> : staffTimeDrafts[person.id]?.checkOut || '—'}</td><td>{canEditStaffAttendance ? <div className="attendance-choice-group" role="group" aria-label={'Attendance for ' + person.first_name + ' ' + person.last_name}>{(['Present', 'Absent', 'Late', 'Excused'] as const).map(status => <button key={status} type="button" className={'attendance-choice attendance-' + status.toLowerCase() + (staffStatuses[person.id] === status ? ' selected' : '')} aria-pressed={staffStatuses[person.id] === status} onClick={() => setStaffStatuses(current => ({ ...current, [person.id]: status }))}>{status}</button>)}</div> : <span className="attendance-status-pill">{staffStatuses[person.id] || 'Not marked'}</span>}</td></tr>)}
           </Fragment>)}
           {!staff.length && <tr><td colSpan={4}>No active staff records found.</td></tr>}
         </tbody></table></div>}
         {canEditStaffAttendance && <div className="form-actions"><button className="primary-button" type="button" disabled={saving || !staff.length} onClick={() => void saveStaffRegister()}><Save size={15}/>{saving ? 'Saving...' : 'Save staff attendance'}</button></div>}
         {!canEditStaffAttendance && <p className="form-hint">View-only staff attendance access. You cannot change this register.</p>}
         <h3>Saved attendance · {staffDate}</h3>
-        <p className="attendance-help">Staff can verify their record by checking their name and status here. If a status is incorrect, ask the administrator to correct that date’s register. Individual staff sign-in confirmation is not yet enabled.</p>
-        <div className="table-wrap"><table><thead><tr><th>Staff member</th><th>Category</th><th>Recorded status</th><th>Notes</th></tr></thead><tbody>{staffRows.map(row => { const person = staff.find(item => item.id === row.staff_id); return <tr key={row.id}><td>{person ? person.first_name + ' ' + person.last_name : 'Staff #' + row.staff_id}</td><td>{person?.category || '—'}</td><td><span className={'attendance-status-pill status-' + row.status.toLowerCase()}>{row.status}</span></td><td>{row.notes || '—'}</td></tr> })}{!staffRows.length && <tr><td colSpan={4}>No saved staff attendance yet for this date.</td></tr>}</tbody></table></div>
+        <p className="attendance-help">Self check-in times are submitted here for review. Authorised attendance administrators can revise check-in, check-out, notes and the final attendance status before saving.</p>
+        <div className="table-wrap"><table><thead><tr><th>Staff member</th><th>Category</th><th>Check in</th><th>Check out</th><th>Recorded status</th><th>Notes</th></tr></thead><tbody>{staffRows.map(row => { const person = staff.find(item => item.id === row.staff_id); return <tr key={row.id}><td>{person ? person.first_name + ' ' + person.last_name : 'Staff #' + row.staff_id}</td><td>{person?.category || '—'}</td><td>{row.check_in_at?.slice(11,16) || '—'}</td><td>{row.check_out_at?.slice(11,16) || '—'}</td><td><span className={'attendance-status-pill status-' + row.status.toLowerCase()}>{row.status}</span></td><td>{row.notes || '—'}</td></tr> })}{!staffRows.length && <tr><td colSpan={6}>No saved staff attendance yet for this date.</td></tr>}</tbody></table></div>
       </> : <>
         <p className="attendance-help">A weekly class timetable. Choose a class to see its lessons arranged by weekday and period. Lesson cards show the subject, teacher and time.</p>
         {canEditTimetable && <details className="form-disclosure" open={editingEntryId !== null}><summary><Plus size={15}/> {editingEntryId ? "Edit lesson" : "Add a lesson"}</summary>

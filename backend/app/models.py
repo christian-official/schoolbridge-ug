@@ -300,6 +300,8 @@ class StaffAttendance(Base):
     attendance_date: Mapped[date] = mapped_column(Date, default=date.today, index=True)
     status: Mapped[str] = mapped_column(String(20))
     notes: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    check_in_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    check_out_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 class TimetableEntry(Base):

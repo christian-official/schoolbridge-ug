@@ -567,7 +567,7 @@ function App() {
       else if(profile.role==='parent') setActive('My Children')
       else if(profile.role==='admin') await loadSchoolData(authToken,profile)
       else {
-        const allowedItems = [...menu, ...teacherMenu.filter(item => !menu.some(base => base.label === item.label))].filter(item => (profile.permissions?.[item.label] || []).includes('view'))
+        const allowedItems = [...menu, ...teacherMenu.filter(item => !menu.some(base => base.label === item.label))].filter(item => item.label === 'My Attendance' || (profile.permissions?.[item.label] || []).includes('view'))
         setActive(allowedItems[0]?.label || 'Overview')
         await loadSchoolData(authToken,profile)
       }
@@ -663,7 +663,7 @@ function App() {
         </div>
         <div className="school-label">SCHOOL MANAGEMENT</div>
         <nav>
-          {(user.role === 'parent' ? parentMenu : user.role === 'admin' ? menu : [...menu, ...teacherMenu.filter(item => !menu.some(base => base.label === item.label))].filter(item => isFinanceAccount(user) ? ['Overview','Fees & Finance','My Profile'].includes(item.label) : item.label === 'My Profile' || (user.permissions?.[item.label] || []).includes('view') || (item.label === 'Attendance' && (user.permissions?.['Staff Attendance'] || []).includes('view')))).map(item => {
+          {(user.role === 'parent' ? parentMenu : user.role === 'admin' ? menu : [...menu, ...teacherMenu.filter(item => !menu.some(base => base.label === item.label))].filter(item => isFinanceAccount(user) ? ['Overview','Fees & Finance','My Attendance','My Profile'].includes(item.label) : item.label === 'My Profile' || item.label === 'My Attendance' || (user.permissions?.[item.label] || []).includes('view') || (item.label === 'Attendance' && (user.permissions?.['Staff Attendance'] || []).includes('view')))).map(item => {
             const Icon = item.icon
             return (
               <button key={item.label} className={`nav-item ${active === item.label ? 'active' : ''}`} onClick={() => { setActive(item.label); setMobileMenu(false) }}>
@@ -712,6 +712,7 @@ function App() {
           {dataError && <div className="notice">{dataError} <button onClick={() => void loadSchoolData(token)}>Retry</button></div>}
 
           {(active === 'My Classes' || active === 'Attendance' || active === 'My Attendance' || active === 'My Results') && user.role === 'teacher' && <TeacherWorkspace token={token} active={active} />}
+          {active === 'My Attendance' && user.role !== 'teacher' && user.role !== 'parent' && user.role !== 'admin' && <StaffSelfAttendance token={token} />}
           {((active === 'Parent Access' || active === 'Announcements') && user.role !== 'parent' || (active === 'My Children' || active === 'Announcements') && user.role === 'parent') && <Phase4Workspace token={token} role={user.role} active={active} permissions={user.permissions} />}
 
           {active === 'Overview' && user.role === 'admin' && (
@@ -985,11 +986,52 @@ function AcademicSettings({token,onSaved}:{token:string;onSaved:()=>void}) {
   return <section className="panel settings-panel"><div className="panel-heading"><div><h2>Academic year and active term</h2><p>These settings determine which class fee is assigned to new students.</p></div></div>{message&&<div className="success-notice">{message}</div>}<details className="form-disclosure"><summary>Edit academic year and active term</summary><form className="student-form" onSubmit={save}><div className="student-form-grid"><label>Academic year *<input required type="number" min="2000" max="2100" value={year} onChange={e=>setYear(Number(e.target.value))}/></label><label>Active term *<select required value={term} onChange={e=>setTerm(e.target.value)}><option>Term 1</option><option>Term 2</option><option>Term 3</option></select></label></div><div className="form-actions"><button className="primary-button" disabled={busy}>{busy?'Saving...':'Save academic settings'}</button></div></form></details></section>
 }
 
+type StaffSelfAttendanceRecord = {id:number;attendance_date:string;status:string;notes?:string|null;check_in_at?:string|null;check_out_at?:string|null}
+type StaffSelfAttendanceData = {staff_name:string;staff_number:string;today:{attendance_date:string;status:string;check_in_at?:string|null;check_out_at?:string|null};records:StaffSelfAttendanceRecord[]}
+
+function StaffSelfAttendance({token}:{token:string}) {
+  const [data,setData]=useState<StaffSelfAttendanceData|null>(null)
+  const [loading,setLoading]=useState(true)
+  const [busy,setBusy]=useState(false)
+  const [error,setError]=useState('')
+  const [notice,setNotice]=useState('')
+  async function refresh() {
+    setLoading(true);setError('')
+    try { setData(await api<StaffSelfAttendanceData>('me/staff-attendance',token)) }
+    catch(e) { setError(e instanceof Error?e.message:'Unable to load your staff attendance.') }
+    finally { setLoading(false) }
+  }
+  useEffect(()=>{void refresh()},[token])
+  async function act(action:'check-in'|'check-out') {
+    setBusy(true);setError('');setNotice('')
+    try {
+      const result=await api<{message:string}>(`me/staff-attendance/${action}`,token,{method:'POST'})
+      setNotice(result.message);setData(await api<StaffSelfAttendanceData>('me/staff-attendance',token))
+    } catch(e) {setError(e instanceof Error?e.message:'Unable to record your attendance.')}
+    finally {setBusy(false)}
+  }
+  return <div className="academic-workspace"><section className="panel">
+    <div className="panel-heading"><div><h2>My attendance</h2><p>Check in and out using your staff account. Your times are sent to the authorised attendance office.</p></div><button type="button" className="secondary-button" onClick={()=>void refresh()} disabled={loading||busy}>Refresh</button></div>
+    {error&&<div className="form-error" role="alert">{error}</div>}{notice&&<div className="success-notice" role="status">{notice}</div>}
+    {loading&&!data&&<p className="form-hint">Loading your attendance...</p>}
+    {data&&<>
+      <div className="teacher-attendance-identity"><strong>{data.staff_name}</strong><span>{data.staff_number}</span></div>
+      <div className="staff-self-checkin-card"><div><span>Today · {new Date(data.today.attendance_date+'T00:00:00').toLocaleDateString('en-UG',{day:'numeric',month:'long',year:'numeric'})}</span><strong>{data.today.status}</strong><small>Check in: {data.today.check_in_at?.slice(11,16)||'Not recorded'} · Check out: {data.today.check_out_at?.slice(11,16)||'Not recorded'}</small></div>
+        {!data.today.check_in_at?<button type="button" className="primary-button" disabled={busy} onClick={()=>void act('check-in')}>{busy?'Submitting...':'Check in'}</button>:!data.today.check_out_at?<button type="button" className="secondary-button" disabled={busy} onClick={()=>void act('check-out')}>{busy?'Submitting...':'Check out'}</button>:<span className="attendance-status-pill status-present">Day completed</span>}
+      </div>
+      <div className="table-wrap"><table><thead><tr><th>Date</th><th>Check in</th><th>Check out</th><th>Status</th><th>Notes</th></tr></thead><tbody>
+        {data.records.map(row=><tr key={row.id}><td>{new Date(row.attendance_date+'T00:00:00').toLocaleDateString('en-UG',{day:'numeric',month:'short',year:'numeric'})}</td><td>{row.check_in_at?.slice(11,16)||'—'}</td><td>{row.check_out_at?.slice(11,16)||'—'}</td><td><span className={'attendance-status-pill status-'+row.status.toLowerCase()}>{row.status}</span></td><td>{row.notes||'—'}</td></tr>)}
+        {!data.records.length&&<tr><td colSpan={5}>No attendance records yet.</td></tr>}
+      </tbody></table></div>
+    </>}
+  </section></div>
+}
+
 type TeacherAssignment = {assignment_id:number;class_id:number;class:string;subject_id:number;subject:string}
 type TeacherStudent = {id:number;first_name:string;last_name:string;admission_number:string;class_id:number}
 type TeacherExam = {id:number;name:string;term:string;year:number;class_id:number|null;assigned_subjects:{id:number;name:string}[]}
 type TeacherMark = {id:number;student_id:number;subject_id:number;exam_id:number;score:number;verified:boolean;student_name:string;admission_number:string;class_id:number|null}
-type TeacherOwnAttendance = {staff_name:string;staff_number:string;records:{id:number;attendance_date:string;status:string;notes?:string|null}[]}
+type TeacherOwnAttendance = {staff_name:string;staff_number:string;today:{attendance_date:string;status:string;check_in_at?:string|null;check_out_at?:string|null};records:{id:number;attendance_date:string;status:string;notes?:string|null;check_in_at?:string|null;check_out_at?:string|null}[]}
 type ClassTeacherAssignment = {assignment_id:number;class_id:number;class:string}
 
 function TeacherWorkspace({token,active}:{token:string;active:string}) {
@@ -1010,9 +1052,12 @@ function TeacherWorkspace({token,active}:{token:string;active:string}) {
   const [resultMessage,setResultMessage]=useState('')
   const [resultError,setResultError]=useState('')
   const [resultSaving,setResultSaving]=useState(false)
+  const [resultSubmissionComplete,setResultSubmissionComplete]=useState(false)
   const [ownAttendance,setOwnAttendance]=useState<TeacherOwnAttendance|null>(null)
   const [ownAttendanceError,setOwnAttendanceError]=useState('')
   const [ownAttendanceLoading,setOwnAttendanceLoading]=useState(false)
+  const [ownAttendanceActionBusy,setOwnAttendanceActionBusy]=useState(false)
+  const [ownAttendanceNotice,setOwnAttendanceNotice]=useState('')
 
   useEffect(()=>{Promise.all([api<TeacherAssignment[]>('teacher/my-assignments',token),api<ClassTeacherAssignment[]>('teacher/my-class-teacher-assignments',token)]).then(([rows,classRows])=>{setAssignments(rows);setClassTeacherAssignments(classRows);if(classRows.length)setClassId(String(classRows[0].class_id))}).catch(e=>setMessage(e.message))},[token])
   useEffect(()=>{if(active!=='Attendance'||!classId)return;api<TeacherStudent[]>('teacher/students?class_id='+classId,token).then(setStudents).catch(e=>setMessage(e.message))},[active,classId,token])
@@ -1020,7 +1065,7 @@ function TeacherWorkspace({token,active}:{token:string;active:string}) {
     if(active!=='My Results')return
     api<TeacherExam[]>('teacher/exams',token).then(rows=>{
       setTeacherExams(rows)
-      if(rows.length){setExamId(String(rows[0].id));setSelectedSubjectId(String(rows[0].assigned_subjects?.[0]?.id||''))}
+      if(rows.length){setExamId(String(rows[0].id));setSelectedSubjectId(String(rows[0].assigned_subjects?.[0]?.id||''));setResultSubmissionComplete(false)}
       else {setExamId('');setSelectedSubjectId('')}
     }).catch(e=>setResultError(e.message))
   },[active,token])
@@ -1029,15 +1074,27 @@ function TeacherWorkspace({token,active}:{token:string;active:string}) {
     let cancelled=false
     setOwnAttendanceLoading(true)
     setOwnAttendanceError('')
-    api<TeacherOwnAttendance>('teacher/my-staff-attendance',token).then(data=>{
+    api<TeacherOwnAttendance>('me/staff-attendance',token).then(data=>{
       if(!cancelled)setOwnAttendance(data)
     }).catch(error=>{
       if(!cancelled){setOwnAttendance(null);setOwnAttendanceError(error instanceof Error?error.message:'Unable to load your attendance records.')}
     }).finally(()=>{if(!cancelled)setOwnAttendanceLoading(false)})
     return ()=>{cancelled=true}
   },[active,token])
+  async function updateOwnAttendance(action:'check-in'|'check-out') {
+    setOwnAttendanceActionBusy(true); setOwnAttendanceNotice(''); setOwnAttendanceError('')
+    try {
+      const result = await api<{message:string}>(`me/staff-attendance/${action}`, token, { method: 'POST' })
+      const latest = await api<TeacherOwnAttendance>('me/staff-attendance', token)
+      setOwnAttendance(latest); setOwnAttendanceNotice(result.message)
+    } catch (error) {
+      setOwnAttendanceError(error instanceof Error ? error.message : 'Unable to update your attendance.')
+    } finally { setOwnAttendanceActionBusy(false) }
+  }
     const selectedTeacherExam=teacherExams.find(exam=>String(exam.id)===examId)||null
   const assignedSubjects=selectedTeacherExam?.assigned_subjects||[]
+  const currentSubjectSubmittedCount = resultStudents.filter(student => resultMarks.some(mark => mark.student_id === student.id && mark.subject_id === Number(selectedSubjectId))).length
+  const currentSubjectProgress = resultStudents.length ? Math.round(currentSubjectSubmittedCount / resultStudents.length * 100) : 0
   useEffect(()=>{
     if(active!=='My Results'||!selectedTeacherExam){setResultStudents([]);setResultMarks([]);return}
     let cancelled=false
@@ -1065,7 +1122,7 @@ function TeacherWorkspace({token,active}:{token:string;active:string}) {
     try{
       const result=await api<{saved:number;no_score?:number}>('teacher/marks/bulk',token,{method:'POST',body:JSON.stringify({exam_id:selectedTeacherExam.id,subject_id:Number(selectedSubjectId),records})})
       const rows=await api<TeacherMark[]>('teacher/marks?exam_id='+selectedTeacherExam.id,token)
-      setResultMarks(rows);setResultMessage(result.saved+' results submitted for academic verification, including '+(result.no_score ?? noScoreCount)+' No score (0) entries.')
+      setResultMarks(rows);setResultMessage(result.saved+' results submitted for academic verification, including '+(result.no_score ?? noScoreCount)+' No score (0) entries.');setResultSubmissionComplete(true)
     }catch(e){setResultError(e instanceof Error?e.message:'Unable to submit class results.')}
     finally{setResultSaving(false)}
   }
@@ -1077,10 +1134,14 @@ function TeacherWorkspace({token,active}:{token:string;active:string}) {
       {ownAttendanceError&&<div className="form-error" role="alert">{ownAttendanceError}</div>}
       {ownAttendance&&<>
         <div className="teacher-attendance-identity"><strong>{ownAttendance.staff_name}</strong><span>{ownAttendance.staff_number}</span></div>
-        <p className="attendance-help">Check the date and recorded status. If anything is incorrect, contact the school administrator to request a correction.</p>
-        <div className="table-wrap"><table><thead><tr><th>Date</th><th>Your status</th><th>Notes</th></tr></thead><tbody>
-          {ownAttendance.records.map(record=><tr key={record.id}><td>{new Date(record.attendance_date+'T00:00:00').toLocaleDateString('en-UG',{day:'numeric',month:'short',year:'numeric'})}</td><td><span className={'attendance-status-pill status-'+record.status.toLowerCase()}>{record.status}</span></td><td>{record.notes||'—'}</td></tr>)}
-          {!ownAttendance.records.length&&<tr><td colSpan={3}>No attendance records have been saved against your staff profile yet.</td></tr>}
+        <div className="staff-self-checkin-card"><div><span>Today · {new Date(ownAttendance.today.attendance_date+'T00:00:00').toLocaleDateString('en-UG',{day:'numeric',month:'long',year:'numeric'})}</span><strong>{ownAttendance.today.status}</strong><small>Check in: {ownAttendance.today.check_in_at?.slice(11,16) || 'Not recorded'} · Check out: {ownAttendance.today.check_out_at?.slice(11,16) || 'Not recorded'}</small></div>
+          {!ownAttendance.today.check_in_at ? <button type="button" className="primary-button" disabled={ownAttendanceActionBusy} onClick={()=>void updateOwnAttendance('check-in')}>{ownAttendanceActionBusy?'Submitting...':'Check in'}</button> : !ownAttendance.today.check_out_at ? <button type="button" className="secondary-button" disabled={ownAttendanceActionBusy} onClick={()=>void updateOwnAttendance('check-out')}>{ownAttendanceActionBusy?'Submitting...':'Check out'}</button> : <span className="attendance-status-pill status-present">Day completed</span>}
+        </div>
+        {ownAttendanceNotice&&<div className="success-notice" role="status">{ownAttendanceNotice}</div>}
+        <p className="attendance-help">Your check-in and check-out times are sent to the authorised attendance office. The attendance administrator can review and correct the official status.</p>
+        <div className="table-wrap"><table><thead><tr><th>Date</th><th>Check in</th><th>Check out</th><th>Your status</th><th>Notes</th></tr></thead><tbody>
+          {ownAttendance.records.map(record=><tr key={record.id}><td>{new Date(record.attendance_date+'T00:00:00').toLocaleDateString('en-UG',{day:'numeric',month:'short',year:'numeric'})}</td><td>{record.check_in_at?.slice(11,16)||'—'}</td><td>{record.check_out_at?.slice(11,16)||'—'}</td><td><span className={'attendance-status-pill status-'+record.status.toLowerCase()}>{record.status}</span></td><td>{record.notes||'—'}</td></tr>)}
+          {!ownAttendance.records.length&&<tr><td colSpan={5}>No attendance records have been saved against your staff profile yet.</td></tr>}
         </tbody></table></div>
       </>}
     </section>
@@ -1091,24 +1152,36 @@ function TeacherWorkspace({token,active}:{token:string;active:string}) {
       {resultError&&<div className="form-error" role="alert">{resultError}</div>}
       {resultMessage&&<div className="success-notice" role="status">{resultMessage}</div>}
       <div className="student-form-grid">
-        <label>Examination<select value={examId} onChange={e=>{const next=teacherExams.find(row=>String(row.id)===e.target.value);setExamId(e.target.value);setSelectedSubjectId(String(next?.assigned_subjects?.[0]?.id||''))}}>
+        <label>Examination<select value={examId} onChange={e=>{const next=teacherExams.find(row=>String(row.id)===e.target.value);setExamId(e.target.value);setSelectedSubjectId(String(next?.assigned_subjects?.[0]?.id||''));setResultSubmissionComplete(false)}}>
           <option value="">Choose an assigned examination</option>
           {teacherExams.map(exam=><option key={exam.id} value={exam.id}>{exam.name} · {exam.term} {exam.year}</option>)}
         </select></label>
-        <label>Assigned subject<select value={selectedSubjectId} onChange={e=>setSelectedSubjectId(e.target.value)}>
+        <label>Assigned subject<select value={selectedSubjectId} onChange={e=>{setSelectedSubjectId(e.target.value);setResultSubmissionComplete(false)}}>
           <option value="">Choose subject</option>
           {assignedSubjects.map(subject=><option key={subject.id} value={subject.id}>{subject.name}</option>)}
         </select></label>
       </div>
       {selectedTeacherExam&&<p className="form-hint">Class: {assignments.find(row=>row.class_id===selectedTeacherExam.class_id)?.class || 'Assigned class'} · {resultStudents.length} active students loaded.</p>}
       {!teacherExams.length&&<p className="form-hint">No examinations are available for your assigned subject and class combinations.</p>}
-      {selectedTeacherExam&&selectedSubjectId&&<form className="student-form" onSubmit={saveTeacherMarksBulk}>
-        <div className="table-wrap"><table><thead><tr><th>#</th><th>Student</th><th>Admission number</th><th>Score (0–100)</th><th>Status</th></tr></thead><tbody>
-          {resultStudents.map((student,index)=>{const mark=resultMarks.find(row=>row.student_id===student.id&&row.subject_id===Number(selectedSubjectId));return <tr key={student.id}><td>{index+1}</td><td>{student.first_name} {student.last_name}</td><td>{student.admission_number}</td><td><input aria-label={'Score for '+student.first_name+' '+student.last_name} type="number" min="0" max="100" step="0.01" required value={resultScores[student.id]??''} disabled={Boolean(mark?.verified)} onChange={e=>setResultScores(old=>({...old,[student.id]:e.target.value}))}/></td><td>{mark?.verified?'Verified · locked':mark?'Saved · editable':'Not yet entered'}</td></tr>})}
-          {!resultStudents.length&&<tr><td colSpan={5}>No active students are registered in this class.</td></tr>}
-        </tbody></table></div>
-        <div className="form-actions"><button className="primary-button" disabled={resultSaving||!resultStudents.length}>{resultSaving?'Submitting class results...':'Submit all class results'}</button></div>
-      </form>}
+      {selectedTeacherExam&&selectedSubjectId&&<>
+        <div className="teacher-results-progress">
+          <div><strong>Submission progress</strong><span>{currentSubjectSubmittedCount} of {resultStudents.length} student records submitted · {currentSubjectProgress}%</span></div>
+          <div className="teacher-results-progress-track"><span style={{width:(resultSaving?Math.max(currentSubjectProgress,65):currentSubjectProgress)+'%'}}/></div>
+        </div>
+        {resultSubmissionComplete ? <section className="teacher-results-complete" role="status">
+          <div className="teacher-results-complete-icon">✓</div><h3>Class results submitted</h3>
+          <p>{resultStudents.length} student records for {assignedSubjects.find(subject=>String(subject.id)===selectedSubjectId)?.name || 'this subject'} have been sent to the academic officers.</p>
+          <span className="student-score-status recorded">Submitted · Not verified</span>
+          <p className="form-hint">The academic officer will review and verify these results. Once verified, the status will update here automatically when you refresh.</p>
+          <button type="button" className="secondary-button" onClick={()=>{const next=assignedSubjects.find(subject=>String(subject.id)!==selectedSubjectId&&!resultMarks.some(mark=>mark.subject_id===subject.id));if(next)setSelectedSubjectId(String(next.id));setResultSubmissionComplete(false)}}>Continue to another subject / review scores</button>
+        </section> : <form className="student-form" onSubmit={saveTeacherMarksBulk}>
+          <div className="table-wrap"><table><thead><tr><th>#</th><th>Student</th><th>Admission number</th><th>Score (0–100)</th><th>Status</th></tr></thead><tbody>
+            {resultStudents.map((student,index)=>{const mark=resultMarks.find(row=>row.student_id===student.id&&row.subject_id===Number(selectedSubjectId));return <tr key={student.id}><td>{index+1}</td><td>{student.first_name} {student.last_name}</td><td>{student.admission_number}</td><td><input aria-label={'Score for '+student.first_name+' '+student.last_name} type="number" min="0" max="100" step="0.01" required value={resultScores[student.id]??''} disabled={Boolean(mark?.verified)} onChange={e=>setResultScores(old=>({...old,[student.id]:e.target.value}))}/></td><td>{mark?.verified?'Verified':mark?'Submitted · Not verified':'Not submitted'}</td></tr>})}
+            {!resultStudents.length&&<tr><td colSpan={5}>No active students are registered in this class.</td></tr>}
+          </tbody></table></div>
+          <div className="form-actions"><button className="primary-button" disabled={resultSaving||!resultStudents.length}>{resultSaving?'Submitting class results...':'Submit all class results'}</button></div>
+        </form>}
+      </>}
     </section>
   </div>
   return <section className="panel teacher-class-attendance"><div className="panel-heading"><div><h2>Class attendance</h2><p>Mark the whole class register and submit it once. Only your separately assigned class-teacher responsibilities appear here.</p></div></div>{message&&<div className="notice">{message}</div>}<div className="teacher-attendance-controls"><div><strong>Choose your responsible class</strong><div className="teacher-class-picks">{classTeacherAssignments.map(a=><button type="button" key={a.assignment_id} className={String(classId)===String(a.class_id)?"teacher-class-pick active":"teacher-class-pick"} aria-pressed={String(classId)===String(a.class_id)} onClick={()=>{setClassId(String(a.class_id));setStatuses({})}}>{a.class}</button>)}</div></div><label className="teacher-attendance-date">Attendance date<input type="date" value={attendanceDate} onChange={e=>setAttendanceDate(e.target.value)}/></label></div><div className="table-wrap"><table><thead><tr><th>#</th><th>Student</th><th>Admission number</th><th>Status</th></tr></thead><tbody>{students.map((student,index)=><tr key={student.id}><td>{index+1}</td><td>{student.first_name} {student.last_name}</td><td>{student.admission_number}</td><td><div className="attendance-choice-group" role="group" aria-label={"Attendance status for "+student.first_name+" "+student.last_name}>{["Present","Absent","Late","Excused"].map(status=><button type="button" key={status} className={(statuses[student.id]||"Present")===status?"attendance-choice active status-"+status.toLowerCase():"attendance-choice"} aria-pressed={(statuses[student.id]||"Present")===status} onClick={()=>setStatuses(old=>({...old,[student.id]:status}))}>{status}</button>)}</div></td></tr>)}</tbody></table></div>{students.length>0&&<div className="form-actions"><button type="button" className="primary-button" disabled={busy!==null} onClick={()=>void saveClassAttendance()}>{busy!==null?'Saving register...':'Submit class attendance'}</button></div>}{!students.length&&<div className="empty-state"><Users size={30}/><p>{classTeacherAssignments.length?'Choose one of your assigned classes to load its active students.':'No class has been assigned to you as class teacher. Subject teaching assignments do not grant class attendance access.'}</p></div>}</section>
