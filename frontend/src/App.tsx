@@ -969,24 +969,26 @@ function App() {
           <div className="brand-name">School<span>Bridge</span></div>
           <button className="mobile-close" onClick={() => setMobileMenu(false)}><X /></button>
         </div>
-        <div className="school-label">SCHOOL MANAGEMENT</div>
-        <nav>
-          {(user.role === 'parent' ? parentMenu : user.role === 'admin' ? menu : isFinanceAccount(user) ? getStaffNavigation(user).filter(item => ['Overview','Fees & Finance','My Attendance','My Profile'].includes(item.label)) : getStaffNavigation(user)).map(item => {
-            const Icon = item.icon
-            return (
-              <button key={item.label} className={`nav-item ${active === item.label ? 'active' : ''}`} onClick={() => { setActive(item.label); setMobileMenu(false) }}>
-                <Icon size={19} /> <span>{item.label}</span>
-                {active === item.label && <span className="active-dot" />}
-              </button>
-            )
-          })}
-        </nav>
-        <div className="sidebar-bottom">
-          {user.role === 'admin' && <button className="nav-item" onClick={() => setActive('Settings')}><Settings size={19} /> Settings</button>}
-          <div className="profile-card">
-            <div className="avatar">{user.username.slice(0, 1).toUpperCase()}</div>
-            <div className="profile-info"><strong>{user.username}</strong><small>{user.role}</small></div>
-            <button className="logout-button" title="Sign out" onClick={logout}><LogOut size={18} /></button>
+        <div className="sidebar-management">
+          <div className="school-label">SCHOOL MANAGEMENT</div>
+          <nav>
+            {(user.role === 'parent' ? parentMenu : user.role === 'admin' ? menu : isFinanceAccount(user) ? getStaffNavigation(user).filter(item => ['Overview','Fees & Finance','My Attendance','My Profile'].includes(item.label)) : getStaffNavigation(user)).map(item => {
+              const Icon = item.icon
+              return (
+                <button key={item.label} className={`nav-item ${active === item.label ? 'active' : ''}`} onClick={() => { setActive(item.label); setMobileMenu(false) }}>
+                  <Icon size={19} /> <span>{item.label}</span>
+                  {active === item.label && <span className="active-dot" />}
+                </button>
+              )
+            })}
+          </nav>
+          <div className="sidebar-bottom">
+            {user.role === 'admin' && <button className="nav-item" onClick={() => setActive('Settings')}><Settings size={19} /> Settings</button>}
+            <div className="profile-card">
+              <div className="avatar">{user.username.slice(0, 1).toUpperCase()}</div>
+              <div className="profile-info"><strong>{user.username}</strong><small>{user.role}</small></div>
+              <button className="logout-button" title="Sign out" onClick={logout}><LogOut size={18} /></button>
+            </div>
           </div>
         </div>
       </aside>

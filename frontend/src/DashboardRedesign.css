@@ -134,3 +134,50 @@
 .redesigned-app-shell .sidebar .sidebar-brand .brand-name{color:#1d2b42!important}
 .redesigned-app-shell .sidebar .sidebar-brand .brand-name span{color:var(--role-primary)!important}
 .redesigned-app-shell .sidebar .sidebar-brand .mobile-close{color:#536176!important}
+
+
+/* Sidebar is intentionally split into two visible panels:
+   white SchoolBridge brand header and a separate role-coloured management panel. */
+.redesigned-app-shell .sidebar{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  padding:16px 14px 14px!important;
+  background:#e9eef5!important;
+}
+.redesigned-app-shell .sidebar .sidebar-brand{
+  flex:0 0 auto;
+  min-height:76px;
+  margin:0!important;
+  padding:14px 12px!important;
+  background:#fff!important;
+  border:1px solid #dce4ee;
+  border-radius:14px;
+  box-shadow:0 3px 12px #172b4d0d;
+}
+.redesigned-app-shell .sidebar .sidebar-management{
+  display:flex;
+  flex:1 1 auto;
+  flex-direction:column;
+  min-height:0;
+  padding:18px 12px 14px;
+  border-radius:14px;
+  background:linear-gradient(180deg,var(--role-deep,#122c4b) 0%,var(--role-primary,#2869b4) 100%);
+  color:#fff;
+  box-shadow:0 8px 22px #172b4d18;
+}
+.redesigned-app-shell .sidebar .sidebar-management .school-label{
+  padding:2px 10px 14px;
+  color:#ffffffb8;
+  font-size:9px;
+  font-weight:800;
+  letter-spacing:1.45px;
+}
+.redesigned-app-shell .sidebar .sidebar-management nav{flex:0 0 auto}
+.redesigned-app-shell .sidebar .sidebar-management .sidebar-bottom{margin-top:auto;padding-top:20px}
+.redesigned-app-shell .sidebar .sidebar-management .profile-card{
+  border-top:1px solid #ffffff30!important;
+}
+@media(max-width:900px){
+  .redesigned-app-shell .sidebar{padding:16px 14px 14px!important}
+}
