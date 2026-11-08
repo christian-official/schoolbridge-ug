@@ -339,7 +339,7 @@ function App() {
     const canLoadStudents = allowed('Students')
     const canLoadClasses = canLoadStudents || allowed('Timetable') || allowed('Examinations') || allowed('Attendance')
     const jobs: Promise<any>[] = [
-      canLoadStudents ? api<StudentPage>('students/search?page=1&page_size=25', authToken) : Promise.resolve(null),
+      canLoadStudents ? api<StudentPage>('students/search?page=1&page_size=5', authToken) : Promise.resolve(null),
       canLoadClasses ? api<RecordItem[]>('classes', authToken) : Promise.resolve(null),
       isAdmin ? api<AdmissionSettings>('settings/admission-number', authToken) : Promise.resolve(null),
       allowed('Overview') ? api<DashboardSummary>(`dashboard/summary?attendance_date=${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`, authToken) : Promise.resolve(null),
@@ -532,7 +532,7 @@ function App() {
 
   async function loadStudentPage(page = 1, query = search) {
     try {
-      const params = new URLSearchParams({ page: String(page), page_size: '25', search: query })
+      const params = new URLSearchParams({ page: String(page), page_size: '5', search: query })
       if (studentClassFilter) params.set('class_id', studentClassFilter)
       const result = await api<StudentPage>('students/search?' + params.toString(), token)
       setStudents(result.items); setStudentTotal(result.total); setStudentPage(result.page)
@@ -1588,7 +1588,7 @@ function LeadershipDuty({token}:{token:string}) {
     const [p,d,s,t]=await Promise.all([
       api<PrefectRow[]>('leadership/prefects?active_only=false',token),
       api<DutyRow[]>('leadership/teacher-duties',token),
-      api<{items:LeadershipStudent[]}>('students/search?page=1&page_size=100&search='+encodeURIComponent(studentSearch),token),
+      api<{items:LeadershipStudent[]}>('students/search?page=1&page_size=5&search='+encodeURIComponent(studentSearch),token),
       api<{items:LeadershipStaff[]}>('staff?page=1&page_size=100&category=Teaching',token),
     ])
     setPrefects(p);setDuties(d);setStudents(s.items);setStaff(t.items.filter(x=>x.status==='active'))
