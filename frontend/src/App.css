@@ -1452,3 +1452,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .staff-category-option:focus-visible { outline:2px solid var(--blue); outline-offset:2px; }
 .staff-list-count { margin:8px 0 12px; color:var(--muted,#667085); font-size:13px; }
 @media (max-width:760px) { .staff-category-options { width:100%; } .staff-category-option { flex:1 1 auto; } }
+
+
+/* Submitted-result review indicators */
+.academic-tab-count { display:inline-flex; align-items:center; justify-content:center; min-width:19px; height:19px; margin-left:7px; padding:0 5px; border-radius:999px; background:#fff0d7; color:#8a5100; font-size:11px; font-weight:850; }
+.submitted-results-workspace > .recorded-subject-card { margin-top:16px; }
+.submitted-results-workspace .recorded-subject-heading > div { display:grid; gap:4px; }
+.submitted-results-workspace .recorded-subject-heading > div span { color:#718096; font-size:12px; }
