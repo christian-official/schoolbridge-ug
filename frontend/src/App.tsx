@@ -922,7 +922,7 @@ function App() {
                   <label>Separator<select value={admissionSettings.admission_separator} onChange={e => setAdmissionSettings({ ...admissionSettings, admission_separator: e.target.value })}><option value="-">Hyphen (-)</option><option value="/">Slash (/)</option><option value="">None</option></select></label>
                   <label>Number of digits<select value={admissionSettings.admission_padding} onChange={e => setAdmissionSettings({ ...admissionSettings, admission_padding: Number(e.target.value) })}>{[3,4,5,6,7,8].map(n => <option key={n} value={n}>{n} digits</option>)}</select></label>
                   <label>Next sequence number<input type="number" min="1" value={admissionSettings.next_admission_number} onChange={e => setAdmissionSettings({ ...admissionSettings, next_admission_number: Math.max(1, Number(e.target.value)) })} required /></label>
-                  <label className="settings-checkbox"><input type="checkbox" checked={admissionSettings.include_year} onChange={e => setAdmissionSettings({ ...admissionSettings, include_year: e.target.checked })} /> Include current year</label>
+                  <button type="button" className={admissionSettings.include_year ? "choice-toggle active" : "choice-toggle"} aria-pressed={admissionSettings.include_year} onClick={() => setAdmissionSettings({ ...admissionSettings, include_year: !admissionSettings.include_year })}>Include current year · {admissionSettings.include_year ? "Yes" : "No"}</button>
                 </div>
                 <div className="number-preview"><span>Example of next admission number</span><strong>{[admissionSettings.admission_prefix.trim(), ...(admissionSettings.include_year ? [String(new Date().getFullYear())] : []), String(admissionSettings.next_admission_number).padStart(admissionSettings.admission_padding, '0')].filter(Boolean).join(admissionSettings.admission_separator)}</strong></div>
                 <p className="form-hint">These settings affect new registrations only. Existing admission numbers will not be changed.</p>
@@ -1044,6 +1044,8 @@ function TeacherWorkspace({token,active}:{token:string;active:string}) {
   const [message,setMessage]=useState('')
   const [busy,setBusy]=useState<number|null>(null)
   const [teacherExams,setTeacherExams]=useState<TeacherExam[]>([])
+  const [activeTeacherExamType,setActiveTeacherExamType]=useState('All exams')
+  const [selectedTeacherExamGroupKey,setSelectedTeacherExamGroupKey]=useState('')
   const [examId,setExamId]=useState('')
   const [resultStudents,setResultStudents]=useState<TeacherStudent[]>([])
   const [resultMarks,setResultMarks]=useState<TeacherMark[]>([])
@@ -1065,8 +1067,14 @@ function TeacherWorkspace({token,active}:{token:string;active:string}) {
     if(active!=='My Results')return
     api<TeacherExam[]>('teacher/exams',token).then(rows=>{
       setTeacherExams(rows)
-      if(rows.length){setExamId(String(rows[0].id));setSelectedSubjectId(String(rows[0].assigned_subjects?.[0]?.id||''));setResultSubmissionComplete(false)}
-      else {setExamId('');setSelectedSubjectId('')}
+      if(rows.length){
+        const first=rows[0]
+        setActiveTeacherExamType('All exams')
+        setSelectedTeacherExamGroupKey([first.name||'Other',first.term,first.year].join('|'))
+        setExamId(String(first.id))
+        setSelectedSubjectId(String(first.assigned_subjects?.[0]?.id||''))
+        setResultSubmissionComplete(false)
+      } else {setExamId('');setSelectedSubjectId('');setSelectedTeacherExamGroupKey('')}
     }).catch(e=>setResultError(e.message))
   },[active,token])
   useEffect(()=>{
@@ -1091,7 +1099,12 @@ function TeacherWorkspace({token,active}:{token:string;active:string}) {
       setOwnAttendanceError(error instanceof Error ? error.message : 'Unable to update your attendance.')
     } finally { setOwnAttendanceActionBusy(false) }
   }
-    const selectedTeacherExam=teacherExams.find(exam=>String(exam.id)===examId)||null
+    const teacherExamTypes=['Beginning of Term','Mid-Term','End of Term','Mock','Promotional','Other']
+  const teacherExamGroupKey=(exam:TeacherExam)=>[exam.name||'Other',exam.term,exam.year].join('|')
+  const teacherExamCategories=['All exams',...teacherExamTypes]
+  const visibleTeacherExams=teacherExams.filter(exam=>activeTeacherExamType==='All exams'||(teacherExamTypes.includes(exam.name)?exam.name:'Other')===activeTeacherExamType)
+  const teacherExamGroups=Array.from(new Map(visibleTeacherExams.map(exam=>[teacherExamGroupKey(exam),exam])).values())
+  const selectedTeacherExam=teacherExams.find(exam=>String(exam.id)===examId)||null
   const assignedSubjects=selectedTeacherExam?.assigned_subjects||[]
   const currentSubjectSubmittedCount = resultStudents.filter(student => resultMarks.some(mark => mark.student_id === student.id && mark.subject_id === Number(selectedSubjectId))).length
   const currentSubjectProgress = resultStudents.length ? Math.round(currentSubjectSubmittedCount / resultStudents.length * 100) : 0
@@ -1151,16 +1164,14 @@ function TeacherWorkspace({token,active}:{token:string;active:string}) {
       <div className="panel-heading"><div><h2>Class results entry</h2><p>Your assigned subject and class are loaded automatically. Enter the whole class register and submit once. Blank scores are submitted as <strong>No score (0)</strong> for academic officers to review.</p></div>{selectedTeacherExam&&<button type="button" className="secondary-button" disabled={resultSaving} onClick={()=>api<TeacherMark[]>('teacher/marks?exam_id='+selectedTeacherExam.id,token).then(setResultMarks).catch(e=>setResultError(e instanceof Error?e.message:'Unable to refresh result status.'))}>Refresh status</button>}</div>
       {resultError&&<div className="form-error" role="alert">{resultError}</div>}
       {resultMessage&&<div className="success-notice" role="status">{resultMessage}</div>}
-      <div className="student-form-grid">
-        <label>Examination<select value={examId} onChange={e=>{const next=teacherExams.find(row=>String(row.id)===e.target.value);setExamId(e.target.value);setSelectedSubjectId(String(next?.assigned_subjects?.[0]?.id||''));setResultSubmissionComplete(false)}}>
-          <option value="">Choose an assigned examination</option>
-          {teacherExams.map(exam=><option key={exam.id} value={exam.id}>{exam.name} · {exam.term} {exam.year}</option>)}
-        </select></label>
-        <label>Assigned subject<select value={selectedSubjectId} onChange={e=>{setSelectedSubjectId(e.target.value);setResultSubmissionComplete(false)}}>
-          <option value="">Choose subject</option>
-          {assignedSubjects.map(subject=><option key={subject.id} value={subject.id}>{subject.name}</option>)}
-        </select></label>
-      </div>
+      <div className="teacher-exam-selection">
+         <div className="exam-flow-step"><span className="form-section-number">01</span><div><strong>Choose exam type</strong><small>Choose the category used by the school examination register.</small></div></div>
+         <nav className="exam-type-tabs" aria-label="Examination types">{teacherExamCategories.map(type=><button type="button" key={type} className={activeTeacherExamType===type?'exam-type-tab active':'exam-type-tab'} aria-pressed={activeTeacherExamType===type} onClick={()=>{setActiveTeacherExamType(type);setSelectedTeacherExamGroupKey('');setExamId('');setSelectedSubjectId('');setResultSubmissionComplete(false)}}>{type}</button>)}</nav>
+         <div className="exam-flow-step"><span className="form-section-number">02</span><div><strong>Choose examination</strong><small>Select the term and academic year.</small></div></div>
+         <div className="exam-choice-grid">{teacherExamGroups.map(exam=>{const key=teacherExamGroupKey(exam);return <button type="button" key={key} className={selectedTeacherExamGroupKey===key?'exam-choice active':'exam-choice'} aria-pressed={selectedTeacherExamGroupKey===key} onClick={()=>{setSelectedTeacherExamGroupKey(key);setExamId('');setSelectedSubjectId('');setResultSubmissionComplete(false)}}><strong>{teacherExamTypes.includes(exam.name)?exam.name:'Other'}</strong><span>{exam.term} · {exam.year}</span><small>{visibleTeacherExams.filter(row=>teacherExamGroupKey(row)===key).length} assigned class(es)</small></button>})}{!teacherExamGroups.length&&<p className="form-hint">No examinations are available under this category for your assigned classes and subjects.</p>}</div>
+         {selectedTeacherExamGroupKey&&<><div className="exam-flow-step"><span className="form-section-number">03</span><div><strong>Choose class</strong><small>Open the assigned class examination.</small></div></div><div className="exam-class-choices">{teacherExams.filter(exam=>teacherExamGroupKey(exam)===selectedTeacherExamGroupKey).map(exam=><button type="button" key={exam.id} className={examId===String(exam.id)?'exam-class-choice active':'exam-class-choice'} aria-pressed={examId===String(exam.id)} onClick={()=>{setExamId(String(exam.id));setSelectedSubjectId(String(exam.assigned_subjects?.[0]?.id||''));setResultSubmissionComplete(false)}}>{assignments.find(row=>row.class_id===exam.class_id)?.class||'Assigned class'}</button>)}</div></>}
+         {selectedTeacherExam&&<><div className="exam-flow-step"><span className="form-section-number">04</span><div><strong>Choose assigned subject</strong><small>Only subjects assigned to you for this examination are shown.</small></div></div><div className="subject-choice-options">{assignedSubjects.map(subject=><button type="button" key={subject.id} className={selectedSubjectId===String(subject.id)?'exam-pill active':'exam-pill'} aria-pressed={selectedSubjectId===String(subject.id)} onClick={()=>{setSelectedSubjectId(String(subject.id));setResultSubmissionComplete(false)}}>{subject.name}</button>)}</div></>}
+       </div>
       {selectedTeacherExam&&<p className="form-hint">Class: {assignments.find(row=>row.class_id===selectedTeacherExam.class_id)?.class || 'Assigned class'} · {resultStudents.length} active students loaded.</p>}
       {!teacherExams.length&&<p className="form-hint">No examinations are available for your assigned subject and class combinations.</p>}
       {selectedTeacherExam&&selectedSubjectId&&<>
@@ -1322,11 +1333,11 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
     if(label==='Attendance Officer'){next['Attendance']=['view','add','edit'];next['Staff Attendance']=['view','add','edit']}
     setRoleLabel(label);setRoleType(label==='Teacher'||label==='Class Teacher'?'teacher':'staff');setPermissions(next)
   }
-  function toggleSection(section:string,checked:boolean) {
+  function toggleSection(section:string) {
     setPermissions(current=>{
       const next={...current}
-      if(checked) next[section]=section==='My Results'?['view','add','edit']:section==='Attendance'&&roleType==='teacher'?['view','add']:section==='Timetable'&&['Academic Administrator','Academics Officer','DOS'].includes(roleLabel)?['view','add','edit','delete']:['view']
-      else delete next[section]
+      if(next[section]?.includes('view')) delete next[section]
+      else next[section]=section==='My Results'?['view','add','edit']:section==='Attendance'&&roleType==='teacher'?['view','add']:section==='Timetable'&&['Academic Administrator','Academics Officer','DOS'].includes(roleLabel)?['view','add','edit','delete']:['view']
       return next
     })
   }
@@ -1409,8 +1420,8 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
         <label>Staff category<select value={roleType} onChange={e=>setRoleType(e.target.value as 'teacher'|'staff')}><option value="teacher">Teaching staff</option><option value="staff">Non-teaching staff</option></select></label>
       </div>
       <details className="form-disclosure"><summary>Choose which areas this staff member can open</summary>
-        <p className="form-hint">Tick only the school areas needed for this person's work. Unticked areas will not appear in their menu.</p>
-        <div className="student-form-grid">{(catalog.sections||[]).map((section:string)=><label className="settings-checkbox" key={section}><input type="checkbox" checked={Boolean(permissions[section]?.includes('view'))} onChange={e=>toggleSection(section,e.target.checked)}/>{section}</label>)}</div>
+        <p className="form-hint">Choose the school areas this staff member is allowed to open. Selected areas appear in their menu.</p>
+        <div className="permission-choice-grid">{(catalog.sections||[]).map((section:string)=><button type="button" key={section} className={permissions[section]?.includes('view')?'permission-choice active':'permission-choice'} aria-pressed={Boolean(permissions[section]?.includes('view'))} onClick={()=>toggleSection(section)}><span>{section}</span><small>{permissions[section]?.includes('view')?'Enabled':'Not enabled'}</small></button>)}</div>
       </details>
       <div className="form-actions"><button type="button" className="primary-button" onClick={()=>void savePermissions()} disabled={busy||!selectedId}>{busy?'Saving...':'Save staff access'}</button></div>
       <div className="form-actions"><button type="button" className="secondary-button" onClick={()=>void resetSelectedPassword()} disabled={busy||!selectedId}>{busy?'Working...':'Reset login passcode'}</button></div>
@@ -1558,8 +1569,8 @@ function SubjectSettings({token,schoolType}:{token:string;schoolType:'Primary'|'
     names:group.names.filter(name=>available(name)&&name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()))
   })).filter(group=>group.names.length)
 
-  function toggleSubject(name:string,checked:boolean) {
-    setSelected(current=>checked?[...current,name]:current.filter(item=>item!==name))
+  function toggleSubject(name:string) {
+    setSelected(current=>current.includes(name)?current.filter(item=>item!==name):[...current,name])
     setError('');setMessage('')
   }
 
@@ -1604,12 +1615,12 @@ function SubjectSettings({token,schoolType}:{token:string;schoolType:'Primary'|'
     <details className="form-disclosure" open><summary>Add school subjects</summary>
       <form className="student-form" onSubmit={addSelected}>
         <label>Find a subject<input type="search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search the subject list"/></label>
-        <p className="form-hint">Tick every subject you want. Subjects already registered are hidden from this list.</p>
+        <p className="form-hint">Tap each subject you want to add. Selected subjects are highlighted; subjects already registered are hidden.</p>
         {loading?<p className="form-hint">Loading available subjects...</p>:<div className="subject-catalogue">
           {visibleGroups.map(group=><fieldset className="subject-catalogue-group" key={group.group}>
             <legend>{group.group}</legend>
             <div className="subject-catalogue-options">
-              {group.names.map(name=><label className="subject-choice" key={name}><input type="checkbox" checked={selected.includes(name)} onChange={e=>toggleSubject(name,e.target.checked)}/><span>{name}</span></label>)}
+              {group.names.map(name=><button type="button" className={selected.includes(name)?"subject-choice-button active":"subject-choice-button"} key={name} aria-pressed={selected.includes(name)} onClick={()=>toggleSubject(name)}>{name}</button>)}
             </div>
           </fieldset>)}
           {!visibleGroups.length&&<p className="form-hint">No more matching subjects in the catalogue.</p>}
