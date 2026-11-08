@@ -1417,7 +1417,10 @@ def login(
     if user is None:
         surname_matches = db.query(models.User).join(
             models.StaffMember, models.User.staff_id == models.StaffMember.id
-        ).filter(func.lower(models.StaffMember.last_name) == login_name.lower()).all()
+        ).filter(or_(
+            func.lower(models.StaffMember.last_name) == login_name.lower(),
+            func.lower(models.StaffMember.staff_number) == login_name.lower(),
+        )).all()
         if len(surname_matches) == 1:
             user = surname_matches[0]
         elif len(surname_matches) > 1:
