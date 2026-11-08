@@ -2156,11 +2156,60 @@ def create_staff(data: StaffCreate, db: Session = Depends(get_db)):
         raise HTTPException(422, "Enter the staff member's department.")
     if data.category == "Teaching" and (not data.subjects or not data.subjects.strip()):
         raise HTTPException(422, "Enter at least one subject taught by this teacher.")
-    item = models.StaffMember(staff_number="STF-" + str(date.today().year) + "-" + uuid4().hex[:6].upper(), **data.model_dump())
+    staff_number = "STF-" + str(date.today().year) + "-" + uuid4().hex[:6].upper()
+    item = models.StaffMember(staff_number=staff_number, **data.model_dump())
+    # Create the staff profile and login together so registration is one step.
+    temporary_passcode = secrets.token_urlsafe(9)
+    username = staff_number.lower()
+    account_email = (data.email or "").strip().lower() or f"{username}@accounts.schoolbridge.local"
+    account_role = "teacher" if data.category == "Teaching" else "staff"
+    if db.query(models.User).filter(or_(models.User.username == username, models.User.email == account_email)).first():
+        raise HTTPException(409, "A login already exists with this staff username or email. Check the staff details.")
+    if account_role == "teacher":
+        default_permissions = {
+            "My Classes": ["view"], "Attendance": ["view", "add"],
+            "My Attendance": ["view"], "My Results": ["view", "add", "edit"],
+            "Announcements": ["view"], "Timetable": ["view"],
+        }
+    else:
+        title = (data.position or "").strip().lower()
+        if "bursar" in title or "account" in title:
+            sections = ["Overview", "Fees & Finance", "Students", "Reports"]
+        elif "secretary" in title or "admin" in title:
+            sections = ["Overview", "Students", "Staff", "Parent Access", "Announcements", "Reports"]
+        elif "head" in title or title == "dos" or "director of studies" in title:
+            sections = ["Overview", "Students", "Staff", "Examinations", "Attendance", "Timetable", "Leadership & Duty", "Announcements", "Reports"]
+        else:
+            sections = ["Overview"]
+        default_permissions = {section: ["view"] for section in sections}
+    item_user = models.User(
+        username=username,
+        email=account_email,
+        hashed_password=password_hash.hash(temporary_passcode),
+        role=account_role,
+        role_label=(data.position or ("Teacher" if account_role == "teacher" else "Staff"))[:80],
+        permissions_json=json.dumps(default_permissions),
+    )
     db.add(item)
-    db.commit()
-    db.refresh(item)
-    return item
+    try:
+        db.flush()
+        item_user.staff_id = item.id
+        db.add(item_user)
+        db.commit()
+        db.refresh(item)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "The staff profile or login could not be created because the username or email is already in use.")
+    return {
+        "staff": item,
+        "login": {
+            "username": item_user.username,
+            "email": item_user.email,
+            "temporary_passcode": temporary_passcode,
+            "role": item_user.role,
+            "role_label": item_user.role_label,
+        },
+    }
 
 
 @app.get("/api/staff", tags=["Staff"])
