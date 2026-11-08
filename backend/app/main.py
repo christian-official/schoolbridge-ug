@@ -1894,7 +1894,7 @@ def assign_class_teacher(data: ClassTeacherAssignmentCreate, db: Session = Depen
         assignment = models.ClassTeacherAssignment(**data.model_dump())
         db.add(assignment)
     permissions = user_permissions(teacher)
-    permissions["Attendance"] = {"view", "add"}
+    permissions["Attendance"] = {"view", "add", "edit"}
     teacher.permissions_json = json.dumps({key: sorted(value) for key, value in permissions.items()})
     write_audit(db, admin, "class_teacher_assigned", "class", data.class_id, f"Teacher account {teacher.username}")
     db.commit()
