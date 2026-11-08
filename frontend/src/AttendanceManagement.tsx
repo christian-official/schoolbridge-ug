@@ -19,7 +19,7 @@ async function request<T>(path: string, token: string, options: RequestInit = {}
   return result as T
 }
 
-export default function AttendanceManagement({ token }: { token: string }) {
+export default function AttendanceManagement({ token, canEdit = true }: { token: string; canEdit?: boolean }) {
   const [classes, setClasses] = useState<SchoolClass[]>([])
   const [students, setStudents] = useState<Student[]>([])
   const [statuses, setStatuses] = useState<Record<number, string>>({})
@@ -34,18 +34,8 @@ export default function AttendanceManagement({ token }: { token: string }) {
   async function load() {
     setLoading(true); setError('')
     try {
-      const [classRows, firstPage] = await Promise.all([
-        request<SchoolClass[]>('classes', token),
-        request<{ items: Student[]; pages: number }>('students/search?page=1&page_size=100', token),
-      ])
-      const remainingPages = await Promise.all(
-        Array.from({ length: Math.max(0, firstPage.pages - 1) }, (_, index) =>
-          request<{ items: Student[] }>(`students/search?page=${index + 2}&page_size=100`, token)
-        )
-      )
+      const classRows = await request<SchoolClass[]>('attendance/options', token)
       setClasses(classRows)
-      setStudents([...firstPage.items, ...remainingPages.flatMap(page => page.items)]
-        .filter(student => student.status === 'active' && student.class_id !== null))
       if (!classId && classRows.length) setClassId(String(classRows[0].id))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to load class registers.')
@@ -53,29 +43,27 @@ export default function AttendanceManagement({ token }: { token: string }) {
   }
 
   async function loadRegister(selectedClass = classId, selectedDate = attendanceDate) {
-    if (!selectedClass) { setSummary(null); return }
+    if (!selectedClass) { setSummary(null); setStudents([]); return }
     setLoading(true); setError('')
     try {
-      const [rows, totals] = await Promise.all([
+      const [studentRows, rows, totals] = await Promise.all([
+        request<Student[]>(`attendance/students?class_id=${selectedClass}`, token),
         request<Attendance[]>(`attendance?class_id=${selectedClass}&attendance_date=${selectedDate}`, token),
         request<Summary>(`attendance/summary?class_id=${selectedClass}&attendance_date=${selectedDate}`, token),
       ])
+      setStudents(studentRows)
       setSummary(totals)
       const byStudent = Object.fromEntries(rows.map(row => [row.student_id, row.status]))
-      setStatuses(() => {
-        const next: Record<number, string> = {}
-        students.filter(student => String(student.class_id) === selectedClass).forEach(student => {
-          next[student.id] = byStudent[student.id] || ''
-        })
-        return next
-      })
+      const next: Record<number, string> = {}
+      studentRows.forEach(student => { next[student.id] = byStudent[student.id] || '' })
+      setStatuses(next)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to load attendance register.')
     } finally { setLoading(false) }
   }
 
   useEffect(() => { void load() }, [token])
-  useEffect(() => { if (students.length) void loadRegister() }, [classId, attendanceDate, students.length])
+  useEffect(() => { if (classId) void loadRegister() }, [classId, attendanceDate])
 
   const classStudents = useMemo(() => students.filter(student => String(student.class_id) === classId).sort((a, b) => a.last_name.localeCompare(b.last_name) || a.first_name.localeCompare(b.first_name)), [students, classId])
 
@@ -144,13 +132,14 @@ export default function AttendanceManagement({ token }: { token: string }) {
               <td>{index + 1}</td>
               <td>{student.first_name} {student.last_name}</td>
               <td>{student.admission_number}</td>
-              <td><div className="attendance-choice-group" role="group" aria-label={`Attendance for ${student.first_name} ${student.last_name}`}>
+              <td>{canEdit ? <div className="attendance-choice-group" role="group" aria-label={`Attendance for ${student.first_name} ${student.last_name}`}>
                 {(['Present', 'Absent', 'Late', 'Excused'] as const).map(status => <button key={status} type="button" className={`attendance-choice attendance-${status.toLowerCase()} ${(statuses[student.id] === status) ? 'selected' : ''}`} aria-pressed={statuses[student.id] === status} onClick={() => setStatuses(current => ({ ...current, [student.id]: status }))}>{status}</button>)}
-              </div></td>
+              </div> : <span className={`attendance-status-pill status-${(statuses[student.id] || 'unmarked').toLowerCase()}`}>{statuses[student.id] || 'Not marked'}</span>}</td>
             </tr>)}</tbody>
           </table>
         </div>
-        <div className="form-actions"><button className="primary-button" type="button" onClick={() => void saveRegister()} disabled={saving || loading}><Save size={15}/>{saving ? 'Saving register...' : 'Save class attendance'}</button></div>
+        {canEdit && <div className="form-actions"><button className="primary-button" type="button" onClick={() => void saveRegister()} disabled={saving || loading}><Save size={15}/>{saving ? 'Saving register...' : 'Save class attendance'}</button></div>}
+        {!canEdit && <p className="form-hint">View-only attendance access. You cannot change this register.</p>}
       </>}
     </section>
   </div>
