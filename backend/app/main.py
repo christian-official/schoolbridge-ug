@@ -59,7 +59,7 @@ PERMISSION_SECTIONS = {
 PERMISSION_ACTIONS = {"view", "add", "edit", "delete", "approve", "print"}
 ADMIN_ONLY_PATHS = {
     "/api/auth/users", "/api/auth/teachers", "/api/auth/permissions",
-    "/api/teacher-assignments", "/api/backups/restore",
+    "/api/teacher-assignments", "/api/class-teacher-assignments", "/api/backups/restore",
 }
 
 
@@ -85,7 +85,7 @@ def user_permissions(user):
 
 
 def permission_for_path(path: str):
-    if path.startswith("/api/teacher/my-assignments") or path.startswith("/api/teacher/students"): return "My Classes"
+    if path.startswith(("/api/teacher/my-assignments", "/api/teacher/my-class-teacher-assignments", "/api/teacher/students")): return "My Classes"
     if path.startswith("/api/teacher/my-staff-attendance"): return "My Attendance"
     if path.startswith("/api/teacher/attendance"): return "Attendance"
     if path.startswith(("/api/teacher/marks", "/api/teacher/exams")): return "My Results"
@@ -1418,9 +1418,9 @@ async def protect_school_data(request: Request, call_next):
                 {"detail": "Account is unavailable."}, status_code=401
             )
 
-        if path == "/api/auth/me" or path.startswith("/api/me/"):
-            # Authenticated users may manage their own linked staff profile
-            # and password without requiring broad Staff or Settings access.
+        if path == "/api/auth/me" or path.startswith("/api/me/") or path == "/api/dashboard/my-work":
+            # Self-service profile, password and personal dashboard endpoints
+            # are scoped to the authenticated account.
             pass
         elif path.startswith("/api/teacher/"):
             if user.role != "teacher":
@@ -1557,10 +1557,12 @@ def permission_catalog(admin=Depends(require_admin)):
         "Headteacher": ["Overview", "Students", "Staff", "Fees & Finance", "Examinations", "Attendance", "Staff Attendance", "Timetable", "Leadership & Duty", "Parent Access", "Announcements", "Reports"],
         "Deputy Headteacher": ["Overview", "Students", "Staff", "Examinations", "Attendance", "Timetable", "Leadership & Duty", "Announcements", "Reports"],
         "DOS": ["Overview", "Examinations", "Attendance", "Timetable", "Students", "Reports", "Announcements"],
+        "Academic Administrator": ["Overview", "Examinations", "Timetable", "Students", "Reports", "Announcements"],
+        "Academics Officer": ["Overview", "Examinations", "Timetable", "Students", "Reports"],
         "Bursar": ["Overview", "Fees & Finance", "Students", "Reports"],
         "Accountant": ["Overview", "Fees & Finance", "Staff", "Reports"],
         "Secretary": ["Overview", "Students", "Staff", "Parent Access", "Announcements", "Reports"],
-        "Teacher": ["My Classes", "Attendance", "My Attendance", "My Results", "Announcements", "Timetable"],
+        "Teacher": ["My Classes", "My Attendance", "My Results", "Announcements", "Timetable"],
         "Class Teacher": ["My Classes", "Students", "Attendance", "My Attendance", "My Results", "Announcements", "Timetable"],
     }
     return {"sections": sorted(PERMISSION_SECTIONS), "actions": sorted(PERMISSION_ACTIONS), "presets": presets}
@@ -2866,8 +2868,9 @@ def teacher_students(class_id: int, db: Session = Depends(get_db), teacher=Depen
     assigned = db.query(models.TeacherAssignment).filter_by(
         teacher_id=teacher.id, class_id=class_id
     ).first()
-    if not assigned:
-        raise HTTPException(403, "This class is not assigned to your account.")
+    class_teacher = is_assigned_class_teacher(db, teacher.id, class_id)
+    if not assigned and not class_teacher:
+        raise HTTPException(403, "This class is not assigned to your teaching or class-teacher responsibilities.")
     return db.query(models.Student).filter(
         models.Student.class_id == class_id, models.Student.status == "active"
     ).order_by(models.Student.last_name, models.Student.first_name).all()
