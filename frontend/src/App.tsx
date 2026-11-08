@@ -1404,7 +1404,8 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
   }
   async function assign(e:React.FormEvent) {
     e.preventDefault()
-    if(!assignment.teacher_id||!assignment.class_id||!assignment.subject_id){setError('Select a teacher, class and subject before saving.');return}
+    if(!assignment.teacher_id||!assignment.class_id||!assignment.subject_id){setError('Select a teacher, class and one of their registered subjects before saving.');return}
+    if(!availableAssignmentSubjects.some((subject:any)=>String(subject.id)===assignment.subject_id)){setError('The selected subject was not registered under this teacher. Update the teacher profile first.');return}
     setBusy(true);setError('');setMessage('')
     try {
       await api('teacher-assignments',token,{method:'POST',body:JSON.stringify({teacher_id:Number(assignment.teacher_id),class_id:Number(assignment.class_id),subject_id:Number(assignment.subject_id)})})
@@ -1413,6 +1414,10 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
     finally {setBusy(false)}
   }
   const activeTeachers=users.filter(u=>u.role==='teacher'&&u.active)
+  const selectedAssignmentTeacher=activeTeachers.find((u:any)=>String(u.id)===assignment.teacher_id)
+  const selectedAssignmentStaff=staff.find((p:any)=>p.id===selectedAssignmentTeacher?.staff_id)
+  const registeredTeacherSubjects=String(selectedAssignmentStaff?.subjects||'').split(',').map((name:string)=>name.trim()).filter(Boolean)
+  const availableAssignmentSubjects=subjects.filter((subject:any)=>registeredTeacherSubjects.includes(subject.name))
   const editableUsers=users.filter(u=>u.role!=='admin'&&u.role!=='parent')
   const otherAccounts=users.filter(u=>u.role==='admin'||u.role==='parent')
   const staffLoginMatches=editableUsers.filter(u=>{
@@ -1453,11 +1458,11 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
     </>}
     </div>}
     {accountTab==='assignments'&&<div className="account-tab-panel">
-    <h3>Assign classes and subjects to teachers</h3>
+    <h3>Assign classes and subjects to teachers</h3><p className="form-hint">A teacher can be assigned to multiple classes and multiple subjects, but each subject must first be selected in that teacher’s Staff registration profile.</p>
     <form className="student-form" onSubmit={assign}><div className="student-form-grid">
-      <label>Teacher *<select required value={assignment.teacher_id} onChange={e=>setAssignment({...assignment,teacher_id:e.target.value})}><option value="">Select teacher</option>{activeTeachers.map(u=>{const person=staff.find((p:any)=>p.id===u.staff_id);return <option key={u.id} value={u.id}>{person?person.first_name+' '+person.last_name:u.username}</option>})}</select></label>
+      <label>Teacher *<select required value={assignment.teacher_id} onChange={e=>setAssignment({...assignment,teacher_id:e.target.value,subject_id:''})}><option value="">Select teacher</option>{activeTeachers.map(u=>{const person=staff.find((p:any)=>p.id===u.staff_id);return <option key={u.id} value={u.id}>{person?person.first_name+' '+person.last_name:u.username}</option>})}</select></label>
       <label>Class *<select required value={assignment.class_id} onChange={e=>setAssignment({...assignment,class_id:e.target.value})}><option value="">Select class</option>{classes.map(item=><option key={item.id} value={item.id}>{item.name}{item.section?' — '+item.section:''}</option>)}</select></label>
-      <label>Subject *<select required value={assignment.subject_id} onChange={e=>setAssignment({...assignment,subject_id:e.target.value})}><option value="">Select subject</option>{subjects.map(sub=><option key={sub.id} value={sub.id}>{sub.name}</option>)}</select></label>
+      <label>Registered subject *<select required value={assignment.subject_id} onChange={e=>setAssignment({...assignment,subject_id:e.target.value})} disabled={!assignment.teacher_id||!availableAssignmentSubjects.length}><option value="">{!assignment.teacher_id?'Choose a teacher first':availableAssignmentSubjects.length?'Select one of this teacher’s subjects':'No subjects recorded for this teacher'}</option>{availableAssignmentSubjects.map((sub:any)=><option key={sub.id} value={sub.id}>{sub.name}</option>)}</select><small className="field-hint">Only subjects recorded in the selected teacher’s staff profile are listed.</small></label>
     </div><div className="form-actions"><button className="primary-button" disabled={busy||loading||!activeTeachers.length||!subjects.length||!classes.length}>{busy?'Saving...':'Save teacher assignment'}</button></div></form>
     <h3>Assign class teachers</h3>
     <p className="form-hint">This is a separate responsibility from teaching individual subjects. Each class has one assigned class teacher, who is authorised to manage that class's attendance register.</p>
