@@ -143,7 +143,7 @@ export default function StaffFinance({token,active,classes=[],refreshKey=0,initi
   }
   async function archiveStaff(id:number){
     if(!window.confirm('Archive this staff member? Their records and salary history will be retained.')) return
-    try {await request('staff/'+id+'/archive',token,{method:'POST'});setMessage('Staff member archived.');const p=new URLSearchParams({search,page:'1',page_size:'100'});if(category)p.set('category',category);const r=await request<Page<Staff>>('staff?'+p.toString(),token);setStaff(r.items);setStaffTotal(r.total)}
+    try {await request('staff/'+id+'/archive',token,{method:'POST'});setMessage('Staff member archived.');const p=new URLSearchParams({search,page:'1',page_size:'5'});if(category)p.set('category',category);const r=await request<Page<Staff>>('staff?'+p.toString(),token);setStaff(r.items);setStaffTotal(r.total)}
     catch(e){setMessage(e instanceof Error?e.message:'Unable to archive staff member.')}
   }
   async function saveOtherExpense(e:FormEvent){
