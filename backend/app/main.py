@@ -2200,8 +2200,12 @@ def create_staff(data: StaffCreate, db: Session = Depends(get_db)):
     except IntegrityError:
         db.rollback()
         raise HTTPException(409, "The staff profile or login could not be created because the username or email is already in use.")
+    # Keep the original staff fields at the top level for existing API clients,
+    # while also returning the grouped staff/login objects used by the new UI.
+    staff_data = {column.name: getattr(item, column.name) for column in item.__table__.columns}
     return {
-        "staff": item,
+        **staff_data,
+        "staff": staff_data,
         "login": {
             "username": item_user.username,
             "email": item_user.email,
