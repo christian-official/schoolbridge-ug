@@ -1,5 +1,5 @@
-import { Fragment, useEffect, useState } from 'react'
-import { Plus, RefreshCw, Save, Trash2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Plus, RefreshCw, Trash2 } from 'lucide-react'
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 async function request<T>(path: string, token: string, options: RequestInit = {}): Promise<T> {
@@ -15,24 +15,18 @@ const today = () => { const now = new Date(); return `${now.getFullYear()}-${Str
 
 type Staff = { id: number; first_name: string; last_name: string; staff_number: string; category: string; status: string }
 type StaffAttendance = { id: number; staff_id: number; attendance_date: string; status: string; notes?: string; check_in_at?: string | null; check_out_at?: string | null }
-type StaffAttendanceSummary = { total_staff: number; marked: number; unmarked: number; present: number; absent: number; late: number; excused: number }
 type SchoolClass = { id: number; name: string; section?: string }
 type Subject = { id: number; name: string; code?: string | null }
 type TimetableEntry = { id: number; class_id: number; class_name?: string; class_section?: string; subject_id?: number | null; subject_name?: string; staff_id?: number | null; teacher_name?: string; day_of_week: number; start_time: string; end_time: string }
 
 export default function OperationsManagement({ token, active, permissions = {}, isAdmin = false, roleLabel = '' }: { token: string; active: string; permissions?: Record<string, string[]>; isAdmin?: boolean; roleLabel?: string }) {
   const canEditTimetable = isAdmin || (['Academic Administrator','Academics Administrator','Academics Officer','Director of Studies','DOS'].includes(roleLabel.trim()) && ['add','edit','delete'].some(action => (permissions['Timetable'] || []).includes(action)))
-  const canEditStaffAttendance = isAdmin || (permissions['Staff Attendance'] || []).includes('edit')
   const [staff, setStaff] = useState<Staff[]>([])
   const [classes, setClasses] = useState<SchoolClass[]>([])
   const [subjects, setSubjects] = useState<Subject[]>([])
-  const [staffStatuses, setStaffStatuses] = useState<Record<number, string>>({})
-  const [staffNotes, setStaffNotes] = useState<Record<number, string>>({})
   const [staffDate, setStaffDate] = useState(today())
   const [staffRows, setStaffRows] = useState<StaffAttendance[]>([])
   const [staffMonthRows, setStaffMonthRows] = useState<StaffAttendance[]>([])
-  const [staffTimeDrafts, setStaffTimeDrafts] = useState<Record<number, { checkIn: string; checkOut: string }>>({})
-  const [staffSummary, setStaffSummary] = useState<StaffAttendanceSummary | null>(null)
   const [entries, setEntries] = useState<TimetableEntry[]>([])
   const [selectedTimetableClass, setSelectedTimetableClass] = useState('')
   const [editingEntryId, setEditingEntryId] = useState<number | null>(null)
@@ -68,21 +62,8 @@ export default function OperationsManagement({ token, active, permissions = {}, 
 
   async function loadStaffAttendance() {
     try {
-      const [rows, totals] = await Promise.all([
-        request<StaffAttendance[]>(`staff-attendance?attendance_date=${staffDate}`, token),
-        request<StaffAttendanceSummary>(`staff-attendance/summary?attendance_date=${staffDate}`, token),
-      ])
-      setStaffRows(rows); setStaffSummary(totals)
-      const values: Record<number, string> = {}
-      const times: Record<number, { checkIn: string; checkOut: string }> = {}
-      const notes: Record<number, string> = {}
-      staff.forEach(person => {
-        const record = rows.find(row => row.staff_id === person.id)
-        values[person.id] = record?.status || ''
-        times[person.id] = { checkIn: record?.check_in_at?.slice(11, 16) || '', checkOut: record?.check_out_at?.slice(11, 16) || '' }
-        notes[person.id] = record?.notes || ''
-      })
-      setStaffStatuses(values); setStaffTimeDrafts(times); setStaffNotes(notes)
+      const rows = await request<StaffAttendance[]>(`staff-attendance?attendance_date=${staffDate}`, token)
+      setStaffRows(rows)
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to load staff attendance.') }
   }
 
@@ -100,19 +81,6 @@ export default function OperationsManagement({ token, active, permissions = {}, 
       .catch(e => setError(e instanceof Error ? e.message : 'Unable to load the attendance calendar.'))
   }, [active, staffDate.slice(0, 7), token])
 
-  async function saveStaffRegister() {
-    if (staff.some(person => !staffStatuses[person.id])) { setError('Select an attendance status for every staff member before saving the register.'); return }
-    setSaving(true); setError(''); setMessage('')
-    try {
-      const result = await request<{ saved: number }>('staff-attendance/register', token, {
-        method: 'PUT',
-        body: JSON.stringify({ attendance_date: staffDate, records: staff.map(person => ({ staff_id: person.id, status: staffStatuses[person.id], check_in_time: staffTimeDrafts[person.id]?.checkIn || null, check_out_time: staffTimeDrafts[person.id]?.checkOut || null, notes: staffNotes[person.id] || null })) }),
-      })
-      setMessage(`${result.saved} staff attendance records saved for ${staffDate}.`)
-      await loadStaffAttendance()
-    } catch (e) { setError(e instanceof Error ? e.message : 'Unable to save staff attendance.') }
-    finally { setSaving(false) }
-  }
 
   async function addTimetableEntry(event: React.FormEvent) {
     event.preventDefault(); setSaving(true); setError(''); setMessage('')
@@ -154,7 +122,6 @@ export default function OperationsManagement({ token, active, permissions = {}, 
   }
 
   const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
-  const staffCategories = Array.from(new Set(staff.map(person => person.category || 'Other'))).sort((a, b) => a === 'Teaching' ? -1 : b === 'Teaching' ? 1 : a.localeCompare(b))
   const timetableDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
   const timetableClassId = Number(selectedTimetableClass || classes[0]?.id || 0)
   const timetableClassEntries = entries.filter(entry => entry.class_id === timetableClassId)
