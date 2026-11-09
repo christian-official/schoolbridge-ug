@@ -1564,7 +1564,8 @@ def test_sync_offline_proposals_detect_conflict_and_rebase_without_applying():
         pid=response.json()["proposal_id"]
         rebased=client.patch(f"/api/sync/proposals/{pid}/resolution",headers=headers,json={"device_id":device,"decision":"rebase"})
         assert rebased.status_code==200 and rebased.json()["status"]=="pending_review" and rebased.json()["applied"] is False
-        assert client.patch(f"/api/sync/proposals/{pid}/resolution",headers=headers,json={"device_id":device,"decision":"discard"}).status_code==409
+        discarded=client.patch(f"/api/sync/proposals/{pid}/resolution",headers=headers,json={"device_id":device,"decision":"discard"})
+        assert discarded.status_code==200 and discarded.json()["status"]=="discarded"
         db=SessionLocal()
         try: assert db.get(models.Student,sid).last_name=="Server update"
         finally: db.close()
