@@ -83,3 +83,10 @@ Registered devices can request a paginated class catalogue containing only class
 ### Scoped attendance, examination and finance snapshots
 
 Registered devices can now download paginated attendance, exam, marks and fee snapshots. Attendance is limited to administrators, authorised attendance staff, assigned class teachers and parents linked to the affected students. Exam metadata follows class visibility; marks are limited to assigned class/subject pairs for teachers, while parent accounts receive verified results only for linked children. Fee charges and payments are restricted to linked children for parents; authorised finance staff and administrators receive school fee records. The fee snapshot excludes payroll, general expenses and unnecessary payment reference/collector details. Each collection has its own cursor so pagination cannot skip records in another collection. These endpoints are read-only snapshots; they do not enable offline writes or relax the administrator-only change journal.
+
+
+### Offline proposal submission and conflict review
+
+Offline write envelopes are currently restricted to administrators on active registered devices. Each proposal stores its owner, device identity, idempotency key, entity, operation, base journal sequence, bounded JSON payload and review status. Repeating the same key and content returns the original proposal; reusing a key with different content is rejected.
+
+For updates and deletes, the server checks whether the entity changed after the submitted base sequence. An intervening change marks the proposal as conflicted. An administrator may discard it or rebase it for fresh manual review. **Proposals are not applied to live school records.** Automatic offline writes remain disabled until entity-specific validation, permission-aware application and a complete approval workflow exist. The change feed remains administrator-only because the journal does not yet preserve enough historical relationship context to safely filter deletes and reassignment events for teachers and parents.

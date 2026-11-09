@@ -1241,6 +1241,21 @@ def bootstrap_initial_admin():
 
 bootstrap_initial_admin()
 
+class SyncChangeProposalCreate(BaseModel):
+    device_id: UUID
+    idempotency_key: str = Field(min_length=16, max_length=100)
+    entity_type: str = Field(min_length=1, max_length=40)
+    entity_id: int | None = Field(default=None, ge=1)
+    operation: str = Field(pattern="^(create|update|delete)$")
+    base_sequence: int = Field(ge=0)
+    payload: dict = Field(default_factory=dict)
+
+
+class SyncChangeProposalResolution(BaseModel):
+    device_id: UUID
+    decision: str = Field(pattern="^(discard|rebase)$")
+
+
 class SyncDeviceRegistration(BaseModel):
     device_id: UUID
     device_name: str = Field(min_length=1, max_length=100)
@@ -1706,7 +1721,7 @@ async def protect_school_data(request: Request, call_next):
             # Self-service profile, password and personal dashboard endpoints
             # are scoped to the authenticated account.
             pass
-        elif path == "/api/sync/devices" or path.startswith("/api/sync/devices/") or path in {"/api/sync/changes", "/api/sync/students", "/api/sync/classes", "/api/sync/attendance", "/api/sync/exams", "/api/sync/marks", "/api/sync/fees"}:
+        elif path == "/api/sync/devices" or path.startswith("/api/sync/devices/") or path in {"/api/sync/changes", "/api/sync/students", "/api/sync/classes", "/api/sync/attendance", "/api/sync/exams", "/api/sync/marks", "/api/sync/fees", "/api/sync/proposals"}:
             # Sync routes enforce account, device and record scope in each handler.
             pass
         elif path.startswith("/api/teacher/"):
@@ -2029,6 +2044,70 @@ def list_sync_changes(
         "next_cursor": next_cursor,
         "has_more": has_more,
     }
+
+
+@app.post("/api/sync/proposals", tags=["Offline Synchronisation"])
+def submit_sync_change_proposal(data: SyncChangeProposalCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    if user.role != "admin":
+        raise HTTPException(403, "Offline change submissions are currently restricted to administrators.")
+    device = _sync_active_device(db, user, data.device_id)
+    allowed = {"Student","SchoolClass","Subject","StaffMember","Attendance","StaffAttendance","Exam","Mark","FeeCharge","FeePayment","ClassFee","SalaryPayment","OtherExpense","TimetableEntry"}
+    if data.entity_type not in allowed:
+        raise HTTPException(422, "This record type is not enabled for offline proposals.")
+    if (data.operation == "create" and data.entity_id is not None) or (data.operation != "create" and data.entity_id is None):
+        raise HTTPException(422, "Create must omit entity_id; update and delete require it.")
+    if data.base_sequence > device.last_issued_sequence:
+        raise HTTPException(409, "The proposal base sequence has not been delivered to this device.")
+    payload=json.dumps(data.payload,sort_keys=True,separators=(",",":"))
+    if len(payload.encode("utf-8")) > 32768:
+        raise HTTPException(413, "Offline proposal payload exceeds 32 KB.")
+    old=db.query(models.SyncChangeProposal).filter_by(user_id=user.id,idempotency_key=data.idempotency_key).first()
+    if old:
+        same=(old.device_id==str(data.device_id) and old.entity_type==data.entity_type and old.entity_id==data.entity_id and old.operation==data.operation and old.base_sequence==data.base_sequence and old.payload_json==payload)
+        if not same: raise HTTPException(409,"Idempotency key already used for different content.")
+        return {"proposal_id":old.id,"status":old.status,"conflict_sequence":old.conflict_sequence,"duplicate":True,"applied":False}
+    conflict=None
+    if data.entity_id is not None:
+        conflict=db.query(models.SyncChange).filter(models.SyncChange.entity_type==data.entity_type,models.SyncChange.entity_id==data.entity_id,models.SyncChange.id>data.base_sequence).order_by(models.SyncChange.id.desc()).first()
+    row=models.SyncChangeProposal(user_id=user.id,device_id=device.device_id,idempotency_key=data.idempotency_key,entity_type=data.entity_type,entity_id=data.entity_id,operation=data.operation,payload_json=payload,base_sequence=data.base_sequence,status="conflict" if conflict else "pending_review",conflict_sequence=conflict.id if conflict else None)
+    db.add(row)
+    try:
+        db.commit(); db.refresh(row)
+    except IntegrityError:
+        db.rollback()
+        old=db.query(models.SyncChangeProposal).filter_by(user_id=user.id,idempotency_key=data.idempotency_key).first()
+        if old and old.payload_json==payload and old.device_id==str(data.device_id) and old.entity_type==data.entity_type and old.entity_id==data.entity_id and old.operation==data.operation and old.base_sequence==data.base_sequence:
+            return {"proposal_id":old.id,"status":old.status,"conflict_sequence":old.conflict_sequence,"duplicate":True,"applied":False}
+        raise HTTPException(409,"Proposal key collision; retry with the same request.")
+    return {"proposal_id":row.id,"status":row.status,"conflict_sequence":row.conflict_sequence,"duplicate":False,"applied":False}
+
+
+@app.get("/api/sync/proposals", tags=["Offline Synchronisation"])
+def list_sync_change_proposals(device_id: UUID, after_id: int=Query(0,ge=0), limit: int=Query(100,ge=1,le=200), db: Session=Depends(get_db), user=Depends(get_current_user)):
+    if user.role!="admin": raise HTTPException(403,"Proposal review is administrator-only.")
+    _sync_active_device(db,user,device_id)
+    rows=db.query(models.SyncChangeProposal).filter(models.SyncChangeProposal.user_id==user.id,models.SyncChangeProposal.id>after_id).order_by(models.SyncChangeProposal.id.asc()).limit(limit+1).all()
+    more=len(rows)>limit; rows=rows[:limit]
+    return {"proposals":[{"id":r.id,"device_id":r.device_id,"idempotency_key":r.idempotency_key,"entity_type":r.entity_type,"entity_id":r.entity_id,"operation":r.operation,"payload":json.loads(r.payload_json),"base_sequence":r.base_sequence,"status":r.status,"conflict_sequence":r.conflict_sequence,"submitted_at":r.submitted_at,"resolved_at":r.resolved_at,"resolution":r.resolution} for r in rows],"next_after_id":rows[-1].id if rows else after_id,"has_more":more}
+
+
+@app.patch("/api/sync/proposals/{proposal_id}/resolution", tags=["Offline Synchronisation"])
+def resolve_sync_change_proposal(proposal_id: int, data: SyncChangeProposalResolution, db: Session=Depends(get_db), user=Depends(get_current_user)):
+    if user.role!="admin": raise HTTPException(403,"Proposal resolution is administrator-only.")
+    _sync_active_device(db,user,data.device_id)
+    row=db.query(models.SyncChangeProposal).filter_by(id=proposal_id,user_id=user.id).first()
+    if not row: raise HTTPException(404,"Offline proposal not found.")
+    if row.status not in {"conflict","pending_review"}: raise HTTPException(409,"Proposal already resolved.")
+    if data.decision=="discard":
+        row.status="discarded"; row.resolution="discard"
+    else:
+        latest=None
+        if row.entity_id is not None:
+            latest=db.query(models.SyncChange).filter_by(entity_type=row.entity_type,entity_id=row.entity_id).order_by(models.SyncChange.id.desc()).first()
+        row.base_sequence=latest.id if latest else row.base_sequence
+        row.conflict_sequence=None; row.status="pending_review"; row.resolution="rebase"
+    row.resolved_at=datetime.utcnow(); db.commit()
+    return {"proposal_id":row.id,"status":row.status,"base_sequence":row.base_sequence,"resolution":row.resolution,"applied":False}
 
 
 @app.get("/api/sync/students", tags=["Offline Synchronisation"])

@@ -1514,3 +1514,57 @@ def test_sync_fee_snapshot_limits_parent_to_linked_children_and_paginates_collec
         assert len(payload["payments"]) == 1
         assert payload["class_fees"][0]["class_id"] is not None
         assert all("received_by" not in row and "reference" not in row for row in payload["payments"])
+
+
+def test_sync_offline_proposals_are_idempotent_scoped_and_not_applied():
+    reset_database()
+    admin=create_admin(); teacher=create_teacher()
+    ah={"Authorization":f"Bearer {create_access_token(admin)}"}
+    th={"Authorization":f"Bearer {create_access_token(teacher)}"}
+    device="00000000-0000-4000-8000-000000000301"
+    with TestClient(app) as client:
+        assert client.post("/api/sync/devices",headers=ah,json={"device_id":device,"device_name":"Proposal device"}).status_code==200
+        db=SessionLocal()
+        try:
+            student=models.Student(admission_number="OFFLINE-PROP-1",first_name="Amina",last_name="Original")
+            db.add(student); db.commit(); sid=student.id
+        finally: db.close()
+        feed=client.get(f"/api/sync/changes?device_id={device}&cursor=0",headers=ah)
+        body={"device_id":device,"idempotency_key":"offline-proposal-key-0001","entity_type":"Student","entity_id":sid,"operation":"update","base_sequence":feed.json()["next_cursor"],"payload":{"last_name":"Offline edit"}}
+        first=client.post("/api/sync/proposals",headers=ah,json=body)
+        assert first.status_code==200,first.text
+        again=client.post("/api/sync/proposals",headers=ah,json=body)
+        assert again.status_code==200 and again.json()["duplicate"] is True
+        assert again.json()["proposal_id"]==first.json()["proposal_id"]
+        assert client.post("/api/sync/proposals",headers=ah,json={**body,"payload":{"last_name":"Different"}}).status_code==409
+        assert client.post("/api/sync/proposals",headers=th,json=body).status_code==403
+        listed=client.get(f"/api/sync/proposals?device_id={device}",headers=ah)
+        assert listed.status_code==200 and len(listed.json()["proposals"])==1
+        db=SessionLocal()
+        try: assert db.get(models.Student,sid).last_name=="Original"
+        finally: db.close()
+
+
+def test_sync_offline_proposals_detect_conflict_and_rebase_without_applying():
+    reset_database(); admin=create_admin()
+    headers={"Authorization":f"Bearer {create_access_token(admin)}"}
+    device="00000000-0000-4000-8000-000000000302"
+    with TestClient(app) as client:
+        client.post("/api/sync/devices",headers=headers,json={"device_id":device,"device_name":"Conflict device"})
+        db=SessionLocal()
+        try:
+            student=models.Student(admission_number="OFFLINE-CONFLICT-1",first_name="B",last_name="Before")
+            db.add(student); db.commit(); sid=student.id
+            base=db.query(func.max(models.SyncChange.id)).scalar() or 0
+            student.last_name="Server update"; db.commit()
+        finally: db.close()
+        assert client.get(f"/api/sync/changes?device_id={device}&cursor=0",headers=headers).status_code==200
+        response=client.post("/api/sync/proposals",headers=headers,json={"device_id":device,"idempotency_key":"offline-conflict-key-0001","entity_type":"Student","entity_id":sid,"operation":"update","base_sequence":base,"payload":{"last_name":"Offline version"}})
+        assert response.status_code==200 and response.json()["status"]=="conflict"
+        pid=response.json()["proposal_id"]
+        rebased=client.patch(f"/api/sync/proposals/{pid}/resolution",headers=headers,json={"device_id":device,"decision":"rebase"})
+        assert rebased.status_code==200 and rebased.json()["status"]=="pending_review" and rebased.json()["applied"] is False
+        assert client.patch(f"/api/sync/proposals/{pid}/resolution",headers=headers,json={"device_id":device,"decision":"discard"}).status_code==409
+        db=SessionLocal()
+        try: assert db.get(models.Student,sid).last_name=="Server update"
+        finally: db.close()

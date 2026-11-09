@@ -139,3 +139,14 @@ def test_sync_device_checkpoint_column_is_migrated(tmp_path):
     columns = {column["name"] for column in inspect(engine).get_columns("sync_devices")}
     assert {"last_sync_sequence", "last_issued_sequence"}.issubset(columns)
     engine.dispose()
+
+
+def test_sync_change_proposals_migration(tmp_path):
+    url=f"sqlite:///{tmp_path / 'sync-proposals.sqlite3'}"
+    upgrade_database(url)
+    engine=create_engine(url)
+    inspector=inspect(engine)
+    assert "sync_change_proposals" in inspector.get_table_names()
+    cols={c["name"] for c in inspector.get_columns("sync_change_proposals")}
+    assert {"user_id","device_id","idempotency_key","entity_type","entity_id","operation","payload_json","base_sequence","status","conflict_sequence","submitted_at","resolved_at","resolution"}.issubset(cols)
+    engine.dispose()

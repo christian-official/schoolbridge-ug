@@ -372,6 +372,26 @@ class SyncDevice(Base):
 
 
 
+class SyncChangeProposal(Base):
+    """Audited offline proposal; never applied directly to live records."""
+    __tablename__ = "sync_change_proposals"
+    __table_args__ = (UniqueConstraint("user_id", "idempotency_key", name="uq_sync_proposal_user_key"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    device_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    idempotency_key: Mapped[str] = mapped_column(String(100), nullable=False)
+    entity_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    entity_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    operation: Mapped[str] = mapped_column(String(10), nullable=False)
+    payload_json: Mapped[str] = mapped_column(Text, nullable=False)
+    base_sequence: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending_review")
+    conflict_sequence: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    submitted_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    resolution: Mapped[str | None] = mapped_column(String(20), nullable=True)
+
+
 class SyncChange(Base):
     """Append-only metadata journal; record contents remain on the authoritative server."""
     __tablename__ = "sync_changes"
