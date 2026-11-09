@@ -1420,7 +1420,7 @@ def test_sync_attendance_snapshot_is_scoped_to_linked_children_and_class_teacher
         parent_device = _register_snapshot_device(client, parent_headers, 403)
         def get(device, headers):
             return client.get(f"/api/sync/attendance?device_id={device}", headers=headers)
-        assert {r["student_id"] for r in get(admin_device, admin_headers).json()["attendance"]} == {child_id, unrelated_id}
+        assert {r["student_id"] for r in get(admin_device, admin_headers).json()["attendance"]} == {child_id, subject_assigned_child_id, unrelated_id}
         teacher_response = get(teacher_device, teacher_headers)
         assert teacher_response.status_code == 200, teacher_response.text
         assert {r["student_id"] for r in teacher_response.json()["attendance"]} == {child_id, subject_assigned_child_id}
