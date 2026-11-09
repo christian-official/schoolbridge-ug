@@ -1158,3 +1158,85 @@ def test_sync_change_feed_rejects_invalid_cursor_and_limit():
             f"/api/sync/changes?device_id={device_id}&limit=501", headers=headers,
         )
         assert excessive_limit.status_code == 422
+
+
+
+def test_sync_device_checkpoint_is_monotonic_owned_and_bounded():
+    reset_database()
+    admin = create_admin()
+    teacher = create_teacher()
+    admin_headers = {"Authorization": f"Bearer {create_access_token(admin)}"}
+    teacher_headers = {"Authorization": f"Bearer {create_access_token(teacher)}"}
+    device_id = "00000000-0000-4000-8000-000000000201"
+
+    with TestClient(app) as client:
+        registered = client.post("/api/sync/devices", headers=admin_headers, json={
+            "device_id": device_id, "device_name": "Checkpoint device",
+        })
+        assert registered.status_code == 200
+        empty_checkpoint = client.post(
+            f"/api/sync/devices/{device_id}/checkpoint?sequence=0",
+            headers=admin_headers,
+        )
+        assert empty_checkpoint.status_code == 200
+        assert empty_checkpoint.json()["last_sync_sequence"] == 0
+
+        db = SessionLocal()
+        try:
+            db.add(models.Student(admission_number="CHECK-001", first_name="Amina", last_name="Test"))
+            db.commit()
+            latest = db.query(func.max(models.SyncChange.id)).scalar()
+        finally:
+            db.close()
+
+        saved = client.post(
+            f"/api/sync/devices/{device_id}/checkpoint?sequence={latest}",
+            headers=admin_headers,
+        )
+        assert saved.status_code == 200
+        assert saved.json()["last_sync_sequence"] == latest
+
+        backwards = client.post(
+            f"/api/sync/devices/{device_id}/checkpoint?sequence=0",
+            headers=admin_headers,
+        )
+        assert backwards.status_code == 409
+
+        future = client.post(
+            f"/api/sync/devices/{device_id}/checkpoint?sequence={latest + 1}",
+            headers=admin_headers,
+        )
+        assert future.status_code == 409
+
+        other_user = client.post(
+            f"/api/sync/devices/{device_id}/checkpoint?sequence={latest}",
+            headers=teacher_headers,
+        )
+        assert other_user.status_code == 403
+
+        listed = client.get("/api/sync/devices", headers=admin_headers)
+        assert listed.json()["devices"][0]["last_sync_sequence"] == latest
+
+        client.delete(f"/api/sync/devices/{device_id}", headers=admin_headers)
+        revoked = client.post(
+            f"/api/sync/devices/{device_id}/checkpoint?sequence={latest}",
+            headers=admin_headers,
+        )
+        assert revoked.status_code == 403
+
+
+def test_sync_device_checkpoint_rejects_negative_sequence():
+    reset_database()
+    admin = create_admin()
+    headers = {"Authorization": f"Bearer {create_access_token(admin)}"}
+    device_id = "00000000-0000-4000-8000-000000000202"
+
+    with TestClient(app) as client:
+        client.post("/api/sync/devices", headers=headers, json={
+            "device_id": device_id, "device_name": "Negative checkpoint test",
+        })
+        response = client.post(
+            f"/api/sync/devices/{device_id}/checkpoint?sequence=-1",
+            headers=headers,
+        )
+        assert response.status_code == 422

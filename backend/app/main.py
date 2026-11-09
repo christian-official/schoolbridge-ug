@@ -1968,6 +1968,7 @@ def list_sync_devices(
                 "device_name": device.device_name,
                 "created_at": device.created_at,
                 "last_seen_at": device.last_seen_at,
+                "last_sync_sequence": device.last_sync_sequence,
                 "revoked_at": device.revoked_at,
                 "active": device.revoked_at is None,
             }
@@ -2020,6 +2021,39 @@ def list_sync_changes(
         ],
         "next_cursor": next_cursor,
         "has_more": has_more,
+    }
+
+
+@app.post("/api/sync/devices/{device_id}/checkpoint", tags=["Offline Synchronisation"])
+def acknowledge_sync_checkpoint(
+    device_id: UUID,
+    sequence: int = Query(..., ge=0),
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """Persist the highest change sequence successfully processed by this device."""
+    if user.role != "admin":
+        raise HTTPException(403, "Checkpoint access is currently restricted to administrators.")
+
+    device = db.query(models.SyncDevice).filter_by(
+        user_id=user.id, device_id=str(device_id)
+    ).first()
+    if device is None or device.revoked_at is not None:
+        raise HTTPException(403, "An active registered device is required.")
+
+    latest_sequence = db.query(func.coalesce(func.max(models.SyncChange.id), 0)).scalar() or 0
+    if sequence > latest_sequence:
+        raise HTTPException(409, "A device cannot acknowledge changes that have not been recorded.")
+    if sequence < device.last_sync_sequence:
+        raise HTTPException(409, "A sync checkpoint cannot move backwards.")
+
+    device.last_sync_sequence = sequence
+    device.last_seen_at = datetime.utcnow()
+    db.commit()
+    return {
+        "device_id": device.device_id,
+        "last_sync_sequence": device.last_sync_sequence,
+        "message": "Sync checkpoint saved.",
     }
 
 

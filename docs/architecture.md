@@ -63,3 +63,8 @@ This registry is only an identity and access-control foundation. It does not yet
 The API records append-only change metadata for supported school records (students, classes, subjects, staff, attendance, examinations, marks, fee records, expenses, salaries and timetable entries). Each insert, update or delete receives a monotonically increasing database sequence. Deletes remain represented as tombstones in the journal; the source row is not required to remain present.
 
 The initial change-feed endpoint returns metadata only, paginated by sequence cursor. It does not include student or financial record contents. At this stage, feed access is restricted to administrators with an active registered device. Role-aware record snapshots, per-user/class filtering, idempotent offline writes and conflict resolution remain future work. The journal is not permission to cache or edit records offline.
+
+
+### Per-device synchronisation checkpoints
+
+Each registered device stores the highest change-journal sequence it has successfully processed. A device may advance its checkpoint but cannot move it backwards or acknowledge a sequence that does not yet exist. Checkpoints are scoped to the owning account and revoked devices cannot update them. This records progress only; it does not mean record contents have been downloaded or safely applied locally.

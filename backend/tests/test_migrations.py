@@ -127,3 +127,15 @@ def test_fresh_database_includes_sync_change_journal(tmp_path):
     columns = {column["name"] for column in inspector.get_columns("sync_changes")}
     assert {"id", "entity_type", "entity_id", "operation", "changed_at"}.issubset(columns)
     engine.dispose()
+
+
+
+def test_sync_device_checkpoint_column_is_migrated(tmp_path):
+    database_path = tmp_path / "sync-device-checkpoint.sqlite3"
+    database_url = f"sqlite:///{database_path}"
+    upgrade_database(database_url)
+
+    engine = create_engine(database_url)
+    columns = {column["name"] for column in inspect(engine).get_columns("sync_devices")}
+    assert "last_sync_sequence" in columns
+    engine.dispose()
