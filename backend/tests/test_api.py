@@ -1581,5 +1581,5 @@ def test_sync_offline_proposals_detect_conflict_and_rebase_without_applying():
                     models.AuditLog.entity_type=="sync_change_proposal"
                 ).order_by(models.AuditLog.id).all()
             ]
-            assert audit_actions==["sync_proposal_resolved","sync_proposal_resolved"]
+            assert audit_actions==["sync_proposal_submitted","sync_proposal_resolved","sync_proposal_resolved"]
         finally: db.close()
