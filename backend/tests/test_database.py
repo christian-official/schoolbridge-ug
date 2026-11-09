@@ -22,7 +22,7 @@ def test_in_memory_sqlite_keeps_memory_journal_mode():
     try:
         configure_sqlite_connection(connection, persistent_database=False)
         assert connection.execute("PRAGMA foreign_keys").fetchone()[0] == 1
-        assert connection.execute("PRAGMA busy_timeout").fetchone()[0] == 10000
+        assert connection.execute("PRAGMA busy_timeout").fetchone()[0] == SQLITE_BUSY_TIMEOUT_MS
         assert connection.execute("PRAGMA journal_mode").fetchone()[0].lower() == "memory"
     finally:
         connection.close()

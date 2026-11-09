@@ -61,11 +61,17 @@ def configure_sqlite_connection(connection, persistent_database: bool = True) ->
 
 def sqlite_connection_diagnostics(connection) -> dict:
     """Return safe, non-sensitive SQLite runtime settings for health checks."""
+    def read_pragma(statement):
+        if hasattr(connection, "exec_driver_sql"):
+            result = connection.exec_driver_sql(statement)
+            return result.scalar()
+        return connection.execute(statement).fetchone()[0]
+
     return {
-        "journal_mode": connection.exec_driver_sql("PRAGMA journal_mode").scalar().lower(),
-        "foreign_keys": bool(connection.exec_driver_sql("PRAGMA foreign_keys").scalar()),
-        "busy_timeout_ms": int(connection.exec_driver_sql("PRAGMA busy_timeout").scalar()),
-        "synchronous": int(connection.exec_driver_sql("PRAGMA synchronous").scalar()),
+        "journal_mode": str(read_pragma("PRAGMA journal_mode")).lower(),
+        "foreign_keys": bool(read_pragma("PRAGMA foreign_keys")),
+        "busy_timeout_ms": int(read_pragma("PRAGMA busy_timeout")),
+        "synchronous": int(read_pragma("PRAGMA synchronous")),
     }
 
 
