@@ -26,6 +26,10 @@ services:
       SCHOOLBRIDGE_SECRET_KEY: ${SCHOOLBRIDGE_SECRET_KEY:?Set SCHOOLBRIDGE_SECRET_KEY in .env}
       SCHOOLBRIDGE_CORS_ORIGINS: ${SCHOOLBRIDGE_CORS_ORIGINS:-*}
       SCHOOLBRIDGE_SEED_DEMO_DATA: "false"
+      SCHOOLBRIDGE_BACKUP_DIR: /backups
+      SCHOOLBRIDGE_BACKUP_RETENTION_DAYS: ${SCHOOLBRIDGE_BACKUP_RETENTION_DAYS:-30}
+    volumes:
+      - schoolbridge-backups:/backups
     depends_on:
       database:
         condition: service_healthy
@@ -54,6 +58,7 @@ services:
 
 volumes:
   schoolbridge-postgres:
+  schoolbridge-backups:
 
 networks:
   schoolbridge-internal:

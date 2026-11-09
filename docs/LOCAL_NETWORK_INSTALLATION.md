@@ -10,7 +10,7 @@ directly to the database.
 - A Windows, Linux, or macOS host with Docker Desktop / Docker Engine and the
   Docker Compose plugin.
 - A reliable local network and a reserved/static LAN address for the host.
-- Enough disk space for the PostgreSQL data volume and backups.
+- Enough disk space for the PostgreSQL data and backup volumes.
 - A firewall rule allowing inbound TCP on the chosen SchoolBridge port
   (8080 by default) from the school's trusted LAN only.
 
@@ -56,7 +56,7 @@ internet. The database port is not published by this Compose configuration.
    to the same LAN. Sign in with the administrator account you created.
 
 The Compose setup disables demo-data seeding and uses PostgreSQL with a
-persistent Docker volume. It does not use SQLite over a network share.
+persistent database volume. It does not use SQLite over a network share.
 
 ## Daily operation
 
@@ -67,9 +67,45 @@ persistent Docker volume. It does not use SQLite over a network share.
 - Update after backing up: pull the reviewed application version, then run
   `docker compose up -d --build`.
 
-`docker compose down` preserves the database volume. **Do not run
-`docker compose down -v`** unless you intentionally want to delete the
-PostgreSQL data volume.
+`docker compose down` preserves the database and backup volumes. **Do not run
+`docker compose down -v`** unless you intentionally want to delete both
+volumes.
+
+## PostgreSQL backups
+
+The backend includes a verified custom-format PostgreSQL backup command. Run
+it from the repository host:
+
+```sh
+docker compose exec backend python backup_postgres.py
+```
+
+The command uses PostgreSQL's `pg_dump`, validates the archive with
+`pg_restore --list`, and only then publishes the backup. Files are stored in
+the persistent `schoolbridge-backups` Docker volume, with permissions limited
+to the container owner. By default, backups older than 30 days are pruned;
+change `SCHOOLBRIDGE_BACKUP_RETENTION_DAYS` in `.env` to adjust the window.
+A failed dump or validation leaves no published backup.
+
+Run this command regularly using the host operating system's task scheduler
+or a trusted scheduler. For example, schedule it daily during a quiet period.
+The command is not automatically scheduled by Docker Compose.
+
+To list backups:
+
+```sh
+docker compose exec backend sh -c 'ls -lh /backups'
+```
+
+The backup volume is on the same host, so it is not protection against host
+loss, theft, disk failure, or ransomware. Periodically copy backups to a
+separate encrypted drive or secured backup destination, and test recovery
+procedures before relying on them. Do not store backup copies in the source
+repository.
+
+A PostgreSQL restore is an administrative recovery operation and must be
+planned separately. Do not try to use the SQLite file restore feature for
+PostgreSQL backups.
 
 ## Network and security notes
 
@@ -83,21 +119,16 @@ PostgreSQL data volume.
   stricter setup, set `SCHOOLBRIDGE_CORS_ORIGINS` to the exact origin used by
   staff browsers, such as `http://192.168.1.20:8080`, then recreate the backend.
 - This setup is a LAN deployment foundation, not a hardened public-internet
-  deployment. HTTPS, managed firewall policy, tested backup scheduling,
-  disaster recovery, and production monitoring still need to be configured.
+  deployment. HTTPS, managed firewall policy, tested disaster recovery, and
+  production monitoring still need to be configured.
 - The browser service worker caches the application shell only. It does not
   cache school records or queue offline edits. If the server is unavailable,
   staff cannot view or change live records until connectivity returns.
 - Back up PostgreSQL using PostgreSQL-native backup procedures. The SQLite
   file backup and restore endpoints do not apply to this PostgreSQL deployment.
 
-## Backup example
+## SQLite backup note
 
-Create a compressed logical backup from the running database container:
-
-```sh
-docker compose exec -T database sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > schoolbridge-postgres-backup.sql
-```
-
-Store backups separately from the host and test restores before relying on
-them. Never commit database backups or real school data to the repository.
+The SQLite migration snapshots and file restore protections apply only to
+single-host SQLite installations. Multi-device network deployments use the
+PostgreSQL backup command above.
