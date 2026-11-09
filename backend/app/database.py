@@ -10,8 +10,19 @@ DATABASE_URL = os.getenv(
     "sqlite:///./schoolbridge.db"
 )
 
-connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
-engine = create_engine(DATABASE_URL, connect_args=connect_args, pool_pre_ping=True)
+SQLITE_BUSY_TIMEOUT_MS = 30000
+is_sqlite = DATABASE_URL.startswith("sqlite")
+sqlite_database_name = DATABASE_URL.removeprefix("sqlite:///") if is_sqlite else None
+is_sqlite_memory = is_sqlite and sqlite_database_name in (None, "", ":memory:")
+connect_args = (
+    {"check_same_thread": False, "timeout": SQLITE_BUSY_TIMEOUT_MS / 1000}
+    if is_sqlite else {}
+)
+engine_options = {"connect_args": connect_args, "pool_pre_ping": True}
+if not is_sqlite_memory:
+    # A bounded pool prevents unbounded connection growth under concurrent staff use.
+    engine_options.update(pool_size=5, max_overflow=10, pool_timeout=30)
+engine = create_engine(DATABASE_URL, **engine_options)
 
 
 def create_sqlite_backup(source_path: str, backup_path: str) -> None:
@@ -37,7 +48,7 @@ def configure_sqlite_connection(connection, persistent_database: bool = True) ->
     cursor = connection.cursor()
     try:
         cursor.execute("PRAGMA foreign_keys=ON")
-        cursor.execute("PRAGMA busy_timeout=10000")
+        cursor.execute(f"PRAGMA busy_timeout={SQLITE_BUSY_TIMEOUT_MS}")
         if persistent_database:
             # WAL allows readers to continue while a write transaction is active.
             # FULL synchronous mode keeps committed transactions durable.
@@ -46,6 +57,16 @@ def configure_sqlite_connection(connection, persistent_database: bool = True) ->
             cursor.execute("PRAGMA wal_autocheckpoint=1000")
     finally:
         cursor.close()
+
+
+def sqlite_connection_diagnostics(connection) -> dict:
+    """Return safe, non-sensitive SQLite runtime settings for health checks."""
+    return {
+        "journal_mode": connection.exec_driver_sql("PRAGMA journal_mode").scalar().lower(),
+        "foreign_keys": bool(connection.exec_driver_sql("PRAGMA foreign_keys").scalar()),
+        "busy_timeout_ms": int(connection.exec_driver_sql("PRAGMA busy_timeout").scalar()),
+        "synchronous": int(connection.exec_driver_sql("PRAGMA synchronous").scalar()),
+    }
 
 
 if DATABASE_URL.startswith("sqlite"):

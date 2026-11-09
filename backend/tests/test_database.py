@@ -1,6 +1,6 @@
 import sqlite3
 
-from app.database import configure_sqlite_connection
+from app.database import SQLITE_BUSY_TIMEOUT_MS, configure_sqlite_connection
 
 
 def test_persistent_sqlite_connection_uses_safe_local_database_pragmas(tmp_path):
@@ -9,7 +9,7 @@ def test_persistent_sqlite_connection_uses_safe_local_database_pragmas(tmp_path)
     try:
         configure_sqlite_connection(connection, persistent_database=True)
         assert connection.execute("PRAGMA foreign_keys").fetchone()[0] == 1
-        assert connection.execute("PRAGMA busy_timeout").fetchone()[0] == 10000
+        assert connection.execute("PRAGMA busy_timeout").fetchone()[0] == 30000
         assert connection.execute("PRAGMA journal_mode").fetchone()[0].lower() == "wal"
         assert connection.execute("PRAGMA synchronous").fetchone()[0] == 2
         assert connection.execute("PRAGMA wal_autocheckpoint").fetchone()[0] == 1000
@@ -121,3 +121,41 @@ def test_restore_rolls_back_to_verified_safety_copy_when_installed_file_fails_va
     finally:
         restored.close()
     assert safety.exists()
+
+
+def test_sqlite_concurrent_connections_preserve_committed_writes(tmp_path):
+    database_path = tmp_path / "concurrent.sqlite3"
+    first = sqlite3.connect(database_path, timeout=SQLITE_BUSY_TIMEOUT_MS / 1000)
+    second = sqlite3.connect(database_path, timeout=SQLITE_BUSY_TIMEOUT_MS / 1000)
+    try:
+        configure_sqlite_connection(first, persistent_database=True)
+        configure_sqlite_connection(second, persistent_database=True)
+        first.execute("CREATE TABLE entries (id INTEGER PRIMARY KEY, value TEXT NOT NULL)")
+        first.commit()
+        first.execute("INSERT INTO entries(value) VALUES ('first')")
+        first.commit()
+        second.execute("INSERT INTO entries(value) VALUES ('second')")
+        second.commit()
+        assert second.execute("SELECT value FROM entries ORDER BY id").fetchall() == [
+            ("first",), ("second",)
+        ]
+    finally:
+        second.close()
+        first.close()
+
+
+def test_sqlite_diagnostics_report_active_safety_settings(tmp_path):
+    from app.database import sqlite_connection_diagnostics
+
+    connection = sqlite3.connect(tmp_path / "diagnostics.sqlite3")
+    try:
+        configure_sqlite_connection(connection, persistent_database=True)
+        details = sqlite_connection_diagnostics(connection)
+        assert details == {
+            "journal_mode": "wal",
+            "foreign_keys": True,
+            "busy_timeout_ms": SQLITE_BUSY_TIMEOUT_MS,
+            "synchronous": 2,
+        }
+    finally:
+        connection.close()

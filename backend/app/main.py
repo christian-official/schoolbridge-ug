@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import update, func, or_, text
 
-from .database import DATABASE_URL, Base, engine, get_db, SessionLocal, create_sqlite_backup, apply_sqlite_restore
+from .database import DATABASE_URL, Base, engine, get_db, SessionLocal, create_sqlite_backup, apply_sqlite_restore, sqlite_connection_diagnostics
 from .migrations import upgrade_database
 from . import models
 
@@ -700,6 +700,14 @@ def health_check(response: Response):
     try:
         with engine.connect() as connection:
             connection.execute(text("SELECT 1"))
+            database_info = {"status": "connected", "type": database_type}
+            if database_type == "sqlite":
+                database_info.update(sqlite_connection_diagnostics(connection))
+                database_info["deployment_mode"] = "single_host"
+                database_info["network_shared_database_supported"] = False
+            else:
+                database_info["deployment_mode"] = "multi_host"
+                database_info["network_shared_database_supported"] = True
     except Exception:
         response.status_code = 503
         return {
@@ -712,7 +720,7 @@ def health_check(response: Response):
         "status": "ok",
         "application": "SchoolBridge",
         "version": "0.2.0",
-        "database": {"status": "connected", "type": database_type},
+        "database": database_info,
     }
 
 

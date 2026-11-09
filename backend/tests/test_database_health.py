@@ -12,10 +12,19 @@ def test_health_endpoint_reports_database_connection():
 
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
-    assert response.json()["database"] == {
-        "status": "connected",
-        "type": engine.dialect.name,
-    }
+    database = response.json()["database"]
+    assert database["status"] == "connected"
+    assert database["type"] == engine.dialect.name
+    if engine.dialect.name == "sqlite":
+        assert database["journal_mode"] == "wal"
+        assert database["foreign_keys"] is True
+        assert database["busy_timeout_ms"] == 30000
+        assert database["synchronous"] == 2
+        assert database["deployment_mode"] == "single_host"
+        assert database["network_shared_database_supported"] is False
+    else:
+        assert database["deployment_mode"] == "multi_host"
+        assert database["network_shared_database_supported"] is True
 
 
 def test_health_endpoint_reports_database_unavailable_without_leaking_details():
