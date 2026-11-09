@@ -944,6 +944,25 @@ function App() {
   }, [token])
 
   useEffect(() => {
+    if (!token || !user || serverConnection !== 'connected') return
+    const deviceId = localStorage.getItem('schoolbridge-sync-device-' + user.id)
+    if (!deviceId) { setSyncDeviceRevoked(false); return }
+    let cancelled = false
+    api<{ devices: { device_id: string; active: boolean }[] }>('sync/devices', token)
+      .then(result => {
+        if (cancelled) return
+        const device = result.devices.find(item => item.device_id === deviceId)
+        const revoked = Boolean(device && !device.active)
+        setSyncDeviceRevoked(revoked)
+        if (revoked) void clearLocalSyncData(user.id, deviceId)
+      })
+      .catch(() => {
+        // A temporary request failure is not evidence that a device was revoked.
+      })
+    return () => { cancelled = true }
+  }, [token, user?.id, serverConnection])
+
+  useEffect(() => {
     if (!token) { setServerConnection('checking'); return }
     let cancelled = false
     async function checkServerConnection() {
