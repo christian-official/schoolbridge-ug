@@ -2132,7 +2132,7 @@ def list_sync_class_snapshot(
 
     query = db.query(models.SchoolClass)
     scope = None
-    if user.role == "admin" or "view" in user_permissions(user).get("Students", set()):
+    if user.role == "admin":
         scope = "school"
     elif user.role == "teacher":
         if "view" not in user_permissions(user).get("My Classes", set()) and "view" not in user_permissions(user).get("Students", set()):
@@ -2149,6 +2149,8 @@ def list_sync_class_snapshot(
         )
         query = query.filter(models.SchoolClass.id.in_(class_ids) if class_ids else models.SchoolClass.id == -1)
         scope = "assigned_classes"
+    elif "view" in user_permissions(user).get("Students", set()):
+        scope = "school"
     elif user.role == "parent":
         linked_student_ids = [
             row[0] for row in db.query(models.ParentStudentLink.student_id).filter_by(
