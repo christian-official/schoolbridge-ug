@@ -2313,3 +2313,17 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .photo-status.pending{color:#9a6813}
 .community-table .student-cell{display:flex;align-items:center;gap:10px;min-width:180px}
 .community-table .student-avatar{width:34px;height:34px;font-size:13px}
+
+/* Permission grants are usable by default; administrators can narrow each action. */
+.permission-choice-wrap{min-width:0;border:1px solid #e1e8f0;border-radius:12px;background:#fff;padding:8px}
+.permission-choice-wrap.active{border-color:#9bb9d7;background:#f7fbff}
+.permission-action-filters{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px;padding:8px 2px 2px;border-top:1px solid #e5edf5}
+.permission-action-filters label{display:inline-flex;align-items:center;gap:4px;font-size:11px;text-transform:capitalize;color:#475569}
+.permission-action-filters input{accent-color:#245b8f}
+.selected-staff-summary{display:grid;gap:4px;margin:12px 0;padding:14px 16px;border:1px solid #d7e3ef;border-radius:12px;background:#f5f9fd;color:#24415e}
+.selected-staff-summary span,.selected-staff-summary small{color:#61758a}
+.teacher-admission-checklist{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:18px 0}
+.teacher-admission-checklist>div{display:grid;gap:6px;padding:15px;border:1px solid #e1e8f0;border-radius:12px;background:#fbfdff}
+.teacher-admission-checklist span{font-size:13px;color:#64748b;line-height:1.5}
+.settings-hub-subpage>.settings-section-tabs{margin-bottom:16px}
+@media(max-width:680px){.teacher-admission-checklist{grid-template-columns:1fr}.permission-action-filters{gap:5px}}

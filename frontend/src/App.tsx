@@ -1022,7 +1022,7 @@ function App() {
           {(user.role === 'parent' ? parentMenu : user.role === 'admin' ? menu : isFinanceAccount(user) ? getStaffNavigation(user).filter(item => ['Overview','Fees & Finance','My Attendance','My Profile'].includes(item.label)) : getStaffNavigation(user)).map(item => {
             const Icon = item.icon
             return (
-              <button key={item.label} className={`nav-item ${active === item.label ? 'active' : ''}`} title="Hold for 5 seconds to add this page to your Overview shortcuts" onPointerDown={() => beginShortcutHold(item.label)} onPointerUp={cancelShortcutHold} onPointerLeave={cancelShortcutHold} onPointerCancel={cancelShortcutHold} onContextMenu={event => event.preventDefault()} onClick={() => { if (longPressTriggered.current) { longPressTriggered.current = false; return } setActive(item.label); setMobileMenu(false) }}>
+              <button key={item.label} className={`nav-item ${active === item.label ? 'active' : ''}`} title="Hold for 5 seconds to add this page to your Overview shortcuts" onPointerDown={() => beginShortcutHold(item.label)} onPointerUp={cancelShortcutHold} onPointerLeave={cancelShortcutHold} onPointerCancel={cancelShortcutHold} onContextMenu={event => event.preventDefault()} onClick={() => { if (longPressTriggered.current) { longPressTriggered.current = false; return } if (active !== item.label) setActive(item.label); setMobileMenu(false) }}>
                 <Icon size={19} /> <span>{item.label}</span>
                 {active === item.label && <span className="active-dot" />}
               </button>
@@ -1030,7 +1030,7 @@ function App() {
           })}
         </nav>
         <div className="sidebar-bottom">
-          {user.role === 'admin' && <button className="nav-item" onClick={() => setActive('Settings')}><Settings size={19} /> Settings</button>}
+          {user.role === 'admin' && <button className="nav-item" onClick={() => { if (active !== 'Settings') setActive('Settings') }}><Settings size={19} /> Settings</button>}
           <div className="profile-card">
             <div className="avatar">{user.username.slice(0, 1).toUpperCase()}</div>
             <div className="profile-info"><strong>{user.username}</strong><small>{user.role}</small></div>
@@ -1240,11 +1240,9 @@ function App() {
             <section className="settings-hub">
               <div className="panel-heading"><div><h2>School settings</h2><p>Choose a category to configure how SchoolBridge works for this school.</p></div></div>
               <div className="settings-category-grid">
-                <button className="settings-category" onClick={() => setSettingsSection('school')}><span className="settings-category-icon"><GraduationCap /></span><strong>School Profile</strong><small>School name, contacts and identity</small><ArrowUpRight /></button>
+                <button className="settings-category" onClick={() => setSettingsSection('school')}><span className="settings-category-icon"><GraduationCap /></span><strong>School Profile & Admissions</strong><small>School identity, student and teacher admission setup</small><ArrowUpRight /></button>
                 <button className="settings-category" onClick={() => setSettingsSection('classes')}><span className="settings-category-icon"><BookOpen /></span><strong>Classes & Streams</strong><small>Create classes, streams and manage class fees</small><ArrowUpRight /></button>
-                <button className="settings-category" onClick={() => setSettingsSection('admission')}><span className="settings-category-icon"><Users /></span><strong>Admission Numbers</strong><small>Set the format for student admission numbers</small><ArrowUpRight /></button>
-                <button className="settings-category" onClick={() => setSettingsSection('academic')}><span className="settings-category-icon"><CalendarDays /></span><strong>Academic Year & Terms</strong><small>Set the active academic year and term</small><ArrowUpRight /></button>
-                <button className="settings-category" onClick={() => setSettingsSection('curriculum')}><span className="settings-category-icon"><BookOpen /></span><strong>Academic & Curriculum</strong><small>Configure A-Level combinations, O-Level optional and subsidiary subjects</small><ArrowUpRight /></button>
+                <button className="settings-category" onClick={() => setSettingsSection('academy')}><span className="settings-category-icon"><CalendarDays /></span><strong>Academy</strong><small>Academic year, terms, subjects and curriculum</small><ArrowUpRight /></button>
                 <button className="settings-category" onClick={() => setSettingsSection('users')}><span className="settings-category-icon"><ShieldCheck /></span><strong>Users & Permissions</strong><small>Teaching and non-teaching staff roles, tabs and actions</small><ArrowUpRight /></button>
                 <button className="settings-category" onClick={() => setSettingsSection('backups')}><span className="settings-category-icon"><Settings /></span><strong>Backups & Restore</strong><small>Protect and restore school records</small><ArrowUpRight /></button>
                 <button className="settings-category" onClick={() => setSettingsSection('audit')}><span className="settings-category-icon"><ShieldCheck /></span><strong>Audit Log</strong><small>Review important changes and financial actions</small><ArrowUpRight /></button>
@@ -1274,9 +1272,8 @@ function App() {
               </form></details>
             </section>
               )}
-              {settingsSection === 'school' && <SchoolProfileSettings token={token} onSaved={() => { api<any>('settings/school-profile',token).then(setSchoolConfig).catch(()=>{}); setSettingsSection('home') }} />}
-              {settingsSection === 'academic' && <><AcademicSettings token={token} onSaved={() => setSettingsSection('home')} /><SubjectSettings token={token} schoolType={schoolConfig.school_type === 'Secondary' ? 'Secondary' : 'Primary'} /></>}
-              {settingsSection === 'curriculum' && <AcademicCurriculumSettings token={token} onSaved={() => setSettingsSection('home')} />}
+              {settingsSection === 'school' && <SchoolProfileAdmissionsHub token={token} onProfileSaved={() => { api<any>('settings/school-profile',token).then(setSchoolConfig).catch(()=>{}) }} />}
+              {settingsSection === 'academy' && <AcademySettingsHub token={token} schoolType={schoolConfig.school_type === 'Secondary' ? 'Secondary' : 'Primary'} onSaved={() => setSettingsSection('home')} />}
               {settingsSection === 'users' && <TeacherUsersSettings token={token} classes={classes} onSaved={() => { setRefreshKey(value => value + 1) }} />}
               {settingsSection === 'backups' && <BackupSettings token={token} />}
               {settingsSection === 'audit' && <AuditLogSettings token={token} />}
@@ -1319,6 +1316,33 @@ function EmptyState({ text }: { text: string }) {
 
 export default App
 
+
+function SchoolProfileAdmissionsHub({token,onProfileSaved}:{token:string;onProfileSaved:()=>void}) {
+  const [tab,setTab]=useState<'profile'|'students'|'teachers'>('profile')
+  return <section className="settings-hub-subpage">
+    <div className="settings-section-tabs" role="tablist" aria-label="School profile and admissions">
+      <button type="button" role="tab" aria-selected={tab==='profile'} className={tab==='profile'?'active':''} onClick={()=>setTab('profile')}>School Profile</button>
+      <button type="button" role="tab" aria-selected={tab==='students'} className={tab==='students'?'active':''} onClick={()=>setTab('students')}>Student Admissions</button>
+      <button type="button" role="tab" aria-selected={tab==='teachers'} className={tab==='teachers'?'active':''} onClick={()=>setTab('teachers')}>Teacher Admissions</button>
+    </div>
+    {tab==='profile'&&<SchoolProfileSettings token={token} onSaved={onProfileSaved}/>}
+    {tab==='students'&&<AdmissionNumberSettings token={token}/>}
+    {tab==='teachers'&&<section className="panel settings-panel"><div className="panel-heading"><div><h2>Teacher & staff admissions</h2><p>Staff are admitted through the Staff workspace, where their employment profile is created before login access is assigned.</p></div></div><div className="teacher-admission-checklist"><div><strong>01 · Staff identity</strong><span>Record the staff number, full name and contact details.</span></div><div><strong>02 · Employment details</strong><span>Choose teaching or non-teaching category, job title, department and house.</span></div><div><strong>03 · Teaching profile</strong><span>For teachers, record registered subjects and class responsibilities.</span></div><div><strong>04 · Account access</strong><span>Assign a login, role and permitted SchoolBridge workspaces under Users & Permissions.</span></div></div><p className="form-hint">Open Staff from the main menu to register a new teacher or staff member. Their account and permissions are managed separately after registration.</p></section>}
+  </section>
+}
+
+function AdmissionNumberSettings({token}:{token:string}) {
+  const [settings,setSettings]=useState<AdmissionSettings>({admission_prefix:'SB',include_year:true,admission_separator:'-',admission_padding:4,next_admission_number:1})
+  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('')
+  useEffect(()=>{api<AdmissionSettings>('settings/admission-number',token).then(setSettings).catch(e=>setError(e.message))},[token])
+  async function save(e:React.FormEvent<HTMLFormElement>){e.preventDefault();setBusy(true);setError('');setMessage('');try{const saved=await api<AdmissionSettings>('settings/admission-number',token,{method:'PUT',body:JSON.stringify(settings)});setSettings(saved);setMessage('Student admission number format saved.')}catch(e){setError(e instanceof Error?e.message:'Unable to save student admission settings.')}finally{setBusy(false)}}
+  return <section className="panel settings-panel"><div className="panel-heading"><div><h2>Student admission setup</h2><p>Configure the admission number generated for each newly registered student.</p></div></div>{error&&<div className="form-error" role="alert">{error}</div>}{message&&<div className="success-notice" role="status">{message}</div>}<form className="student-form" onSubmit={save}><div className="student-form-grid"><label>School prefix *<input required maxLength={20} value={settings.admission_prefix} onChange={e=>setSettings({...settings,admission_prefix:e.target.value})}/></label><label>Separator<select value={settings.admission_separator} onChange={e=>setSettings({...settings,admission_separator:e.target.value})}><option value="-">Hyphen (-)</option><option value="/">Slash (/)</option><option value="">None</option></select></label><label>Number of digits<select value={settings.admission_padding} onChange={e=>setSettings({...settings,admission_padding:Number(e.target.value)})}>{[3,4,5,6,7,8].map(n=><option key={n} value={n}>{n} digits</option>)}</select></label><label>Next sequence number<input type="number" min="1" required value={settings.next_admission_number} onChange={e=>setSettings({...settings,next_admission_number:Math.max(1,Number(e.target.value))})}/></label></div><button type="button" className={settings.include_year?'choice-toggle active':'choice-toggle'} aria-pressed={settings.include_year} onClick={()=>setSettings({...settings,include_year:!settings.include_year})}>Include current year · {settings.include_year?'Yes':'No'}</button><div className="number-preview"><span>Next student admission number</span><strong>{[settings.admission_prefix.trim(),...(settings.include_year?[String(new Date().getFullYear())]:[]),String(settings.next_admission_number).padStart(settings.admission_padding,'0')].filter(Boolean).join(settings.admission_separator)}</strong></div><div className="form-actions"><button className="primary-button" disabled={busy}>{busy?'Saving...':'Save student admission setup'}</button></div></form></section>
+}
+
+function AcademySettingsHub({token,schoolType,onSaved}:{token:string;schoolType:string;onSaved:()=>void}) {
+  const [tab,setTab]=useState<'calendar'|'curriculum'>('calendar')
+  return <section className="settings-hub-subpage"><div className="settings-section-tabs" role="tablist" aria-label="Academy settings"><button type="button" role="tab" aria-selected={tab==='calendar'} className={tab==='calendar'?'active':''} onClick={()=>setTab('calendar')}>Academic Year & Terms</button><button type="button" role="tab" aria-selected={tab==='curriculum'} className={tab==='curriculum'?'active':''} onClick={()=>setTab('curriculum')}>Curriculum & Subjects</button></div>{tab==='calendar'&&<AcademicSettings token={token} onSaved={()=>{}}/>}{tab==='curriculum'&&<><AcademicCurriculumSettings token={token} onSaved={()=>{}}/><SubjectSettings token={token} schoolType={schoolType}/></>}</section>
+}
 
 function AcademicSettings({token,onSaved}:{token:string;onSaved:()=>void}) {
   const [year,setYear]=useState(new Date().getFullYear())
@@ -1745,12 +1769,22 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
     if(label==='Attendance Officer'){next['Attendance']=['view','add','edit'];next['Staff Attendance']=['view','add','edit']}
     setRoleLabel(label);setRoleType(label==='Teacher'||label==='Class Teacher'?'teacher':'staff');setPermissions(next)
   }
+  const permissionActions=['view','add','edit','delete','approve','print']
   function toggleSection(section:string) {
     setPermissions(current=>{
       const next={...current}
       if(next[section]?.includes('view')) delete next[section]
-      else next[section]=section==='My Results'?['view','add','edit']:section==='Attendance'&&roleType==='teacher'?['view','add']:section==='Timetable'&&['Academic Administrator','Academics Officer','DOS'].includes(roleLabel)?['view','add','edit','delete']:['view']
+      else next[section]=[...permissionActions]
       return next
+    })
+  }
+  function togglePermissionAction(section:string,action:string) {
+    setPermissions(current=>{
+      const actions=new Set(current[section]||[])
+      if(actions.has(action)) actions.delete(action); else actions.add(action)
+      if(actions.size) actions.add('view')
+      if(!actions.size) delete current[section]
+      return {...current,[section]:[...actions]}
     })
   }
   async function savePermissions() {
@@ -1831,14 +1865,15 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
     <h3>Manage a staff member's access</h3>
     {loading?<p className="form-hint">Loading staff accounts...</p>:!editableUsers.length?<p className="form-hint">No staff login accounts yet. Register a staff member first.</p>:<>
       <div className="student-form-grid">
-        <label>Staff member<select value={selectedId} onChange={e=>selectAccount(e.target.value)}><option value="">Choose staff account</option>{editableUsers.map(u=>{const person=staff.find((p:any)=>p.id===u.staff_id);return <option key={u.id} value={u.id}>{person?person.first_name+' '+person.last_name:u.username} — {u.username}</option>})}</select></label>
-        <label>Job role<select value={presetNames.includes(roleLabel)?roleLabel:'Custom role'} onChange={e=>{if(e.target.value!=='Custom role')applyPreset(e.target.value)}}><option>Custom role</option>{presetNames.map((name:string)=><option key={name}>{name}</option>)}</select></label>
-        <label>Display title<input value={roleLabel} onChange={e=>setRoleLabel(e.target.value)} maxLength={80} placeholder="e.g. Bursar, Secretary, DOS"/></label>
-        <label>Staff category<select value={roleType} onChange={e=>setRoleType(e.target.value as 'teacher'|'staff')}><option value="teacher">Teaching staff</option><option value="staff">Non-teaching staff</option></select></label>
+        <label>Staff member *<select required value={selectedId} onChange={e=>{selectAccount(e.target.value);const account=users.find((u:any)=>String(u.id)===e.target.value);const person=staff.find((p:any)=>p.id===account?.staff_id);if(person){setRoleLabel(person.position||account.role_label||account.role);setRoleType(person.category==='Teaching'?'teacher':'staff')}}}><option value="">Choose staff account</option>{editableUsers.map(u=>{const person=staff.find((p:any)=>p.id===u.staff_id);return <option key={u.id} value={u.id}>{person?person.first_name+' '+person.last_name:u.username} — {u.username}</option>})}</select></label>
+        <label>Access role *<select required value={presetNames.includes(roleLabel)?roleLabel:'Custom role'} onChange={e=>{if(e.target.value!=='Custom role')applyPreset(e.target.value)}}><option>Custom role</option>{presetNames.map((name:string)=><option key={name}>{name}</option>)}</select></label>
+        <label>Job title / display role *<input required value={roleLabel} onChange={e=>setRoleLabel(e.target.value)} maxLength={80} placeholder="e.g. Bursar, Secretary, DOS"/></label>
+        <label>Staff category *<select required value={roleType} onChange={e=>setRoleType(e.target.value as 'teacher'|'staff')}><option value="teacher">Teaching staff</option><option value="staff">Non-teaching staff</option></select></label>
       </div>
+      {selectedId&&(()=>{const account=editableUsers.find((u:any)=>String(u.id)===selectedId);const person=staff.find((p:any)=>p.id===account?.staff_id);return <div className="selected-staff-summary"><strong>{person?[person.first_name,person.last_name].filter(Boolean).join(' '):account?.username}</strong><span>{person?.staff_number||'No staff number'} · {person?.category|| (roleType==='teacher'?'Teaching':'Non-teaching')} · {person?.department||'Department not set'}</span><small>Login: {account?.username} · Email: {account?.email||person?.email||'Not provided'} · Current role: {account?.role_label||account?.role}</small></div>})()}
       <details className="form-disclosure"><summary>Choose which areas this staff member can open</summary>
         <p className="form-hint">Choose the school areas this staff member is allowed to open. Selected areas appear in their menu.</p>
-        <div className="permission-choice-grid">{(catalog.sections||[]).map((section:string)=><button type="button" key={section} className={permissions[section]?.includes('view')?'permission-choice active':'permission-choice'} aria-pressed={Boolean(permissions[section]?.includes('view'))} onClick={()=>toggleSection(section)}><span>{section}</span><small>{permissions[section]?.includes('view')?'Enabled':'Not enabled'}</small></button>)}</div>
+        <div className="permission-choice-grid">{(catalog.sections||[]).map((section:string)=><div key={section} className={permissions[section]?.includes('view')?'permission-choice-wrap active':'permission-choice-wrap'}><button type="button" className={permissions[section]?.includes('view')?'permission-choice active':'permission-choice'} aria-pressed={Boolean(permissions[section]?.includes('view'))} onClick={()=>toggleSection(section)}><span>{section}</span><small>{permissions[section]?.includes('view')?'Enabled · full access by default':'Not enabled'}</small></button>{permissions[section]?.includes('view')&&<div className="permission-action-filters" aria-label={section+' permitted actions'}>{permissionActions.map(action=><label key={action}><input type="checkbox" checked={(permissions[section]||[]).includes(action)} disabled={action==='view'} onChange={()=>togglePermissionAction(section,action)}/>{action}</label>)}</div>}</div>)}</div>
       </details>
       <div className="form-actions"><button type="button" className="primary-button" onClick={()=>void savePermissions()} disabled={busy||!selectedId}>{busy?'Saving...':'Save staff access'}</button></div>
       <div className="form-actions"><button type="button" className="secondary-button" onClick={()=>void resetSelectedPassword()} disabled={busy||!selectedId}>{busy?'Working...':'Reset login passcode'}</button></div>
