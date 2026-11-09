@@ -188,12 +188,17 @@ def test_admin_can_stage_valid_restore_without_immediate_replacement(tmp_path):
         source.close()
 
     # Make the uploaded backup intentionally different from the live database.
-    with sqlite3.connect(str(backup_path)) as backup_db:
+    backup_db = sqlite3.connect(str(backup_path))
+    try:
         backup_db.execute(
             "INSERT INTO users (username, email, hashed_password, role, is_active) "
             "VALUES (?, ?, ?, ?, ?)",
             ("backup-only-teacher", "backup-only@example.invalid", "test-hash", "teacher", 1),
         )
+        backup_db.commit()
+    finally:
+        # Close the WAL-backed copy before reading its main database file.
+        backup_db.close()
 
     try:
         with TestClient(app) as client:
