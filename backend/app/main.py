@@ -1706,8 +1706,8 @@ async def protect_school_data(request: Request, call_next):
             # Self-service profile, password and personal dashboard endpoints
             # are scoped to the authenticated account.
             pass
-        elif path == "/api/sync/devices" or path.startswith("/api/sync/devices/") or path == "/api/sync/changes":
-            # Device registry routes always filter by the authenticated user ID.
+        elif path == "/api/sync/devices" or path.startswith("/api/sync/devices/") or path in {"/api/sync/changes", "/api/sync/students"}:
+            # Sync routes enforce account, device and record scope in each handler.
             pass
         elif path.startswith("/api/teacher/"):
             if user.role != "teacher":
@@ -2027,6 +2027,90 @@ def list_sync_changes(
             for row in rows
         ],
         "next_cursor": next_cursor,
+        "has_more": has_more,
+    }
+
+
+@app.get("/api/sync/students", tags=["Offline Synchronisation"])
+def list_sync_student_snapshot(
+    device_id: UUID,
+    after_id: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=200),
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """Return a minimal student snapshot limited to the signed-in user's scope."""
+    device = db.query(models.SyncDevice).filter_by(
+        user_id=user.id, device_id=str(device_id)
+    ).first()
+    if device is None or device.revoked_at is not None:
+        raise HTTPException(403, "An active registered device is required.")
+
+    query = db.query(models.Student)
+    scope = None
+    if user.role == "admin":
+        scope = "school"
+    elif user.role == "teacher":
+        if "view" not in user_permissions(user).get("My Classes", set()) and "view" not in user_permissions(user).get("Students", set()):
+            raise HTTPException(403, "You do not have permission to view assigned students.")
+        class_ids = {
+            row[0] for row in db.query(models.TeacherAssignment.class_id).filter_by(
+                teacher_id=user.id
+            ).distinct().all()
+        }
+        class_ids.update(
+            row[0] for row in db.query(models.ClassTeacherAssignment.class_id).filter_by(
+                teacher_id=user.id
+            ).all()
+        )
+        if not class_ids:
+            query = query.filter(models.Student.id == -1)
+        else:
+            query = query.filter(models.Student.class_id.in_(class_ids))
+        scope = "assigned_classes"
+    elif user.role == "parent":
+        student_ids = [
+            row[0] for row in db.query(models.ParentStudentLink.student_id).filter_by(
+                user_id=user.id
+            ).all()
+        ]
+        query = query.filter(models.Student.id.in_(student_ids) if student_ids else models.Student.id == -1)
+        scope = "linked_students"
+    elif "view" in user_permissions(user).get("Students", set()):
+        scope = "school"
+    else:
+        raise HTTPException(403, "Your account is not authorised to download student records.")
+
+    rows = query.filter(models.Student.id > after_id).order_by(
+        models.Student.id.asc()
+    ).limit(limit + 1).all()
+    has_more = len(rows) > limit
+    rows = rows[:limit]
+    next_after_id = rows[-1].id if rows else after_id
+
+    # Keep this bootstrap payload deliberately small; sensitive contact,
+    # guardian and photo fields are never included.
+    payload = [
+        {
+            "id": row.id,
+            "admission_number": row.admission_number,
+            "first_name": row.first_name,
+            "middle_name": row.middle_name,
+            "last_name": row.last_name,
+            "class_id": row.class_id,
+            "status": row.status,
+            "academic_level": row.academic_level,
+            "combination": row.combination,
+            "study_mode": row.study_mode,
+        }
+        for row in rows
+    ]
+    device.last_seen_at = datetime.utcnow()
+    db.commit()
+    return {
+        "students": payload,
+        "scope": scope,
+        "next_after_id": next_after_id,
         "has_more": has_more,
     }
 

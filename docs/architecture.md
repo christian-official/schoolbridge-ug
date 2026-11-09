@@ -68,3 +68,8 @@ The initial change-feed endpoint returns metadata only, paginated by sequence cu
 ### Per-device synchronisation checkpoints
 
 Each registered device stores both the highest change-journal sequence returned to it and the highest sequence it has successfully processed. A device may advance its checkpoint only up to its own delivered high-water mark; it cannot acknowledge another device's unseen changes or move its checkpoint backwards. Checkpoints are scoped to the owning account and revoked devices cannot update them. This records progress only; it does not mean record contents have been downloaded or safely applied locally.
+
+
+### Scoped student bootstrap snapshots
+
+Registered devices can request a paginated, minimal student snapshot. Administrators and staff with explicit Students-view permission receive school-wide student basics; teachers receive only students in classes assigned to them; parents receive only students explicitly linked to their account. Guardian contacts, student contact details, dates of birth and photos are excluded from this first payload. The endpoint is device-owner scoped and rejects revoked devices. Other record types and role-aware change-feed filtering remain disabled until equivalent access rules are implemented and tested.

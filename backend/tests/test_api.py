@@ -1262,3 +1262,84 @@ def test_sync_device_checkpoint_rejects_negative_sequence():
             headers=headers,
         )
         assert response.status_code == 422
+
+
+def test_sync_student_snapshot_is_scoped_to_authorised_records():
+    reset_database()
+    admin = create_admin()
+    teacher = create_teacher()
+    db = SessionLocal()
+    try:
+        school_class = models.SchoolClass(name="S1", section="A")
+        other_class = models.SchoolClass(name="S2", section="B")
+        db.add_all([school_class, other_class])
+        db.flush()
+        assigned = models.Student(
+            admission_number="SNAP-001", first_name="Amina", last_name="Assigned",
+            class_id=school_class.id, guardian_phone="0700000001",
+        )
+        unrelated = models.Student(
+            admission_number="SNAP-002", first_name="Brian", last_name="Other",
+            class_id=other_class.id,
+        )
+        parent = models.User(
+            username="snapshot-parent", email="snapshot-parent@example.invalid",
+            hashed_password=password_hash.hash("ParentPassword123!"),
+            role="parent", is_active=True,
+        )
+        db.add_all([assigned, unrelated, parent])
+        db.flush()
+        db.add_all([
+            models.ClassTeacherAssignment(teacher_id=teacher.id, class_id=school_class.id),
+            models.ParentStudentLink(user_id=parent.id, student_id=assigned.id),
+        ])
+        db.commit()
+        parent_id = parent.id
+        assigned_id, unrelated_id = assigned.id, unrelated.id
+    finally:
+        db.close()
+
+    admin_headers = {"Authorization": f"Bearer {create_access_token(admin)}"}
+    teacher_headers = {"Authorization": f"Bearer {create_access_token(teacher)}"}
+    parent_headers = {"Authorization": f"Bearer {create_access_token(SimpleNamespace(id=parent_id, role='parent'))}"}
+    devices = {
+        "admin": ("00000000-0000-4000-8000-000000000301", admin_headers),
+        "teacher": ("00000000-0000-4000-8000-000000000302", teacher_headers),
+        "parent": ("00000000-0000-4000-8000-000000000303", parent_headers),
+    }
+    with TestClient(app) as client:
+        for device_id, headers in devices.values():
+            registered = client.post(
+                "/api/sync/devices", headers=headers,
+                json={"device_id": device_id, "device_name": "Snapshot test"},
+            )
+            assert registered.status_code == 200
+
+        def snapshot(device, headers):
+            return client.get(
+                f"/api/sync/students?device_id={device}&limit=200",
+                headers=headers,
+            )
+
+        admin_response = snapshot(*devices["admin"])
+        teacher_response = snapshot(*devices["teacher"])
+        parent_response = snapshot(*devices["parent"])
+        assert admin_response.status_code == 200
+        assert {row["id"] for row in admin_response.json()["students"]} == {assigned_id, unrelated_id}
+        assert teacher_response.status_code == 200
+        assert [row["id"] for row in teacher_response.json()["students"]] == [assigned_id]
+        assert teacher_response.json()["scope"] == "assigned_classes"
+        assert parent_response.status_code == 200
+        assert [row["id"] for row in parent_response.json()["students"]] == [assigned_id]
+        assert parent_response.json()["scope"] == "linked_students"
+        assert "guardian_phone" not in teacher_response.json()["students"][0]
+        assert "photo_data" not in teacher_response.json()["students"][0]
+
+        wrong_owner = snapshot(devices["admin"][0], teacher_headers)
+        assert wrong_owner.status_code == 403
+        revoked = client.delete(
+            f"/api/sync/devices/{devices['parent'][0]}", headers=parent_headers,
+        )
+        assert revoked.status_code == 200
+        revoked_snapshot = snapshot(*devices["parent"])
+        assert revoked_snapshot.status_code == 403
