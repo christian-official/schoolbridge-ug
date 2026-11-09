@@ -1432,22 +1432,24 @@ def test_sync_exam_and_mark_snapshots_filter_teacher_subjects_and_parent_verific
     db = SessionLocal()
     try:
         school_class = models.SchoolClass(name="S3", section="A")
+        other_class = models.SchoolClass(name="S4", section="B")
         biology = models.Subject(name="Biology")
         chemistry = models.Subject(name="Chemistry")
-        db.add_all([school_class, biology, chemistry])
+        db.add_all([school_class, other_class, biology, chemistry])
         db.flush()
         child = models.Student(admission_number="EX-SYNC-1", first_name="A", last_name="One", class_id=school_class.id)
-        other = models.Student(admission_number="EX-SYNC-2", first_name="B", last_name="Two", class_id=school_class.id)
+        other = models.Student(admission_number="EX-SYNC-2", first_name="B", last_name="Two", class_id=other_class.id)
         parent = models.User(username="exam-parent", email="exam-parent@example.invalid", hashed_password=password_hash.hash("ParentPassword123!"), role="parent", is_active=True)
         exam = models.Exam(name="Mid Term", term="Term 1", year=2026, class_id=school_class.id)
-        db.add_all([child, other, parent, exam])
+        other_exam = models.Exam(name="Mid Term Other Class", term="Term 1", year=2026, class_id=other_class.id)
+        db.add_all([child, other, parent, exam, other_exam])
         db.flush()
         db.add_all([
             models.TeacherAssignment(teacher_id=teacher.id, class_id=school_class.id, subject_id=biology.id),
             models.ParentStudentLink(user_id=parent.id, student_id=child.id),
             models.Mark(student_id=child.id, subject_id=biology.id, exam_id=exam.id, score=80, verified=True),
             models.Mark(student_id=child.id, subject_id=chemistry.id, exam_id=exam.id, score=70, verified=False),
-            models.Mark(student_id=other.id, subject_id=biology.id, exam_id=exam.id, score=60, verified=False),
+            models.Mark(student_id=other.id, subject_id=biology.id, exam_id=other_exam.id, score=60, verified=False),
         ])
         db.commit()
         child_id, parent_id, exam_id, biology_id, chemistry_id = child.id, parent.id, exam.id, biology.id, chemistry.id
