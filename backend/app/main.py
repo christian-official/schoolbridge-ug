@@ -497,6 +497,7 @@ class StudentCreate(BaseModel):
     combination: str | None = None
     optional_subjects: str | None = None
     subsidiary_subjects: str | None = None
+    photo_data: str | None = Field(default=None, max_length=1_800_000)
 
 
 class StudentUpdate(BaseModel):
@@ -774,6 +775,8 @@ def list_subjects(db: Session = Depends(get_db)):
 
 @app.post("/api/students", response_model=StudentOut, tags=["Students"])
 def create_student(data: StudentCreate, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    if data.photo_data is not None:
+        validate_profile_photo(data.photo_data)
     if not data.first_name.strip() or not data.last_name.strip():
         raise HTTPException(422, "Enter the student's first and last names before registering.")
     if not data.gender or not data.gender.strip():
