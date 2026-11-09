@@ -8,6 +8,7 @@ os.environ["SCHOOLBRIDGE_SECRET_KEY"] = "test-only-secret-key-that-is-not-used-i
 
 from fastapi.testclient import TestClient
 from types import SimpleNamespace
+from sqlalchemy import func
 
 from app.database import Base, engine, SessionLocal
 from app.main import app, create_access_token, password_hash
