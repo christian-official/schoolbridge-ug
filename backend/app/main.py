@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import update, func, or_, text
 
-from .database import DATABASE_URL, Base, engine, get_db, SessionLocal
+from .database import DATABASE_URL, Base, engine, get_db, SessionLocal, create_sqlite_backup
 from .migrations import upgrade_database
 from . import models
 
@@ -3872,13 +3872,7 @@ def create_database_backup(admin=Depends(require_admin)):
     fd, backup_path = tempfile.mkstemp(prefix="schoolbridge-backup-", suffix=".sqlite3")
     os.close(fd)
     try:
-        source = sqlite3.connect(os.path.abspath(db_path))
-        destination = sqlite3.connect(backup_path)
-        try:
-            source.backup(destination)
-        finally:
-            destination.close()
-            source.close()
+        create_sqlite_backup(os.path.abspath(db_path), backup_path)
     except Exception:
         if os.path.exists(backup_path):
             os.unlink(backup_path)
