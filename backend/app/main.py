@@ -3568,6 +3568,8 @@ def update_student(student_id: int, data: StudentUpdate, db: Session = Depends(g
     if not student:
         raise HTTPException(404, "Student not found.")
     changes = data.model_dump(exclude_unset=True)
+    if not student.photo_data and not changes.get("photo_data"):
+        raise HTTPException(422, "Upload a passport photo to complete this student profile.")
     if changes.get("photo_data") is not None:
         validate_profile_photo(changes["photo_data"])
     if "class_id" in changes and changes["class_id"] is not None and not db.get(models.SchoolClass, changes["class_id"]):
@@ -3659,6 +3661,8 @@ def update_my_staff_profile(data: MyStaffProfileUpdate, user=Depends(get_current
     staff = db.get(models.StaffMember, user.staff_id)
     if not staff:
         raise HTTPException(404, "Staff profile not found.")
+    if not staff.photo_data and not data.photo_data:
+        raise HTTPException(422, "Upload a passport photo to complete your staff profile.")
     email = data.email.strip().lower() if data.email and data.email.strip() else user.email
     if email:
         duplicate = db.query(models.User).filter(models.User.email == email, models.User.id != user.id).first()

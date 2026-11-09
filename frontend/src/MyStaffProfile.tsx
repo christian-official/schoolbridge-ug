@@ -90,7 +90,7 @@ export default function MyStaffProfile({ token }: { token: string }) {
             <label>Phone number<input type="tel" value={phone} onChange={e=>setPhone(e.target.value)} /></label>
             <label>Email address<input type="email" value={email} onChange={e=>setEmail(e.target.value)} /></label>
           </div>
-          <div className="form-actions"><button className="primary-button" disabled={saving}>Save profile changes</button></div>
+          <div className="form-actions"><button className="primary-button" disabled={saving||!photoData}>{saving?'Saving...':photoData?'Save profile changes':'Add a passport photo to complete the profile'}</button></div>
         </form>
         <hr />
         <form className="student-form" onSubmit={savePassword}>
