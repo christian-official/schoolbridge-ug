@@ -25,7 +25,7 @@ Each school's installation and data must remain isolated. Internet access may be
 
 ## Development status
 
-Phase 5 — Database & Offline Architecture is in progress. The repository includes a Docker Compose deployment foundation for a school-hosted PostgreSQL backend and browser access over a trusted local network, plus verified PostgreSQL backup tooling. This is not yet a complete offline records or synchronisation implementation.
+Phase 5 — Database & Offline Architecture has implemented its database-safety, school-LAN deployment, backup, device-registration, change-journal, checkpoint, role-scoped snapshot and audited offline-proposal foundations. Final validation and deployment verification remain. This is not a complete offline records or synchronisation implementation: API data is not cached for offline use, and submitted offline proposals are not automatically applied to live records.
 
 See [the local-network installation guide](docs/LOCAL_NETWORK_INSTALLATION.md) for setup and [the architecture notes](docs/architecture.md) for the current design direction.
 

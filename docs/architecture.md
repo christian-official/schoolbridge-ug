@@ -53,9 +53,9 @@ This is an initial direction, not a final packaging decision. Windows installati
 
 ## Offline synchronisation foundation
 
-The server maintains a per-user device registry. Each authenticated account can register a browser or desktop installation, list its registered devices, and revoke a device from future synchronisation. Device identities are scoped to the account that registered them; one user cannot inspect or revoke another user's devices.
+The server provides a per-user device registry, an append-only metadata change journal, per-device delivery/checkpoint tracking, and paginated role-scoped bootstrap snapshots for students, classes, attendance, examinations, marks and fee records. Each authenticated account can register a browser or desktop installation, list its registered devices, and revoke a device from future synchronisation. Device identities are scoped to the account that registered them; one user cannot inspect or revoke another user's devices.
 
-This registry is only an identity and access-control foundation. It does not yet cache student records, queue offline edits, or synchronise changes. Until the later synchronisation protocol is implemented, the service worker must continue to avoid caching API responses and the application must treat the server as authoritative.
+This is a synchronisation foundation, not complete offline operation. The browser client does not cache API responses, the change journal is administrator-only, and offline write envelopes are stored as proposals for manual review rather than applied to live records. The server remains authoritative.
 
 
 ### Versioned change journal
