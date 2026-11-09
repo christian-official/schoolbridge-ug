@@ -1998,6 +1998,8 @@ def list_sync_changes(
     ).first()
     if device is None or device.revoked_at is not None:
         raise HTTPException(403, "An active registered device is required.")
+    if cursor > device.last_issued_sequence:
+        raise HTTPException(409, "A change-feed cursor cannot skip beyond changes already delivered to this device.")
 
     rows = db.query(models.SyncChange).filter(
         models.SyncChange.id > cursor

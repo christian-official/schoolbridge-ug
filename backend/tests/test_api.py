@@ -1159,6 +1159,10 @@ def test_sync_change_feed_rejects_invalid_cursor_and_limit():
             f"/api/sync/changes?device_id={device_id}&limit=501", headers=headers,
         )
         assert excessive_limit.status_code == 422
+        skipped_cursor = client.get(
+            f"/api/sync/changes?device_id={device_id}&cursor=1", headers=headers,
+        )
+        assert skipped_cursor.status_code == 409
 
 
 
