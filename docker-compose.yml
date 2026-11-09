@@ -1,0 +1,60 @@
+services:
+  database:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-schoolbridge}
+      POSTGRES_USER: ${POSTGRES_USER:-schoolbridge}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - schoolbridge-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-schoolbridge} -d ${POSTGRES_DB:-schoolbridge}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - schoolbridge-internal
+
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    environment:
+      SCHOOLBRIDGE_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-schoolbridge}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB:-schoolbridge}
+      SCHOOLBRIDGE_SECRET_KEY: ${SCHOOLBRIDGE_SECRET_KEY:?Set SCHOOLBRIDGE_SECRET_KEY in .env}
+      SCHOOLBRIDGE_CORS_ORIGINS: ${SCHOOLBRIDGE_CORS_ORIGINS:-*}
+      SCHOOLBRIDGE_SEED_DEMO_DATA: "false"
+    depends_on:
+      database:
+        condition: service_healthy
+    expose:
+      - "8001"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/api/health', timeout=5)"]
+      interval: 20s
+      timeout: 7s
+      retries: 5
+      start_period: 40s
+    networks:
+      - schoolbridge-internal
+
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${SCHOOLBRIDGE_PORT:-8080}:80"
+    networks:
+      - schoolbridge-internal
+
+volumes:
+  schoolbridge-postgres:
+
+networks:
+  schoolbridge-internal:
+    driver: bridge

@@ -25,13 +25,13 @@ Each school's installation and data must remain isolated. Internet access may be
 
 ## Development status
 
-Early development — foundation and architecture setup.
+Phase 5 — Database & Offline Architecture is in progress. A Docker Compose deployment foundation is now included for a school-hosted PostgreSQL backend and browser access over a trusted local network. This is an installation foundation, not a claim that offline record access, queued writes, or synchronisation are complete.
+
+See [the local-network installation guide](docs/LOCAL_NETWORK_INSTALLATION.md) for setup and [the architecture notes](docs/architecture.md) for the current design direction.
 
 ## Development
 
-The initial backend uses Python, FastAPI and SQLAlchemy. The data layer is being designed to support SQLite for a single-computer installation and PostgreSQL for multi-user school networks. The production Windows installer and mobile-friendly interface will be added in later milestones.
-
-See [the architecture notes](docs/architecture.md) for the current design direction.
+The backend uses Python, FastAPI and SQLAlchemy. SQLite is intended for a single-host installation; PostgreSQL is used for multi-user school networks. The production Windows installer and safe offline data synchronisation will be added in later milestones.
 
 ## Important principles
 
