@@ -1122,7 +1122,7 @@ function App() {
           )}
 
           {dataError && <div className="notice">{dataError} <button onClick={() => void loadSchoolData(token)}>Retry</button></div>}
-          {syncDeviceRevoked && <div className="notice" role="alert">This browser's synchronisation access has been revoked. Local synchronisation storage has been cleared. The old device identity remains blocked; open Device Management to register a new identity.</div>}
+          {syncDeviceRevoked && <div className="notice" role="alert">This browser's synchronisation access has been revoked. SchoolBridge does not currently keep offline copies of API records in this browser. The old device identity remains blocked; open Device Management to register a new identity.</div>}
 
           {(active === 'My Classes' || active === 'Attendance' || active === 'My Attendance' || active === 'My Results') && user.role === 'teacher' && <TeacherWorkspace token={token} active={active} />}
           {active === 'My Attendance' && user.role !== 'teacher' && user.role !== 'parent' && user.role !== 'admin' && <StaffSelfAttendance token={token} />}

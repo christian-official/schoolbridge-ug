@@ -94,9 +94,13 @@ For updates and deletes, the server checks whether the entity changed after the 
 
 ### Device revocation and local data limits
 
-Revoking a registered device blocks its future authenticated synchronisation requests. It cannot reach a device that is disconnected or erase information already downloaded to that device. Clients must therefore revalidate the account and device before displaying protected synchronised data after reconnecting, clear locally held school data when access is denied, and avoid treating an offline copy as proof that access is still authorised. Until a client implements and tests those controls, SchoolBridge does not enable background API caching or general offline record access.
+Revoking a registered device blocks its future authenticated synchronisation requests. It cannot reach a device that is disconnected or erase information already downloaded to that device. The browser client now revalidates the current account's registered device when the school server reconnects and performs cleanup for that device's local sync-cache namespace if the identity is revoked. The old UUID is retained as revoked and is never silently re-registered.
+
+This is revocation handling, not a complete offline cache. The browser still does not persist API record snapshots, and the service worker continues to cache only the application shell and static same-origin assets. There are therefore no SchoolBridge API record copies in the current browser client to display offline or purge on revocation. Users must not treat exported files, screenshots or other copies outside the application as remotely revocable. General offline record access remains disabled until encrypted local storage, offline re-authentication, role/relationship invalidation and end-to-end cleanup are implemented and tested.
 
 
 ### Browser device registration and revocation controls
+
+Administrators with an active registered device can also review their account's offline proposal queue from Device Management. The review screen displays proposal metadata and the submitted draft payload, and supports discard or rebase. Rebase updates the proposal's comparison baseline and returns it to pending review; it never applies the draft to live records.
 
 The signed-in user can review devices registered to their own account, register the current browser, and revoke an existing device. The browser stores only its account-scoped device UUID; this is an identity marker, not an offline credential or local copy of school records. A revoked identity is not silently reused: the user must explicitly create a replacement identity. Device revocation blocks subsequent sync API requests, but cannot erase information already downloaded to a disconnected device. Offline record storage and editing remain disabled until a permission-aware client and safe application workflow are implemented and tested.
