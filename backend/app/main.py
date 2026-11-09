@@ -1704,6 +1704,9 @@ async def protect_school_data(request: Request, call_next):
             # Self-service profile, password and personal dashboard endpoints
             # are scoped to the authenticated account.
             pass
+        elif path == "/api/sync/devices" or path.startswith("/api/sync/devices/"):
+            # Device registry routes always filter by the authenticated user ID.
+            pass
         elif path.startswith("/api/teacher/"):
             if user.role != "teacher":
                 return JSONResponse({"detail": "Teacher account required."}, status_code=403)

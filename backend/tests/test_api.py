@@ -1029,6 +1029,18 @@ def test_sync_device_registration_is_authenticated_user_scoped_and_revocable():
         assert teacher_devices.status_code == 200
         assert teacher_devices.json()["devices"] == []
 
+        teacher_registered = client.post(
+            "/api/sync/devices", headers=teacher_headers,
+            json={
+                "device_id": "00000000-0000-4000-8000-000000000002",
+                "device_name": "Teacher phone",
+            },
+        )
+        assert teacher_registered.status_code == 200, teacher_registered.text
+        teacher_devices_after = client.get("/api/sync/devices", headers=teacher_headers)
+        assert len(teacher_devices_after.json()["devices"]) == 1
+        assert teacher_devices_after.json()["devices"][0]["device_name"] == "Teacher phone"
+
         other_user_revoke = client.delete(
             f"/api/sync/devices/{device_id}", headers=teacher_headers,
         )
