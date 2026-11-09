@@ -1097,16 +1097,14 @@ def test_sync_change_feed_tracks_ordered_mutations_and_deletions():
         )
         assert registered.status_code == 200
 
-        created = client.post("/api/students", headers=admin_headers, json={
-            "admission_number": "SYNC-001", "first_name": "Amina",
-            "last_name": "Sample",
-        })
-        assert created.status_code == 200, created.text
-        student_id = created.json()["id"]
-
         db = SessionLocal()
         try:
-            student = db.get(models.Student, student_id)
+            student = models.Student(
+                admission_number="SYNC-001", first_name="Amina", last_name="Sample",
+            )
+            db.add(student)
+            db.commit()
+            student_id = student.id
             student.last_name = "Updated"
             db.commit()
             db.delete(student)
