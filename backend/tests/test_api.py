@@ -1536,6 +1536,13 @@ def test_sync_offline_proposals_are_idempotent_scoped_and_not_applied():
         again=client.post("/api/sync/proposals",headers=ah,json=body)
         assert again.status_code==200 and again.json()["duplicate"] is True
         assert again.json()["proposal_id"]==first.json()["proposal_id"]
+        db=SessionLocal()
+        try:
+            submitted_audits=db.query(models.AuditLog).filter_by(action="sync_proposal_submitted").all()
+            assert len(submitted_audits)==1
+            assert f"proposal_entity=Student; entity_id={sid}; operation=update" in submitted_audits[0].details
+            assert "Offline edit" not in submitted_audits[0].details
+        finally: db.close()
         assert client.post("/api/sync/proposals",headers=ah,json={**body,"payload":{"last_name":"Different"}}).status_code==409
         assert client.post("/api/sync/proposals",headers=th,json=body).status_code==403
         listed=client.get(f"/api/sync/proposals?device_id={device}",headers=ah)
@@ -1567,5 +1574,12 @@ def test_sync_offline_proposals_detect_conflict_and_rebase_without_applying():
         discarded=client.patch(f"/api/sync/proposals/{pid}/resolution",headers=headers,json={"device_id":device,"decision":"discard"})
         assert discarded.status_code==200 and discarded.json()["status"]=="discarded"
         db=SessionLocal()
-        try: assert db.get(models.Student,sid).last_name=="Server update"
+        try:
+            assert db.get(models.Student,sid).last_name=="Server update"
+            audit_actions=[
+                row.action for row in db.query(models.AuditLog).filter(
+                    models.AuditLog.entity_type=="sync_change_proposal"
+                ).order_by(models.AuditLog.id).all()
+            ]
+            assert audit_actions==["sync_proposal_resolved","sync_proposal_resolved"]
         finally: db.close()

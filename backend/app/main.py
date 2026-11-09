@@ -2071,6 +2071,10 @@ def submit_sync_change_proposal(data: SyncChangeProposalCreate, db: Session = De
         conflict=db.query(models.SyncChange).filter(models.SyncChange.entity_type==data.entity_type,models.SyncChange.entity_id==data.entity_id,models.SyncChange.id>data.base_sequence).order_by(models.SyncChange.id.desc()).first()
     row=models.SyncChangeProposal(user_id=user.id,device_id=device.device_id,idempotency_key=data.idempotency_key,entity_type=data.entity_type,entity_id=data.entity_id,operation=data.operation,payload_json=payload,base_sequence=data.base_sequence,status="conflict" if conflict else "pending_review",conflict_sequence=conflict.id if conflict else None)
     db.add(row)
+    write_audit(
+        db, user, "sync_proposal_submitted", "sync_change_proposal", 0,
+        f"proposal_entity={data.entity_type}; entity_id={data.entity_id}; operation={data.operation}; base_sequence={data.base_sequence}; status={row.status}",
+    )
     try:
         db.commit(); db.refresh(row)
     except IntegrityError:
@@ -2106,7 +2110,12 @@ def resolve_sync_change_proposal(proposal_id: int, data: SyncChangeProposalResol
             latest=db.query(models.SyncChange).filter_by(entity_type=row.entity_type,entity_id=row.entity_id).order_by(models.SyncChange.id.desc()).first()
         row.base_sequence=latest.id if latest else row.base_sequence
         row.conflict_sequence=None; row.status="pending_review"; row.resolution="rebase"
-    row.resolved_at=datetime.utcnow(); db.commit()
+    row.resolved_at=datetime.utcnow()
+    write_audit(
+        db, user, "sync_proposal_resolved", "sync_change_proposal", row.id,
+        f"decision={data.decision}; resulting_status={row.status}; base_sequence={row.base_sequence}; applied=false",
+    )
+    db.commit()
     return {"proposal_id":row.id,"status":row.status,"base_sequence":row.base_sequence,"resolution":row.resolution,"applied":False}
 
 
@@ -2601,6 +2610,10 @@ def revoke_sync_device(
 
     if device.revoked_at is None:
         device.revoked_at = datetime.utcnow()
+        write_audit(
+            db, user, "sync_device_revoked", "sync_device", device.id,
+            f"device_id={device.device_id}; device_name={device.device_name}",
+        )
         db.commit()
 
     return {"message": "Device access to future SchoolBridge synchronisation has been revoked."}
