@@ -1388,22 +1388,27 @@ def test_sync_attendance_snapshot_is_scoped_to_linked_children_and_class_teacher
     db = SessionLocal()
     try:
         assigned_class = models.SchoolClass(name="S1", section="A")
-        other_class = models.SchoolClass(name="S2", section="B")
-        db.add_all([assigned_class, other_class])
+        subject_assigned_class = models.SchoolClass(name="S1", section="B")
+        other_class = models.SchoolClass(name="S2", section="C")
+        subject = models.Subject(name="Biology")
+        db.add_all([assigned_class, subject_assigned_class, other_class, subject])
         db.flush()
         child = models.Student(admission_number="ATT-SYNC-1", first_name="A", last_name="One", class_id=assigned_class.id)
+        subject_assigned_child = models.Student(admission_number="ATT-SYNC-3", first_name="C", last_name="Three", class_id=subject_assigned_class.id)
         unrelated = models.Student(admission_number="ATT-SYNC-2", first_name="B", last_name="Two", class_id=other_class.id)
         parent = models.User(username="att-parent", email="att-parent@example.invalid", hashed_password=password_hash.hash("ParentPassword123!"), role="parent", is_active=True)
-        db.add_all([child, unrelated, parent])
+        db.add_all([child, subject_assigned_child, unrelated, parent])
         db.flush()
         db.add_all([
             models.ClassTeacherAssignment(teacher_id=teacher.id, class_id=assigned_class.id),
+            models.TeacherAssignment(teacher_id=teacher.id, class_id=subject_assigned_class.id, subject_id=subject.id),
             models.ParentStudentLink(user_id=parent.id, student_id=child.id),
             models.Attendance(student_id=child.id, attendance_date=date(2026, 3, 1), status="Present"),
+            models.Attendance(student_id=subject_assigned_child.id, attendance_date=date(2026, 3, 1), status="Present"),
             models.Attendance(student_id=unrelated.id, attendance_date=date(2026, 3, 1), status="Absent"),
         ])
         db.commit()
-        child_id, unrelated_id, parent_id = child.id, unrelated.id, parent.id
+        child_id, subject_assigned_child_id, unrelated_id, parent_id = child.id, subject_assigned_child.id, unrelated.id, parent.id
     finally:
         db.close()
     admin_headers = {"Authorization": f"Bearer {create_access_token(admin)}"}
@@ -1418,7 +1423,7 @@ def test_sync_attendance_snapshot_is_scoped_to_linked_children_and_class_teacher
         assert {r["student_id"] for r in get(admin_device, admin_headers).json()["attendance"]} == {child_id, unrelated_id}
         teacher_response = get(teacher_device, teacher_headers)
         assert teacher_response.status_code == 200, teacher_response.text
-        assert {r["student_id"] for r in teacher_response.json()["attendance"]} == {child_id}
+        assert {r["student_id"] for r in teacher_response.json()["attendance"]} == {child_id, subject_assigned_child_id}
         parent_response = get(parent_device, parent_headers)
         assert parent_response.status_code == 200, parent_response.text
         assert {r["student_id"] for r in parent_response.json()["attendance"]} == {child_id}

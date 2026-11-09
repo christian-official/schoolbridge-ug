@@ -2335,11 +2335,9 @@ def list_sync_attendance_snapshot(
         permissions = user_permissions(user)
         if "view" not in permissions.get("My Attendance", set()) and "view" not in permissions.get("Attendance", set()):
             raise HTTPException(403, "You do not have permission to view attendance.")
-        class_ids = {
-            row[0] for row in db.query(models.ClassTeacherAssignment.class_id).filter_by(
-                teacher_id=user.id
-            ).all()
-        }
+        # Attendance is visible to both explicitly assigned subject teachers
+        # and class teachers, matching the class/student snapshot scope.
+        class_ids = _sync_teacher_class_ids(db, user)
         query = query.filter(models.Student.class_id.in_(class_ids) if class_ids else models.Attendance.id == -1)
         scope = "assigned_classes"
     elif "view" in user_permissions(user).get("Attendance", set()):
