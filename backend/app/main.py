@@ -1706,7 +1706,7 @@ async def protect_school_data(request: Request, call_next):
             # Self-service profile, password and personal dashboard endpoints
             # are scoped to the authenticated account.
             pass
-        elif path == "/api/sync/devices" or path.startswith("/api/sync/devices/") or path in {"/api/sync/changes", "/api/sync/students", "/api/sync/classes"}:
+        elif path == "/api/sync/devices" or path.startswith("/api/sync/devices/") or path in {"/api/sync/changes", "/api/sync/students", "/api/sync/classes", "/api/sync/attendance", "/api/sync/exams", "/api/sync/marks", "/api/sync/fees"}:
             # Sync routes enforce account, device and record scope in each handler.
             pass
         elif path.startswith("/api/teacher/"):
@@ -2187,6 +2187,293 @@ def list_sync_class_snapshot(
         "next_after_id": next_after_id,
         "has_more": has_more,
     }
+
+
+
+
+def _sync_active_device(db: Session, user, device_id: UUID):
+    device = db.query(models.SyncDevice).filter_by(
+        user_id=user.id, device_id=str(device_id)
+    ).first()
+    if device is None or device.revoked_at is not None:
+        raise HTTPException(403, "An active registered device is required.")
+    device.last_seen_at = datetime.utcnow()
+    return device
+
+
+def _sync_linked_student_ids(db: Session, user):
+    return {
+        row[0] for row in db.query(models.ParentStudentLink.student_id).filter_by(
+            user_id=user.id
+        ).all()
+    }
+
+
+def _sync_teacher_class_ids(db: Session, user):
+    ids = {
+        row[0] for row in db.query(models.TeacherAssignment.class_id).filter_by(
+            teacher_id=user.id
+        ).distinct().all()
+    }
+    ids.update(
+        row[0] for row in db.query(models.ClassTeacherAssignment.class_id).filter_by(
+            teacher_id=user.id
+        ).all()
+    )
+    return ids
+
+
+@app.get("/api/sync/attendance", tags=["Offline Synchronisation"])
+def list_sync_attendance_snapshot(
+    device_id: UUID,
+    after_id: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=200),
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """Return minimal attendance records visible to this account."""
+    _sync_active_device(db, user, device_id)
+    query = db.query(models.Attendance).join(
+        models.Student, models.Student.id == models.Attendance.student_id
+    )
+    scope = None
+    if user.role == "admin":
+        scope = "school"
+    elif user.role == "parent":
+        student_ids = _sync_linked_student_ids(db, user)
+        query = query.filter(models.Attendance.student_id.in_(student_ids) if student_ids else models.Attendance.id == -1)
+        scope = "linked_students"
+    elif user.role == "teacher":
+        permissions = user_permissions(user)
+        if "view" not in permissions.get("My Attendance", set()) and "view" not in permissions.get("Attendance", set()):
+            raise HTTPException(403, "You do not have permission to view attendance.")
+        class_ids = {
+            row[0] for row in db.query(models.ClassTeacherAssignment.class_id).filter_by(
+                teacher_id=user.id
+            ).all()
+        }
+        query = query.filter(models.Student.class_id.in_(class_ids) if class_ids else models.Attendance.id == -1)
+        scope = "assigned_classes"
+    elif "view" in user_permissions(user).get("Attendance", set()):
+        scope = "school"
+    else:
+        raise HTTPException(403, "Your account is not authorised to download attendance records.")
+
+    rows = query.filter(models.Attendance.id > after_id).order_by(
+        models.Attendance.id.asc()
+    ).limit(limit + 1).all()
+    has_more = len(rows) > limit
+    rows = rows[:limit]
+    next_after_id = rows[-1].id if rows else after_id
+    payload = [
+        {"id": row.id, "student_id": row.student_id,
+         "attendance_date": row.attendance_date, "status": row.status}
+        for row in rows
+    ]
+    db.commit()
+    return {"attendance": payload, "scope": scope,
+            "next_after_id": next_after_id, "has_more": has_more}
+
+
+@app.get("/api/sync/exams", tags=["Offline Synchronisation"])
+def list_sync_exam_snapshot(
+    device_id: UUID,
+    after_id: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=200),
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """Return exam metadata for classes the account is allowed to see."""
+    _sync_active_device(db, user, device_id)
+    query = db.query(models.Exam)
+    scope = None
+    if user.role == "admin":
+        scope = "school"
+    elif user.role == "parent":
+        student_ids = _sync_linked_student_ids(db, user)
+        class_ids = {
+            row[0] for row in db.query(models.Student.class_id).filter(
+                models.Student.id.in_(student_ids), models.Student.class_id.isnot(None)
+            ).all()
+        } if student_ids else set()
+        query = query.filter(models.Exam.class_id.in_(class_ids) if class_ids else models.Exam.id == -1)
+        scope = "linked_students"
+    elif user.role == "teacher":
+        if "view" not in user_permissions(user).get("My Results", set()):
+            raise HTTPException(403, "You do not have permission to view assigned exam records.")
+        class_ids = _sync_teacher_class_ids(db, user)
+        query = query.filter(models.Exam.class_id.in_(class_ids) if class_ids else models.Exam.id == -1)
+        scope = "assigned_classes"
+    elif "view" in user_permissions(user).get("Examinations", set()):
+        scope = "school"
+    else:
+        raise HTTPException(403, "Your account is not authorised to download examination records.")
+
+    rows = query.filter(models.Exam.id > after_id).order_by(
+        models.Exam.id.asc()
+    ).limit(limit + 1).all()
+    has_more = len(rows) > limit
+    rows = rows[:limit]
+    next_after_id = rows[-1].id if rows else after_id
+    payload = [
+        {"id": row.id, "name": row.name, "term": row.term, "year": row.year,
+         "class_id": row.class_id, "exam_type": row.exam_type}
+        for row in rows
+    ]
+    db.commit()
+    return {"exams": payload, "scope": scope,
+            "next_after_id": next_after_id, "has_more": has_more}
+
+
+@app.get("/api/sync/marks", tags=["Offline Synchronisation"])
+def list_sync_mark_snapshot(
+    device_id: UUID,
+    after_id: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=200),
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """Return marks restricted by student, class, subject and verification scope."""
+    _sync_active_device(db, user, device_id)
+    query = db.query(models.Mark).join(
+        models.Student, models.Student.id == models.Mark.student_id
+    )
+    scope = None
+    if user.role == "admin":
+        scope = "school"
+    elif user.role == "parent":
+        student_ids = _sync_linked_student_ids(db, user)
+        query = query.filter(
+            models.Mark.student_id.in_(student_ids) if student_ids else models.Mark.id == -1,
+            models.Mark.verified.is_(True),
+        )
+        scope = "linked_verified_results"
+    elif user.role == "teacher":
+        if "view" not in user_permissions(user).get("My Results", set()):
+            raise HTTPException(403, "You do not have permission to view assigned marks.")
+        assignments = db.query(
+            models.TeacherAssignment.class_id, models.TeacherAssignment.subject_id
+        ).filter_by(teacher_id=user.id).all()
+        if not assignments:
+            query = query.filter(models.Mark.id == -1)
+        else:
+            pairs = [(class_id, subject_id) for class_id, subject_id in assignments]
+            pair_filter = or_(*[
+                (models.Student.class_id == class_id) & (models.Mark.subject_id == subject_id)
+                for class_id, subject_id in pairs
+            ])
+            query = query.filter(pair_filter)
+        scope = "assigned_class_subjects"
+    elif "view" in user_permissions(user).get("Examinations", set()):
+        scope = "school"
+    else:
+        raise HTTPException(403, "Your account is not authorised to download marks.")
+
+    rows = query.filter(models.Mark.id > after_id).order_by(
+        models.Mark.id.asc()
+    ).limit(limit + 1).all()
+    has_more = len(rows) > limit
+    rows = rows[:limit]
+    next_after_id = rows[-1].id if rows else after_id
+    payload = [
+        {"id": row.id, "student_id": row.student_id, "subject_id": row.subject_id,
+         "exam_id": row.exam_id, "score": row.score, "verified": row.verified}
+        for row in rows
+    ]
+    db.commit()
+    return {"marks": payload, "scope": scope,
+            "next_after_id": next_after_id, "has_more": has_more}
+
+
+@app.get("/api/sync/fees", tags=["Offline Synchronisation"])
+def list_sync_fee_snapshot(
+    device_id: UUID,
+    after_charge_id: int = Query(0, ge=0),
+    after_payment_id: int = Query(0, ge=0),
+    after_class_fee_id: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=200),
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """Return fee records only for linked children or authorised finance staff."""
+    _sync_active_device(db, user, device_id)
+    is_parent = user.role == "parent"
+    if user.role == "admin":
+        scope = "school"
+        student_ids = None
+        class_ids = None
+    elif is_parent:
+        scope = "linked_students"
+        student_ids = _sync_linked_student_ids(db, user)
+        class_ids = {
+            row[0] for row in db.query(models.Student.class_id).filter(
+                models.Student.id.in_(student_ids), models.Student.class_id.isnot(None)
+            ).all()
+        } if student_ids else set()
+    elif "view" in user_permissions(user).get("Fees & Finance", set()):
+        scope = "school"
+        student_ids = None
+        class_ids = None
+    else:
+        raise HTTPException(403, "Your account is not authorised to download fee records.")
+
+    charge_query = db.query(models.FeeCharge)
+    payment_query = db.query(models.FeePayment).join(
+        models.FeeCharge, models.FeeCharge.id == models.FeePayment.charge_id
+    )
+    class_fee_query = db.query(models.ClassFee)
+    if is_parent:
+        charge_query = charge_query.filter(
+            models.FeeCharge.student_id.in_(student_ids) if student_ids else models.FeeCharge.id == -1
+        )
+        payment_query = payment_query.filter(
+            models.FeeCharge.student_id.in_(student_ids) if student_ids else models.FeePayment.id == -1
+        )
+        class_fee_query = class_fee_query.filter(
+            models.ClassFee.class_id.in_(class_ids) if class_ids else models.ClassFee.id == -1
+        )
+
+    charges = charge_query.filter(models.FeeCharge.id > after_charge_id).order_by(
+        models.FeeCharge.id.asc()
+    ).limit(limit + 1).all()
+    payments = payment_query.filter(models.FeePayment.id > after_payment_id).order_by(
+        models.FeePayment.id.asc()
+    ).limit(limit + 1).all()
+    class_fees = class_fee_query.filter(models.ClassFee.id > after_class_fee_id).order_by(
+        models.ClassFee.id.asc()
+    ).limit(limit + 1).all()
+
+    charge_more, payment_more, class_fee_more = (
+        len(charges) > limit, len(payments) > limit, len(class_fees) > limit
+    )
+    charges, payments, class_fees = charges[:limit], payments[:limit], class_fees[:limit]
+    payload_charges = [
+        {"id": row.id, "student_id": row.student_id, "term": row.term,
+         "year": row.year, "amount": row.amount, "description": row.description}
+        for row in charges
+    ]
+    payload_payments = [
+        {"id": row.id, "charge_id": row.charge_id, "amount": row.amount,
+         "payment_date": row.payment_date, "method": row.method,
+         "receipt_number": row.receipt_number}
+        for row in payments
+    ]
+    payload_class_fees = [
+        {"id": row.id, "class_id": row.class_id, "term": row.term, "year": row.year,
+         "amount": row.amount, "boarding_amount": row.boarding_amount,
+         "day_amount": row.day_amount}
+        for row in class_fees
+    ]
+    db.commit()
+    return {
+        "scope": scope, "charges": payload_charges, "payments": payload_payments,
+        "class_fees": payload_class_fees,
+        "next_after_charge_id": charges[-1].id if charges else after_charge_id,
+        "next_after_payment_id": payments[-1].id if payments else after_payment_id,
+        "next_after_class_fee_id": class_fees[-1].id if class_fees else after_class_fee_id,
+        "has_more": {"charges": charge_more, "payments": payment_more, "class_fees": class_fee_more},
+    }
+
 
 
 @app.post("/api/sync/devices/{device_id}/checkpoint", tags=["Offline Synchronisation"])

@@ -1369,3 +1369,146 @@ def test_sync_student_snapshot_is_scoped_to_authorised_records():
         assert revoked.status_code == 200
         revoked_snapshot = snapshot(*devices["parent"])
         assert revoked_snapshot.status_code == 403
+
+
+def _register_snapshot_device(client, headers, suffix):
+    device_id = f"00000000-0000-4000-8000-{suffix:012d}"
+    response = client.post(
+        "/api/sync/devices", headers=headers,
+        json={"device_id": device_id, "device_name": "Snapshot device"},
+    )
+    assert response.status_code == 200, response.text
+    return device_id
+
+
+def test_sync_attendance_snapshot_is_scoped_to_linked_children_and_class_teachers():
+    reset_database()
+    admin = create_admin()
+    teacher = create_teacher()
+    db = SessionLocal()
+    try:
+        assigned_class = models.SchoolClass(name="S1", section="A")
+        other_class = models.SchoolClass(name="S2", section="B")
+        db.add_all([assigned_class, other_class])
+        db.flush()
+        child = models.Student(admission_number="ATT-SYNC-1", first_name="A", last_name="One", class_id=assigned_class.id)
+        unrelated = models.Student(admission_number="ATT-SYNC-2", first_name="B", last_name="Two", class_id=other_class.id)
+        parent = models.User(username="att-parent", email="att-parent@example.invalid", hashed_password=password_hash.hash("ParentPassword123!"), role="parent", is_active=True)
+        db.add_all([child, unrelated, parent])
+        db.flush()
+        db.add_all([
+            models.ClassTeacherAssignment(teacher_id=teacher.id, class_id=assigned_class.id),
+            models.ParentStudentLink(user_id=parent.id, student_id=child.id),
+            models.Attendance(student_id=child.id, attendance_date=date(2026, 3, 1), status="Present"),
+            models.Attendance(student_id=unrelated.id, attendance_date=date(2026, 3, 1), status="Absent"),
+        ])
+        db.commit()
+        child_id, unrelated_id, parent_id = child.id, unrelated.id, parent.id
+    finally:
+        db.close()
+    admin_headers = {"Authorization": f"Bearer {create_access_token(admin)}"}
+    teacher_headers = {"Authorization": f"Bearer {create_access_token(teacher)}"}
+    parent_headers = {"Authorization": f"Bearer {create_access_token(SimpleNamespace(id=parent_id, role='parent'))}"}
+    with TestClient(app) as client:
+        admin_device = _register_snapshot_device(client, admin_headers, 401)
+        teacher_device = _register_snapshot_device(client, teacher_headers, 402)
+        parent_device = _register_snapshot_device(client, parent_headers, 403)
+        def get(device, headers):
+            return client.get(f"/api/sync/attendance?device_id={device}", headers=headers)
+        assert {r["student_id"] for r in get(admin_device, admin_headers).json()["attendance"]} == {child_id, unrelated_id}
+        teacher_response = get(teacher_device, teacher_headers)
+        assert teacher_response.status_code == 200, teacher_response.text
+        assert {r["student_id"] for r in teacher_response.json()["attendance"]} == {child_id}
+        parent_response = get(parent_device, parent_headers)
+        assert parent_response.status_code == 200, parent_response.text
+        assert {r["student_id"] for r in parent_response.json()["attendance"]} == {child_id}
+        assert get(admin_device, teacher_headers).status_code == 403
+
+
+def test_sync_exam_and_mark_snapshots_filter_teacher_subjects_and_parent_verification():
+    reset_database()
+    admin = create_admin()
+    teacher = create_teacher()
+    db = SessionLocal()
+    try:
+        school_class = models.SchoolClass(name="S3", section="A")
+        biology = models.Subject(name="Biology")
+        chemistry = models.Subject(name="Chemistry")
+        db.add_all([school_class, biology, chemistry])
+        db.flush()
+        child = models.Student(admission_number="EX-SYNC-1", first_name="A", last_name="One", class_id=school_class.id)
+        other = models.Student(admission_number="EX-SYNC-2", first_name="B", last_name="Two", class_id=school_class.id)
+        parent = models.User(username="exam-parent", email="exam-parent@example.invalid", hashed_password=password_hash.hash("ParentPassword123!"), role="parent", is_active=True)
+        exam = models.Exam(name="Mid Term", term="Term 1", year=2026, class_id=school_class.id)
+        db.add_all([child, other, parent, exam])
+        db.flush()
+        db.add_all([
+            models.TeacherAssignment(teacher_id=teacher.id, class_id=school_class.id, subject_id=biology.id),
+            models.ParentStudentLink(user_id=parent.id, student_id=child.id),
+            models.Mark(student_id=child.id, subject_id=biology.id, exam_id=exam.id, score=80, verified=True),
+            models.Mark(student_id=child.id, subject_id=chemistry.id, exam_id=exam.id, score=70, verified=False),
+            models.Mark(student_id=other.id, subject_id=biology.id, exam_id=exam.id, score=60, verified=False),
+        ])
+        db.commit()
+        child_id, parent_id, exam_id, biology_id, chemistry_id = child.id, parent.id, exam.id, biology.id, chemistry.id
+    finally:
+        db.close()
+    admin_headers = {"Authorization": f"Bearer {create_access_token(admin)}"}
+    teacher_headers = {"Authorization": f"Bearer {create_access_token(teacher)}"}
+    parent_headers = {"Authorization": f"Bearer {create_access_token(SimpleNamespace(id=parent_id, role='parent'))}"}
+    with TestClient(app) as client:
+        ad = _register_snapshot_device(client, admin_headers, 411)
+        td = _register_snapshot_device(client, teacher_headers, 412)
+        pd = _register_snapshot_device(client, parent_headers, 413)
+        def get(path, device, headers):
+            return client.get(f"/api/sync/{path}?device_id={device}", headers=headers)
+        assert len(get("exams", td, teacher_headers).json()["exams"]) == 1
+        teacher_marks = get("marks", td, teacher_headers).json()["marks"]
+        assert {(r["student_id"], r["subject_id"]) for r in teacher_marks} == {(child_id, biology_id)}
+        parent_marks = get("marks", pd, parent_headers).json()["marks"]
+        assert len(parent_marks) == 1
+        assert parent_marks[0]["verified"] is True
+        assert parent_marks[0]["student_id"] == child_id
+        assert len(get("marks", ad, admin_headers).json()["marks"]) == 3
+
+
+def test_sync_fee_snapshot_limits_parent_to_linked_children_and_paginates_collections():
+    reset_database()
+    admin = create_admin()
+    db = SessionLocal()
+    try:
+        school_class = models.SchoolClass(name="P5", section="A")
+        db.add(school_class)
+        db.flush()
+        child = models.Student(admission_number="FEE-SYNC-1", first_name="A", last_name="One", class_id=school_class.id)
+        other = models.Student(admission_number="FEE-SYNC-2", first_name="B", last_name="Two", class_id=school_class.id)
+        parent = models.User(username="fee-parent", email="fee-parent@example.invalid", hashed_password=password_hash.hash("ParentPassword123!"), role="parent", is_active=True)
+        db.add_all([child, other, parent])
+        db.flush()
+        charge = models.FeeCharge(student_id=child.id, term="Term 1", year=2026, amount=1000)
+        other_charge = models.FeeCharge(student_id=other.id, term="Term 1", year=2026, amount=2000)
+        class_fee = models.ClassFee(class_id=school_class.id, term="Term 1", year=2026, amount=1000)
+        db.add_all([charge, other_charge, class_fee])
+        db.flush()
+        db.add(models.FeePayment(charge_id=charge.id, amount=300, payment_date=date(2026, 3, 1), receipt_number="SYNC-RCPT-1"))
+        db.add(models.ParentStudentLink(user_id=parent.id, student_id=child.id))
+        db.commit()
+        parent_id, child_id, other_id = parent.id, child.id, other.id
+    finally:
+        db.close()
+    admin_headers = {"Authorization": f"Bearer {create_access_token(admin)}"}
+    parent_headers = {"Authorization": f"Bearer {create_access_token(SimpleNamespace(id=parent_id, role='parent'))}"}
+    with TestClient(app) as client:
+        ad = _register_snapshot_device(client, admin_headers, 421)
+        pd = _register_snapshot_device(client, parent_headers, 422)
+        admin_data = client.get(f"/api/sync/fees?device_id={ad}&limit=1", headers=admin_headers)
+        assert admin_data.status_code == 200, admin_data.text
+        assert len(admin_data.json()["charges"]) == 1
+        assert admin_data.json()["has_more"]["charges"] is True
+        parent_data = client.get(f"/api/sync/fees?device_id={pd}", headers=parent_headers)
+        assert parent_data.status_code == 200, parent_data.text
+        payload = parent_data.json()
+        assert {row["student_id"] for row in payload["charges"]} == {child_id}
+        assert len(payload["payments"]) == 1
+        assert payload["class_fees"][0]["class_id"] is not None
+        assert all("received_by" not in row and "reference" not in row for row in payload["payments"])

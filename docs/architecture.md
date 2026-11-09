@@ -78,3 +78,8 @@ Registered devices can request a paginated, minimal student snapshot. Administra
 ### Scoped class bootstrap snapshots
 
 Registered devices can request a paginated class catalogue containing only class IDs, names and sections. Administrators and staff with Students-view permission receive the school catalogue; teachers receive only their assigned classes; parents receive only classes containing their linked children. The endpoint uses the same account-owned active-device check as the student snapshot. It does not expose class membership beyond the separately scoped student snapshot.
+
+
+### Scoped attendance, examination and finance snapshots
+
+Registered devices can now download paginated attendance, exam, marks and fee snapshots. Attendance is limited to administrators, authorised attendance staff, assigned class teachers and parents linked to the affected students. Exam metadata follows class visibility; marks are limited to assigned class/subject pairs for teachers, while parent accounts receive verified results only for linked children. Fee charges and payments are restricted to linked children for parents; authorised finance staff and administrators receive school fee records. The fee snapshot excludes payroll, general expenses and unnecessary payment reference/collector details. Each collection has its own cursor so pagination cannot skip records in another collection. These endpoints are read-only snapshots; they do not enable offline writes or relax the administrator-only change journal.
