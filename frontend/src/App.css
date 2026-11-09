@@ -2345,3 +2345,15 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   .connection-indicator > span { display: none; }
   .connection-indicator { gap: 0; }
 }
+
+
+/* Synchronisation device and proposal review workspace. */
+.device-current-status{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin:18px 0 24px;padding:16px;border:1px solid #dbe5ef;border-radius:12px;background:#f7fafc}
+.device-current-status>strong{color:#243b53}
+.device-current-status>span{color:#52677d;font-size:13px;flex:1}
+.sync-devices-panel h3{margin:24px 0 10px;color:#263b50}
+.proposal-review-actions{display:flex;flex-wrap:wrap;gap:6px}
+.sync-proposal-details{margin-top:8px}
+.sync-proposal-details summary{cursor:pointer;color:#315f8c;font-size:12px;font-weight:700}
+.sync-proposal-payload{max-width:360px;max-height:220px;overflow:auto;margin:8px 0;padding:10px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;color:#334155;font-size:11px;white-space:pre-wrap;overflow-wrap:anywhere}
+@media(max-width:680px){.device-current-status{align-items:flex-start;flex-direction:column}.sync-proposal-payload{max-width:220px}}

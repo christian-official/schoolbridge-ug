@@ -168,7 +168,7 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
         {proposals.length === 0 ? <p className="empty-state">No offline proposals are waiting in this account's review list.</p> : <div className="table-wrap"><table><thead><tr><th>Proposal</th><th>Record</th><th>Status</th><th>Submitted</th><th>Review</th></tr></thead><tbody>
           {proposals.map(proposal => <tr key={proposal.id}>
             <td>#{proposal.id}<small className="form-hint">{proposal.operation}</small></td>
-            <td>{proposal.entity_type}{proposal.entity_id ? ' #' + proposal.entity_id : ' (new record)'}</td>
+            <td>{proposal.entity_type}{proposal.entity_id ? ' #' + proposal.entity_id : ' (new record)'}<details className="sync-proposal-details"><summary>View submitted draft</summary><pre className="sync-proposal-payload">{JSON.stringify(proposal.payload, null, 2)}</pre></details></td>
             <td>{proposal.status}{proposal.conflict_sequence ? <small className="form-hint">Conflict at sequence {proposal.conflict_sequence}</small> : null}</td>
             <td>{proposal.submitted_at ? new Date(proposal.submitted_at + (proposal.submitted_at.endsWith('Z') ? '' : 'Z')).toLocaleString() : '—'}</td>
             <td>{['pending_review', 'conflict'].includes(proposal.status) ? <div className="proposal-review-actions"><button className="secondary-button" type="button" disabled={busy} onClick={() => void resolveProposal(proposal.id, 'rebase')}>Rebase</button><button className="secondary-button" type="button" disabled={busy} onClick={() => void resolveProposal(proposal.id, 'discard')}>Discard</button></div> : proposal.resolution || 'Reviewed'}</td>
