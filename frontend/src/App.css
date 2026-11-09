@@ -2327,3 +2327,21 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .teacher-admission-checklist span{font-size:13px;color:#64748b;line-height:1.5}
 .settings-hub-subpage>.settings-section-tabs{margin-bottom:16px}
 @media(max-width:680px){.teacher-admission-checklist{grid-template-columns:1fr}.permission-action-filters{gap:5px}}
+
+
+/* School server connectivity — independent of internet availability. */
+.connection-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #18794e;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.connection-disconnected { color: #b42318; }
+.connection-checking { color: #64748b; }
+@media (max-width: 760px) {
+  .connection-indicator > span { display: none; }
+  .connection-indicator { gap: 0; }
+}

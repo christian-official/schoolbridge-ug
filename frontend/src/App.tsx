@@ -4,7 +4,7 @@ import {
   FileText, Settings, LogOut,
   Search, Plus, Menu, X, ArrowUpRight, UserPlus,
   CalendarDays, TrendingUp, ShieldCheck, LoaderCircle, RefreshCw,
-  Contact, Megaphone, Briefcase, Clock, FolderOpen, CalendarCheck, CheckCircle2, UserX, MessageSquareText,
+  Contact, Megaphone, Briefcase, Clock, FolderOpen, CalendarCheck, CheckCircle2, UserX, MessageSquareText, Wifi, WifiOff,
 } from 'lucide-react'
 import StaffFinance from './StaffFinance'
 import AcademicManagement from './AcademicManagement'
@@ -604,6 +604,7 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [active, setActive] = useState('Overview')
   const [overviewShortcuts, setOverviewShortcuts] = useState<string[]>([])
+  const [serverConnection, setServerConnection] = useState<'checking' | 'connected' | 'disconnected'>('checking')
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressTriggered = useRef(false)
   useEffect(() => {
@@ -939,6 +940,32 @@ function App() {
     if (token) void loadUser(token)
   }, [token])
 
+  useEffect(() => {
+    if (!token) { setServerConnection('checking'); return }
+    let cancelled = false
+    async function checkServerConnection() {
+      const controller = new AbortController()
+      const timeout = window.setTimeout(() => controller.abort(), 5000)
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/health`, {
+          method: 'GET',
+          cache: 'no-store',
+          signal: controller.signal,
+        })
+        const result = await response.json().catch(() => null)
+        if (!cancelled) setServerConnection(response.ok && result?.status === 'ok' ? 'connected' : 'disconnected')
+      } catch {
+        if (!cancelled) setServerConnection('disconnected')
+      } finally {
+        window.clearTimeout(timeout)
+      }
+    }
+    void checkServerConnection()
+    const interval = window.setInterval(() => { void checkServerConnection() }, 15000)
+    return () => { cancelled = true; window.clearInterval(interval) }
+  }, [token])
+
+
   async function login(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setLoading(true)
@@ -1046,6 +1073,10 @@ function App() {
           <button className="mobile-menu-button" onClick={() => setMobileMenu(true)}><Menu /></button>
           <div className="breadcrumb">School workspace <span>/</span> <strong>{active}</strong></div>
           <div className="top-actions">
+            <span className={`connection-indicator connection-${serverConnection}`} role="status" aria-live="polite">
+              {serverConnection === 'connected' ? <CheckCircle2 size={15}/> : serverConnection === 'disconnected' ? <WifiOff size={15}/> : <Wifi size={15}/>}
+              <span>{serverConnection === 'connected' ? 'School server connected' : serverConnection === 'disconnected' ? 'School server unavailable' : 'Checking connection'}</span>
+            </span>
             <button className="secondary-button refresh-button" type="button" onClick={() => void refreshWorkspace()} disabled={isRefreshing} aria-live="polite">
               {isRefreshing ? <LoaderCircle className="spin" size={15} /> : <RefreshCw size={15} />}
               {isRefreshing ? 'Refreshing...' : 'Refresh'}
