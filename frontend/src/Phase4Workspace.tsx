@@ -13,7 +13,7 @@ async function api<T>(path: string, token: string, options: RequestInit = {}): P
   return result as T
 }
 
-type StudentOption = { id: number; first_name: string; middle_name?: string | null; last_name: string; admission_number: string; class_id?: number | null; guardian_name?: string | null; guardian_relationship?: string | null; guardian_phone?: string | null }
+type StudentOption = { id: number; first_name: string; middle_name?: string | null; last_name: string; admission_number: string; class_id?: number | null; guardian_name?: string | null; guardian_relationship?: string | null; guardian_phone?: string | null; guardian2_name?: string | null; guardian2_relationship?: string | null; guardian2_phone?: string | null }
 type ParentChild = { id: number; name: string; admission_number: string; status: string; class_name: string; stream: string; fees_charged: number; fees_paid: number; balance: number }
 type Announcement = { id: number; title: string; message: string; audience: string; published: boolean; created_at: string }
 type ChildResult = { exam: string; term: string; year: number; subject: string; score: number }
@@ -107,9 +107,8 @@ export default function Phase4Workspace({ token, role, active, permissions }: { 
     if (!selectedStudentIds.length) { setError('Select at least one student to link to this parent.'); return }
     setSavingAccount(true); setError(''); setMessage('')
     try {
-      const created = await api<{ username: string; email: string; temporary_password: string; email_sent?: boolean; email_error?: string }>('parent-accounts', token, { method: 'POST', body: JSON.stringify({ ...account, student_ids: selectedStudentIds }) })
-      const guardianPhones = [...new Set(students.filter(student => selectedStudentIds.includes(student.id)).map(student => student.guardian_phone?.trim()).filter(Boolean))]
-      setIssuedPasscode({ username: created.username, email: created.email, password: created.temporary_password, emailSent: !!created.email_sent, emailError: created.email_error, phone: guardianPhones.join(', ') })
+      const created = await api<{ username: string; email: string; temporary_password: string; email_sent?: boolean; email_error?: string; guardians?:string[]; guardian_phones?:string[] }>('parent-accounts', token, { method: 'POST', body: JSON.stringify({ ...account, student_ids: selectedStudentIds }) })
+      setIssuedPasscode({ username: created.username, email: created.email, password: created.temporary_password, emailSent: !!created.email_sent, emailError: created.email_error, phone: (created.guardian_phones||[]).join(', '), guardians: (created.guardians||[]).join(' and ') } as any)
       setAccount({ username: '', email: '' }); setSelectedStudentIds([]); setStudentSearch('')
       await loadAdminParents()
       setParentTab('manage')
@@ -152,13 +151,13 @@ export default function Phase4Workspace({ token, role, active, permissions }: { 
       </nav>
       {issuedPasscode && <div className="success-notice parent-passcode-handover" role="status">
         <strong>New parent login — hand over securely</strong>
-        <p>Username: <strong>{issuedPasscode.username}</strong></p><p>Email: {issuedPasscode.email}</p><p>Temporary passcode: <strong>{issuedPasscode.password}</strong></p>
+        <p>Username: <strong>{issuedPasscode.username}</strong></p><p>Email: {issuedPasscode.email}</p><p>Temporary passcode: <strong>{issuedPasscode.password}</strong></p><p><strong>Shared by:</strong> {(issuedPasscode as any).guardians||'Both registered guardians'} — one login is intended for both guardians.</p>
         <p><strong>Email delivery:</strong> {issuedPasscode.emailSent ? 'Sent successfully.' : 'Not sent automatically.'}</p>
         {!issuedPasscode.emailSent && <small>{issuedPasscode.emailError || 'Configure SMTP on the school server to send email automatically.'}</small>}
         <p><strong>Registered guardian phone:</strong> {issuedPasscode.phone || 'No phone number was saved for the selected guardian.'}</p>
         <div className="form-actions">
           <button type="button" className="secondary-button" onClick={() => void navigator.clipboard?.writeText('SchoolBridge parent login\nUsername: '+issuedPasscode.username+'\nTemporary passcode: '+issuedPasscode.password)}>Copy login details</button>
-          {issuedPasscode.phone && <button type="button" className="secondary-button" onClick={() => void navigator.clipboard?.writeText('Your SchoolBridge parent account is ready. Username: '+issuedPasscode.username+'. Temporary passcode: '+issuedPasscode.password+'. Sign in to the school portal and change your passcode.')}>Copy SMS message</button>}
+          {issuedPasscode.phone && <button type="button" className="secondary-button" onClick={() => void navigator.clipboard?.writeText('SchoolBridge parent login for '+((issuedPasscode as any).guardians||'both guardians')+'. Both guardians use the same account. Username: '+issuedPasscode.username+'. Temporary passcode: '+issuedPasscode.password+'. Sign in and change the passcode.')}>Copy SMS message</button>}
           <button type="button" className="secondary-button" onClick={() => { const cleanup = () => { delete document.body.dataset.schoolbridgePrint }; document.body.dataset.schoolbridgePrint = "handover"; window.addEventListener("afterprint", cleanup, { once: true }); window.print() }}>Print handover details</button>
           <button type="button" className="secondary-button" onClick={() => setIssuedPasscode(null)}>Dismiss passcode</button>
         </div>
@@ -173,10 +172,10 @@ export default function Phase4Workspace({ token, role, active, permissions }: { 
         <div className="form-actions"><button type="button" className="primary-button" onClick={() => setParentTab('add')}><PlusCircle size={15}/> Add a parent account</button><button type="button" className="secondary-button" onClick={() => setParentTab('manage')}>Open parent directory</button></div>
       </div>}
       {parentTab === 'add' && <form className="student-form" onSubmit={createParentAccount}>
-        <div className="panel-heading"><div><h3>Create parent login</h3><p>Search by student name or admission number, then link every child belonging to this parent.</p></div></div>
+        <div className="panel-heading"><div><h3>Create parent login</h3><p>Create one shared login for the selected student's parent/guardians. If two guardians are registered, give the same username and passcode to both; do not create a second login.</p></div></div>
         <div className="student-form-grid">
           <label>Find student<input type="search" value={studentSearch} onChange={e => setStudentSearch(e.target.value)} placeholder="Student name or admission number"/></label>
-          <label>Parent / guardian name<input readOnly value={[...new Set(students.filter(student => selectedStudentIds.includes(student.id)).map(student => student.guardian_name).filter(Boolean))].join(', ')} placeholder="Taken from student registration"/><small>Guardian details come from the selected students.</small></label>
+          <label>Parent / guardian names<input readOnly value={[...new Set(students.filter(student => selectedStudentIds.includes(student.id)).flatMap(student => [student.guardian_name,student.guardian2_name]).filter(Boolean))].join(' & ')} placeholder="Taken from student registration"/><small>One account is shared by all listed guardians.</small></label>
           <label>Parent username *<input required minLength={3} value={account.username} onChange={e => setAccount({ ...account, username: e.target.value })}/></label>
           <label>Parent email *<input required type="email" value={account.email} onChange={e => setAccount({ ...account, email: e.target.value })}/></label>
         </div>
@@ -188,7 +187,7 @@ export default function Phase4Workspace({ token, role, active, permissions }: { 
                  const chosen = !selectedStudentIds.includes(student.id)
                  setSelectedStudentIds(current => chosen ? [...current, student.id] : current.filter(id => id !== student.id))
                  if (chosen && student.guardian_name && !account.username.trim()) setAccount(current => ({ ...current, username: student.guardian_name!.trim().toLowerCase().replace(/[^a-z0-9]+/g, '.') }))
-               }}><span><strong>{student.first_name} {student.middle_name || ''} {student.last_name}</strong> · {student.admission_number}<small>Guardian: {student.guardian_name || 'Not recorded'}{student.guardian_relationship ? ' · ' + student.guardian_relationship : ''}{student.guardian_phone ? ' · ' + student.guardian_phone : ''}</small></span><b>{selectedStudentIds.includes(student.id) ? "Selected" : "Select"}</b></button>)}
+               }}><span><strong>{student.first_name} {student.middle_name || ''} {student.last_name}</strong> · {student.admission_number}<small>Guardians: {[student.guardian_name,student.guardian2_name].filter(Boolean).join(' & ')||'Not recorded'}{[student.guardian_phone,student.guardian2_phone].filter(Boolean).length ? ' · '+[student.guardian_phone,student.guardian2_phone].filter(Boolean).join(' / ') : ''}</small></span><b>{selectedStudentIds.includes(student.id) ? "Selected" : "Select"}</b></button>)}
             {studentSearch.trim() && students.length > 0 && !students.some(student => (student.first_name + ' ' + (student.middle_name || '') + ' ' + student.last_name + ' ' + student.admission_number).toLowerCase().includes(studentSearch.trim().toLowerCase())) && <p className="form-hint">No students match that search.</p>}
             {!students.length && <p className="form-hint">No registered students are available.</p>}
           </div>
@@ -199,7 +198,7 @@ export default function Phase4Workspace({ token, role, active, permissions }: { 
       {parentTab === 'manage' && <div>
         <div className="panel-heading"><div><h3>Parent directory</h3><p>Review linked students and remove parent accounts that should no longer have portal access.</p></div><button type="button" className="secondary-button" onClick={() => void loadAdminParents()}>Refresh list</button></div>
         <div className="table-wrap"><table><thead><tr><th>Parent account</th><th>Linked students</th><th>Status</th><th>Action</th></tr></thead><tbody>
-          {parents.map(parent => <tr key={parent.id}><td><strong>{parent.username}</strong><small>{parent.email}</small></td><td>{parent.children?.map((child: any) => child.name + ' (' + child.admission_number + ')').join(', ') || 'No linked students'}</td><td><span className={parent.active ? 'attendance-status-pill status-present' : 'attendance-status-pill'}>{parent.active ? 'Active' : 'Disabled'}</span></td><td><button type="button" className="danger-button" disabled={removingParentId === parent.id} onClick={() => void removeParentAccount(parent)}>{removingParentId === parent.id ? 'Removing…' : 'Remove parent'}</button></td></tr>)}
+          {parents.map(parent => <tr key={parent.id}><td><strong>{parent.username}</strong><small>{parent.email}</small></td><td>{parent.children?.map((child: any) => child.name + ' (' + child.admission_number + ') · '+(child.guardians||[]).join(' & ')).join(', ') || 'No linked students'}</td><td><span className={parent.active ? 'attendance-status-pill status-present' : 'attendance-status-pill'}>{parent.active ? 'Active' : 'Disabled'}</span></td><td><button type="button" className="danger-button" disabled={removingParentId === parent.id} onClick={() => void removeParentAccount(parent)}>{removingParentId === parent.id ? 'Removing…' : 'Remove parent'}</button></td></tr>)}
           {!parents.length && <tr><td colSpan={4}>{busy ? 'Loading parent accounts...' : 'No parent accounts have been created yet.'}</td></tr>}
         </tbody></table></div>
       </div>}

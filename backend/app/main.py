@@ -520,6 +520,7 @@ class StudentUpdate(BaseModel):
     previous_school: str | None = None
     admission_date: date | None = None
     class_id: int | None = None
+    photo_data: str | None = Field(default=None, max_length=1_800_000)
     status: str | None = Field(default=None, pattern="^(active|transferred|dismissed|inactive)$")
     academic_level: str | None = Field(default=None, pattern="^(O-Level|A-Level)$")
     combination: str | None = None
@@ -2003,6 +2004,9 @@ def create_parent_account(data: ParentAccountCreate, db: Session = Depends(get_d
     students = db.query(models.Student).filter(models.Student.id.in_(student_ids)).all()
     if len(students) != len(student_ids):
         raise HTTPException(404, "One or more selected students could not be found.")
+    already_linked = db.query(models.ParentStudentLink).filter(models.ParentStudentLink.student_id.in_(student_ids)).first()
+    if already_linked:
+        raise HTTPException(409, "At least one selected student already has a parent login. Use that same account for both guardians; do not create a second login.")
     parent = models.User(
         username=data.username.strip(),
         email=data.email.strip().lower(),
@@ -2050,7 +2054,7 @@ def create_parent_account(data: ParentAccountCreate, db: Session = Depends(get_d
             email_error = "Email delivery could not be completed. Use the displayed local handover details."
     else:
         email_error = "Email delivery needs the school's SMTP username and app password in server settings."
-    return {"id": parent.id, "username": parent.username, "email": parent.email, "role": parent.role, "linked_students": len(student_ids), "temporary_password": temporary_password, "email_sent": email_sent, "email_error": email_error}
+    return {"id": parent.id, "username": parent.username, "email": parent.email, "role": parent.role, "linked_students": len(student_ids), "guardians": list(dict.fromkeys(name for student in students for name in [student.guardian_name, student.guardian2_name] if name)), "guardian_phones": list(dict.fromkeys(phone for student in students for phone in [student.guardian_phone, student.guardian2_phone] if phone)), "temporary_password": temporary_password, "email_sent": email_sent, "email_error": email_error}
 
 
 @app.get("/api/parent-accounts", tags=["Parent Access"])
@@ -2063,7 +2067,7 @@ def list_parent_accounts(db: Session = Depends(get_db), admin=Depends(require_ad
         for link in links:
             student = db.get(models.Student, link.student_id)
             if student:
-                children.append({"id": student.id, "name": " ".join(x for x in [student.first_name, student.middle_name, student.last_name] if x), "admission_number": student.admission_number})
+                children.append({"id": student.id, "name": " ".join(x for x in [student.first_name, student.middle_name, student.last_name] if x), "admission_number": student.admission_number, "guardians": [name for name in [student.guardian_name, student.guardian2_name] if name], "guardian_phones": [phone for phone in [student.guardian_phone, student.guardian2_phone] if phone]})
         output.append({"id": parent.id, "username": parent.username, "email": parent.email, "active": parent.is_active, "children": children})
     return output
 
@@ -2874,7 +2878,7 @@ def upgrade_existing_database():
         "previous_school": "VARCHAR(160)", "admission_date": "DATE",
         "status": "VARCHAR(20) NOT NULL DEFAULT 'active'",
         "academic_level": "VARCHAR(20)", "combination": "VARCHAR(100)", "optional_subjects": "TEXT", "subsidiary_subjects": "TEXT",
-        "guardian2_name": "VARCHAR(160)", "guardian2_relationship": "VARCHAR(60)", "guardian2_phone": "VARCHAR(30)", "study_mode": "VARCHAR(20) NOT NULL DEFAULT 'Day'", "house": "VARCHAR(80)",
+        "guardian2_name": "VARCHAR(160)", "guardian2_relationship": "VARCHAR(60)", "guardian2_phone": "VARCHAR(30)", "study_mode": "VARCHAR(20) NOT NULL DEFAULT 'Day'", "house": "VARCHAR(80)", "photo_data": "TEXT",
     }
     settings_columns = {c["name"] for c in inspector.get_columns("school_settings")} if "school_settings" in inspector.get_table_names() else set()
     staff_columns = {c["name"] for c in inspector.get_columns("staff_members")} if "staff_members" in inspector.get_table_names() else set()
@@ -2888,6 +2892,7 @@ def upgrade_existing_database():
             if "salary_amount" not in staff_columns: connection.execute(text("ALTER TABLE staff_members ADD COLUMN salary_amount INTEGER"))
             if "salary_frequency" not in staff_columns: connection.execute(text("ALTER TABLE staff_members ADD COLUMN salary_frequency VARCHAR(20) NOT NULL DEFAULT 'Monthly'"))
             if "house" not in staff_columns: connection.execute(text("ALTER TABLE staff_members ADD COLUMN house VARCHAR(80)"))
+            if "photo_data" not in staff_columns: connection.execute(text("ALTER TABLE staff_members ADD COLUMN photo_data TEXT"))
         if "class_fees" in inspector.get_table_names():
             if "boarding_amount" not in class_fee_columns: connection.execute(text("ALTER TABLE class_fees ADD COLUMN boarding_amount INTEGER"))
             if "day_amount" not in class_fee_columns: connection.execute(text("ALTER TABLE class_fees ADD COLUMN day_amount INTEGER"))
@@ -3010,6 +3015,7 @@ def school_community(db: Session = Depends(get_db), user=Depends(get_current_use
             "class_name": (school_class.name + (" — " + school_class.section if school_class.section else "")) if school_class else "Unassigned",
             "study_mode": student.study_mode or "Day",
             "house": student.house,
+            "photo_data": student.photo_data,
             "member_type": "Student",
         } for student, school_class in students],
         "staff": [{
@@ -3018,6 +3024,7 @@ def school_community(db: Session = Depends(get_db), user=Depends(get_current_use
             "staff_number": member.staff_number,
             "position": member.position or member.category,
             "house": member.house,
+            "photo_data": member.photo_data,
             "member_type": "Staff",
         } for member in staff_rows],
     }
@@ -3539,12 +3546,27 @@ def student_profile(student_id: int, db: Session = Depends(get_db)):
     }
 
 
+def validate_profile_photo(photo_data: str):
+    import base64, binascii
+    match = re.fullmatch(r"data:image/(?:jpeg|png|webp);base64,([A-Za-z0-9+/]+={0,2})", photo_data or "")
+    if not match:
+        raise HTTPException(422, "Upload a JPG, PNG or WEBP passport photo.")
+    try:
+        decoded = base64.b64decode(match.group(1), validate=True)
+    except (binascii.Error, ValueError):
+        raise HTTPException(422, "The selected photo could not be read. Please choose another image.")
+    if not decoded or len(decoded) > 1_200_000:
+        raise HTTPException(413, "Passport photos must be 1.2 MB or smaller.")
+
+
 @app.patch("/api/students/{student_id}", tags=["Students"])
 def update_student(student_id: int, data: StudentUpdate, db: Session = Depends(get_db), admin=Depends(require_admin)):
     student = db.get(models.Student, student_id)
     if not student:
         raise HTTPException(404, "Student not found.")
     changes = data.model_dump(exclude_unset=True)
+    if changes.get("photo_data") is not None:
+        validate_profile_photo(changes["photo_data"])
     if "class_id" in changes and changes["class_id"] is not None and not db.get(models.SchoolClass, changes["class_id"]):
         raise HTTPException(404, "Class not found.")
     for key, value in changes.items():
@@ -3603,6 +3625,7 @@ class MyStaffProfileUpdate(BaseModel):
     first_name: str = Field(min_length=1, max_length=80)
     phone: str | None = Field(default=None, max_length=30)
     email: str | None = Field(default=None, max_length=150)
+    photo_data: str | None = Field(default=None, max_length=1_800_000)
 
 
 class MyPasswordUpdate(BaseModel):
@@ -3621,6 +3644,7 @@ def get_my_staff_profile(user=Depends(get_current_user), db: Session = Depends(g
         "id": staff.id, "first_name": staff.first_name, "last_name": staff.last_name,
         "staff_number": staff.staff_number, "phone": staff.phone, "email": staff.email,
         "position": staff.position, "department": staff.department, "category": staff.category,
+        "photo_data": staff.photo_data,
         "username": user.username,
     }
 
@@ -3638,6 +3662,9 @@ def update_my_staff_profile(data: MyStaffProfileUpdate, user=Depends(get_current
         if duplicate:
             raise HTTPException(409, "That email address is already used by another account.")
         user.email = email
+    if data.photo_data is not None:
+        validate_profile_photo(data.photo_data)
+        staff.photo_data = data.photo_data
     staff.first_name = data.first_name.strip()
     staff.phone = data.phone.strip() if data.phone and data.phone.strip() else None
     staff.email = email
@@ -3647,6 +3674,7 @@ def update_my_staff_profile(data: MyStaffProfileUpdate, user=Depends(get_current
         "id": staff.id, "first_name": staff.first_name, "last_name": staff.last_name,
         "staff_number": staff.staff_number, "phone": staff.phone, "email": staff.email,
         "position": staff.position, "department": staff.department, "category": staff.category,
+        "photo_data": staff.photo_data,
         "username": user.username,
     }}
 

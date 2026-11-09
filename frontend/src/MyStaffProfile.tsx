@@ -5,7 +5,7 @@ type AttendanceRecord = { id:number; attendance_date:string; status:string; note
 type Profile = {
   first_name: string; last_name: string; staff_number: string; position?: string | null; department?: string | null; subjects?: string | null; phone?: string | null;
   email?: string | null;
-  category: string; username: string
+  category: string; username: string; photo_data?:string|null
 }
 async function request<T>(path: string, token: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_BASE_URL}/api/${path}`, {
@@ -21,6 +21,7 @@ export default function MyStaffProfile({ token }: { token: string }) {
   const [firstName, setFirstName] = useState('')
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
+  const [photoData,setPhotoData]=useState<string|null>(null)
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -36,7 +37,7 @@ export default function MyStaffProfile({ token }: { token: string }) {
     setLoading(true); setError('')
     try {
       const [data, attendanceData] = await Promise.all([request<Profile>('me/staff-profile', token), request<{records:AttendanceRecord[]}>('me/staff-attendance', token)])
-      setProfile(data); setFirstName(data.first_name); setPhone(data.phone || ''); setEmail(data.email || '')
+      setProfile(data); setFirstName(data.first_name); setPhone(data.phone || ''); setEmail(data.email || ''); setPhotoData(data.photo_data||null)
       setAttendance(attendanceData.records || [])
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to load your profile.') }
     finally { setLoading(false) }
@@ -55,7 +56,7 @@ export default function MyStaffProfile({ token }: { token: string }) {
   async function saveProfile(event: React.FormEvent) {
     event.preventDefault(); setSaving(true); setError(''); setMessage('')
     try {
-      const result = await request<{message:string;profile:Profile}>('me/staff-profile', token, { method: 'PATCH', body: JSON.stringify({ first_name: firstName, phone, email }) })
+      const result = await request<{message:string;profile:Profile}>('me/staff-profile', token, { method: 'PATCH', body: JSON.stringify({ first_name: firstName, phone, email, photo_data: photoData }) })
       setProfile(result.profile); setMessage(result.message)
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to update your profile.') }
     finally { setSaving(false) }
@@ -75,11 +76,13 @@ export default function MyStaffProfile({ token }: { token: string }) {
       {error && <div className="form-error" role="alert">{error}</div>}
       {message && <div className="success-notice" role="status">{message}</div>}
       {loading ? <p className="form-hint">Loading your profile…</p> : profile && <>
+        <div className="student-profile-heading staff-profile-photo"><div className="student-avatar profile-avatar">{photoData?<img src={photoData} alt="Staff passport photo"/>:profile.first_name.slice(0,1).toUpperCase()}</div><div><strong>{profile.first_name} {profile.last_name}</strong><small>{profile.staff_number} · {profile.position||profile.category}</small></div></div>
         <section className="staff-self-checkin-card"><div><strong>Daily staff attendance</strong><span>Check in when you arrive and check out when you leave. Your shift status is updated here and your time is sent to the authorised attendance office.</span>{attendance[0] && <small>Today: {attendance[0].status} · In {attendance[0].check_in_at?.slice(11,16) || '—'} · Out {attendance[0].check_out_at?.slice(11,16) || '—'}</small>}</div><div className="form-actions"><button type="button" className="primary-button" disabled={attendanceBusy || !!attendance[0]?.check_in_at && attendance[0]?.attendance_date === new Date().toLocaleDateString('en-CA',{timeZone:'Africa/Kampala'})} onClick={() => void recordAttendance('check-in')}>{attendanceBusy ? 'Sending…' : 'Check in'}</button><button type="button" className="secondary-button" disabled={attendanceBusy || !attendance[0]?.check_in_at || !!attendance[0]?.check_out_at || attendance[0]?.attendance_date !== new Date().toLocaleDateString('en-CA',{timeZone:'Africa/Kampala'})} onClick={() => void recordAttendance('check-out')}>Check out</button></div></section>
         {attendanceError && <div className="form-error" role="alert">{attendanceError}</div>}{attendanceMessage && <div className="success-notice" role="status">{attendanceMessage}</div>}
         <section className="panel"><div className="panel-heading"><div><h3>My attendance history</h3><p>Your shift status and recorded check-in / check-out times.</p></div></div><div className="table-wrap"><table><thead><tr><th>Date</th><th>Check in</th><th>Check out</th><th>Status</th><th>Notes / shift</th></tr></thead><tbody>{attendance.map(row => <tr key={row.id}><td>{row.attendance_date}</td><td>{row.check_in_at?.slice(11,16) || '—'}</td><td>{row.check_out_at?.slice(11,16) || '—'}</td><td><span className={'attendance-status-pill status-' + row.status.toLowerCase()}>{row.status}</span></td><td><span className={'attendance-status-pill ' + (row.check_out_at ? 'status-present' : row.check_in_at ? 'status-late' : '')}>{row.check_out_at ? 'Shift ended' : row.check_in_at ? 'On shift' : 'Not checked in'}</span><small className="staff-shift-note">{row.check_out_at ? 'Checked out at ' + row.check_out_at.slice(11,16) : row.check_in_at ? 'Checked in at ' + row.check_in_at.slice(11,16) : 'No check-in recorded'}</small></td></tr>)}{!attendance.length && <tr><td colSpan={5}>No attendance records yet.</td></tr>}</tbody></table></div></section>
         <form className="student-form" onSubmit={saveProfile}>
           <div className="student-form-grid">
+            <label className="field-span-full">Passport photo <input type="file" accept="image/jpeg,image/png,image/webp" onChange={e=>{const file=e.target.files?.[0];if(!file)return;if(file.size>1200000){setError('Choose a passport photo no larger than 1.2 MB.');return}if(!['image/jpeg','image/png','image/webp'].includes(file.type)){setError('Choose a JPG, PNG or WEBP image.');return}const reader=new FileReader();reader.onload=()=>setPhotoData(String(reader.result||''));reader.onerror=()=>setError('Unable to read the selected photo.');reader.readAsDataURL(file)}}/><small className="field-hint">Optional during staff registration; add it later to complete your profile. Maximum 1.2 MB.</small>{photoData?<span className="photo-status">Passport photo added</span>:<span className="photo-status pending">Passport photo pending — required to complete the profile</span>}</label>
             <label>First name<input required value={firstName} onChange={e=>setFirstName(e.target.value)} /></label>
             <label>Surname (locked)<input value={profile.last_name} readOnly disabled /></label>
             <label>Staff number (locked)<input value={profile.staff_number} readOnly disabled /></label>

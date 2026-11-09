@@ -55,6 +55,7 @@ class Student(Base):
     guardian2_phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
     study_mode: Mapped[str] = mapped_column(String(20), default="Day", server_default="Day", nullable=False)
     house: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    photo_data: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class Attendance(Base):
@@ -174,6 +175,7 @@ class StaffMember(Base):
     salary_frequency: Mapped[str] = mapped_column(String(20), default="Monthly")
     subjects: Mapped[str | None] = mapped_column(Text, nullable=True)
     house: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    photo_data: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 class FeeCharge(Base):
     __tablename__ = "fee_charges"
