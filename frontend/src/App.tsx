@@ -1780,11 +1780,12 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
   }
   function togglePermissionAction(section:string,action:string) {
     setPermissions(current=>{
-      const actions=new Set(current[section]||[])
+      const updated={...current}
+      const actions=new Set(updated[section]||[])
       if(actions.has(action)) actions.delete(action); else actions.add(action)
-      if(actions.size) actions.add('view')
-      if(!actions.size) delete current[section]
-      return {...current,[section]:[...actions]}
+      if(actions.size) { actions.add('view'); updated[section]=[...actions] }
+      else delete updated[section]
+      return updated
     })
   }
   async function savePermissions() {
