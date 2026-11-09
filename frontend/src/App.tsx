@@ -14,6 +14,7 @@ import OperationsManagement from './OperationsManagement'
 import Phase4Workspace from './Phase4Workspace'
 import ParentLiaisonWorkspace from './ParentLiaison'
 import SyncDevices from './SyncDevices'
+import { clearLocalSyncData } from './syncStorage'
 import './App.css'
 import './DashboardRedesign.css'
 
@@ -606,6 +607,7 @@ function App() {
   const [active, setActive] = useState('Overview')
   const [overviewShortcuts, setOverviewShortcuts] = useState<string[]>([])
   const [serverConnection, setServerConnection] = useState<'checking' | 'connected' | 'disconnected'>('checking')
+  const [syncDeviceRevoked, setSyncDeviceRevoked] = useState(false)
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressTriggered = useRef(false)
   useEffect(() => {
@@ -1101,6 +1103,7 @@ function App() {
           )}
 
           {dataError && <div className="notice">{dataError} <button onClick={() => void loadSchoolData(token)}>Retry</button></div>}
+          {syncDeviceRevoked && <div className="notice" role="alert">This browser's synchronisation access has been revoked. Local synchronisation storage has been cleared. The old device identity remains blocked; open Device Management to register a new identity.</div>}
 
           {(active === 'My Classes' || active === 'Attendance' || active === 'My Attendance' || active === 'My Results') && user.role === 'teacher' && <TeacherWorkspace token={token} active={active} />}
           {active === 'My Attendance' && user.role !== 'teacher' && user.role !== 'parent' && user.role !== 'admin' && <StaffSelfAttendance token={token} />}

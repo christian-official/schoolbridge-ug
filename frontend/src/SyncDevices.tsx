@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { clearLocalSyncData } from './syncStorage'
 
 type Device = {
   device_id: string
@@ -72,6 +73,8 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
       setDeviceId(storedId)
       const result = await request<{ devices: Device[] }>('sync/devices', token)
       setDevices(result.devices)
+      const revokedCurrent = result.devices.some(device => device.device_id === storedId && !device.active)
+      if (storedId && revokedCurrent) await clearLocalSyncData(userId, storedId)
       const activeCurrent = result.devices.some(device => device.device_id === storedId && device.active)
       if (isAdmin && storedId && activeCurrent) {
         const proposalResult = await request<{ proposals: Proposal[] }>('sync/proposals?device_id=' + encodeURIComponent(storedId), token)
