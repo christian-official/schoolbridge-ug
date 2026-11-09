@@ -58,6 +58,7 @@ type RecordItem = {
   gender?: string
   class_id?: number | null
   date_of_birth?: string | null
+  photo_data?: string | null
 }
 
 const menu = [
