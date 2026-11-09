@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import update, func, or_, text
 
-from .database import DATABASE_URL, Base, engine, get_db, SessionLocal, create_sqlite_backup
+from .database import DATABASE_URL, Base, engine, get_db, SessionLocal, create_sqlite_backup, apply_sqlite_restore
 from .migrations import upgrade_database
 from . import models
 
@@ -177,8 +177,9 @@ def require_timetable_editor(request: Request, user=Depends(get_current_user)):
 
 
 def apply_pending_database_restore():
-    """Apply a validated restore before SQLAlchemy opens the database at startup."""
-    import os, sqlite3
+    """Apply a staged SQLite restore before migrations or application sessions start."""
+    import os
+    from time import time_ns
     if engine.dialect.name != "sqlite":
         return
     db_path = engine.url.database
@@ -186,18 +187,14 @@ def apply_pending_database_restore():
         return
     absolute_path = os.path.abspath(db_path)
     pending_path = absolute_path + ".restore_pending"
-    if not os.path.exists(pending_path):
+    if not os.path.isfile(pending_path):
         return
-    if os.path.exists(absolute_path):
-        safety_path = absolute_path + ".before_restore_" + str(int(datetime.now().timestamp())) + ".bak"
-        current = sqlite3.connect(absolute_path)
-        safety = sqlite3.connect(safety_path)
-        try:
-            current.backup(safety)
-        finally:
-            safety.close()
-            current.close()
-    os.replace(pending_path, absolute_path)
+
+    # Startup restoration must not race with pooled connections left by imports
+    # or earlier startup hooks.
+    engine.dispose()
+    safety_path = absolute_path + ".before_restore_" + str(time_ns()) + ".bak"
+    apply_sqlite_restore(absolute_path, pending_path, safety_path)
 
 
 apply_pending_database_restore()

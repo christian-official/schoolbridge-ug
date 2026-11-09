@@ -68,3 +68,53 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+def validate_sqlite_database(database_path: str) -> None:
+    """Reject incomplete or structurally invalid SQLite database files."""
+    if not database_path or not os.path.isfile(database_path):
+        raise FileNotFoundError("The SQLite database file does not exist.")
+    connection = sqlite3.connect(database_path)
+    try:
+        integrity = connection.execute("PRAGMA integrity_check").fetchone()
+        foreign_key_errors = connection.execute("PRAGMA foreign_key_check").fetchall()
+        if not integrity or integrity[0] != "ok" or foreign_key_errors:
+            raise sqlite3.DatabaseError("The SQLite database failed integrity validation.")
+    finally:
+        connection.close()
+
+
+def apply_sqlite_restore(database_path: str, pending_path: str, safety_path: str) -> bool:
+    """Safely replace a SQLite database with a validated staged restore.
+
+    The current database is backed up (including committed WAL data) before its
+    WAL is checkpointed and sidecars are removed. The staged file is validated
+    again immediately before the atomic replacement.
+    """
+    if not pending_path or not os.path.isfile(pending_path):
+        return False
+
+    validate_sqlite_database(pending_path)
+
+    if os.path.isfile(database_path):
+        create_sqlite_backup(database_path, safety_path)
+
+        current = sqlite3.connect(database_path)
+        try:
+            result = current.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()
+            if result and result[0] != 0:
+                raise sqlite3.OperationalError("Could not checkpoint the current database WAL.")
+        finally:
+            current.close()
+
+    # No application connections may remain open when this helper is called.
+    # Removing old sidecars before replacement prevents them being replayed
+    # against the restored database after the new main file is installed.
+    for suffix in ("-wal", "-shm"):
+        sidecar = database_path + suffix
+        if os.path.exists(sidecar):
+            os.unlink(sidecar)
+
+    os.replace(pending_path, database_path)
+    validate_sqlite_database(database_path)
+    return True
