@@ -11,7 +11,22 @@ type Device = {
   active: boolean
 }
 
-type Props = { token: string; userId: number }
+type Proposal = {
+  id: number
+  device_id: string
+  entity_type: string
+  entity_id: number | null
+  operation: string
+  payload: Record<string, unknown>
+  base_sequence: number
+  status: string
+  conflict_sequence: number | null
+  submitted_at: string
+  resolved_at: string | null
+  resolution: string | null
+}
+
+type Props = { token: string; userId: number; isAdmin: boolean }
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
 
 function deviceStorageKey(userId: number) {
@@ -40,8 +55,9 @@ async function request<T>(path: string, token: string, options: RequestInit = {}
   return result as T
 }
 
-export default function SyncDevices({ token, userId }: Props) {
+export default function SyncDevices({ token, userId, isAdmin }: Props) {
   const [devices, setDevices] = useState<Device[]>([])
+  const [proposals, setProposals] = useState<Proposal[]>([])
   const [deviceId, setDeviceId] = useState('')
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -56,12 +72,19 @@ export default function SyncDevices({ token, userId }: Props) {
       setDeviceId(storedId)
       const result = await request<{ devices: Device[] }>('sync/devices', token)
       setDevices(result.devices)
+      const activeCurrent = result.devices.some(device => device.device_id === storedId && device.active)
+      if (isAdmin && storedId && activeCurrent) {
+        const proposalResult = await request<{ proposals: Proposal[] }>('sync/proposals?device_id=' + encodeURIComponent(storedId), token)
+        setProposals(proposalResult.proposals)
+      } else {
+        setProposals([])
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to load registered devices.')
     } finally {
       setLoading(false)
     }
-  }, [token, userId])
+  }, [token, userId, isAdmin])
 
   useEffect(() => { void load() }, [load])
 
@@ -103,6 +126,26 @@ export default function SyncDevices({ token, userId }: Props) {
     }
   }
 
+  async function resolveProposal(id: number, decision: 'discard' | 'rebase') {
+    const action = decision === 'discard' ? 'Discard this proposal?' : 'Rebase this proposal for fresh review? It will not be applied to live records.'
+    if (!window.confirm(action)) return
+    setBusy(true)
+    setError('')
+    setMessage('')
+    try {
+      await request('sync/proposals/' + id + '/resolution', token, {
+        method: 'PATCH',
+        body: JSON.stringify({ device_id: deviceId, decision }),
+      })
+      setMessage(decision === 'discard' ? 'Proposal discarded.' : 'Proposal rebased and returned to pending review. No live record was changed.')
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to resolve this proposal.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const currentDevice = devices.find(device => device.device_id === deviceId)
   const currentRevoked = Boolean(currentDevice && !currentDevice.active)
 
@@ -119,6 +162,19 @@ export default function SyncDevices({ token, userId }: Props) {
         {currentRevoked && <button className="primary-button" type="button" disabled={busy} onClick={() => void register(true)}>Register with a new device identity</button>}
         {deviceId && !currentRevoked && !currentDevice && <button className="primary-button" type="button" disabled={busy} onClick={() => void register()}>Register this browser</button>}
       </div>
+      {isAdmin && currentDevice?.active && <>
+        <h3>Offline change proposals</h3>
+        <p className="form-hint">These are administrator-submitted drafts. Rebase only refreshes the review baseline; neither action applies a proposal to live school records.</p>
+        {proposals.length === 0 ? <p className="empty-state">No offline proposals are waiting in this account's review list.</p> : <div className="table-wrap"><table><thead><tr><th>Proposal</th><th>Record</th><th>Status</th><th>Submitted</th><th>Review</th></tr></thead><tbody>
+          {proposals.map(proposal => <tr key={proposal.id}>
+            <td>#{proposal.id}<small className="form-hint">{proposal.operation}</small></td>
+            <td>{proposal.entity_type}{proposal.entity_id ? ' #' + proposal.entity_id : ' (new record)'}</td>
+            <td>{proposal.status}{proposal.conflict_sequence ? <small className="form-hint">Conflict at sequence {proposal.conflict_sequence}</small> : null}</td>
+            <td>{proposal.submitted_at ? new Date(proposal.submitted_at + (proposal.submitted_at.endsWith('Z') ? '' : 'Z')).toLocaleString() : '—'}</td>
+            <td>{['pending_review', 'conflict'].includes(proposal.status) ? <div className="proposal-review-actions"><button className="secondary-button" type="button" disabled={busy} onClick={() => void resolveProposal(proposal.id, 'rebase')}>Rebase</button><button className="secondary-button" type="button" disabled={busy} onClick={() => void resolveProposal(proposal.id, 'discard')}>Discard</button></div> : proposal.resolution || 'Reviewed'}</td>
+          </tr>)}
+        </tbody></table></div>}
+      </>}
       <h3>Devices linked to this account</h3>
       {devices.length === 0 ? <p className="empty-state">No devices have been registered yet.</p> : <div className="table-wrap"><table><thead><tr><th>Device</th><th>Status</th><th>Last seen</th><th>Sync checkpoint</th><th>Action</th></tr></thead><tbody>
         {devices.map(device => <tr key={device.device_id}>
