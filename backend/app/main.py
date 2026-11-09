@@ -7,7 +7,7 @@ from email.message import EmailMessage
 from datetime import date, datetime, time
 from zoneinfo import ZoneInfo
 from uuid import UUID, uuid4
-from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Response
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Response, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from starlette.background import BackgroundTask
