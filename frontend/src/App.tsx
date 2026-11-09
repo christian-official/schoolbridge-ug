@@ -1236,7 +1236,8 @@ function App() {
           {active === 'Timetable' && user.role !== 'parent' && <OperationsManagement token={token} active={active} permissions={user.permissions} isAdmin={user.role === 'admin'} roleLabel={user.role_label || ''} />}
           {active === 'My Profile' && user.role !== 'parent' && user.role !== 'admin' && <MyStaffProfile token={token} />}
           {active === 'Leadership & Duty' && user.role !== 'parent' && <LeadershipDuty token={token} />}
-          {active === 'Settings' && settingsSection === 'home' && (
+          <div className="settings-page-cache" style={{display:active==='Settings'?'':'none'}}>
+          {settingsSection === 'home' && (
             <section className="settings-hub">
               <div className="panel-heading"><div><h2>School settings</h2><p>Choose a category to configure how SchoolBridge works for this school.</p></div></div>
               <div className="settings-category-grid">
@@ -1249,7 +1250,7 @@ function App() {
               </div>
             </section>
           )}
-          {active === 'Settings' && settingsSection !== 'home' && (
+          {settingsSection !== 'home' && (
             <div className="settings-detail">
               <button className="settings-back" onClick={() => setSettingsSection('home')}>← All settings</button>
               
@@ -1279,7 +1280,7 @@ function App() {
               {settingsSection === 'audit' && <AuditLogSettings token={token} />}
             </div>
           )}
-          {active === 'Settings' && settingsSection === 'classes' && (
+          {settingsSection === 'classes' && (
             <section className="panel">
               <div className="panel-heading"><div><h2>School classes</h2><p>Classes registered in the system</p></div><button className="primary-button add-student-button" onClick={() => { setShowClassForm(v => !v); setClassError(''); setClassSuccess(''); if (!showClassForm) { setClassForm({ name: '', section: '' }) } }}><Plus size={16} /> {showClassForm ? 'Close form' : 'Add class'}</button></div>
               {classSuccess && <div className="success-notice">{classSuccess}</div>}
@@ -1290,6 +1291,7 @@ function App() {
             </section>
           )}
 
+          </div>
           <footer className="footer"><span>SchoolBridge</span> · School management made simpler <span className="footer-version">Version 0.1 · Local workspace</span></footer>
         </div>
       </main>
