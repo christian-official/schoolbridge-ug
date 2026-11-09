@@ -56,3 +56,10 @@ This is an initial direction, not a final packaging decision. Windows installati
 The server maintains a per-user device registry. Each authenticated account can register a browser or desktop installation, list its registered devices, and revoke a device from future synchronisation. Device identities are scoped to the account that registered them; one user cannot inspect or revoke another user's devices.
 
 This registry is only an identity and access-control foundation. It does not yet cache student records, queue offline edits, or synchronise changes. Until the later synchronisation protocol is implemented, the service worker must continue to avoid caching API responses and the application must treat the server as authoritative.
+
+
+### Versioned change journal
+
+The API records append-only change metadata for supported school records (students, classes, subjects, staff, attendance, examinations, marks, fee records, expenses, salaries and timetable entries). Each insert, update or delete receives a monotonically increasing database sequence. Deletes remain represented as tombstones in the journal; the source row is not required to remain present.
+
+The initial change-feed endpoint returns metadata only, paginated by sequence cursor. It does not include student or financial record contents. At this stage, feed access is restricted to administrators with an active registered device. Role-aware record snapshots, per-user/class filtering, idempotent offline writes and conflict resolution remain future work. The journal is not permission to cache or edit records offline.

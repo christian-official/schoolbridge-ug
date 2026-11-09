@@ -19,6 +19,7 @@ from sqlalchemy import update, func, or_, text
 from .database import DATABASE_URL, Base, engine, get_db, SessionLocal, create_sqlite_backup, apply_sqlite_restore, sqlite_connection_diagnostics
 from .migrations import upgrade_database
 from . import models
+from .sync_tracking import register_sync_tracking
 
 from dotenv import load_dotenv
 import jwt
@@ -197,6 +198,7 @@ def apply_pending_database_restore():
     apply_sqlite_restore(absolute_path, pending_path, safety_path)
 
 
+register_sync_tracking()
 apply_pending_database_restore()
 upgrade_database(DATABASE_URL)
 
@@ -1704,7 +1706,7 @@ async def protect_school_data(request: Request, call_next):
             # Self-service profile, password and personal dashboard endpoints
             # are scoped to the authenticated account.
             pass
-        elif path == "/api/sync/devices" or path.startswith("/api/sync/devices/"):
+        elif path == "/api/sync/devices" or path.startswith("/api/sync/devices/") or path == "/api/sync/changes":
             # Device registry routes always filter by the authenticated user ID.
             pass
         elif path.startswith("/api/teacher/"):
@@ -1971,6 +1973,53 @@ def list_sync_devices(
             }
             for device in devices
         ]
+    }
+
+
+@app.get("/api/sync/changes", tags=["Offline Synchronisation"])
+def list_sync_changes(
+    device_id: UUID,
+    cursor: int = 0,
+    limit: int = 200,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """Return ordered change metadata for an active administrator device."""
+    if user.role != "admin":
+        raise HTTPException(403, "Change-feed access is currently restricted to administrators.")
+
+    if cursor < 0 or limit < 1 or limit > 500:
+        raise HTTPException(422, "Cursor must be non-negative and limit must be between 1 and 500.")
+
+    device = db.query(models.SyncDevice).filter_by(
+        user_id=user.id, device_id=str(device_id)
+    ).first()
+    if device is None or device.revoked_at is not None:
+        raise HTTPException(403, "An active registered device is required.")
+
+    device.last_seen_at = datetime.utcnow()
+    db.commit()
+
+    rows = db.query(models.SyncChange).filter(
+        models.SyncChange.id > cursor
+    ).order_by(models.SyncChange.id.asc()).limit(limit + 1).all()
+    has_more = len(rows) > limit
+    rows = rows[:limit]
+    next_cursor = rows[-1].id if rows else cursor
+
+    return {
+        "changes": [
+            {
+                "sequence": row.id,
+                "entity_type": row.entity_type,
+                "entity_id": row.entity_id,
+                "operation": row.operation,
+                "changed_at": row.changed_at,
+            }
+            for row in rows
+        ],
+        "next_cursor": next_cursor,
+        "has_more": has_more,
     }
 
 

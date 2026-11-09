@@ -113,3 +113,17 @@ def test_fresh_database_includes_user_scoped_sync_device_registry(tmp_path):
         for item in unique_constraints
     )
     engine.dispose()
+
+
+
+def test_fresh_database_includes_sync_change_journal(tmp_path):
+    database_path = tmp_path / "sync-changes.sqlite3"
+    database_url = f"sqlite:///{database_path}"
+    upgrade_database(database_url)
+
+    engine = create_engine(database_url)
+    inspector = inspect(engine)
+    assert "sync_changes" in inspector.get_table_names()
+    columns = {column["name"] for column in inspector.get_columns("sync_changes")}
+    assert {"id", "entity_type", "entity_id", "operation", "changed_at"}.issubset(columns)
+    engine.dispose()

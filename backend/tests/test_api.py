@@ -1079,3 +1079,84 @@ def test_sync_device_registration_validates_device_identity():
             json={"device_id": "00000000-0000-4000-8000-000000000002", "device_name": "   "},
         )
         assert blank_name.status_code == 422
+
+
+
+def test_sync_change_feed_tracks_ordered_mutations_and_deletions():
+    reset_database()
+    admin = create_admin()
+    teacher = create_teacher()
+    admin_headers = {"Authorization": f"Bearer {create_access_token(admin)}"}
+    teacher_headers = {"Authorization": f"Bearer {create_access_token(teacher)}"}
+    device_id = "00000000-0000-4000-8000-000000000101"
+
+    with TestClient(app) as client:
+        registered = client.post(
+            "/api/sync/devices", headers=admin_headers,
+            json={"device_id": device_id, "device_name": "Sync test device"},
+        )
+        assert registered.status_code == 200
+
+        created = client.post("/api/students", headers=admin_headers, json={
+            "admission_number": "SYNC-001", "first_name": "Amina",
+            "last_name": "Sample",
+        })
+        assert created.status_code == 200, created.text
+        student_id = created.json()["id"]
+
+        db = SessionLocal()
+        try:
+            student = db.get(models.Student, student_id)
+            student.last_name = "Updated"
+            db.commit()
+            db.delete(student)
+            db.commit()
+        finally:
+            db.close()
+
+        feed_url = f"/api/sync/changes?device_id={device_id}&cursor=0&limit=2"
+        first_page = client.get(feed_url, headers=admin_headers)
+        assert first_page.status_code == 200, first_page.text
+        assert len(first_page.json()["changes"]) == 2
+        assert first_page.json()["has_more"] is True
+        sequences = [row["sequence"] for row in first_page.json()["changes"]]
+        assert sequences == sorted(sequences)
+
+        second_page = client.get(
+            f"/api/sync/changes?device_id={device_id}&cursor={first_page.json()['next_cursor']}&limit=10",
+            headers=admin_headers,
+        )
+        assert second_page.status_code == 200
+        all_changes = first_page.json()["changes"] + second_page.json()["changes"]
+        student_changes = [row for row in all_changes if row["entity_type"] == "Student" and row["entity_id"] == student_id]
+        assert [row["operation"] for row in student_changes] == ["insert", "update", "delete"]
+
+        forbidden = client.get(
+            f"/api/sync/changes?device_id={device_id}", headers=teacher_headers,
+        )
+        assert forbidden.status_code == 403
+
+        revoked = client.delete(f"/api/sync/devices/{device_id}", headers=admin_headers)
+        assert revoked.status_code == 200
+        revoked_feed = client.get(feed_url, headers=admin_headers)
+        assert revoked_feed.status_code == 403
+
+
+def test_sync_change_feed_rejects_invalid_cursor_and_limit():
+    reset_database()
+    admin = create_admin()
+    headers = {"Authorization": f"Bearer {create_access_token(admin)}"}
+    device_id = "00000000-0000-4000-8000-000000000102"
+
+    with TestClient(app) as client:
+        client.post("/api/sync/devices", headers=headers, json={
+            "device_id": device_id, "device_name": "Validation device",
+        })
+        negative_cursor = client.get(
+            f"/api/sync/changes?device_id={device_id}&cursor=-1", headers=headers,
+        )
+        assert negative_cursor.status_code == 422
+        excessive_limit = client.get(
+            f"/api/sync/changes?device_id={device_id}&limit=501", headers=headers,
+        )
+        assert excessive_limit.status_code == 422
