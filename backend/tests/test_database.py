@@ -88,3 +88,36 @@ def test_restore_without_existing_database_does_not_require_safety_backup(tmp_pa
         assert connection.execute("SELECT value FROM records").fetchone() == ("restored",)
     finally:
         connection.close()
+
+
+
+def test_restore_rolls_back_to_verified_safety_copy_when_installed_file_fails_validation(tmp_path, monkeypatch):
+    import app.database as database_module
+
+    database = tmp_path / "schoolbridge.sqlite3"
+    pending = tmp_path / "schoolbridge.sqlite3.restore_pending"
+    safety = tmp_path / "schoolbridge.before_restore.bak"
+    _make_database(database, "original")
+    _make_database(pending, "replacement")
+
+    real_validate = database_module.validate_sqlite_database
+    calls = {"count": 0}
+
+    def fail_after_replacement(path):
+        calls["count"] += 1
+        if calls["count"] == 2:
+            raise sqlite3.DatabaseError("simulated post-replacement validation failure")
+        return real_validate(path)
+
+    monkeypatch.setattr(database_module, "validate_sqlite_database", fail_after_replacement)
+
+    import pytest
+    with pytest.raises(sqlite3.DatabaseError, match="simulated"):
+        apply_sqlite_restore(str(database), str(pending), str(safety))
+
+    restored = sqlite3.connect(database)
+    try:
+        assert restored.execute("SELECT value FROM records").fetchall() == [("original",)]
+    finally:
+        restored.close()
+    assert safety.exists()

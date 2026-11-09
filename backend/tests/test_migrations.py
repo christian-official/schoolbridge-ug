@@ -51,3 +51,43 @@ def test_baseline_adds_missing_tables_without_losing_existing_records(tmp_path):
     assert "students" in tables
     assert "fee_charges" in tables
     assert "alembic_version" in tables
+
+
+
+def test_existing_database_is_backed_up_before_pending_migrations(tmp_path):
+    import sqlite3
+
+    database_path = tmp_path / "legacy-school.sqlite3"
+    database_url = f"sqlite:///{database_path}"
+    connection = sqlite3.connect(database_path)
+    try:
+        connection.execute("CREATE TABLE legacy_records (value TEXT NOT NULL)")
+        connection.execute("INSERT INTO legacy_records(value) VALUES ('keep-me')")
+        connection.commit()
+    finally:
+        connection.close()
+
+    upgrade_database(database_url)
+
+    backups = list(tmp_path.glob("legacy-school.sqlite3.pre_migration_*.bak"))
+    assert len(backups) == 1
+    backup = sqlite3.connect(backups[0])
+    try:
+        assert backup.execute("SELECT value FROM legacy_records").fetchone() == ("keep-me",)
+        assert "alembic_version" not in {
+            row[0] for row in backup.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        }
+    finally:
+        backup.close()
+
+
+def test_current_database_does_not_create_redundant_migration_backup(tmp_path):
+    database_path = tmp_path / "current-school.sqlite3"
+    database_url = f"sqlite:///{database_path}"
+    upgrade_database(database_url)
+
+    upgrade_database(database_url)
+
+    assert list(tmp_path.glob("current-school.sqlite3.pre_migration_*.bak")) == []

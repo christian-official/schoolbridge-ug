@@ -1,4 +1,5 @@
 import os
+import shutil
 import sqlite3
 
 from sqlalchemy import create_engine, event
@@ -85,20 +86,20 @@ def validate_sqlite_database(database_path: str) -> None:
 
 
 def apply_sqlite_restore(database_path: str, pending_path: str, safety_path: str) -> bool:
-    """Safely replace a SQLite database with a validated staged restore.
+    """Replace a SQLite database and roll back if the installed file fails validation.
 
-    The current database is backed up (including committed WAL data) before its
-    WAL is checkpointed and sidecars are removed. The staged file is validated
-    again immediately before the atomic replacement.
+    A verified snapshot is made before touching the active database. WAL data is
+    checkpointed before sidecars are removed so the safety copy and rollback
+    remain complete even if the atomic replacement or final validation fails.
     """
     if not pending_path or not os.path.isfile(pending_path):
         return False
 
     validate_sqlite_database(pending_path)
+    had_database = os.path.isfile(database_path)
 
-    if os.path.isfile(database_path):
+    if had_database:
         create_sqlite_backup(database_path, safety_path)
-
         current = sqlite3.connect(database_path)
         try:
             result = current.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()
@@ -108,13 +109,28 @@ def apply_sqlite_restore(database_path: str, pending_path: str, safety_path: str
             current.close()
 
     # No application connections may remain open when this helper is called.
-    # Removing old sidecars before replacement prevents them being replayed
-    # against the restored database after the new main file is installed.
     for suffix in ("-wal", "-shm"):
         sidecar = database_path + suffix
         if os.path.exists(sidecar):
             os.unlink(sidecar)
 
-    os.replace(pending_path, database_path)
-    validate_sqlite_database(database_path)
+    try:
+        os.replace(pending_path, database_path)
+        validate_sqlite_database(database_path)
+    except Exception as restore_error:
+        try:
+            if had_database:
+                rollback_path = database_path + ".restore_rollback"
+                shutil.copy2(safety_path, rollback_path)
+                os.replace(rollback_path, database_path)
+                validate_sqlite_database(database_path)
+            elif os.path.exists(database_path):
+                os.unlink(database_path)
+        except Exception as rollback_error:
+            raise RuntimeError(
+                "Database restore failed and automatic rollback could not be completed; "
+                "the verified safety backup must be preserved for recovery."
+            ) from rollback_error
+        raise restore_error
+
     return True
