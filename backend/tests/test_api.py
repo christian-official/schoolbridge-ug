@@ -1296,6 +1296,7 @@ def test_sync_student_snapshot_is_scoped_to_authorised_records():
         db.commit()
         parent_id = parent.id
         assigned_id, unrelated_id = assigned.id, unrelated.id
+        school_class_id, other_class_id = school_class.id, other_class.id
     finally:
         db.close()
 
@@ -1345,12 +1346,12 @@ def test_sync_student_snapshot_is_scoped_to_authorised_records():
         teacher_classes = class_snapshot(*devices["teacher"])
         parent_classes = class_snapshot(*devices["parent"])
         assert admin_classes.status_code == 200
-        assert {row["id"] for row in admin_classes.json()["classes"]} == {school_class.id, other_class.id}
+        assert {row["id"] for row in admin_classes.json()["classes"]} == {school_class_id, other_class_id}
         assert teacher_classes.status_code == 200
-        assert [row["id"] for row in teacher_classes.json()["classes"]] == [school_class.id]
+        assert [row["id"] for row in teacher_classes.json()["classes"]] == [school_class_id]
         assert teacher_classes.json()["scope"] == "assigned_classes"
         assert parent_classes.status_code == 200
-        assert [row["id"] for row in parent_classes.json()["classes"]] == [school_class.id]
+        assert [row["id"] for row in parent_classes.json()["classes"]] == [school_class_id]
         assert parent_classes.json()["scope"] == "linked_students"
         assert set(admin_classes.json()["classes"][0]) == {"id", "name", "section"}
 
