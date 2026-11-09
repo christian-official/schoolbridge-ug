@@ -7,14 +7,14 @@ from email.message import EmailMessage
 from datetime import date, datetime, time
 from zoneinfo import ZoneInfo
 from uuid import uuid4
-from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from starlette.background import BackgroundTask
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import update, func, or_
+from sqlalchemy import update, func, or_, text
 
 from .database import DATABASE_URL, Base, engine, get_db, SessionLocal
 from .migrations import upgrade_database
@@ -698,8 +698,25 @@ def root():
 
 
 @app.get("/api/health", tags=["System"])
-def health_check():
-    return {"status": "ok", "application": "SchoolBridge", "version": "0.2.0"}
+def health_check(response: Response):
+    database_type = engine.dialect.name
+    try:
+        with engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+    except Exception:
+        response.status_code = 503
+        return {
+            "status": "degraded",
+            "application": "SchoolBridge",
+            "version": "0.2.0",
+            "database": {"status": "unavailable", "type": database_type},
+        }
+    return {
+        "status": "ok",
+        "application": "SchoolBridge",
+        "version": "0.2.0",
+        "database": {"status": "connected", "type": database_type},
+    }
 
 
 @app.post("/api/classes", response_model=ClassOut, tags=["Classes"])
