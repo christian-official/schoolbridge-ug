@@ -91,3 +91,25 @@ def test_current_database_does_not_create_redundant_migration_backup(tmp_path):
     upgrade_database(database_url)
 
     assert list(tmp_path.glob("current-school.sqlite3.pre_migration_*.bak")) == []
+
+
+def test_fresh_database_includes_user_scoped_sync_device_registry(tmp_path):
+    database_path = tmp_path / "sync-devices.sqlite3"
+    database_url = f"sqlite:///{database_path}"
+
+    upgrade_database(database_url)
+
+    engine = create_engine(database_url)
+    inspector = inspect(engine)
+    assert "sync_devices" in inspector.get_table_names()
+    columns = {column["name"] for column in inspector.get_columns("sync_devices")}
+    assert {
+        "id", "user_id", "device_id", "device_name",
+        "created_at", "last_seen_at", "revoked_at",
+    }.issubset(columns)
+    unique_constraints = inspector.get_unique_constraints("sync_devices")
+    assert any(
+        set(item["column_names"]) == {"user_id", "device_id"}
+        for item in unique_constraints
+    )
+    engine.dispose()

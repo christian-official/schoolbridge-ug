@@ -990,3 +990,80 @@ def test_parent_liaison_is_staff_initiated_and_student_linked():
             f"/api/parent-liaison/threads/{thread_id}", headers=unrelated_headers
         )
         assert unrelated_access.status_code == 404
+
+
+def test_sync_device_registration_is_authenticated_user_scoped_and_revocable():
+    reset_database()
+    admin = create_admin()
+    teacher = create_teacher()
+    admin_headers = {"Authorization": f"Bearer {create_access_token(admin)}"}
+    teacher_headers = {"Authorization": f"Bearer {create_access_token(teacher)}"}
+    device_id = "00000000-0000-4000-8000-000000000001"
+
+    with TestClient(app) as client:
+        anonymous = client.post("/api/sync/devices", json={
+            "device_id": device_id, "device_name": "Office laptop",
+        })
+        assert anonymous.status_code == 401
+
+        registered = client.post(
+            "/api/sync/devices", headers=admin_headers,
+            json={"device_id": device_id, "device_name": "Office laptop"},
+        )
+        assert registered.status_code == 200, registered.text
+        assert registered.json()["active"] is True
+
+        updated = client.post(
+            "/api/sync/devices", headers=admin_headers,
+            json={"device_id": device_id, "device_name": "Updated office laptop"},
+        )
+        assert updated.status_code == 200
+        assert updated.json()["device_name"] == "Updated office laptop"
+
+        admin_devices = client.get("/api/sync/devices", headers=admin_headers)
+        assert admin_devices.status_code == 200
+        assert len(admin_devices.json()["devices"]) == 1
+        assert admin_devices.json()["devices"][0]["device_id"] == device_id
+
+        teacher_devices = client.get("/api/sync/devices", headers=teacher_headers)
+        assert teacher_devices.status_code == 200
+        assert teacher_devices.json()["devices"] == []
+
+        other_user_revoke = client.delete(
+            f"/api/sync/devices/{device_id}", headers=teacher_headers,
+        )
+        assert other_user_revoke.status_code == 404
+
+        revoked = client.delete(
+            f"/api/sync/devices/{device_id}", headers=admin_headers,
+        )
+        assert revoked.status_code == 200
+
+        listed_after_revoke = client.get("/api/sync/devices", headers=admin_headers)
+        assert listed_after_revoke.json()["devices"][0]["active"] is False
+        assert listed_after_revoke.json()["devices"][0]["revoked_at"] is not None
+
+        re_register = client.post(
+            "/api/sync/devices", headers=admin_headers,
+            json={"device_id": device_id, "device_name": "Office laptop"},
+        )
+        assert re_register.status_code == 409
+
+
+def test_sync_device_registration_validates_device_identity():
+    reset_database()
+    admin = create_admin()
+    headers = {"Authorization": f"Bearer {create_access_token(admin)}"}
+
+    with TestClient(app) as client:
+        invalid = client.post(
+            "/api/sync/devices", headers=headers,
+            json={"device_id": "not-a-uuid", "device_name": "Laptop"},
+        )
+        assert invalid.status_code == 422
+
+        blank_name = client.post(
+            "/api/sync/devices", headers=headers,
+            json={"device_id": "00000000-0000-4000-8000-000000000002", "device_name": "   "},
+        )
+        assert blank_name.status_code == 422

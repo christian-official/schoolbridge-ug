@@ -352,3 +352,18 @@ class ParentLiaisonMessage(Base):
     message: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     read_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class SyncDevice(Base):
+    __tablename__ = "sync_devices"
+    __table_args__ = (
+        UniqueConstraint("user_id", "device_id", name="uq_sync_devices_user_device"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    device_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    device_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

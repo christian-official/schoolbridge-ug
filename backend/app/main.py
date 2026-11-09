@@ -6,7 +6,7 @@ import smtplib
 from email.message import EmailMessage
 from datetime import date, datetime, time
 from zoneinfo import ZoneInfo
-from uuid import uuid4
+from uuid import UUID, uuid4
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -1239,6 +1239,11 @@ def bootstrap_initial_admin():
 
 bootstrap_initial_admin()
 
+class SyncDeviceRegistration(BaseModel):
+    device_id: UUID
+    device_name: str = Field(min_length=1, max_length=100)
+
+
 class LoginInput(BaseModel):
     username: str
     password: str
@@ -1894,6 +1899,95 @@ def current_account(user=Depends(get_current_user)):
         "active": user.is_active,
         "must_change_password": bool(user.must_change_password),
     }
+
+
+@app.post("/api/sync/devices", tags=["Offline Synchronisation"])
+def register_sync_device(
+    data: SyncDeviceRegistration,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    device_id = str(data.device_id)
+    device_name = data.device_name.strip()
+    if not device_name:
+        raise HTTPException(422, "Device name cannot be empty.")
+
+    device = db.query(models.SyncDevice).filter_by(
+        user_id=user.id, device_id=device_id
+    ).first()
+    if device and device.revoked_at is not None:
+        raise HTTPException(409, "This device has been revoked. Register it using a new device identity.")
+
+    now = datetime.utcnow()
+    if device is None:
+        device = models.SyncDevice(
+            user_id=user.id,
+            device_id=device_id,
+            device_name=device_name,
+            created_at=now,
+            last_seen_at=now,
+        )
+        db.add(device)
+    else:
+        device.device_name = device_name
+        device.last_seen_at = now
+
+    try:
+        db.commit()
+        db.refresh(device)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "This device could not be registered because its identity was already used.")
+
+    return {
+        "device_id": device.device_id,
+        "device_name": device.device_name,
+        "created_at": device.created_at,
+        "last_seen_at": device.last_seen_at,
+        "active": device.revoked_at is None,
+    }
+
+
+@app.get("/api/sync/devices", tags=["Offline Synchronisation"])
+def list_sync_devices(
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    devices = db.query(models.SyncDevice).filter_by(
+        user_id=user.id
+    ).order_by(models.SyncDevice.last_seen_at.desc(), models.SyncDevice.id.desc()).all()
+    return {
+        "devices": [
+            {
+                "device_id": device.device_id,
+                "device_name": device.device_name,
+                "created_at": device.created_at,
+                "last_seen_at": device.last_seen_at,
+                "revoked_at": device.revoked_at,
+                "active": device.revoked_at is None,
+            }
+            for device in devices
+        ]
+    }
+
+
+@app.delete("/api/sync/devices/{device_id}", tags=["Offline Synchronisation"])
+def revoke_sync_device(
+    device_id: UUID,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    device = db.query(models.SyncDevice).filter_by(
+        user_id=user.id, device_id=str(device_id)
+    ).first()
+    if device is None:
+        raise HTTPException(404, "Registered device not found.")
+
+    if device.revoked_at is None:
+        device.revoked_at = datetime.utcnow()
+        db.commit()
+
+    return {"message": "Device access to future SchoolBridge synchronisation has been revoked."}
 
 
 @app.post("/api/auth/users/{user_id}/reset-password", tags=["User Management"])

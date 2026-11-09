@@ -49,3 +49,10 @@ This is an initial direction, not a final packaging decision. Windows installati
 6. Add fees, receipts and finance reports.
 7. Build the responsive staff interface.
 8. Package and test the Windows offline installation.
+
+
+## Offline synchronisation foundation
+
+The server maintains a per-user device registry. Each authenticated account can register a browser or desktop installation, list its registered devices, and revoke a device from future synchronisation. Device identities are scoped to the account that registered them; one user cannot inspect or revoke another user's devices.
+
+This registry is only an identity and access-control foundation. It does not yet cache student records, queue offline edits, or synchronise changes. Until the later synchronisation protocol is implemented, the service worker must continue to avoid caching API responses and the application must treat the server as authoritative.
