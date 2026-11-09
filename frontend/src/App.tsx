@@ -13,6 +13,7 @@ import MyStaffProfile from './MyStaffProfile'
 import OperationsManagement from './OperationsManagement'
 import Phase4Workspace from './Phase4Workspace'
 import ParentLiaisonWorkspace from './ParentLiaison'
+import SyncDevices from './SyncDevices'
 import './App.css'
 import './DashboardRedesign.css'
 
@@ -1077,6 +1078,7 @@ function App() {
               {serverConnection === 'connected' ? <CheckCircle2 size={15}/> : serverConnection === 'disconnected' ? <WifiOff size={15}/> : <Wifi size={15}/>}
               <span>{serverConnection === 'connected' ? 'School server connected' : serverConnection === 'disconnected' ? 'School server unavailable' : 'Checking connection'}</span>
             </span>
+            <button className="secondary-button refresh-button" type="button" onClick={() => setActive('Device Management')} aria-label="Manage registered devices">Devices</button>
             <button className="secondary-button refresh-button" type="button" onClick={() => void refreshWorkspace()} disabled={isRefreshing} aria-live="polite">
               {isRefreshing ? <LoaderCircle className="spin" size={15} /> : <RefreshCw size={15} />}
               {isRefreshing ? 'Refreshing...' : 'Refresh'}
@@ -1106,6 +1108,7 @@ function App() {
 
           {active === 'Parent Liaison' && <ParentLiaisonWorkspace token={token} role={user.role} />}
           {active === 'School Community' && <SchoolCommunityWorkspace token={token} />}
+          {active === 'Device Management' && <SyncDevices token={token} userId={user.id} />}
           {active === 'Overview' && user.role === 'admin' && <AdministratorDashboard token={token} username={user.username} onNavigate={setActive} summary={dashboardSummary} financeSummary={financeDashboard} availableSections={['Students','Staff','Fees & Finance','Examinations','Attendance','Timetable','Leadership & Duty','Parent Access','Parent Liaison','Announcements','Reports']}/>} 
 
                     {active === 'Overview' && user.role !== 'admin' && (user.role === 'staff' && /school administrator|system administrator|^administrator$/i.test(user.role_label||'') ? <AdministratorDashboard token={token} username={user.username} onNavigate={setActive} summary={dashboardSummary} financeSummary={financeDashboard} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)}/> : isFinanceAccount(user) ? <FinanceAccountDashboard token={token} username={user.username} onNavigate={(section,tab)=>{if(tab)setFinanceTabRequest(tab);setActive(section)}}/> : user.role === 'staff' && /director of studies|\bdos\b/i.test(user.role_label||'') ? <DirectorOfStudiesDashboard token={token} onNavigate={setActive} summary={dashboardSummary} summaryAvailable={(user.permissions?.['Overview']||[]).includes('view')} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)}/> : user.role === 'staff' && /secretary|office administrator/i.test(user.role_label||'') ? <SecretaryDashboard username={user.username} onNavigate={setActive} summary={dashboardSummary} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)}/> : user.role === 'staff' && /attendance/i.test(user.role_label||'') ? <AttendanceOfficerDashboard username={user.username} onNavigate={setActive} summary={dashboardSummary} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)}/> : user.role === 'staff' && /teacher|head\s?teacher/i.test(user.role_label||'') ? <TeacherDashboard token={token} username={user.username} onNavigate={setActive}/> : user.role === 'staff' ? <RoleSpecificDashboard username={user.username} roleLabel={user.role_label||'Staff'} onNavigate={setActive} summary={dashboardSummary} summaryAvailable={(user.permissions?.['Overview']||[]).includes('view')} availableSections={Object.entries(user.permissions||{}).filter(([,actions])=>(actions as string[]).includes('view')).map(([section])=>section)} financeSummary={financeDashboard}/> : <PersonalDashboard token={token} username={user.username} onNavigate={setActive}/>) } 

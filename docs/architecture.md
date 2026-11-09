@@ -95,3 +95,8 @@ For updates and deletes, the server checks whether the entity changed after the 
 ### Device revocation and local data limits
 
 Revoking a registered device blocks its future authenticated synchronisation requests. It cannot reach a device that is disconnected or erase information already downloaded to that device. Clients must therefore revalidate the account and device before displaying protected synchronised data after reconnecting, clear locally held school data when access is denied, and avoid treating an offline copy as proof that access is still authorised. Until a client implements and tests those controls, SchoolBridge does not enable background API caching or general offline record access.
+
+
+### Browser device registration and revocation controls
+
+The signed-in user can review devices registered to their own account, register the current browser, and revoke an existing device. The browser stores only its account-scoped device UUID; this is an identity marker, not an offline credential or local copy of school records. A revoked identity is not silently reused: the user must explicitly create a replacement identity. Device revocation blocks subsequent sync API requests, but cannot erase information already downloaded to a disconnected device. Offline record storage and editing remain disabled until a permission-aware client and safe application workflow are implemented and tested.
