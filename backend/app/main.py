@@ -1706,7 +1706,7 @@ async def protect_school_data(request: Request, call_next):
             # Self-service profile, password and personal dashboard endpoints
             # are scoped to the authenticated account.
             pass
-        elif path == "/api/sync/devices" or path.startswith("/api/sync/devices/") or path in {"/api/sync/changes", "/api/sync/students"}:
+        elif path == "/api/sync/devices" or path.startswith("/api/sync/devices/") or path in {"/api/sync/changes", "/api/sync/students", "/api/sync/classes"}:
             # Sync routes enforce account, device and record scope in each handler.
             pass
         elif path.startswith("/api/teacher/"):
@@ -2109,6 +2109,78 @@ def list_sync_student_snapshot(
     db.commit()
     return {
         "students": payload,
+        "scope": scope,
+        "next_after_id": next_after_id,
+        "has_more": has_more,
+    }
+
+
+@app.get("/api/sync/classes", tags=["Offline Synchronisation"])
+def list_sync_class_snapshot(
+    device_id: UUID,
+    after_id: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=200),
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """Return class metadata only for classes represented in the user's student scope."""
+    device = db.query(models.SyncDevice).filter_by(
+        user_id=user.id, device_id=str(device_id)
+    ).first()
+    if device is None or device.revoked_at is not None:
+        raise HTTPException(403, "An active registered device is required.")
+
+    query = db.query(models.SchoolClass)
+    scope = None
+    if user.role == "admin" or "view" in user_permissions(user).get("Students", set()):
+        scope = "school"
+    elif user.role == "teacher":
+        if "view" not in user_permissions(user).get("My Classes", set()) and "view" not in user_permissions(user).get("Students", set()):
+            raise HTTPException(403, "You do not have permission to view assigned classes.")
+        class_ids = {
+            row[0] for row in db.query(models.TeacherAssignment.class_id).filter_by(
+                teacher_id=user.id
+            ).distinct().all()
+        }
+        class_ids.update(
+            row[0] for row in db.query(models.ClassTeacherAssignment.class_id).filter_by(
+                teacher_id=user.id
+            ).all()
+        )
+        query = query.filter(models.SchoolClass.id.in_(class_ids) if class_ids else models.SchoolClass.id == -1)
+        scope = "assigned_classes"
+    elif user.role == "parent":
+        linked_student_ids = [
+            row[0] for row in db.query(models.ParentStudentLink.student_id).filter_by(
+                user_id=user.id
+            ).all()
+        ]
+        class_ids = {
+            row[0] for row in db.query(models.Student.class_id).filter(
+                models.Student.id.in_(linked_student_ids),
+                models.Student.class_id.isnot(None),
+            ).all()
+        } if linked_student_ids else set()
+        query = query.filter(models.SchoolClass.id.in_(class_ids) if class_ids else models.SchoolClass.id == -1)
+        scope = "linked_students"
+    else:
+        raise HTTPException(403, "Your account is not authorised to download class records.")
+
+    rows = query.filter(models.SchoolClass.id > after_id).order_by(
+        models.SchoolClass.id.asc()
+    ).limit(limit + 1).all()
+    has_more = len(rows) > limit
+    rows = rows[:limit]
+    next_after_id = rows[-1].id if rows else after_id
+
+    payload = [
+        {"id": row.id, "name": row.name, "section": row.section}
+        for row in rows
+    ]
+    device.last_seen_at = datetime.utcnow()
+    db.commit()
+    return {
+        "classes": payload,
         "scope": scope,
         "next_after_id": next_after_id,
         "has_more": has_more,

@@ -73,3 +73,8 @@ Each registered device stores both the highest change-journal sequence returned 
 ### Scoped student bootstrap snapshots
 
 Registered devices can request a paginated, minimal student snapshot. Administrators and staff with explicit Students-view permission receive school-wide student basics; teachers receive only students in classes assigned to them; parents receive only students explicitly linked to their account. Guardian contacts, student contact details, dates of birth and photos are excluded from this first payload. The endpoint is device-owner scoped and rejects revoked devices. Other record types and role-aware change-feed filtering remain disabled until equivalent access rules are implemented and tested.
+
+
+### Scoped class bootstrap snapshots
+
+Registered devices can request a paginated class catalogue containing only class IDs, names and sections. Administrators and staff with Students-view permission receive the school catalogue; teachers receive only their assigned classes; parents receive only classes containing their linked children. The endpoint uses the same account-owned active-device check as the student snapshot. It does not expose class membership beyond the separately scoped student snapshot.

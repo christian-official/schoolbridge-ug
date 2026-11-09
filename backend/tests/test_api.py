@@ -1335,6 +1335,31 @@ def test_sync_student_snapshot_is_scoped_to_authorised_records():
         assert "guardian_phone" not in teacher_response.json()["students"][0]
         assert "photo_data" not in teacher_response.json()["students"][0]
 
+        def class_snapshot(device, headers, limit=200):
+            return client.get(
+                f"/api/sync/classes?device_id={device}&limit={limit}",
+                headers=headers,
+            )
+
+        admin_classes = class_snapshot(*devices["admin"])
+        teacher_classes = class_snapshot(*devices["teacher"])
+        parent_classes = class_snapshot(*devices["parent"])
+        assert admin_classes.status_code == 200
+        assert {row["id"] for row in admin_classes.json()["classes"]} == {school_class.id, other_class.id}
+        assert teacher_classes.status_code == 200
+        assert [row["id"] for row in teacher_classes.json()["classes"]] == [school_class.id]
+        assert teacher_classes.json()["scope"] == "assigned_classes"
+        assert parent_classes.status_code == 200
+        assert [row["id"] for row in parent_classes.json()["classes"]] == [school_class.id]
+        assert parent_classes.json()["scope"] == "linked_students"
+        assert set(admin_classes.json()["classes"][0]) == {"id", "name", "section"}
+
+        paged_classes = class_snapshot(*devices["admin"], limit=1)
+        assert paged_classes.status_code == 200
+        assert len(paged_classes.json()["classes"]) == 1
+        assert paged_classes.json()["has_more"] is True
+        assert paged_classes.json()["next_after_id"] == paged_classes.json()["classes"][0]["id"]
+
         wrong_owner = snapshot(devices["admin"][0], teacher_headers)
         assert wrong_owner.status_code == 403
         revoked = client.delete(
