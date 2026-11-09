@@ -67,4 +67,4 @@ The initial change-feed endpoint returns metadata only, paginated by sequence cu
 
 ### Per-device synchronisation checkpoints
 
-Each registered device stores the highest change-journal sequence it has successfully processed. A device may advance its checkpoint but cannot move it backwards or acknowledge a sequence that does not yet exist. Checkpoints are scoped to the owning account and revoked devices cannot update them. This records progress only; it does not mean record contents have been downloaded or safely applied locally.
+Each registered device stores both the highest change-journal sequence returned to it and the highest sequence it has successfully processed. A device may advance its checkpoint only up to its own delivered high-water mark; it cannot acknowledge another device's unseen changes or move its checkpoint backwards. Checkpoints are scoped to the owning account and revoked devices cannot update them. This records progress only; it does not mean record contents have been downloaded or safely applied locally.

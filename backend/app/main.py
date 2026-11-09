@@ -1969,6 +1969,7 @@ def list_sync_devices(
                 "created_at": device.created_at,
                 "last_seen_at": device.last_seen_at,
                 "last_sync_sequence": device.last_sync_sequence,
+                "last_issued_sequence": device.last_issued_sequence,
                 "revoked_at": device.revoked_at,
                 "active": device.revoked_at is None,
             }
@@ -1998,15 +1999,19 @@ def list_sync_changes(
     if device is None or device.revoked_at is not None:
         raise HTTPException(403, "An active registered device is required.")
 
-    device.last_seen_at = datetime.utcnow()
-    db.commit()
-
     rows = db.query(models.SyncChange).filter(
         models.SyncChange.id > cursor
     ).order_by(models.SyncChange.id.asc()).limit(limit + 1).all()
     has_more = len(rows) > limit
     rows = rows[:limit]
     next_cursor = rows[-1].id if rows else cursor
+
+    # Only sequences actually returned to this device may be acknowledged.
+    # Keep the high-water mark monotonic across repeated or overlapping reads.
+    if rows and rows[-1].id > device.last_issued_sequence:
+        device.last_issued_sequence = rows[-1].id
+    device.last_seen_at = datetime.utcnow()
+    db.commit()
 
     return {
         "changes": [
@@ -2041,9 +2046,8 @@ def acknowledge_sync_checkpoint(
     if device is None or device.revoked_at is not None:
         raise HTTPException(403, "An active registered device is required.")
 
-    latest_sequence = db.query(func.coalesce(func.max(models.SyncChange.id), 0)).scalar() or 0
-    if sequence > latest_sequence:
-        raise HTTPException(409, "A device cannot acknowledge changes that have not been recorded.")
+    if sequence > device.last_issued_sequence:
+        raise HTTPException(409, "A device cannot acknowledge changes that have not been delivered to it.")
     if sequence < device.last_sync_sequence:
         raise HTTPException(409, "A sync checkpoint cannot move backwards.")
 

@@ -1190,6 +1190,21 @@ def test_sync_device_checkpoint_is_monotonic_owned_and_bounded():
         finally:
             db.close()
 
+        # A globally valid sequence is not sufficient: this device must first
+        # receive it from its own change-feed request.
+        undelivered = client.post(
+            f"/api/sync/devices/{device_id}/checkpoint?sequence={latest}",
+            headers=admin_headers,
+        )
+        assert undelivered.status_code == 409
+
+        feed = client.get(
+            f"/api/sync/changes?device_id={device_id}&cursor=0&limit=500",
+            headers=admin_headers,
+        )
+        assert feed.status_code == 200
+        assert feed.json()["changes"][-1]["sequence"] == latest
+
         saved = client.post(
             f"/api/sync/devices/{device_id}/checkpoint?sequence={latest}",
             headers=admin_headers,
@@ -1216,7 +1231,9 @@ def test_sync_device_checkpoint_is_monotonic_owned_and_bounded():
         assert other_user.status_code == 403
 
         listed = client.get("/api/sync/devices", headers=admin_headers)
-        assert listed.json()["devices"][0]["last_sync_sequence"] == latest
+        device = listed.json()["devices"][0]
+        assert device["last_sync_sequence"] == latest
+        assert device["last_issued_sequence"] == latest
 
         client.delete(f"/api/sync/devices/{device_id}", headers=admin_headers)
         revoked = client.post(

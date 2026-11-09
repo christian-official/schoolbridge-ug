@@ -137,5 +137,5 @@ def test_sync_device_checkpoint_column_is_migrated(tmp_path):
 
     engine = create_engine(database_url)
     columns = {column["name"] for column in inspect(engine).get_columns("sync_devices")}
-    assert "last_sync_sequence" in columns
+    assert {"last_sync_sequence", "last_issued_sequence"}.issubset(columns)
     engine.dispose()
