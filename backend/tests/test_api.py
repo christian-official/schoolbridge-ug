@@ -1461,6 +1461,15 @@ def test_sync_student_snapshot_is_scoped_to_authorised_records():
         revoked_snapshot = snapshot(*devices["parent"])
         assert revoked_snapshot.status_code == 403
 
+        # Revocation must block every offline snapshot and the change feed,
+        # not just the student bootstrap endpoint.
+        for endpoint in ("classes", "attendance", "exams", "marks", "fees", "changes"):
+            denied = client.get(
+                f"/api/sync/{endpoint}?device_id={devices['parent'][0]}",
+                headers=parent_headers,
+            )
+            assert denied.status_code == 403, (endpoint, denied.text)
+
 
 def _register_snapshot_device(client, headers, suffix):
     device_id = f"00000000-0000-4000-8000-{suffix:012d}"
