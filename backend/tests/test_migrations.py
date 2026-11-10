@@ -282,3 +282,61 @@ def test_legacy_school_profile_without_users_is_grandfathered(tmp_path):
     assert state[0] is not None
     assert state[1] is not None
     assert "Configured School Without Accounts" in state[2]
+
+
+
+def test_partial_school_setup_state_table_gets_missing_activation_columns(tmp_path):
+    import sqlite3
+
+    database_path = tmp_path / "partial-school-setup.sqlite3"
+    database_url = f"sqlite:///{database_path}"
+    connection = sqlite3.connect(database_path)
+    try:
+        connection.execute("""
+            CREATE TABLE school_setup_state (
+                id INTEGER PRIMARY KEY,
+                installation_id VARCHAR(36) NOT NULL UNIQUE,
+                activated_at DATETIME,
+                activation_license_hash VARCHAR(64),
+                activation_locked_until DATETIME,
+                setup_completed_at DATETIME,
+                original_identity_json TEXT
+            )
+        """)
+        connection.execute(
+            "INSERT INTO school_setup_state (id, installation_id) VALUES (1, ?)",
+            ("existing-installation-id",),
+        )
+        connection.execute("CREATE TABLE alembic_version (version_num VARCHAR(32) NOT NULL)")
+        connection.execute(
+            "INSERT INTO alembic_version (version_num) VALUES (?)",
+            ("0025_first_school_setup",),
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    upgrade_database(database_url)
+
+    connection = sqlite3.connect(database_path)
+    try:
+        columns = {
+            row[1] for row in connection.execute("PRAGMA table_info(school_setup_state)")
+        }
+        attempts = connection.execute(
+            "SELECT activation_attempts FROM school_setup_state WHERE id=1"
+        ).fetchone()[0]
+        installation_id = connection.execute(
+            "SELECT installation_id FROM school_setup_state WHERE id=1"
+        ).fetchone()[0]
+        revision = connection.execute(
+            "SELECT version_num FROM alembic_version"
+        ).fetchone()[0]
+    finally:
+        connection.close()
+
+    assert "activation_attempts" in columns
+    assert "activation_locked_until" in columns
+    assert attempts == 0
+    assert installation_id == "existing-installation-id"
+    assert revision == "0026_repair_school_setup_state"
