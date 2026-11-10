@@ -27,7 +27,7 @@ Each school's installation and data must remain isolated. Internet access may be
 
 Phase 5 — Database & Offline Architecture includes verified database-safety, school-LAN deployment, device registration, change-journal, checkpoint and role-scoped snapshot foundations. Teacher mark drafts are encrypted locally and valid submissions are automatically applied after server-side permission, assignment, device, student, result-lock and conflict checks. Device Management supports an explicit, 24-hour AES-GCM encrypted snapshot of authorised students, classes, attendance, examinations, marks and fees; it is invalidated after detected permission or record changes on reconnect. Automatic offline writes are currently enabled only for validated teacher-mark and class-attendance batches. Other entity types remain disabled until their own permission, relationship, validation and conflict rules are implemented. PostgreSQL LAN installs run a dedicated daily verified backup service; SQLite single-host installs can run the same scheduler through Windows Task Scheduler.
 
-See [the local-network installation guide](docs/LOCAL_NETWORK_INSTALLATION.md) for setup and [the architecture notes](docs/architecture.md) for the current design direction.
+Before a school visit, use the [school-readiness and first installation guide](docs/SCHOOL_READINESS_AND_INSTALLATION.md). Follow the [local-network installation guide](docs/LOCAL_NETWORK_INSTALLATION.md) for host setup and [the architecture notes](docs/architecture.md) for the current design direction.
 
 ## Development
 
