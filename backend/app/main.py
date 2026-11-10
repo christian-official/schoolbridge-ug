@@ -4685,6 +4685,14 @@ def _offline_teacher_mark_conflict(db: Session, exam_id: int, subject_id: int, e
         student_id = int(entry["student_id"] if isinstance(entry, dict) else entry.student_id)
         baseline_id = base_mark_ids.get(str(student_id), base_mark_ids.get(student_id))
         current = db.query(models.Mark).filter_by(student_id=student_id, exam_id=exam_id, subject_id=subject_id).first()
+        scope_change = db.query(func.max(models.SyncChange.id)).filter(
+            models.SyncChange.entity_type == f"MarkScope:{exam_id}:{subject_id}",
+            models.SyncChange.entity_id == student_id,
+            models.SyncChange.id > base_sequence,
+        ).scalar()
+        if scope_change:
+            conflict = True
+            conflict_sequence = max(conflict_sequence or 0, scope_change)
         if baseline_id is None:
             if current is not None:
                 conflict = True

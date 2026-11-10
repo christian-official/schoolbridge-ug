@@ -1715,3 +1715,37 @@ def test_offline_teacher_marks_detect_deleted_baseline_mark_as_conflict():
             assert db.query(models.Mark).filter_by(student_id=student_id, exam_id=exam_id, subject_id=subject_id).first() is None
             proposal = db.get(models.SyncChangeProposal, queued.json()["proposal_id"])
             assert proposal.status == "conflict"
+
+
+def test_offline_teacher_marks_detect_a_mark_created_and_deleted_after_snapshot():
+    reset_database()
+    admin = create_admin()
+    teacher = create_teacher()
+    th = {"Authorization": f"Bearer {create_access_token(teacher)}"}
+    device = "00000000-0000-4000-8000-000000000405"
+    with SessionLocal() as db:
+        db.get(models.User, teacher.id).permissions_json = json.dumps({"My Results": ["view", "add"]})
+        school_class = models.SchoolClass(name="Offline S5", section="A")
+        subject = models.Subject(name="Geography", school_type="Secondary")
+        db.add_all([school_class, subject]); db.flush()
+        exam = models.Exam(name="Midterm", term="Term 2", year=2026, class_id=school_class.id)
+        student = models.Student(admission_number="OFFLINE-MARK-5", first_name="Rita", last_name="Test", class_id=school_class.id, status="active")
+        db.add_all([exam, student]); db.flush()
+        db.add(models.TeacherAssignment(teacher_id=teacher.id, class_id=school_class.id, subject_id=subject.id))
+        db.commit()
+        exam_id, subject_id, student_id = exam.id, subject.id, student.id
+    with TestClient(app) as client:
+        client.post("/api/sync/devices", headers=th, json={"device_id": device, "device_name": "Teacher laptop"})
+        snapshot = client.get(f"/api/sync/marks?device_id={device}", headers=th)
+        base = snapshot.json()["snapshot_sequence"]
+        with SessionLocal() as db:
+            transient = models.Mark(student_id=student_id, subject_id=subject_id, exam_id=exam_id, score=30)
+            db.add(transient); db.commit()
+            db.delete(db.get(models.Mark, transient.id)); db.commit()
+        queued = client.post("/api/sync/teacher-mark-proposals", headers=th, json={
+            "device_id": device, "idempotency_key": "teacher-offline-marks-0005",
+            "exam_id": exam_id, "subject_id": subject_id, "base_sequence": base,
+            "records": [{"student_id": student_id, "score": 90}],
+        })
+        assert queued.status_code == 200
+        assert queued.json()["status"] == "conflict"

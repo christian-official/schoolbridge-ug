@@ -39,6 +39,16 @@ def register_sync_tracking() -> None:
                     changed_at=datetime.utcnow(),
                 )
             )
+            if target.__class__ is models.Mark:
+                # Preserve the student/exam/subject scope even when a mark is later deleted.
+                connection.execute(
+                    models.SyncChange.__table__.insert().values(
+                        entity_type=f"MarkScope:{target.exam_id}:{target.subject_id}",
+                        entity_id=target.student_id,
+                        operation=operation,
+                        changed_at=datetime.utcnow(),
+                    )
+                )
         return listener
 
     for model in _TRACKED_MODELS:
