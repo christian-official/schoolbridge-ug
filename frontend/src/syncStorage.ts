@@ -51,7 +51,7 @@ async function deriveOfflineDraftKey(passphrase: string, salt: Uint8Array): Prom
 }
 
 export async function saveEncryptedOfflineDraft(userId: number, deviceId: string, passphrase: string, value: unknown, replaceExisting = false) {
-  if (!passphrase || passphrase.length < 12) throw new Error('Use a passphrase of at least 10 characters.')
+  if (!passphrase || passphrase.length < 12) throw new Error('Use a passphrase of at least 12 characters.')
   if (!crypto?.subtle || typeof indexedDB === 'undefined') throw new Error('This browser does not support protected offline storage.')
   const salt = crypto.getRandomValues(new Uint8Array(16))
   const iv = crypto.getRandomValues(new Uint8Array(12))
@@ -167,4 +167,60 @@ export async function deleteEncryptedOfflineSnapshot(userId: number, deviceId: s
       transaction.onerror = () => reject(new Error('Unable to clear the encrypted offline records.'))
     })
   } finally { db.close() }
+}
+
+
+export async function saveEncryptedOfflineAttendanceDraft(userId:number,deviceId:string,passphrase:string,value:unknown,replaceExisting=false){
+  if(!passphrase||passphrase.length<12)throw new Error('Use a passphrase of at least 12 characters.')
+  if(!crypto?.subtle||typeof indexedDB==='undefined')throw new Error('This browser does not support protected offline storage.')
+  const salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12))
+  const key=await deriveOfflineDraftKey(passphrase,salt)
+  const plaintext=new TextEncoder().encode(JSON.stringify(value))
+  const ciphertext=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv:asArrayBuffer(iv)},key,asArrayBuffer(plaintext)))
+  const db=await openOfflineDatabase(userId,deviceId)
+  try{
+    await new Promise<void>((resolve,reject)=>{
+      const transaction=db.transaction('drafts','readwrite')
+      const store=transaction.objectStore('drafts')
+      const existing=store.get('attendance-register-draft')
+      existing.onsuccess=()=>{
+        if(existing.result&&!replaceExisting){transaction.abort();return}
+        store.put({salt:Array.from(salt),iv:Array.from(iv),ciphertext:Array.from(ciphertext),updatedAt:Date.now()},'attendance-register-draft')
+      }
+      transaction.oncomplete=()=>resolve()
+      transaction.onerror=()=>reject(new Error('Unable to save the encrypted attendance draft.'))
+      transaction.onabort=()=>reject(new Error('An attendance draft already exists. Confirm replacement before saving a new register.'))
+    })
+  }finally{db.close()}
+}
+
+export async function loadEncryptedOfflineAttendanceDraft<T>(userId:number,deviceId:string,passphrase:string):Promise<T>{
+  if(!passphrase||passphrase.length<12)throw new Error('Enter the passphrase used to protect the attendance draft.')
+  const db=await openOfflineDatabase(userId,deviceId)
+  let record:any
+  try{
+    record=await new Promise((resolve,reject)=>{
+      const request=db.transaction('drafts','readonly').objectStore('drafts').get('attendance-register-draft')
+      request.onsuccess=()=>resolve(request.result)
+      request.onerror=()=>reject(new Error('Unable to read the encrypted attendance draft.'))
+    })
+  }finally{db.close()}
+  if(!record)throw new Error('No encrypted attendance draft is saved on this browser.')
+  try{
+    const key=await deriveOfflineDraftKey(passphrase,new Uint8Array(record.salt))
+    const plaintext=await crypto.subtle.decrypt({name:'AES-GCM',iv:asArrayBuffer(new Uint8Array(record.iv))},key,asArrayBuffer(new Uint8Array(record.ciphertext)))
+    return JSON.parse(new TextDecoder().decode(plaintext)) as T
+  }catch{throw new Error('Unable to unlock the attendance draft. Check the passphrase and try again.')}
+}
+
+export async function deleteEncryptedOfflineAttendanceDraft(userId:number,deviceId:string){
+  const db=await openOfflineDatabase(userId,deviceId)
+  try{
+    await new Promise<void>((resolve,reject)=>{
+      const transaction=db.transaction('drafts','readwrite')
+      transaction.objectStore('drafts').delete('attendance-register-draft')
+      transaction.oncomplete=()=>resolve()
+      transaction.onerror=()=>reject(new Error('Unable to clear the attendance draft.'))
+    })
+  }finally{db.close()}
 }
