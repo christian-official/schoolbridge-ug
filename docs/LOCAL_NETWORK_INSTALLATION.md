@@ -111,9 +111,12 @@ to the container owner. By default, backups older than 30 days are pruned;
 change `SCHOOLBRIDGE_BACKUP_RETENTION_DAYS` in `.env` to adjust the window.
 A failed dump or validation leaves no published backup.
 
-Run this command regularly using the host operating system's task scheduler
-or a trusted scheduler. For example, schedule it daily during a quiet period.
-The command is not automatically scheduled by Docker Compose.
+The PostgreSQL Docker Compose deployment includes a separate `backup`
+service that runs the verified backup scheduler immediately and then every
+24 hours by default. Confirm that service is healthy with `docker compose ps`
+and review its logs. The command above is also available for an on-demand
+backup. For a single-computer SQLite installation, configure Windows Task
+Scheduler as described in the automated-backups section below.
 
 To list backups:
 
