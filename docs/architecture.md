@@ -55,7 +55,7 @@ This is an initial direction, not a final packaging decision. Windows installati
 
 The server provides a per-user device registry, an append-only metadata change journal, per-device delivery/checkpoint tracking, and paginated role-scoped bootstrap snapshots for students, classes, attendance, examinations, marks and fee records. Each authenticated account can register a browser or desktop installation, list its registered devices, and revoke a device from future synchronisation. Device identities are scoped to the account that registered them; one user cannot inspect or revoke another user's devices.
 
-This is a controlled offline synchronisation foundation. General school-record caching and generic offline writes remain disabled unless their record-specific permission, relationship and conflict controls are enforced. Teacher mark drafts are encrypted locally and submitted after reconnecting. Valid submissions are automatically applied by the server; conflicting or invalid submissions are rejected or held without overwriting official records. The server remains authoritative.
+This is a controlled offline synchronisation foundation. Explicit encrypted read-only snapshots are available from Device Management. Automatic offline writes are enabled only for teacher mark batches and class-attendance registers, each with encrypted local drafts, account/device isolation, idempotency, current permission and assignment checks, record eligibility validation, baseline conflict detection and audit events. Valid submissions are automatically applied by the server; conflicts and invalid submissions remain unapplied. Other record types remain disabled until equivalent entity-specific controls are implemented. The server remains authoritative.
 
 
 ### Versioned change journal
@@ -119,3 +119,8 @@ Device Management can explicitly download the currently authorised student, clas
 
 
 PostgreSQL restore is deliberately non-destructive: run `python restore_postgres.py <archive.dump> <new_database_name>` from the backend environment. The command validates the archive, creates a separate target database, restores and checks required SchoolBridge tables, and removes the staging database if restore validation fails. It refuses to target the active database. After verifying the restored school instance, an operator can deliberately point a test or production deployment at the new database; the existing database is never overwritten by this script.
+
+
+### Automatic offline class attendance
+
+An authorised attendance user can save one encrypted class-register draft in browser storage. The draft is tied to the registered account/device and a 24-hour expiry, and it includes the class/date, baseline attendance IDs, baseline journal sequence and the complete set of student statuses. After reconnecting, the server rechecks the active device, current class attendance permission, class-teacher assignment where applicable, active class membership, status values, idempotency key and per-student/date baseline. A clean batch is applied atomically and audited. A stale or conflicting batch is recorded as a conflict and is not applied; the user must refresh the register and create a new draft. No administrator approval queue is involved.
