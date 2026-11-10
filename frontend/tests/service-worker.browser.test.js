@@ -36,6 +36,9 @@ test('real Chromium verifies the offline service-worker boundary', async () => {
     await page.goto(baseUrl)
     await page.waitForFunction(() => navigator.serviceWorker.controller !== null)
     await page.evaluate(() => navigator.serviceWorker.ready)
+    // The first navigation installs the worker but is not yet controlled. Reload
+    // once so the worker can observe and cache the built JS/CSS requests.
+    await page.reload({ waitUntil: 'networkidle' })
     assert.equal(await page.title(), 'SchoolBridge')
 
     const cachedAssets = await page.evaluate(async () => {
