@@ -32,10 +32,16 @@ function openOfflineDatabase(userId: number, deviceId: string): Promise<IDBDatab
   })
 }
 
+function asArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const buffer = new ArrayBuffer(bytes.byteLength)
+  new Uint8Array(buffer).set(bytes)
+  return buffer
+}
+
 async function deriveOfflineDraftKey(passphrase: string, salt: Uint8Array): Promise<CryptoKey> {
-  const material = await crypto.subtle.importKey('raw', new TextEncoder().encode(passphrase), 'PBKDF2', false, ['deriveKey'])
+  const material = await crypto.subtle.importKey('raw', asArrayBuffer(new TextEncoder().encode(passphrase)), 'PBKDF2', false, ['deriveKey'])
   return crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt, iterations: 310000, hash: 'SHA-256' },
+    { name: 'PBKDF2', salt: asArrayBuffer(salt), iterations: 310000, hash: 'SHA-256' },
     material,
     { name: 'AES-GCM', length: 256 },
     false,
@@ -50,7 +56,7 @@ export async function saveEncryptedOfflineDraft(userId: number, deviceId: string
   const iv = crypto.getRandomValues(new Uint8Array(12))
   const key = await deriveOfflineDraftKey(passphrase, salt)
   const plaintext = new TextEncoder().encode(JSON.stringify(value))
-  const ciphertext = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plaintext))
+  const ciphertext = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: asArrayBuffer(iv) }, key, asArrayBuffer(plaintext)))
   const db = await openOfflineDatabase(userId, deviceId)
   try {
     await new Promise<void>((resolve, reject) => {
@@ -81,7 +87,7 @@ export async function loadEncryptedOfflineDraft<T>(userId: number, deviceId: str
   try {
     const salt = new Uint8Array(record.salt), iv = new Uint8Array(record.iv), ciphertext = new Uint8Array(record.ciphertext)
     const key = await deriveOfflineDraftKey(passphrase, salt)
-    const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext)
+    const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: asArrayBuffer(iv) }, key, asArrayBuffer(ciphertext))
     return JSON.parse(new TextDecoder().decode(plaintext)) as T
   } catch {
     throw new Error('Unable to unlock the draft. Check the passphrase and try again.')
