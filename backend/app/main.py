@@ -3275,14 +3275,14 @@ def create_parent_account(data: ParentAccountCreate, db: Session = Depends(get_d
 
 @app.get("/api/parent-accounts", tags=["Parent Access"])
 def list_parent_accounts(db: Session = Depends(get_db), admin=Depends(require_admin)):
-    parents = db.query(models.User).filter_by(role="parent").order_by(models.User.username).all()
+    parents = db.query(models.User).filter_by(role="parent", is_active=True).order_by(models.User.username).all()
     output = []
     for parent in parents:
         links = db.query(models.ParentStudentLink).filter_by(user_id=parent.id).all()
         children = []
         for link in links:
             student = db.get(models.Student, link.student_id)
-            if student:
+            if student and student.status == "active":
                 children.append({"id": student.id, "name": " ".join(x for x in [student.first_name, student.middle_name, student.last_name] if x), "admission_number": student.admission_number, "guardians": [name for name in [student.guardian_name, student.guardian2_name] if name], "guardian_phones": [phone for phone in [student.guardian_phone, student.guardian2_phone] if phone]})
         output.append({"id": parent.id, "username": parent.username, "email": parent.email, "active": parent.is_active, "children": children})
     return output
@@ -5500,3 +5500,63 @@ def list_my_offline_teacher_mark_proposals(
         })
     return {"proposals": proposals}
 
+
+
+class VisitorCheckIn(BaseModel):
+    visitor_name: str = Field(min_length=2, max_length=160)
+    phone: str | None = Field(default=None, max_length=30)
+    organisation: str | None = Field(default=None, max_length=160)
+    person_to_see: str = Field(min_length=2, max_length=160)
+    purpose: str = Field(min_length=2, max_length=255)
+    vehicle_registration: str | None = Field(default=None, max_length=30)
+
+
+def _is_gatekeeper(user) -> bool:
+    label = (user.role_label or "").strip().lower()
+    return user.role == "staff" and label in {"gatekeeper", "security officer", "security guard", "school guard"}
+
+
+@app.post("/api/visitors/check-in", tags=["Visitors"])
+def visitor_check_in(data: VisitorCheckIn, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    if not _is_gatekeeper(user) and user.role != "admin":
+        raise HTTPException(403, "Only the gatekeeper or an administrator may register visitors.")
+    visitor = models.VisitorLog(**data.model_dump(), recorded_by=user.id)
+    db.add(visitor)
+    db.commit()
+    db.refresh(visitor)
+    write_audit(db, user, "visitor_checked_in", "visitor", visitor.id, "Visitor check-in recorded.")
+    db.commit()
+    return {"id": visitor.id, "visitor_name": visitor.visitor_name, "checked_in_at": visitor.checked_in_at}
+
+
+@app.post("/api/visitors/{visitor_id}/check-out", tags=["Visitors"])
+def visitor_check_out(visitor_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    if not _is_gatekeeper(user) and user.role != "admin":
+        raise HTTPException(403, "Only the gatekeeper or an administrator may check visitors out.")
+    visitor = db.get(models.VisitorLog, visitor_id)
+    if not visitor or visitor.checked_out_at is not None:
+        raise HTTPException(404, "Active visitor record not found.")
+    visitor.checked_out_at = datetime.utcnow()
+    write_audit(db, user, "visitor_checked_out", "visitor", visitor.id, "Visitor record forwarded to administration.")
+    db.commit()
+    # Gate staff receive no visitor details after checkout.
+    return {"message": "Visitor checked out. The record is now available to administrators."}
+
+
+@app.get("/api/visitors", tags=["Visitors"])
+def list_visitors(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    if user.role == "admin":
+        rows = db.query(models.VisitorLog).order_by(models.VisitorLog.checked_in_at.desc()).limit(1000).all()
+    elif _is_gatekeeper(user):
+        rows = db.query(models.VisitorLog).filter(
+            models.VisitorLog.recorded_by == user.id,
+            models.VisitorLog.checked_out_at.is_(None),
+        ).order_by(models.VisitorLog.checked_in_at.desc()).all()
+    else:
+        raise HTTPException(403, "Visitor register access is restricted.")
+    return [{
+        "id": row.id, "visitor_name": row.visitor_name, "phone": row.phone,
+        "organisation": row.organisation, "person_to_see": row.person_to_see,
+        "purpose": row.purpose, "vehicle_registration": row.vehicle_registration,
+        "checked_in_at": row.checked_in_at, "checked_out_at": row.checked_out_at,
+    } for row in rows]
