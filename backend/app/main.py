@@ -1416,7 +1416,7 @@ def linked_parent_student(db: Session, parent, student_id: int):
     if not link:
         raise HTTPException(404, "This student is not linked to your parent account.")
     student = db.get(models.Student, student_id)
-    if not student:
+    if not student or student.status != "active":
         raise HTTPException(404, "Student record not found.")
     return student
 
