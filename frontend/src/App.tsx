@@ -1487,6 +1487,7 @@ function TeacherWorkspace({token,active,userId}:{token:string;active:string;user
   const [offlinePassphrase,setOfflinePassphrase]=useState('')
   const [offlineDraftMessage,setOfflineDraftMessage]=useState('')
   const [offlineDraftBusy,setOfflineDraftBusy]=useState(false)
+  const [offlineDraftUnlocked,setOfflineDraftUnlocked]=useState(false)
   const [resultSnapshotSequence,setResultSnapshotSequence]=useState<number|null>(null)
   const [ownAttendance,setOwnAttendance]=useState<TeacherOwnAttendance|null>(null)
   const [ownAttendanceError,setOwnAttendanceError]=useState('')
@@ -1585,9 +1586,10 @@ function TeacherWorkspace({token,active,userId}:{token:string;active:string;user
     return ()=>{cancelled=true}
   },[active,examId,selectedTeacherExam?.class_id,token])
   async function saveClassAttendance(){if(!classId||!students.length){setMessage('Choose a responsible class with active students.');return}setBusy(-1);setMessage('');try{const result=await api<{saved:number}>('attendance/register',token,{method:'PUT',body:JSON.stringify({class_id:Number(classId),attendance_date:attendanceDate,records:students.map(student=>({student_id:student.id,status:statuses[student.id]||'Present'}))})});setMessage(result.saved+' student attendance records saved for '+attendanceDate+'.')}catch(e){setMessage(e instanceof Error?e.message:'Unable to save class attendance.')}finally{setBusy(null)}}
-  useEffect(()=>{const context=String(examId)+':'+String(selectedSubjectId);const changed=lastOfflineScoreContext.current!==context;lastOfflineScoreContext.current=context;if(!selectedSubjectId){setResultScores({});return}setResultScores(current=>{const next:Record<number,string>=changed?{}:{...current};resultStudents.forEach(student=>{const mark=resultMarks.find(row=>row.student_id===student.id&&row.subject_id===Number(selectedSubjectId));if(mark)next[student.id]=String(mark.score);else if(next[student.id]===undefined)next[student.id]=''});return next})},[examId,selectedSubjectId,resultStudents,resultMarks])
+  useEffect(()=>{const context=String(examId)+':'+String(selectedSubjectId);const changed=lastOfflineScoreContext.current!==context;lastOfflineScoreContext.current=context;if(!selectedSubjectId){setResultScores({});return}if(changed&&offlineDraftUnlocked)setOfflineDraftUnlocked(false);const preserveUnlockedDraft=offlineDraftUnlocked&&!changed;setResultScores(current=>{const next:Record<number,string>=changed?{}:{...current};resultStudents.forEach(student=>{const mark=resultMarks.find(row=>row.student_id===student.id&&row.subject_id===Number(selectedSubjectId));if(preserveUnlockedDraft){if(next[student.id]===undefined)next[student.id]=''}else if(mark)next[student.id]=String(mark.score);else if(next[student.id]===undefined)next[student.id]=''});return next})},[examId,selectedSubjectId,resultStudents,resultMarks,offlineDraftUnlocked])
   async function saveOfflineTeacherMarksDraft(){
     if(!selectedTeacherExam||!selectedSubjectId||!resultStudents.length){setOfflineDraftMessage('Choose an examination, assigned subject and class register first.');return}
+    if(currentSubjectIsVerified){setOfflineDraftMessage('These results are verified and locked. Ask the administrator to unlock them before saving changes.');return}
     if(!window.confirm('Save the current class scores as the encrypted offline draft? This replaces the previous saved draft on this browser, if one exists.'))return
     if(offlinePassphrase.trim().length<12){setOfflineDraftMessage('Use a strong offline passphrase of at least 12 characters. It is not stored by SchoolBridge.');return}
     const deviceId=localStorage.getItem('schoolbridge-sync-device-'+userId)
@@ -1618,10 +1620,35 @@ function TeacherWorkspace({token,active,userId}:{token:string;active:string;user
       setTeacherExams([draft.exam]);setExamId(String(draft.exam.id))
       setSelectedTeacherExamGroupKey([draft.exam.name||'Other',draft.exam.term,draft.exam.year].join('|'))
       setActiveTeacherExamType('All exams');lastOfflineScoreContext.current=String(draft.exam.id)+':'+String(draft.subject_id);setSelectedSubjectId(String(draft.subject_id))
-      setResultStudents(draft.students);setResultScores(draft.scores||{})
+      setResultStudents(draft.students);setResultScores(draft.scores||{});setOfflineDraftUnlocked(true)
       setResultSnapshotSequence(draft.base_sequence);setResultSubmissionComplete(false)
       setOfflineDraftMessage('Encrypted draft unlocked. Check the class and scores before submitting it when online.')
     }catch(error){setOfflineDraftMessage(error instanceof Error?error.message:'Unable to unlock the offline draft.')}
+    finally{setOfflineDraftBusy(false)}
+  }
+  async function refreshOfflineTeacherMarksBaseline(){
+    const deviceId=localStorage.getItem('schoolbridge-sync-device-'+userId)
+    if(!deviceId||!selectedTeacherExam||!selectedSubjectId){setOfflineDraftMessage('Register this browser and choose an assigned examination and subject first.');return}
+    setOfflineDraftBusy(true);setOfflineDraftMessage('')
+    try{
+      const [examRows,studentRows,markRows,statusRows,snapshot]=await Promise.all([
+        api<TeacherExam[]>('teacher/exams',token),
+        api<TeacherStudent[]>('teacher/students?class_id='+selectedTeacherExam.class_id,token),
+        api<TeacherMark[]>('teacher/marks?exam_id='+selectedTeacherExam.id,token),
+        api<TeacherResultStatus[]>('teacher/result-status?exam_id='+selectedTeacherExam.id,token),
+        api<{snapshot_sequence:number}>('sync/marks?device_id='+encodeURIComponent(deviceId)+'&limit=200',token),
+      ])
+      const currentExam=examRows.find(row=>row.id===selectedTeacherExam.id)
+      if(!currentExam||!currentExam.assigned_subjects.some(subject=>subject.id===Number(selectedSubjectId))){
+        throw new Error('Your class or subject assignment has changed. This draft cannot be refreshed for submission.')
+      }
+      if(statusRows.some(row=>row.subject_id===Number(selectedSubjectId)&&row.status==='Verified')){
+        throw new Error('These results are verified and locked. Ask the administrator to unlock them before making changes.')
+      }
+      setTeacherExams(examRows);setResultStudents(studentRows);setResultMarks(markRows);setResultStatuses(statusRows)
+      setResultSnapshotSequence(snapshot.snapshot_sequence)
+      setOfflineDraftMessage('Fresh server baseline loaded. Your unlocked scores were retained. Review them, then save a new encrypted draft before resubmitting.')
+    }catch(error){setOfflineDraftMessage(error instanceof Error?error.message:'Unable to refresh the offline marks baseline.')}
     finally{setOfflineDraftBusy(false)}
   }
   async function submitOfflineTeacherMarksDraft(){
@@ -1638,9 +1665,14 @@ function TeacherWorkspace({token,active,userId}:{token:string;active:string;user
         device_id:draft.device_id,idempotency_key:draft.idempotency_key,exam_id:draft.exam.id,
         subject_id:draft.subject_id,base_sequence:draft.base_sequence,base_mark_ids:draft.base_mark_ids||{},records:currentRecords,
       })})
-      await deleteEncryptedOfflineDraft(userId,deviceId)
-      setOfflineDraftMessage('Draft submitted as proposal #'+result.proposal_id+' ('+result.status+'). An administrator must review it; official marks have not been changed.')
-      setOfflinePassphrase('')
+      if(result.status==='conflict'){
+        setOfflineDraftMessage('Proposal #'+result.proposal_id+' has a conflict. Your encrypted draft was kept. Refresh the baseline, review the retained scores, save a new encrypted draft, then submit again.')
+      }else{
+        await deleteEncryptedOfflineDraft(userId,deviceId)
+        setOfflineDraftUnlocked(false)
+        setOfflineDraftMessage('Draft submitted as proposal #'+result.proposal_id+' ('+result.status+'). An administrator must review it; official marks have not been changed.')
+        setOfflinePassphrase('')
+      }
     }catch(error){setOfflineDraftMessage(error instanceof Error?error.message:'Unable to submit the saved draft.')}
     finally{setOfflineDraftBusy(false)}
   }
@@ -1688,6 +1720,7 @@ function TeacherWorkspace({token,active,userId}:{token:string;active:string;user
         <div><strong>Offline marks draft</strong><p className="form-hint">Prepare and save this class register while online. If the connection drops, unlock it with the same passphrase and continue editing. Save / update again before closing the browser, then unlock and submit for administrator review after reconnecting.</p></div>
         <label>Offline passphrase<input type="password" minLength={10} autoComplete="off" value={offlinePassphrase} onChange={event=>setOfflinePassphrase(event.target.value)} placeholder="At least 12 characters"/></label>
         <div className="form-actions">
+          <button type="button" className="secondary-button" disabled={offlineDraftBusy||resultSaving||!selectedTeacherExam||!selectedSubjectId} onClick={()=>void refreshOfflineTeacherMarksBaseline()}>Refresh baseline online</button>
           <button type="button" className="secondary-button" disabled={offlineDraftBusy||resultSaving||!selectedTeacherExam||!selectedSubjectId} onClick={()=>void saveOfflineTeacherMarksDraft()}>{offlineDraftBusy?'Working...':'Save encrypted offline draft'}</button>
           <button type="button" className="secondary-button" disabled={offlineDraftBusy} onClick={()=>void unlockOfflineTeacherMarksDraft()}>Unlock saved draft</button>
           <button type="button" className="primary-button" disabled={offlineDraftBusy} onClick={()=>void submitOfflineTeacherMarksDraft()}>Submit saved draft when online</button>

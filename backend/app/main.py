@@ -4712,6 +4712,19 @@ def _offline_teacher_mark_conflict(db: Session, exam_id: int, subject_id: int, e
     return conflict, conflict_sequence
 
 
+def _offline_teacher_mark_missing_permissions(teacher, entries, base_mark_ids):
+    """Require add/edit permission for the operation represented by each snapshot row."""
+    permissions = user_permissions(teacher).get("My Results", set())
+    missing = set()
+    for entry in entries:
+        student_id = int(entry["student_id"] if isinstance(entry, dict) else entry.student_id)
+        baseline_id = base_mark_ids.get(str(student_id), base_mark_ids.get(student_id))
+        required = "edit" if baseline_id is not None else "add"
+        if required not in permissions:
+            missing.add(required)
+    return missing
+
+
 class OfflineTeacherMarkEntry(BaseModel):
     student_id: int = Field(ge=1)
     score: float = Field(ge=0, le=100)
@@ -4732,9 +4745,6 @@ def submit_offline_teacher_marks(data: OfflineTeacherMarkBatch, db: Session = De
     """Queue offline teacher marks for review; never writes official marks."""
     if teacher.role != "teacher":
         raise HTTPException(403, "Teacher account required.")
-    permissions = user_permissions(teacher).get("My Results", set())
-    if not ({"add", "edit"} & permissions):
-        raise HTTPException(403, "You do not have permission to submit examination results.")
     device = _sync_active_device(db, teacher, data.device_id)
     if data.base_sequence > device.last_issued_sequence:
         raise HTTPException(409, "The proposal baseline has not been issued to this device.")
@@ -4756,6 +4766,15 @@ def submit_offline_teacher_marks(data: OfflineTeacherMarkBatch, db: Session = De
     ).all()
     if len(students) != len(student_ids):
         raise HTTPException(422, "Every submitted student must be active and belong to this examination's class.")
+    missing_permissions = _offline_teacher_mark_missing_permissions(
+        teacher, data.records, data.base_mark_ids
+    )
+    if missing_permissions:
+        raise HTTPException(
+            403,
+            "Your current My Results permissions do not allow this batch: "
+            + ", ".join(sorted(missing_permissions)) + " permission required.",
+        )
     locked = db.query(models.Mark.id).filter(
         models.Mark.exam_id == exam.id, models.Mark.subject_id == subject.id,
         models.Mark.verified.is_(True)
@@ -4854,15 +4873,6 @@ def apply_offline_teacher_mark_proposal(proposal_id: int, db: Session = Depends(
                     "Teacher account, examination or class context is no longer valid.")
         db.commit()
         raise HTTPException(409, "The teacher or examination context is no longer valid; proposal rejected.")
-    teacher_permissions = user_permissions(teacher).get("My Results", set())
-    if not ({"add", "edit"} & teacher_permissions):
-        row.status = "rejected"
-        row.resolution = "reject_permission_changed"
-        row.resolved_at = datetime.utcnow()
-        write_audit(db, admin, "offline_teacher_marks_rejected", "sync_change_proposal", row.id,
-                    "Teacher no longer has permission to submit examination results.")
-        db.commit()
-        raise HTTPException(409, "Teacher result-entry permission has changed. Proposal rejected; no marks were applied.")
     assignment = db.query(models.TeacherAssignment.id).filter_by(
         teacher_id=teacher.id, class_id=exam.class_id, subject_id=subject.id
     ).first()
@@ -4893,6 +4903,17 @@ def apply_offline_teacher_mark_proposal(proposal_id: int, db: Session = Depends(
                     "Student eligibility or score validation failed.")
         db.commit()
         raise HTTPException(422, "Student eligibility or score validation failed; no marks were applied.")
+    missing_permissions = _offline_teacher_mark_missing_permissions(
+        teacher, entries, payload.get("base_mark_ids", {})
+    )
+    if missing_permissions:
+        row.status = "rejected"
+        row.resolution = "reject_permission_changed"
+        row.resolved_at = datetime.utcnow()
+        write_audit(db, admin, "offline_teacher_marks_rejected", "sync_change_proposal", row.id,
+                    "Teacher no longer has permission for every add/edit operation in this batch.")
+        db.commit()
+        raise HTTPException(409, "Teacher result-entry permissions changed. Proposal rejected; no marks were applied.")
     locked = db.query(models.Mark.id).filter(
         models.Mark.exam_id == exam.id, models.Mark.subject_id == subject.id,
         models.Mark.verified.is_(True)
