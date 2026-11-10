@@ -457,7 +457,6 @@ export default function AcademicManagement({ token, classes, canVerify = false, 
       await persistReportBranding(reportLogo, {})
       setReportTemplateConfig({})
       setReportTemplate('modern')
-      setReportTemplateConfig({})
       setReportTitle('STUDENT PROGRESS REPORT')
       setReportFooter('SchoolBridge · Official student progress report · Keep this report for your records')
       setMessage('Uploaded report template deleted. Built-in designs are available again.')
