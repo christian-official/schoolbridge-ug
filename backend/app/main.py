@@ -2145,6 +2145,8 @@ def _sync_change_visible_to_user(row, user):
     try: scope = json.loads(row.scope_json or "{}")
     except (TypeError, ValueError): scope = {}
     entity = row.entity_type.split(":", 1)[0]
+    if entity == "AttendanceScope":
+        entity = "Attendance"
     parent_visible = user.id in scope.get("parent_user_ids", [])
     teacher_visible = user.id in scope.get("teacher_user_ids", [])
     permissions = user_permissions(user)
