@@ -2386,3 +2386,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .owner-correction-panel .secondary-button{justify-self:start}
 
 .first-setup-logo-preview{display:block;width:96px;height:96px;object-fit:contain;padding:8px;border:1px solid #e2e8f0;border-radius:12px;background:#fff}
+
+.first-setup-confirmation{display:grid;gap:8px;padding:14px;border:1px solid #d7e2ee;border-radius:12px;background:#f7fafc}
+.first-setup-confirmation strong{font-size:13px;color:#29445f}
+.first-setup-confirmation p{margin:0;color:#64748b;font-size:12px;line-height:1.5}
+.first-setup-confirmation label{display:flex;align-items:flex-start;gap:9px;font-size:12px;line-height:1.5}
+.first-setup-confirmation input{width:auto;min-width:16px;margin:2px 0 0}

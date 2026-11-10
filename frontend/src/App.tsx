@@ -718,6 +718,11 @@ function FirstTimeSetupWizard({status,onStatusChange}:{status:FirstSetupStatus;o
             <label>Private password *<input required type="password" minLength={12} maxLength={128} autoComplete="new-password" value={school.admin_password} onChange={e=>setSchool({...school,admin_password:e.target.value})}/></label>
             <p className="form-hint">Use at least 12 characters. SchoolBridge stores only a secure password hash.</p>
           </div>
+          <div className="first-setup-confirmation">
+            <strong>Final confirmation</strong>
+            <p>The official school name, school type, country and school structure will be protected after setup. Any exceptional correction will require a separate owner-signed authorisation.</p>
+            <label><input type="checkbox" required/> I have checked these official school details and confirm they are correct.</label>
+          </div>
           {error&&<p className="error" role="alert">{error}</p>}
           <button className="primary-button login-button" disabled={busy}>{busy?'Saving school setup...':'Complete school setup'}</button>
         </form>

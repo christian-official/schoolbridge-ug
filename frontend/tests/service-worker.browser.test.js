@@ -193,6 +193,7 @@ test('real Chromium completes the first-install owner activation and school setu
     await page.getByLabel('Administrator username *').fill('first-admin')
     await page.getByLabel('Administrator email *').fill('admin@example.invalid')
     await page.getByLabel('Private password *').fill('LongTestPassword123!')
+    await page.getByLabel('I have checked these official school details and confirm they are correct.').check()
     await page.getByRole('button', { name: 'Complete school setup' }).click()
     await page.getByRole('heading', { name: 'Welcome back' }).waitFor()
 
