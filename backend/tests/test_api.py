@@ -1202,12 +1202,14 @@ def test_sync_change_feed_filters_parent_and_teacher_history_scopes():
         # account that was authorised immediately before the removal.
         with SessionLocal() as db:
             db.get(models.User, teacher.id).permissions_json = json.dumps({"My Classes": ["view"], "My Results": ["view"]})
-            db.query(models.ParentStudentLink).filter_by(
+            parent_link = db.query(models.ParentStudentLink).filter_by(
                 user_id=parent_id, student_id=student_id
-            ).delete(synchronize_session=False)
-            db.query(models.TeacherAssignment).filter_by(
+            ).one()
+            teacher_assignment = db.query(models.TeacherAssignment).filter_by(
                 teacher_id=teacher.id, class_id=class_id, subject_id=subject_id
-            ).delete(synchronize_session=False)
+            ).one()
+            db.delete(parent_link)
+            db.delete(teacher_assignment)
             db.commit()
 
         teacher_removed = client.get(
