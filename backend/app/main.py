@@ -1721,7 +1721,7 @@ async def protect_school_data(request: Request, call_next):
             # Self-service profile, password and personal dashboard endpoints
             # are scoped to the authenticated account.
             pass
-        elif path == "/api/sync/devices" or path.startswith("/api/sync/devices/") or path in {"/api/sync/changes", "/api/sync/students", "/api/sync/classes", "/api/sync/attendance", "/api/sync/exams", "/api/sync/marks", "/api/sync/fees", "/api/sync/proposals"} or path.startswith("/api/sync/teacher-mark-proposals"):
+        elif path == "/api/sync/devices" or path.startswith("/api/sync/devices/") or path in {"/api/sync/changes", "/api/sync/sequence", "/api/sync/students", "/api/sync/classes", "/api/sync/attendance", "/api/sync/exams", "/api/sync/marks", "/api/sync/fees", "/api/sync/proposals"} or path.startswith("/api/sync/teacher-mark-proposals"):
             # Sync routes enforce account, device and record scope in each handler.
             pass
         elif path.startswith("/api/teacher/"):
@@ -2333,6 +2333,16 @@ def _sync_teacher_class_ids(db: Session, user):
     )
     return ids
 
+
+
+
+@app.get("/api/sync/sequence", tags=["Offline Synchronisation"])
+def get_sync_sequence(device_id: UUID, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    """Return a metadata-only journal high-water mark for snapshot consistency checks."""
+    _sync_active_device(db, user, device_id)
+    sequence = db.query(func.max(models.SyncChange.id)).scalar() or 0
+    db.commit()
+    return {"sequence": sequence}
 
 @app.get("/api/sync/attendance", tags=["Offline Synchronisation"])
 def list_sync_attendance_snapshot(

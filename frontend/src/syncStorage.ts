@@ -23,9 +23,10 @@ function offlineDatabaseName(userId: number, deviceId: string) {
 
 function openOfflineDatabase(userId: number, deviceId: string): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const opening = indexedDB.open(offlineDatabaseName(userId, deviceId), 1)
+    const opening = indexedDB.open(offlineDatabaseName(userId, deviceId), 2)
     opening.onupgradeneeded = () => {
       if (!opening.result.objectStoreNames.contains('drafts')) opening.result.createObjectStore('drafts')
+      if (!opening.result.objectStoreNames.contains('snapshots')) opening.result.createObjectStore('snapshots')
     }
     opening.onsuccess = () => resolve(opening.result)
     opening.onerror = () => reject(new Error('Unable to open encrypted offline storage.'))
@@ -106,6 +107,64 @@ export async function deleteEncryptedOfflineDraft(userId: number, deviceId: stri
       transaction.objectStore('drafts').delete('teacher-mark-draft')
       transaction.oncomplete = () => resolve()
       transaction.onerror = () => reject(new Error('Unable to clear the submitted offline draft.'))
+    })
+  } finally { db.close() }
+}
+
+
+type EncryptedSnapshotRecord = { salt: number[]; iv: number[]; ciphertext: number[]; updatedAt: number }
+
+export async function saveEncryptedOfflineSnapshot(userId: number, deviceId: string, passphrase: string, value: unknown) {
+  if (!passphrase || passphrase.length < 12) throw new Error('Use a passphrase of at least 12 characters.')
+  if (!crypto?.subtle || typeof indexedDB === 'undefined') throw new Error('This browser does not support protected offline storage.')
+  const salt = crypto.getRandomValues(new Uint8Array(16))
+  const iv = crypto.getRandomValues(new Uint8Array(12))
+  const key = await deriveOfflineDraftKey(passphrase, salt)
+  const plaintext = new TextEncoder().encode(JSON.stringify(value))
+  const ciphertext = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: asArrayBuffer(iv) }, key, asArrayBuffer(plaintext)))
+  const db = await openOfflineDatabase(userId, deviceId)
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const transaction = db.transaction('snapshots', 'readwrite')
+      transaction.objectStore('snapshots').put({
+        salt: Array.from(salt), iv: Array.from(iv), ciphertext: Array.from(ciphertext), updatedAt: Date.now(),
+      } satisfies EncryptedSnapshotRecord, 'authorised-records')
+      transaction.oncomplete = () => resolve()
+      transaction.onerror = () => reject(new Error('Unable to save the encrypted offline records.'))
+    })
+  } finally { db.close() }
+}
+
+export async function loadEncryptedOfflineSnapshot<T>(userId: number, deviceId: string, passphrase: string): Promise<T> {
+  if (!passphrase || passphrase.length < 12) throw new Error('Enter the passphrase used to protect these records.')
+  if (!crypto?.subtle || typeof indexedDB === 'undefined') throw new Error('This browser does not support protected offline storage.')
+  const db = await openOfflineDatabase(userId, deviceId)
+  let record: EncryptedSnapshotRecord | undefined
+  try {
+    record = await new Promise((resolve, reject) => {
+      const request = db.transaction('snapshots', 'readonly').objectStore('snapshots').get('authorised-records')
+      request.onsuccess = () => resolve(request.result as EncryptedSnapshotRecord | undefined)
+      request.onerror = () => reject(new Error('Unable to read the encrypted offline records.'))
+    })
+  } finally { db.close() }
+  if (!record) throw new Error('No encrypted offline record snapshot is saved on this browser.')
+  try {
+    const key = await deriveOfflineDraftKey(passphrase, new Uint8Array(record.salt))
+    const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: asArrayBuffer(new Uint8Array(record.iv)) }, key, asArrayBuffer(new Uint8Array(record.ciphertext)))
+    return JSON.parse(new TextDecoder().decode(plaintext)) as T
+  } catch {
+    throw new Error('Unable to unlock offline records. Check the passphrase and try again.')
+  }
+}
+
+export async function deleteEncryptedOfflineSnapshot(userId: number, deviceId: string) {
+  const db = await openOfflineDatabase(userId, deviceId)
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const transaction = db.transaction('snapshots', 'readwrite')
+      transaction.objectStore('snapshots').delete('authorised-records')
+      transaction.oncomplete = () => resolve()
+      transaction.onerror = () => reject(new Error('Unable to clear the encrypted offline records.'))
     })
   } finally { db.close() }
 }
