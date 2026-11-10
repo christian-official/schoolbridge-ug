@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { clearLocalSyncData } from './syncStorage'
+import { clearLocalSyncData, saveEncryptedOfflineSnapshot, loadEncryptedOfflineSnapshot, deleteEncryptedOfflineSnapshot } from './syncStorage'
 
 type Device = {
   device_id: string
@@ -64,6 +64,10 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+  const [offlinePassphrase, setOfflinePassphrase] = useState('')
+  const [offlineStatus, setOfflineStatus] = useState('')
+  const [offlineBusy, setOfflineBusy] = useState(false)
+  const [offlineSnapshot, setOfflineSnapshot] = useState<any>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -74,8 +78,28 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
       const result = await request<{ devices: Device[] }>('sync/devices', token)
       setDevices(result.devices)
       const revokedCurrent = result.devices.some(device => device.device_id === storedId && !device.active)
-      if (storedId && revokedCurrent) await clearLocalSyncData(userId, storedId)
+      if (storedId && revokedCurrent) { await clearLocalSyncData(userId, storedId); localStorage.removeItem('schoolbridge-offline-snapshot-meta-' + userId + '-' + storedId); setOfflineSnapshot(null) }
       const activeCurrent = result.devices.some(device => device.device_id === storedId && device.active)
+      if (storedId && activeCurrent) {
+        const metaKey = 'schoolbridge-offline-snapshot-meta-' + userId + '-' + storedId
+        const rawMeta = localStorage.getItem(metaKey)
+        if (rawMeta) {
+          try {
+            const meta = JSON.parse(rawMeta) as { fingerprint:string; sequence:number }
+            const account = await request<{role:string;permissions:Record<string,string[]>}>('auth/me', token)
+            const fingerprint = JSON.stringify({role:account.role,permissions:Object.fromEntries(Object.entries(account.permissions||{}).sort(([a],[b])=>a.localeCompare(b)))})
+            const changes = await request<{changes:unknown[];has_more:boolean}>('sync/changes?device_id='+encodeURIComponent(storedId)+'&cursor='+meta.sequence+'&limit=500', token)
+            if (meta.fingerprint !== fingerprint || changes.changes.length > 0 || changes.has_more) {
+              await deleteEncryptedOfflineSnapshot(userId, storedId)
+              localStorage.removeItem(metaKey)
+              setOfflineSnapshot(null)
+              setOfflineStatus('The saved offline copy was cleared because permissions or school records changed. Download a fresh copy while connected.')
+            }
+          } catch {
+            // Keep the encrypted copy when the server is unreachable; its short expiry still applies.
+          }
+        }
+      }
       if (isAdmin && storedId && activeCurrent) {
         const proposalResult = await request<{ proposals: Proposal[] }>('sync/proposals?device_id=' + encodeURIComponent(storedId), token)
         setProposals(proposalResult.proposals)
@@ -149,12 +173,129 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
     }
   }
 
+
+  function permissionFingerprint(account:{role:string;permissions:Record<string,string[]>}) {
+    return JSON.stringify({role:account.role,permissions:Object.fromEntries(Object.entries(account.permissions||{}).sort(([a],[b])=>a.localeCompare(b)))})
+  }
+
+  async function collectSnapshotPages<T>(endpoint:string, field:string, id:string):Promise<T[]> {
+    const records:T[]=[]
+    let after=0
+    for(let page=0;page<100;page++){
+      const result=await request<any>('sync/'+endpoint+'?device_id='+encodeURIComponent(id)+'&after_id='+after+'&limit=200',token)
+      records.push(...(result[field] as T[]))
+      if(records.length>15000)throw new Error('This record category exceeds the 15,000-record offline safety limit.')
+      if(!result.has_more)return records
+      after=result.next_after_id
+    }
+    throw new Error('This record category is too large to finish safely in one download.')
+  }
+
+  async function downloadOfflineRecords() {
+    if(!deviceId||!currentDevice?.active){setOfflineStatus('Register this browser and confirm it is active before downloading records.');return}
+    if(offlinePassphrase.length<12){setOfflineStatus('Use a passphrase of at least 12 characters. It is never stored.');return}
+    setOfflineBusy(true);setOfflineStatus('')
+    try{
+      const account=await request<{role:string;permissions:Record<string,string[]>}>('auth/me',token)
+      const permissions=account.permissions||{}
+      const can=(section:string)=>account.role==='admin'||(permissions[section]||[]).includes('view')
+      const parent=account.role==='parent', teacher=account.role==='teacher'
+      const before=await request<{sequence:number}>('sync/sequence?device_id='+encodeURIComponent(deviceId),token)
+      const snapshot:any={version:1,userId,deviceId,permissionFingerprint:permissionFingerprint(account),downloadedAt:Date.now(),expiresAt:Date.now()+24*60*60*1000,sequence:before.sequence,students:[],classes:[],attendance:[],exams:[],marks:[],charges:[],payments:[],class_fees:[]}
+      const tasks:Promise<void>[]=[]
+      if(parent||can('Students')||(teacher&&can('My Classes'))){
+        tasks.push(collectSnapshotPages<any>('students','students',deviceId).then(rows=>{snapshot.students=rows}))
+        tasks.push(collectSnapshotPages<any>('classes','classes',deviceId).then(rows=>{snapshot.classes=rows}))
+      }
+      if(parent||can('Attendance')||(teacher&&(can('My Attendance')||can('Attendance')))){
+        tasks.push(collectSnapshotPages<any>('attendance','attendance',deviceId).then(rows=>{snapshot.attendance=rows}))
+      }
+      if(parent||can('Examinations')||(teacher&&can('My Results'))){
+        tasks.push(collectSnapshotPages<any>('exams','exams',deviceId).then(rows=>{snapshot.exams=rows}))
+        if(teacher&&can('My Results')||!teacher&&(parent||can('Examinations'))){
+          tasks.push(collectSnapshotPages<any>('marks','marks',deviceId).then(rows=>{snapshot.marks=rows}))
+        }
+      }
+      if(parent||can('Fees & Finance')){
+        let charge=0,payment=0,classFee=0
+        for(let page=0;page<100;page++){
+          const result=await request<any>('sync/fees?device_id='+encodeURIComponent(deviceId)+'&after_charge_id='+charge+'&after_payment_id='+payment+'&after_class_fee_id='+classFee+'&limit=200',token)
+          snapshot.charges.push(...result.charges);snapshot.payments.push(...result.payments);snapshot.class_fees.push(...result.class_fees)
+          if(Object.values(result.has_more||{}).some(Boolean)){
+            charge=result.next_after_charge_id;payment=result.next_after_payment_id;classFee=result.next_after_class_fee_id
+          }else break
+          if(snapshot.charges.length+snapshot.payments.length+snapshot.class_fees.length>15000)throw new Error('The finance snapshot exceeds the 15,000-record safety limit.')
+          if(page===99)throw new Error('The finance snapshot is too large to finish safely.')
+        }
+      }
+      await Promise.all(tasks)
+      const after=await request<{sequence:number}>('sync/sequence?device_id='+encodeURIComponent(deviceId),token)
+      if(after.sequence!==before.sequence)throw new Error('School records changed while the snapshot was being downloaded. Retry to obtain a consistent copy.')
+      const total=Object.keys(snapshot).filter(key=>Array.isArray(snapshot[key])).reduce((sum,key)=>sum+snapshot[key].length,0)
+      if(total>20000)throw new Error('This account has more than 20,000 authorised records. Narrow the data scope before downloading.')
+      snapshot.sequence=after.sequence
+      await saveEncryptedOfflineSnapshot(userId,deviceId,offlinePassphrase,snapshot)
+      localStorage.setItem('schoolbridge-offline-snapshot-meta-'+userId+'-'+deviceId,JSON.stringify({fingerprint:snapshot.permissionFingerprint,sequence:snapshot.sequence}))
+      setOfflineSnapshot(snapshot)
+      setOfflineStatus('Authorised records were encrypted and saved on this browser. The copy expires in 24 hours and is cleared if changed permissions or records are detected after reconnecting.')
+    }catch(error){setOfflineStatus(error instanceof Error?error.message:'Unable to create the encrypted offline snapshot.')}
+    finally{setOfflineBusy(false)}
+  }
+
+  async function unlockOfflineRecords() {
+    const id=localStorage.getItem(deviceStorageKey(userId))||deviceId
+    if(!id){setOfflineStatus('This browser has no registered device identity.');return}
+    if(offlinePassphrase.length<12){setOfflineStatus('Enter the 12-character-or-longer offline passphrase.');return}
+    setOfflineBusy(true);setOfflineStatus('')
+    try{
+      const snapshot=await loadEncryptedOfflineSnapshot<any>(userId,id,offlinePassphrase)
+      if(snapshot.version!==1||snapshot.userId!==userId||snapshot.deviceId!==id)throw new Error('This offline snapshot belongs to a different account or device.')
+      if(!snapshot.expiresAt||snapshot.expiresAt<Date.now()){
+        await deleteEncryptedOfflineSnapshot(userId,id)
+        localStorage.removeItem('schoolbridge-offline-snapshot-meta-'+userId+'-'+id)
+        throw new Error('The offline snapshot has expired. Reconnect and download a fresh copy.')
+      }
+      setOfflineSnapshot(snapshot)
+      setOfflineStatus('Encrypted offline records unlocked. Last downloaded '+new Date(snapshot.downloadedAt).toLocaleString()+'.')
+    }catch(error){setOfflineStatus(error instanceof Error?error.message:'Unable to unlock offline records.')}
+    finally{setOfflineBusy(false)}
+  }
+
+  async function clearOfflineRecords() {
+    const id=localStorage.getItem(deviceStorageKey(userId))||deviceId
+    if(!id)return
+    setOfflineBusy(true)
+    try{
+      await deleteEncryptedOfflineSnapshot(userId,id)
+      localStorage.removeItem('schoolbridge-offline-snapshot-meta-'+userId+'-'+id)
+      setOfflineSnapshot(null);setOfflineStatus('The encrypted offline record copy was cleared.')
+    }catch(error){setOfflineStatus(error instanceof Error?error.message:'Unable to clear offline records.')}
+    finally{setOfflineBusy(false)}
+  }
+
   const currentDevice = devices.find(device => device.device_id === deviceId)
   const currentRevoked = Boolean(currentDevice && !currentDevice.active)
 
   return <section className="panel settings-panel sync-devices-panel">
     <div className="panel-heading"><div><h2>Registered devices</h2><p>Review the browsers and computers authorised to synchronise data for this account.</p></div><button className="secondary-button" type="button" onClick={() => void load()} disabled={loading || busy}>Refresh</button></div>
-    <div className="form-hint">Registration records device identity only. SchoolBridge does not currently store offline copies of school records in this browser.</div>
+    <div className="form-hint">Registered devices can keep a short-lived encrypted copy of records currently authorised for this account. The server remains authoritative.</div>
+    <div className="offline-record-tools">
+      <h3>Encrypted offline records</h3>
+      <p className="form-hint">Use a private passphrase of at least 12 characters. It is never stored. The encrypted copy expires after 24 hours and is cleared when changed permissions or records are detected after reconnecting.</p>
+      <input type="password" autoComplete="new-password" value={offlinePassphrase} onChange={event=>setOfflinePassphrase(event.target.value)} placeholder="Offline records passphrase (12+ characters)" />
+      <div className="proposal-review-actions">
+        <button className="primary-button" type="button" disabled={offlineBusy||loading||!currentDevice?.active} onClick={()=>void downloadOfflineRecords()}>{offlineBusy?'Working…':'Download authorised records'}</button>
+        <button className="secondary-button" type="button" disabled={offlineBusy} onClick={()=>void unlockOfflineRecords()}>Unlock saved records</button>
+        <button className="secondary-button" type="button" disabled={offlineBusy} onClick={()=>void clearOfflineRecords()}>Clear offline copy</button>
+      </div>
+      {offlineStatus&&<p className="form-hint" role="status">{offlineStatus}</p>}
+      {offlineSnapshot&&<div className="sync-offline-snapshot">
+        <strong>Offline copy unlocked</strong>
+        <p className="form-hint">Expires {new Date(offlineSnapshot.expiresAt).toLocaleString()} · Journal sequence {offlineSnapshot.sequence}</p>
+        <p>{offlineSnapshot.students?.length||0} students · {offlineSnapshot.classes?.length||0} classes · {offlineSnapshot.attendance?.length||0} attendance records · {offlineSnapshot.exams?.length||0} examinations · {offlineSnapshot.marks?.length||0} marks · {(offlineSnapshot.charges?.length||0)+(offlineSnapshot.payments?.length||0)+(offlineSnapshot.class_fees?.length||0)} finance records</p>
+        {offlineSnapshot.students?.length>0&&<details><summary>View authorised student records</summary><div className="table-wrap"><table><thead><tr><th>Admission no.</th><th>Student</th><th>Class ID</th><th>Status</th></tr></thead><tbody>{offlineSnapshot.students.slice(0,200).map((student:any)=><tr key={student.id}><td>{student.admission_number}</td><td>{[student.first_name,student.middle_name,student.last_name].filter(Boolean).join(' ')}</td><td>{student.class_id??'—'}</td><td>{student.status}</td></tr>)}</tbody></table>{offlineSnapshot.students.length>200&&<p className="form-hint">Showing first 200 of {offlineSnapshot.students.length} students.</p>}</div></details>}
+      </div>}
+    </div>
     {error && <div className="form-error" role="alert">{error}</div>}
     {message && <div className="success-notice" role="status">{message}</div>}
     {loading ? <p className="form-hint">Loading registered devices…</p> : <>
