@@ -1,0 +1,58 @@
+steps:
+  - label: ":school: SchoolBridge full CI"
+    key: "schoolbridge-ci"
+    agents:
+      queue: "schoolbridge-linux-small"
+    timeout_in_minutes: 45
+    env:
+      PYTHONPATH: "backend"
+      SCHOOLBRIDGE_DATABASE_URL: "sqlite:///./schoolbridge_ci.db"
+      SCHOOLBRIDGE_SECRET_KEY: "ci-only-secret-key-not-for-production"
+      SCHOOLBRIDGE_POSTGRES_INTEGRATION_URL: "postgresql+psycopg://schoolbridge:ci-postgres-password@127.0.0.1:5432/schoolbridge_restore_ci"
+    command: |
+      set -euo pipefail
+
+      echo "=== Start isolated PostgreSQL for recovery tests ==="
+      docker rm -f schoolbridge-ci-postgres >/dev/null 2>&1 || true
+      docker run -d --name schoolbridge-ci-postgres \
+        -e POSTGRES_USER=schoolbridge \
+        -e POSTGRES_PASSWORD=ci-postgres-password \
+        -e POSTGRES_DB=schoolbridge_restore_ci \
+        -p 5432:5432 postgres:16
+
+      for attempt in $(seq 1 60); do
+        if docker exec schoolbridge-ci-postgres pg_isready -U schoolbridge -d schoolbridge_restore_ci >/dev/null 2>&1; then
+          break
+        fi
+        if [ "$attempt" -eq 60 ]; then
+          docker logs schoolbridge-ci-postgres
+          exit 1
+        fi
+        sleep 2
+      done
+
+      echo "=== Backend test suite ==="
+      python3 -m pip install --upgrade pip
+      python3 -m pip install -r backend/requirements-dev.txt
+      python3 -m pytest -q backend/tests
+
+      echo "=== PostgreSQL backup and restore integration ==="
+      python3 -m pytest -q backend/tests/test_postgres_restore_integration.py
+
+      echo "=== Frontend lint, offline tests and production build ==="
+      cd frontend
+      npm ci
+      npm run lint
+      npm run test:offline
+      npm run test:pwa
+      npm run build
+
+      echo "=== Browser-based offline tests ==="
+      npm install --no-save --no-package-lock playwright@1.56.1
+      npx playwright install --with-deps chromium
+      npm run test:offline:browser
+
+      echo "=== SchoolBridge CI completed successfully ==="
+    artifact_paths:
+      - "frontend/dist/**/*"
+      - "schoolbridge_ci.db"
