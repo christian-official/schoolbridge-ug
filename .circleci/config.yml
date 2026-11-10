@@ -59,7 +59,7 @@ jobs:
       - run: python3 -m venv .venv && .venv/bin/pip install -r backend/requirements-dev.txt
       - run:
           name: Migrated schema verification tests
-          command: PYTHONPATH=backend SCHOOLBRIDGE_DATABASE_URL=sqlite:///./schoolbridge_ci.db SCHOOLBRIDGE_SECRET_KEY=ci-only-secret-key-not-for-production .venv/bin/python -m pytest -q backend/tests/test_migrations.py -k "migrated_database or fresh_database"
+          command: PYTHONPATH=backend SCHOOLBRIDGE_DATABASE_URL=sqlite:///./schoolbridge_ci.db SCHOOLBRIDGE_SECRET_KEY=ci-only-secret-key-not-for-production .venv/bin/python -m pytest -q backend/tests/test_migrations.py -k "fresh_database or sync_device_checkpoint_column or sync_change_proposals_migration or sync_change_journal_migrates"
 
   backend-migration-legacy:
     machine:
