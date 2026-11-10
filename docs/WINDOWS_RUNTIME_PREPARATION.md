@@ -44,3 +44,10 @@ Docker Desktop terms must be reviewed and accepted by the authorised school/host
 - [Docker Desktop offline use FAQ](https://docs.docker.com/desktop/troubleshoot-and-support/faqs/general/)
 - [Docker Desktop WSL 2 backend requirements](https://docs.docker.com/desktop/features/wsl/)
 - [Microsoft WSL releases](https://github.com/microsoft/WSL/releases)
+
+
+## Why Windows 8 is not supported
+
+Windows 8 and 8.1 are outside the supported operating-system baseline for this deployment. The current package runs SchoolBridge in Linux containers through Docker Desktop and its WSL 2 backend. That runtime requires modern Windows virtualization and WSL 2 support; Windows 8 cannot provide the supported WSL 2/Docker Desktop environment required by this package. The installer therefore rejects older Windows versions instead of allowing a setup that cannot be reliably installed, secured or maintained.
+
+This is a deployment-runtime limitation, not a limitation in the SchoolBridge web application itself. Supporting Windows 8 would require a separately engineered legacy deployment (for example, a compatible native Windows service/runtime and database arrangement), plus dedicated installation, security, update, backup and recovery testing. It must not be advertised as supported until those tests pass. The current project prioritises one reliable, repeatable Windows deployment rather than adding an unverified legacy path.
