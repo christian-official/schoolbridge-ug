@@ -14,6 +14,9 @@ def test_owner_license_cli_generates_protected_key_and_signs_activation(tmp_path
     private_key_path = tmp_path / "owner.key"
     public_key_path = tmp_path / "owner.pub"
 
+    child_env = os.environ.copy()
+    child_env["SCHOOLBRIDGE_OWNER_KEY_PASSPHRASE"] = "a-very-strong-test-passphrase-123"
+
     generated = subprocess.run(
         [
             sys.executable, str(script), "generate-keypair",
@@ -85,6 +88,6 @@ def test_owner_license_cli_generates_protected_key_and_signs_activation(tmp_path
             "--private-key", str(private_key_path),
             "--public-key", str(public_key_path),
         ],
-        capture_output=True, text=True,
+        capture_output=True, text=True, env=child_env,
     )
     assert overwrite.returncode != 0
