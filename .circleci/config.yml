@@ -210,8 +210,10 @@ jobs:
       - run:
           name: Build and export all images as the USB workflow does
           command: |
-            docker pull postgres:16-alpine
-            docker compose build backend frontend
+            docker pull postgres:16-alpine &
+            postgres_pull_pid=$!
+            docker compose build --parallel backend frontend
+            wait "$postgres_pull_pid"
             docker image inspect schoolbridge/backend:local schoolbridge/frontend:local postgres:16-alpine
             docker save -o /tmp/schoolbridge-images.tar postgres:16-alpine schoolbridge/backend:local schoolbridge/frontend:local
             docker image rm schoolbridge/backend:local schoolbridge/frontend:local
@@ -297,8 +299,10 @@ jobs:
               curl --fail --location --retry 3 "$wsl_url" -o "$pkg/runtime/wsl.msi"
             ) &
             wsl_download_pid=$!
-            curl --fail --location --retry 3 "https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe" -o "$pkg/runtime/Docker Desktop Installer.exe"
+            curl --fail --location --retry 3 "https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe" -o "$pkg/runtime/Docker Desktop Installer.exe" &
+            docker_download_pid=$!
             wait "$wsl_download_pid"
+            wait "$docker_download_pid"
             (cd "$pkg" && find . -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt)
             cd /tmp
             zip -qr SchoolBridge-USB.zip SchoolBridge-USB
