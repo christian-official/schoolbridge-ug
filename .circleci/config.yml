@@ -408,5 +408,20 @@ workflows:
       - backend-support-postgres-backup
       - postgres-recovery-integration
       - frontend-build
-      - local-deployment-package
       - windows-installer-script-validation
+      - local-deployment-package:
+          requires:
+            - backend-api-core
+            - backend-api-academics
+            - backend-api-parent
+            - backend-api-sync
+            - backend-api-offline
+            - backend-migration-schema
+            - backend-migration-legacy
+            - backend-support-database
+            - backend-support-owner-license
+            - backend-support-sqlite-backup
+            - backend-support-postgres-backup
+            - postgres-recovery-integration
+            - frontend-build
+            - windows-installer-script-validation
