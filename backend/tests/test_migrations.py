@@ -2,6 +2,7 @@ from sqlalchemy import create_engine, inspect, insert, select
 
 from app.database import Base
 from app.migrations import upgrade_database
+from app import models
 
 
 def test_fresh_database_is_created_and_versioned(tmp_path):
@@ -19,6 +20,8 @@ def test_fresh_database_is_created_and_versioned(tmp_path):
     assert "verified" in {column["name"] for column in inspector.get_columns("marks")}
     assert "staff_attendance" in tables
     assert "timetable_entries" in tables
+    assert "school_setup_state" in tables
+    assert "school_identity_corrections" in tables
 
 
 def test_baseline_adds_missing_tables_without_losing_existing_records(tmp_path):
@@ -160,3 +163,50 @@ def test_sync_change_journal_migrates_historical_scope_column(tmp_path):
     columns = {item["name"] for item in inspect(engine).get_columns("sync_changes")}
     assert "scope_json" in columns
     engine.dispose()
+
+
+
+def test_legacy_school_with_users_is_grandfathered_by_setup_migration(tmp_path):
+    import json
+    from sqlalchemy import create_engine, select
+
+    database_path = tmp_path / "legacy-active-school.sqlite3"
+    database_url = f"sqlite:///{database_path}"
+    engine = create_engine(database_url)
+    users = Base.metadata.tables["users"]
+    profile = Base.metadata.tables["school_profile"]
+    users.create(bind=engine)
+    profile.create(bind=engine)
+    with engine.begin() as connection:
+        connection.execute(users.insert().values(
+            username="legacy-admin",
+            email="legacy-admin@example.invalid",
+            hashed_password="existing-password-hash",
+            role="admin",
+            is_active=True,
+        ))
+        connection.execute(profile.insert().values(
+            id=1, name="Legacy Academy", school_type="Secondary",
+            country="Uganda", school_structure="Boarding",
+        ))
+    engine.dispose()
+
+    upgrade_database(database_url)
+
+    engine = create_engine(database_url)
+    with engine.connect() as connection:
+        state = connection.execute(select(
+            Base.metadata.tables["school_setup_state"]
+        )).mappings().one()
+        identity = json.loads(state["original_identity_json"])
+        existing_user = connection.execute(select(users.c.username)).scalar_one()
+    engine.dispose()
+
+    assert existing_user == "legacy-admin"
+    assert state["setup_completed_at"] is not None
+    assert state["activated_at"] is not None
+    assert state["activation_license_hash"] is None
+    assert identity["school_name"] == "Legacy Academy"
+    assert identity["school_type"] == "Secondary"
+    assert identity["country"] == "Uganda"
+    assert identity["school_structure"] == "Boarding"
