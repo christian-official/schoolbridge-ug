@@ -2110,3 +2110,16 @@ def test_demo_data_is_disabled_by_default(monkeypatch):
     with SessionLocal() as db:
         assert db.query(models.Student).count() == 0
         assert db.query(models.SchoolProfile).count() == 0
+
+
+
+def test_activation_attempts_are_rate_limited(monkeypatch):
+    reset_new_installation()
+    monkeypatch.delenv("SCHOOLBRIDGE_LICENSE_PUBLIC_KEY", raising=False)
+    with TestClient(app) as client:
+        client.get("/api/setup/status")
+        for _ in range(5):
+            response = client.post("/api/setup/activate", json={"license": "not-a-valid-activation-license"})
+            assert response.status_code == 403
+        locked = client.post("/api/setup/activate", json={"license": "not-a-valid-activation-license"})
+        assert locked.status_code == 429

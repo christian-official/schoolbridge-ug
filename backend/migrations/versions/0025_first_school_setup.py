@@ -25,6 +25,8 @@ def upgrade() -> None:
             sa.Column("installation_id", sa.String(36), nullable=False, unique=True),
             sa.Column("activated_at", sa.DateTime(), nullable=True),
             sa.Column("activation_license_hash", sa.String(64), nullable=True),
+            sa.Column("activation_attempts", sa.Integer(), nullable=False, server_default="0"),
+            sa.Column("activation_locked_until", sa.DateTime(), nullable=True),
             sa.Column("setup_completed_at", sa.DateTime(), nullable=True),
             sa.Column("original_identity_json", sa.Text(), nullable=True),
         )

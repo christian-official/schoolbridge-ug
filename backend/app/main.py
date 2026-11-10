@@ -1973,14 +1973,23 @@ def activate_school_installation(data: SchoolActivationRequest, db: Session = De
     state = get_or_create_setup_state(db)
     if state.activated_at:
         raise HTTPException(409, "This SchoolBridge installation has already been activated.")
+    now = datetime.utcnow()
+    if state.activation_locked_until and state.activation_locked_until > now:
+        raise HTTPException(429, "Too many invalid activation attempts. Try again after the temporary security lock expires.")
     try:
         claims = verify_activation_license(data.license)
+        if claims.get("installation_id") != state.installation_id or claims.get("product") != "SchoolBridge":
+            raise ValueError("License is for another installation.")
     except (ValueError, RuntimeError):
+        state.activation_attempts = (state.activation_attempts or 0) + 1
+        if state.activation_attempts >= 5:
+            state.activation_locked_until = now + timedelta(minutes=15)
+        db.commit()
         raise HTTPException(403, "The activation license is invalid or cannot be verified.")
-    if claims.get("installation_id") != state.installation_id or claims.get("product") != "SchoolBridge":
-        raise HTTPException(403, "This activation license was not issued for this installation.")
-    state.activated_at = datetime.utcnow()
+    state.activated_at = now
     state.activation_license_hash = license_fingerprint(data.license)
+    state.activation_attempts = 0
+    state.activation_locked_until = None
     db.commit()
     return {"message": "SchoolBridge installation activated.", "activated": True}
 

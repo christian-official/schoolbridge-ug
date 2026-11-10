@@ -28,6 +28,9 @@ def verify_activation_license(token: str) -> dict:
         raise ValueError("Invalid activation license.")
     if not isinstance(claims, dict) or not claims.get("installation_id") or claims.get("product") != "SchoolBridge" or not claims.get("license_id") or not claims.get("issued_at"):
         raise ValueError("Invalid activation claims.")
+    issued_at = int(claims["issued_at"])
+    if issued_at > time.time() + 300:
+        raise ValueError("Activation license issue time is invalid.")
     if claims.get("expires_at") is not None and int(claims["expires_at"]) < time.time():
         raise ValueError("Activation license has expired.")
     return claims

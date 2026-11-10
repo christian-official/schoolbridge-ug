@@ -414,5 +414,7 @@ class SchoolSetupState(Base):
     installation_id: Mapped[str] = mapped_column(String(36), unique=True, nullable=False)
     activated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     activation_license_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    activation_attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+    activation_locked_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     setup_completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     original_identity_json: Mapped[str | None] = mapped_column(Text, nullable=True)
