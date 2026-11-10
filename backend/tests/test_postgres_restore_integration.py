@@ -83,3 +83,101 @@ def test_real_postgres_backup_restores_records_into_isolated_database(tmp_path):
         finally:
             admin_engine.dispose()
             source_engine.dispose()
+
+
+def test_fresh_postgres_install_runs_owner_activation_and_school_setup(tmp_path, monkeypatch):
+    import base64
+    import json
+    from datetime import datetime, timezone
+
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from fastapi.testclient import TestClient
+
+    source_url = make_url(DATABASE_URL)
+    target_database = f"schoolbridge_setup_{uuid4().hex[:12]}"
+    target_url = source_url.set(database=target_database)
+    admin_engine = create_engine(source_url.set(database="postgres"))
+    application_engine = None
+
+    try:
+        with admin_engine.connect().execution_options(isolation_level="AUTOCOMMIT") as connection:
+            connection.execute(text(f'CREATE DATABASE "{target_database}"'))
+
+        private_key = Ed25519PrivateKey.generate()
+        public_key = private_key.public_key().public_bytes(
+            serialization.Encoding.Raw, serialization.PublicFormat.Raw
+        )
+        monkeypatch.setenv("SCHOOLBRIDGE_DATABASE_URL", target_url.render_as_string(hide_password=False))
+        monkeypatch.setenv("SCHOOLBRIDGE_SECRET_KEY", "postgres-setup-test-secret-not-for-production")
+        monkeypatch.setenv("SCHOOLBRIDGE_LICENSE_PUBLIC_KEY", base64.b64encode(public_key).decode("ascii"))
+        monkeypatch.setenv("SCHOOLBRIDGE_SEED_DEMO_DATA", "false")
+
+        from app.database import SessionLocal, engine
+        from app.main import app
+
+        application_engine = engine
+        with TestClient(app) as client:
+            status = client.get("/api/setup/status")
+            assert status.status_code == 200
+            installation_id = status.json()["installation_id"]
+            claims = {
+                "product": "SchoolBridge",
+                "installation_id": installation_id,
+                "license_id": "postgres-fresh-install-001",
+                "issued_at": int(datetime.now(timezone.utc).timestamp()),
+                "action": "activate",
+            }
+            payload = json.dumps(claims, sort_keys=True, separators=(",", ":")).encode()
+            encode = lambda value: base64.urlsafe_b64encode(value).decode().rstrip("=")
+            license_token = encode(payload) + "." + encode(private_key.sign(payload))
+
+            activated = client.post("/api/setup/activate", json={"license": license_token})
+            assert activated.status_code == 200, activated.text
+            setup = client.post("/api/setup/complete", json={
+                "activation_license": license_token,
+                "school_name": "PostgreSQL Integration School",
+                "school_type": "Combined",
+                "country": "Uganda",
+                "school_structure": "Both",
+                "address": "Kampala",
+                "motto": "Learn and grow",
+                "house_names": "Lions\\nEagles",
+                "admin_username": "postgres-admin",
+                "admin_email": "postgres-admin@example.invalid",
+                "admin_password": "LongTestPassword123!",
+            })
+            assert setup.status_code == 200, setup.text
+            login = client.post("/api/auth/login", data={
+                "username": "postgres-admin",
+                "password": "LongTestPassword123!",
+            })
+            assert login.status_code == 200, login.text
+
+        with SessionLocal() as db:
+            from app import models
+            profile = db.get(models.SchoolProfile, 1)
+            state = db.get(models.SchoolSetupState, 1)
+            admin = db.query(models.User).filter_by(username="postgres-admin").one()
+            identity = json.loads(state.original_identity_json)
+            assert profile.name == "PostgreSQL Integration School"
+            assert profile.school_type == "Combined"
+            assert profile.country == "Uganda"
+            assert profile.school_structure == "Both"
+            assert profile.house_names == "Lions\\nEagles"
+            assert state.activated_at is not None
+            assert state.setup_completed_at is not None
+            assert state.activation_license_hash
+            assert identity["installation_id"] == installation_id
+            assert admin.hashed_password != "LongTestPassword123!"
+            assert db.query(models.Student).count() == 0
+    finally:
+        if application_engine is not None:
+            application_engine.dispose()
+        with admin_engine.connect().execution_options(isolation_level="AUTOCOMMIT") as connection:
+            connection.execute(text(
+                "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+                "WHERE datname = :database AND pid <> pg_backend_pid()"
+            ), {"database": target_database})
+            connection.execute(text(f'DROP DATABASE IF EXISTS "{target_database}"'))
+        admin_engine.dispose()
