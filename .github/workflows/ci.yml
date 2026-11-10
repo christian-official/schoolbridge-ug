@@ -140,10 +140,13 @@ jobs:
             sleep 2
           done
           if [ "$success" -ne 1 ]; then dc logs; exit 1; fi
-          dc restart backend
+          curl --fail --silent http://127.0.0.1:18080/ | grep -qi 'schoolbridge'
+          dc exec -T database psql -U schoolbridge -d schoolbridge -c "CREATE TABLE usb_ci_persistence_check (id integer primary key, marker text); INSERT INTO usb_ci_persistence_check VALUES (1, 'survives-restart')"
+          dc restart backend database
           for attempt in $(seq 1 60); do
-            if curl --fail --silent http://127.0.0.1:18080/api/health >/dev/null; then exit 0; fi
+            if curl --fail --silent http://127.0.0.1:18080/api/health >/dev/null; then break; fi
             sleep 2
           done
-          dc logs
-          exit 1
+          marker=$(dc exec -T database psql -U schoolbridge -d schoolbridge -tAc "SELECT marker FROM usb_ci_persistence_check WHERE id=1" | tr -d '[:space:]')
+          if [ "$marker" != "survives-restart" ]; then dc logs; exit 1; fi
+          curl --fail --silent http://127.0.0.1:18080/api/health >/dev/null
