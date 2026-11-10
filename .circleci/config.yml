@@ -338,8 +338,9 @@ jobs:
                     payload = package.read(root + relative.removeprefix("./"))
                     actual = hashlib.sha256(payload).hexdigest()
                     assert actual.lower() == digest.lower(), f"SHA256 mismatch: {relative}"
-            assert archive.stat().st_size > 100_000_000, "USB image archive is unexpectedly small"
-            print(f"USB ZIP verified: {archive.stat().st_size:,} bytes; {len(manifest)} manifest entries")
+            image_bytes = package.getinfo("SchoolBridge-USB/schoolbridge-images.tar").file_size
+            assert image_bytes > 100_000_000, "Bundled Docker image tar is unexpectedly small"
+            print(f"USB ZIP verified: {archive.stat().st_size:,} compressed bytes; {image_bytes:,} image bytes; {len(manifest)} manifest entries")
             PY
       - store_artifacts:
           path: /tmp/SchoolBridge-USB.zip
