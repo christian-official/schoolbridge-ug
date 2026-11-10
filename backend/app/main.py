@@ -4868,6 +4868,7 @@ def change_student_status(student_id: int, status: str, db: Session = Depends(ge
             ).filter(
                 models.ParentStudentLink.user_id == parent.id,
                 models.Student.status == "active",
+                models.Student.id != student.id,
             ).first()
             if not remaining_active and parent.is_active:
                 parent.is_active = False
