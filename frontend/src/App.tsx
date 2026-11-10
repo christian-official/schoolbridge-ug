@@ -1458,6 +1458,7 @@ type TeacherStudent = {id:number;first_name:string;last_name:string;admission_nu
 type TeacherExam = {id:number;name:string;term:string;year:number;class_id:number|null;assigned_subjects:{id:number;name:string}[]}
 type TeacherMark = {id:number;student_id:number;subject_id:number;exam_id:number;score:number;verified:boolean;student_name:string;admission_number:string;class_id:number|null}
 type TeacherResultStatus = {subject_id:number;submitted_count:number;pending_count:number;verified_count:number;status:'Not verified'|'Verified'|'Not submitted'}
+type TeacherOfflineProposal = {id:number;exam_name:string;term:string;year:number|null;subject_name:string;status:string;record_count:number;submitted_at:string;resolved_at:string|null;resolution:string|null;conflict_sequence:number|null}
 type TeacherOwnAttendance = {staff_name:string;staff_number:string;today:{attendance_date:string;status:string;check_in_at?:string|null;check_out_at?:string|null};records:{id:number;attendance_date:string;status:string;notes?:string|null;check_in_at?:string|null;check_out_at?:string|null}[]}
 type ClassTeacherAssignment = {assignment_id:number;class_id:number;class:string}
 
@@ -1488,6 +1489,9 @@ function TeacherWorkspace({token,active,userId}:{token:string;active:string;user
   const [offlineDraftMessage,setOfflineDraftMessage]=useState('')
   const [offlineDraftBusy,setOfflineDraftBusy]=useState(false)
   const [offlineDraftUnlocked,setOfflineDraftUnlocked]=useState(false)
+  const [teacherOfflineProposals,setTeacherOfflineProposals]=useState<TeacherOfflineProposal[]>([])
+  const [teacherOfflineProposalsLoading,setTeacherOfflineProposalsLoading]=useState(false)
+  const [teacherOfflineProposalsError,setTeacherOfflineProposalsError]=useState('')
   const [resultSnapshotSequence,setResultSnapshotSequence]=useState<number|null>(null)
   const [ownAttendance,setOwnAttendance]=useState<TeacherOwnAttendance|null>(null)
   const [ownAttendanceError,setOwnAttendanceError]=useState('')
@@ -1513,6 +1517,7 @@ function TeacherWorkspace({token,active,userId}:{token:string;active:string;user
   },[active,token])
   useEffect(()=>{
     if(active!=='My Results')return
+    void refreshTeacherOfflineProposals()
     const deviceId=localStorage.getItem('schoolbridge-sync-device-'+userId)
     if(!deviceId){setResultSnapshotSequence(null);return}
     api<{snapshot_sequence:number}>('sync/marks?device_id='+encodeURIComponent(deviceId)+'&limit=200',token)
@@ -1587,6 +1592,14 @@ function TeacherWorkspace({token,active,userId}:{token:string;active:string;user
   },[active,examId,selectedTeacherExam?.class_id,token])
   async function saveClassAttendance(){if(!classId||!students.length){setMessage('Choose a responsible class with active students.');return}setBusy(-1);setMessage('');try{const result=await api<{saved:number}>('attendance/register',token,{method:'PUT',body:JSON.stringify({class_id:Number(classId),attendance_date:attendanceDate,records:students.map(student=>({student_id:student.id,status:statuses[student.id]||'Present'}))})});setMessage(result.saved+' student attendance records saved for '+attendanceDate+'.')}catch(e){setMessage(e instanceof Error?e.message:'Unable to save class attendance.')}finally{setBusy(null)}}
   useEffect(()=>{const context=String(examId)+':'+String(selectedSubjectId);const changed=lastOfflineScoreContext.current!==context;lastOfflineScoreContext.current=context;if(!selectedSubjectId){setResultScores({});return}if(changed&&offlineDraftUnlocked)setOfflineDraftUnlocked(false);const preserveUnlockedDraft=offlineDraftUnlocked&&!changed;setResultScores(current=>{const next:Record<number,string>=changed?{}:{...current};resultStudents.forEach(student=>{const mark=resultMarks.find(row=>row.student_id===student.id&&row.subject_id===Number(selectedSubjectId));if(preserveUnlockedDraft){if(next[student.id]===undefined)next[student.id]=''}else if(mark)next[student.id]=String(mark.score);else if(next[student.id]===undefined)next[student.id]=''});return next})},[examId,selectedSubjectId,resultStudents,resultMarks,offlineDraftUnlocked])
+  async function refreshTeacherOfflineProposals(){
+    setTeacherOfflineProposalsLoading(true);setTeacherOfflineProposalsError('')
+    try{
+      const result=await api<{proposals:TeacherOfflineProposal[]}>('sync/teacher-mark-proposals/mine',token)
+      setTeacherOfflineProposals(result.proposals)
+    }catch(error){setTeacherOfflineProposalsError(error instanceof Error?error.message:'Unable to refresh offline submission status.')}
+    finally{setTeacherOfflineProposalsLoading(false)}
+  }
   async function saveOfflineTeacherMarksDraft(){
     if(!selectedTeacherExam||!selectedSubjectId||!resultStudents.length){setOfflineDraftMessage('Choose an examination, assigned subject and class register first.');return}
     if(currentSubjectIsVerified){setOfflineDraftMessage('These results are verified and locked. Ask the administrator to unlock them before saving changes.');return}
@@ -1602,7 +1615,7 @@ function TeacherWorkspace({token,active,userId}:{token:string;active:string;user
       await saveEncryptedOfflineDraft(userId,deviceId,offlinePassphrase,{
         version:1,device_id:deviceId,idempotency_key:crypto.randomUUID(),
         exam:selectedTeacherExam,subject_id:Number(selectedSubjectId),base_sequence:resultSnapshotSequence,
-        students:resultStudents,scores:resultScores,records,
+        students:resultStudents.map(student=>({id:student.id,first_name:student.first_name,last_name:student.last_name,admission_number:student.admission_number,class_id:student.class_id})),scores:resultScores,records,
         base_mark_ids:Object.fromEntries(resultStudents.map(student=>[student.id,resultMarks.find(mark=>mark.student_id===student.id&&mark.subject_id===Number(selectedSubjectId))?.id??null])),
       },true)
       setOfflineDraftMessage('Encrypted offline draft saved on this browser. It has not changed official results.')
@@ -1612,7 +1625,7 @@ function TeacherWorkspace({token,active,userId}:{token:string;active:string;user
   async function unlockOfflineTeacherMarksDraft(){
     const deviceId=localStorage.getItem('schoolbridge-sync-device-'+userId)
     if(!deviceId){setOfflineDraftMessage('This browser has no registered device identity.');return}
-    if(offlinePassphrase.trim().length<10){setOfflineDraftMessage('Enter the 12-character-or-longer passphrase used when saving this draft.');return}
+    if(offlinePassphrase.trim().length<12){setOfflineDraftMessage('Enter the 12-character-or-longer passphrase used when saving this draft.');return}
     setOfflineDraftBusy(true);setOfflineDraftMessage('')
     try{
       const draft=await loadEncryptedOfflineDraft<any>(userId,deviceId,offlinePassphrase)
@@ -1653,7 +1666,7 @@ function TeacherWorkspace({token,active,userId}:{token:string;active:string;user
   }
   async function submitOfflineTeacherMarksDraft(){
     const deviceId=localStorage.getItem('schoolbridge-sync-device-'+userId)
-    if(!deviceId||offlinePassphrase.trim().length<10){setOfflineDraftMessage('Enter the offline passphrase and make sure this browser is registered.');return}
+    if(!deviceId||offlinePassphrase.trim().length<12){setOfflineDraftMessage('Enter the offline passphrase and make sure this browser is registered.');return}
     setOfflineDraftBusy(true);setOfflineDraftMessage('')
     try{
       const draft=await loadEncryptedOfflineDraft<any>(userId,deviceId,offlinePassphrase)
@@ -1667,11 +1680,13 @@ function TeacherWorkspace({token,active,userId}:{token:string;active:string;user
       })})
       if(result.status==='conflict'){
         setOfflineDraftMessage('Proposal #'+result.proposal_id+' has a conflict. Your encrypted draft was kept. Refresh the baseline, review the retained scores, save a new encrypted draft, then submit again.')
+        await refreshTeacherOfflineProposals()
       }else{
         await deleteEncryptedOfflineDraft(userId,deviceId)
         setOfflineDraftUnlocked(false)
         setOfflineDraftMessage('Draft submitted as proposal #'+result.proposal_id+' ('+result.status+'). An administrator must review it; official marks have not been changed.')
         setOfflinePassphrase('')
+        await refreshTeacherOfflineProposals()
       }
     }catch(error){setOfflineDraftMessage(error instanceof Error?error.message:'Unable to submit the saved draft.')}
     finally{setOfflineDraftBusy(false)}
@@ -1718,7 +1733,7 @@ function TeacherWorkspace({token,active,userId}:{token:string;active:string;user
       {resultMessage&&<div className="success-notice" role="status">{resultMessage}</div>}
       <section className="offline-mark-draft-tools">
         <div><strong>Offline marks draft</strong><p className="form-hint">Prepare and save this class register while online. If the connection drops, unlock it with the same passphrase and continue editing. Save / update again before closing the browser, then unlock and submit for administrator review after reconnecting.</p></div>
-        <label>Offline passphrase<input type="password" minLength={10} autoComplete="off" value={offlinePassphrase} onChange={event=>setOfflinePassphrase(event.target.value)} placeholder="At least 12 characters"/></label>
+        <label>Offline passphrase<input type="password" minLength={12} autoComplete="off" value={offlinePassphrase} onChange={event=>setOfflinePassphrase(event.target.value)} placeholder="At least 12 characters"/></label>
         <div className="form-actions">
           <button type="button" className="secondary-button" disabled={offlineDraftBusy||resultSaving||!selectedTeacherExam||!selectedSubjectId} onClick={()=>void refreshOfflineTeacherMarksBaseline()}>Refresh baseline online</button>
           <button type="button" className="secondary-button" disabled={offlineDraftBusy||resultSaving||!selectedTeacherExam||!selectedSubjectId} onClick={()=>void saveOfflineTeacherMarksDraft()}>{offlineDraftBusy?'Working...':'Save encrypted offline draft'}</button>
@@ -1727,6 +1742,19 @@ function TeacherWorkspace({token,active,userId}:{token:string;active:string;user
         </div>
         {offlineDraftMessage&&<div className="form-hint" role="status">{offlineDraftMessage}</div>}
         <p className="form-hint">{resultSnapshotSequence===null?'No current sync baseline is available. Connect online and refresh your results first.':'Offline baseline sequence: '+resultSnapshotSequence}</p>
+      </section>
+      <section className="offline-mark-proposal-status">
+        <div className="panel-heading"><div><h3>Your offline submissions</h3><p className="form-hint">Track administrator review without exposing the submitted score payload again.</p></div><button type="button" className="secondary-button" disabled={teacherOfflineProposalsLoading} onClick={()=>void refreshTeacherOfflineProposals()}>{teacherOfflineProposalsLoading?'Refreshing...':'Refresh status'}</button></div>
+        {teacherOfflineProposalsError&&<div className="form-error" role="alert">{teacherOfflineProposalsError}</div>}
+        {teacherOfflineProposalsLoading&&!teacherOfflineProposals.length?<p className="form-hint">Loading submission status...</p>:!teacherOfflineProposals.length?<p className="empty-state">You have not submitted any offline marks yet.</p>:<div className="table-wrap"><table><thead><tr><th>Examination</th><th>Subject</th><th>Entries</th><th>Status</th><th>Submitted</th></tr></thead><tbody>
+          {teacherOfflineProposals.map(item=><tr key={item.id}>
+            <td>{item.exam_name}<small className="form-hint">{item.term} {item.year||''} · Proposal #{item.id}</small></td>
+            <td>{item.subject_name}</td>
+            <td>{item.record_count}</td>
+            <td>{item.status==='pending_review'?'Waiting for administrator':item.status==='conflict'?'Conflict — refresh and resubmit':item.status==='applied'?'Applied — awaiting academic verification':item.status==='rejected'?'Rejected':item.status==='discarded'?'Discarded':item.status}</td>
+            <td>{item.submitted_at?new Date(item.submitted_at+(item.submitted_at.endsWith('Z')?'':'Z')).toLocaleString():'—'}</td>
+          </tr>)}
+        </tbody></table></div>}
       </section>
       <div className="teacher-exam-selection">
          <div className="exam-flow-step"><span className="form-section-number">01</span><div><strong>Choose exam type</strong><small>Choose the category used by the school examination register.</small></div></div>

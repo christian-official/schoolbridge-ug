@@ -1626,6 +1626,11 @@ def test_teacher_offline_marks_are_queued_then_revalidated_and_applied_by_admin(
         queued = client.post("/api/sync/teacher-mark-proposals", headers=th, json=body)
         assert queued.status_code == 200, queued.text
         assert queued.json()["applied"] is False
+        mine = client.get("/api/sync/teacher-mark-proposals/mine", headers=th)
+        assert mine.status_code == 200
+        assert mine.json()["proposals"][0]["id"] == queued.json()["proposal_id"]
+        assert "payload" not in mine.json()["proposals"][0]
+        assert client.get("/api/sync/teacher-mark-proposals/mine", headers=ah).status_code == 403
         with SessionLocal() as check:
             submission_audit = check.query(models.AuditLog).filter_by(
                 action="offline_teacher_marks_submitted"

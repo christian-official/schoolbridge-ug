@@ -4825,6 +4825,39 @@ def submit_offline_teacher_marks(data: OfflineTeacherMarkBatch, db: Session = De
     return {"proposal_id": row.id, "status": row.status, "duplicate": False, "applied": False}
 
 
+@app.get("/api/sync/teacher-mark-proposals/mine", tags=["Offline Synchronisation"])
+def list_my_offline_teacher_mark_proposals(
+    db: Session = Depends(get_db), teacher=Depends(get_current_user)
+):
+    if teacher.role != "teacher":
+        raise HTTPException(403, "Teacher account required.")
+    rows = db.query(models.SyncChangeProposal).filter_by(
+        user_id=teacher.id, entity_type="TeacherMarkBatch"
+    ).order_by(
+        models.SyncChangeProposal.submitted_at.desc(),
+        models.SyncChangeProposal.id.desc(),
+    ).limit(50).all()
+    proposals = []
+    for row in rows:
+        payload = json.loads(row.payload_json)
+        exam = db.get(models.Exam, payload.get("exam_id"))
+        subject = db.get(models.Subject, payload.get("subject_id"))
+        proposals.append({
+            "id": row.id,
+            "exam_name": exam.name if exam else "Unavailable examination",
+            "term": exam.term if exam else "",
+            "year": exam.year if exam else None,
+            "subject_name": subject.name if subject else "Unavailable subject",
+            "status": row.status,
+            "record_count": len(payload.get("records", [])),
+            "submitted_at": row.submitted_at,
+            "resolved_at": row.resolved_at,
+            "resolution": row.resolution,
+            "conflict_sequence": row.conflict_sequence,
+        })
+    return {"proposals": proposals}
+
+
 @app.get("/api/sync/teacher-mark-proposals", tags=["Offline Synchronisation"])
 def list_offline_teacher_mark_proposals(
     status: str | None = Query(None, pattern="^(pending_review|conflict|applied|discarded|rejected)$"),
