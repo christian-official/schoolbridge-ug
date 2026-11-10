@@ -69,6 +69,15 @@ try {
     $PackageCompose = Get-Content $ComposeFile -Raw
     $PackageCompose = [regex]::Replace($PackageCompose, '(?m)^    build:\r?\n      context: \./(backend|frontend)\r?\n', '')
     if ($PackageCompose -match '(?m)^    build:') { throw "USB Compose package still contains source build contexts." }
+
+    # Keep the school deployment self-contained: containers must not need internet
+    # access after installation. The host can still reach the published frontend port.
+    $networkDriverPattern = '(?m)^    driver: bridge\r?\n'
+    $networkDriverMatches = [regex]::Matches($PackageCompose, $networkDriverPattern)
+    if ($networkDriverMatches.Count -ne 1) { throw "Expected exactly one Compose bridge network definition." }
+    $PackageCompose = [regex]::Replace($PackageCompose, $networkDriverPattern, "    driver: bridge`r`n    internal: true`r`n")
+    if ($PackageCompose -notmatch '(?m)^    internal: true\r?$') { throw "USB Compose network is not isolated from external networks." }
+
     Set-Content (Join-Path $PackageDir "docker-compose.yml") $PackageCompose -Encoding UTF8
     Copy-Item (Join-Path $PSScriptRoot "install-schoolbridge.ps1") $PackageDir -Force
     Copy-Item (Join-Path $PSScriptRoot "check-school-host.ps1") $PackageDir -Force
