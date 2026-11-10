@@ -1237,8 +1237,8 @@ function App() {
 
   if (!token || !user) {
     if(setupStatus.loading) return <main className="login-page"><section className="login-card"><div className="brand-name">School<span>Bridge</span></div><p className="muted">Checking school installation...</p></section></main>
-    if(setupStatus.error) return <main className="login-page"><section className="login-card"><div className="brand-name">School<span>Bridge</span></div><h1>Unable to check setup</h1><p className="error" role="alert">{setupStatus.error}</p><button className="primary-button login-button" onClick={()=>window.location.reload()}>Try again</button></section></main>
-    if(!setupStatus.setup_completed) return <FirstTimeSetupWizard status={setupStatus} onStatusChange={setSetupStatus}/>
+    if(setupStatus.error && !localStorage.getItem('schoolbridge-offline-login-index')) return <main className="login-page"><section className="login-card"><div className="brand-name">School<span>Bridge</span></div><h1>Unable to check setup</h1><p className="error" role="alert">{setupStatus.error}</p><button className="primary-button login-button" onClick={()=>window.location.reload()}>Try again</button></section></main>
+    if(!setupStatus.setup_completed && !localStorage.getItem('schoolbridge-offline-login-index')) return <FirstTimeSetupWizard status={setupStatus} onStatusChange={setSetupStatus}/>
     return (
       <main className="login-page">
         <section className="login-card">
