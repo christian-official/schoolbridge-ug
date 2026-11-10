@@ -144,3 +144,8 @@ For a single-computer SQLite installation, configure Windows Task Scheduler to r
 ## Encrypted offline record snapshots
 
 An authorised user can explicitly download a short-lived read-only copy from Device Management. The copy is AES-GCM encrypted in browser IndexedDB, isolated by account and registered device, protected by a user-supplied passphrase, and expires after 24 hours. Reconnection checks the current permission fingerprint and scoped change feed; detected changes invalidate the copy. This is a limited snapshot viewer, not a complete offline application session. A disconnected device cannot be remotely wiped.
+
+
+### PostgreSQL restore procedure
+
+To test or recover a PostgreSQL backup without overwriting the active school database, run `python restore_postgres.py <archive.dump> <new_database_name>` inside the backend environment with the database connection environment configured. The target name must be a new PostgreSQL identifier. The script validates the archive, restores into the new database, verifies the required SchoolBridge tables and drops the new database if validation fails. Inspect the restored instance before changing the deployment connection string. Never restore directly over the active database.
