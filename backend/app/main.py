@@ -1868,7 +1868,7 @@ async def protect_school_data(request: Request, call_next):
             # Self-service profile, password and personal dashboard endpoints
             # are scoped to the authenticated account.
             pass
-        elif path == "/api/sync/devices" or path.startswith("/api/sync/devices/") or path in {"/api/sync/changes", "/api/sync/students", "/api/sync/classes", "/api/sync/attendance", "/api/sync/exams", "/api/sync/marks", "/api/sync/fees", "/api/sync/proposals"} or path.startswith("/api/sync/teacher-mark-proposals"):
+        elif path == "/api/sync/devices" or path.startswith("/api/sync/devices/") or path in {"/api/sync/changes", "/api/sync/students", "/api/sync/classes", "/api/sync/attendance", "/api/sync/exams", "/api/sync/marks", "/api/sync/fees", "/api/sync/proposals", "/api/sync/attendance-baseline", "/api/sync/attendance-batches"} or path.startswith("/api/sync/teacher-mark-proposals"):
             # Sync routes enforce account, device and record scope in each handler.
             pass
         elif path.startswith("/api/teacher/"):
