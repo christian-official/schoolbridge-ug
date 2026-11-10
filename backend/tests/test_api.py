@@ -2548,3 +2548,42 @@ def test_gatekeeper_loses_visitor_record_after_checkout_and_admin_receives_it():
     assert gate_view.status_code == 200 and gate_view.json() == []
     assert admin_view.status_code == 200 and len(admin_view.json()) == 1
     assert admin_view.json()[0]["visitor_name"] == "Visitor One"
+
+
+def test_annual_promotion_moves_students_and_graduates_final_class():
+    reset_database()
+    admin = create_admin()
+    token = create_access_token(admin)
+    db = SessionLocal()
+    try:
+        first = models.SchoolClass(name="Primary 1", section="General")
+        final = models.SchoolClass(name="Primary 7", section="General")
+        db.add_all([first, final])
+        db.flush()
+        learner = models.Student(
+            admission_number="SB-PROMOTE-001", first_name="Lydia", last_name="Learner",
+            gender="Female", guardian_name="Guardian", guardian_phone="0700000000",
+            class_id=first.id, status="active",
+        )
+        final_learner = models.Student(
+            admission_number="SB-PROMOTE-007", first_name="Mark", last_name="Learner",
+            gender="Male", guardian_name="Guardian", guardian_phone="0700000000",
+            class_id=final.id, status="active",
+        )
+        db.add_all([learner, final_learner])
+        db.commit()
+        first_id, final_id = first.id, final.id
+        learner_id, final_learner_id = learner.id, final_learner.id
+    finally:
+        db.close()
+
+    with TestClient(app) as client:
+        response = client.post("/api/students/promote", json={"class_order": [first_id, final_id]},
+                               headers={"Authorization": f"Bearer {token}"})
+
+    assert response.status_code == 200
+    assert response.json()["promoted"] == 1
+    assert response.json()["graduated"] == 1
+    with SessionLocal() as db:
+        assert db.get(models.Student, learner_id).class_id == final_id
+        assert db.get(models.Student, final_learner_id).status == "graduated"
