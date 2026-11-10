@@ -1721,7 +1721,7 @@ async def protect_school_data(request: Request, call_next):
             # Self-service profile, password and personal dashboard endpoints
             # are scoped to the authenticated account.
             pass
-        elif path == "/api/sync/devices" or path.startswith("/api/sync/devices/") or path in {"/api/sync/changes", "/api/sync/sequence", "/api/sync/students", "/api/sync/classes", "/api/sync/attendance", "/api/sync/exams", "/api/sync/marks", "/api/sync/fees", "/api/sync/proposals"} or path.startswith("/api/sync/teacher-mark-proposals"):
+        elif path == "/api/sync/devices" or path.startswith("/api/sync/devices/") or path in {"/api/sync/changes", "/api/sync/students", "/api/sync/classes", "/api/sync/attendance", "/api/sync/exams", "/api/sync/marks", "/api/sync/fees", "/api/sync/proposals"} or path.startswith("/api/sync/teacher-mark-proposals"):
             # Sync routes enforce account, device and record scope in each handler.
             pass
         elif path.startswith("/api/teacher/"):
@@ -2216,11 +2216,14 @@ def list_sync_student_snapshot(
         }
         for row in rows
     ]
+    snapshot_sequence = db.query(func.max(models.SyncChange.id)).scalar() or 0
+    device.last_issued_sequence = max(device.last_issued_sequence, snapshot_sequence)
     device.last_seen_at = datetime.utcnow()
     db.commit()
     return {
         "students": payload,
         "scope": scope,
+        "snapshot_sequence": snapshot_sequence,
         "next_after_id": next_after_id,
         "has_more": has_more,
     }
@@ -2290,11 +2293,14 @@ def list_sync_class_snapshot(
         {"id": row.id, "name": row.name, "section": row.section}
         for row in rows
     ]
+    snapshot_sequence = db.query(func.max(models.SyncChange.id)).scalar() or 0
+    device.last_issued_sequence = max(device.last_issued_sequence, snapshot_sequence)
     device.last_seen_at = datetime.utcnow()
     db.commit()
     return {
         "classes": payload,
         "scope": scope,
+        "snapshot_sequence": snapshot_sequence,
         "next_after_id": next_after_id,
         "has_more": has_more,
     }
@@ -2336,14 +2342,6 @@ def _sync_teacher_class_ids(db: Session, user):
 
 
 
-@app.get("/api/sync/sequence", tags=["Offline Synchronisation"])
-def get_sync_sequence(device_id: UUID, db: Session = Depends(get_db), user=Depends(get_current_user)):
-    """Return a metadata-only journal high-water mark for snapshot consistency checks."""
-    _sync_active_device(db, user, device_id)
-    sequence = db.query(func.max(models.SyncChange.id)).scalar() or 0
-    db.commit()
-    return {"sequence": sequence}
-
 @app.get("/api/sync/attendance", tags=["Offline Synchronisation"])
 def list_sync_attendance_snapshot(
     device_id: UUID,
@@ -2353,7 +2351,7 @@ def list_sync_attendance_snapshot(
     user=Depends(get_current_user),
 ):
     """Return minimal attendance records visible to this account."""
-    _sync_active_device(db, user, device_id)
+    device = _sync_active_device(db, user, device_id)
     query = db.query(models.Attendance).join(
         models.Student, models.Student.id == models.Attendance.student_id
     )
@@ -2389,8 +2387,10 @@ def list_sync_attendance_snapshot(
          "attendance_date": row.attendance_date, "status": row.status}
         for row in rows
     ]
+    snapshot_sequence = db.query(func.max(models.SyncChange.id)).scalar() or 0
+    device.last_issued_sequence = max(device.last_issued_sequence, snapshot_sequence)
     db.commit()
-    return {"attendance": payload, "scope": scope,
+    return {"attendance": payload, "scope": scope, "snapshot_sequence": snapshot_sequence,
             "next_after_id": next_after_id, "has_more": has_more}
 
 
@@ -2403,7 +2403,7 @@ def list_sync_exam_snapshot(
     user=Depends(get_current_user),
 ):
     """Return exam metadata for classes the account is allowed to see."""
-    _sync_active_device(db, user, device_id)
+    device = _sync_active_device(db, user, device_id)
     query = db.query(models.Exam)
     scope = None
     if user.role == "admin":
@@ -2439,8 +2439,10 @@ def list_sync_exam_snapshot(
          "class_id": row.class_id, "exam_type": row.exam_type}
         for row in rows
     ]
+    snapshot_sequence = db.query(func.max(models.SyncChange.id)).scalar() or 0
+    device.last_issued_sequence = max(device.last_issued_sequence, snapshot_sequence)
     db.commit()
-    return {"exams": payload, "scope": scope,
+    return {"exams": payload, "scope": scope, "snapshot_sequence": snapshot_sequence,
             "next_after_id": next_after_id, "has_more": has_more}
 
 
@@ -2517,7 +2519,7 @@ def list_sync_fee_snapshot(
     user=Depends(get_current_user),
 ):
     """Return fee records only for linked children or authorised finance staff."""
-    _sync_active_device(db, user, device_id)
+    device = _sync_active_device(db, user, device_id)
     is_parent = user.role == "parent"
     if user.role == "admin":
         scope = "school"
@@ -2585,9 +2587,12 @@ def list_sync_fee_snapshot(
          "day_amount": row.day_amount}
         for row in class_fees
     ]
+    snapshot_sequence = db.query(func.max(models.SyncChange.id)).scalar() or 0
+    device.last_issued_sequence = max(device.last_issued_sequence, snapshot_sequence)
     db.commit()
     return {
-        "scope": scope, "charges": payload_charges, "payments": payload_payments,
+        "scope": scope, "snapshot_sequence": snapshot_sequence,
+        "charges": payload_charges, "payments": payload_payments,
         "class_fees": payload_class_fees,
         "next_after_charge_id": charges[-1].id if charges else after_charge_id,
         "next_after_payment_id": payments[-1].id if payments else after_payment_id,
