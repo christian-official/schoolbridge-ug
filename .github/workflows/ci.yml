@@ -159,6 +159,35 @@ jobs:
           marker=$(dc exec -T database psql -U schoolbridge -d schoolbridge -tAc "SELECT marker FROM usb_ci_persistence_check WHERE id=1" | tr -d '[:space:]')
           if [ "$marker" != "survives-restart" ]; then dc logs; exit 1; fi
           curl --fail --silent http://127.0.0.1:18080/api/health >/dev/null
+      - name: Assemble downloadable offline USB package
+        run: |
+          set -euo pipefail
+          pkg="$RUNNER_TEMP/SchoolBridge-USB"
+          mkdir -p "$pkg/runtime" "$pkg/docs"
+          cp /tmp/schoolbridge-images.tar "$pkg/schoolbridge-images.tar"
+          cp /tmp/schoolbridge-usb/docker-compose.yml "$pkg/docker-compose.yml"
+          cp scripts/install-schoolbridge.ps1 scripts/check-school-host.ps1 scripts/prepare-school-host.ps1 "$pkg/"
+          cp docs/USB_INSTALLATION.md docs/WINDOWS_RUNTIME_PREPARATION.md docs/SCHOOL_READINESS_AND_INSTALLATION.md "$pkg/docs/"
+          cat > "$pkg/.env.example" <<'EOF'
+          SCHOOLBRIDGE_LICENSE_PUBLIC_KEY=
+          SCHOOLBRIDGE_PORT=8080
+          SCHOOLBRIDGE_BACKUP_RETENTION_DAYS=30
+          SCHOOLBRIDGE_BACKUP_INTERVAL_HOURS=24
+          EOF
+          curl --fail --location --retry 3 "https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe" -o "$pkg/runtime/Docker Desktop Installer.exe"
+          release_json="$(curl --fail --location --retry 3 https://api.github.com/repos/microsoft/WSL/releases/latest)"
+          wsl_url="$(printf '%s' "$release_json" | python -c 'import json,sys; d=json.load(sys.stdin); a=[x["browser_download_url"] for x in d.get("assets",[]) if x["name"].lower().endswith(".x64.msi")]; assert len(a)==1, "Expected exactly one x64 WSL MSI"; print(a[0])')"
+          curl --fail --location --retry 3 "$wsl_url" -o "$pkg/runtime/wsl.msi"
+          (cd "$pkg" && find . -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt)
+          cd "$RUNNER_TEMP"
+          zip -qr SchoolBridge-USB.zip SchoolBridge-USB
+      - name: Upload offline USB package
+        uses: actions/upload-artifact@v4
+        with:
+          name: SchoolBridge-USB
+          path: ${{ runner.temp }}/SchoolBridge-USB.zip
+          if-no-files-found: error
+          retention-days: 14
 
 
   windows-installer-script-validation:
