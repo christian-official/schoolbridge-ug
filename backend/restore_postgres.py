@@ -32,8 +32,11 @@ def restore_postgres_backup(archive_path, target_database, database_url=None, ru
     execute(["pg_restore", "--list", str(archive)], check=True, capture_output=True, text=True, env=env)
     created = False
     try:
-        execute(["createdb", "--no-password", *connection_args, "--owner", url.username or "", target_database],
-                check=True, capture_output=True, text=True, env=env)
+        create_command = ["createdb", "--no-password", *connection_args]
+        if url.username:
+            create_command.extend(["--owner", url.username])
+        create_command.append(target_database)
+        execute(create_command, check=True, capture_output=True, text=True, env=env)
         created = True
         execute(["pg_restore", "--no-password", "--exit-on-error", "--no-owner", "--no-acl",
                  "--dbname", target_database, *connection_args, str(archive)],
