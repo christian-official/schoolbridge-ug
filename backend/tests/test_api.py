@@ -2146,3 +2146,14 @@ def test_legacy_install_without_profile_can_set_identity_once():
             "country": "Uganda", "school_structure": "Day",
         })
         assert second.status_code == 403
+
+
+
+def test_environment_admin_bootstrap_cannot_bypass_first_time_setup(monkeypatch):
+    reset_new_installation()
+    monkeypatch.setenv("SCHOOLBRIDGE_INITIAL_ADMIN_USERNAME", "env-admin")
+    monkeypatch.setenv("SCHOOLBRIDGE_INITIAL_ADMIN_EMAIL", "env-admin@example.invalid")
+    monkeypatch.setenv("SCHOOLBRIDGE_INITIAL_ADMIN_PASSWORD", "LongTestPassword123!")
+    main_module.bootstrap_initial_admin()
+    with SessionLocal() as db:
+        assert db.query(models.User).count() == 0

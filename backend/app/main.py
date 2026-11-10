@@ -1237,6 +1237,9 @@ def bootstrap_initial_admin():
 
     db = SessionLocal()
     try:
+        setup_state = db.get(models.SchoolSetupState, 1)
+        if not setup_state or not setup_state.setup_completed_at:
+            return
         if db.query(models.User).count() == 0:
             admin = models.User(
                 username=username,

@@ -21,7 +21,7 @@ internet. The database port is not published by this Compose configuration.
 
 1. Copy the repository to the school host and open a terminal in its root.
 2. Copy `.env.example` to `.env`.
-3. Generate and set two different secrets. OpenSSL examples:
+3. Generate two different secrets. OpenSSL examples:
 
    ```sh
    openssl rand -hex 24
@@ -29,31 +29,50 @@ internet. The database port is not published by this Compose configuration.
    ```
 
    Use one output for `POSTGRES_PASSWORD` and the other for
-   `SCHOOLBRIDGE_SECRET_KEY`. Hex values avoid URL-encoding problems in the
-   PostgreSQL connection string. Do not commit or share `.env`.
-4. If port 8080 is already in use, change `SCHOOLBRIDGE_PORT` in `.env`.
-5. Start the services:
+   `SCHOOLBRIDGE_SECRET_KEY`. Do not commit or share `.env`.
+4. On a trusted owner-controlled computer, install the signing utility dependency
+   with `python -m pip install cryptography`, then generate the owner keypair:
+
+   ```sh
+   python backend/tools/schoolbridge_owner_license.py generate-keypair \
+     --private-key /secure/schoolbridge-owner.key \
+     --public-key /secure/schoolbridge-owner.pub
+   ```
+
+   Keep the private key offline and outside the repository. Copy only the
+   printed base64 public key into `SCHOOLBRIDGE_LICENSE_PUBLIC_KEY` in the
+   school's `.env` file. The private key must never be placed on the school
+   server or in the deployment environment.
+5. If port 8080 is already in use, change `SCHOOLBRIDGE_PORT` in `.env`.
+6. Start the services:
 
    ```sh
    docker compose up -d --build
    ```
 
-6. Wait until the frontend and backend containers are healthy:
+7. Wait until the frontend and backend containers are healthy:
 
    ```sh
    docker compose ps
    docker compose logs --tail=100 backend
    ```
 
-7. Create the first administrator interactively:
+8. Find the host's LAN IPv4 address and open
+   `http://HOST-LAN-IP:8080` on the host or an authorised device connected to
+   the same LAN. The first-time setup screen displays a unique installation ID.
+9. On the trusted owner computer, issue a signed license for that exact
+   installation ID:
 
    ```sh
-   docker compose exec backend python create_admin.py
+   python backend/tools/schoolbridge_owner_license.py sign-license \
+     --private-key /secure/schoolbridge-owner.key \
+     --installation-id "INSTALLATION-ID-FROM-SCHOOLBRIDGE" \
+     --license-id "SCHOOL-REFERENCE-001"
    ```
 
-8. Find the host's LAN IPv4 address and open
-   `http://HOST-LAN-IP:8080` on the host and on an authorised device connected
-   to the same LAN. Sign in with the administrator account you created.
+10. Paste the signed license into SchoolBridge. Complete the school identity,
+    contact and structure details, then create the first administrator account
+    in the browser. No administrator password is preconfigured by the installer.
 
 The Compose setup disables demo-data seeding and uses PostgreSQL with a
 persistent database volume. It does not use SQLite over a network share.

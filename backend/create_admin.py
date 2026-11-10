@@ -7,6 +7,9 @@ Base.metadata.create_all(bind=engine)
 db = SessionLocal()
 
 try:
+    setup_state = db.get(models.SchoolSetupState, 1)
+    if not setup_state or not setup_state.setup_completed_at:
+        raise SystemExit("Complete the owner activation and first-time school setup in the browser before creating administrator accounts.")
     if db.query(models.User).filter_by(role="admin").first():
         print("An administrator already exists.")
     else:
