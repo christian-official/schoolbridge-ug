@@ -5694,7 +5694,7 @@ def visitor_check_out(visitor_id: int, db: Session = Depends(get_db), user=Depen
     if not _is_gatekeeper(user) and user.role != "admin":
         raise HTTPException(403, "Only the gatekeeper or an administrator may check visitors out.")
     visitor = db.get(models.VisitorLog, visitor_id)
-    if not visitor or visitor.checked_out_at is not None:
+    if not visitor or visitor.checked_out_at is not None or (_is_gatekeeper(user) and visitor.recorded_by != user.id):
         raise HTTPException(404, "Active visitor record not found.")
     visitor.checked_out_at = datetime.utcnow()
     write_audit(db, user, "visitor_checked_out", "visitor", visitor.id, "Visitor record forwarded to administration.")
