@@ -27,7 +27,8 @@ type Proposal = {
   resolution: string | null
 }
 
-type TeacherMarkProposal = { id:number; teacher_id:number; teacher_username:string; payload:{exam_id:number;subject_id:number;class_id:number;records:{student_id:number;score:number}[]}; status:string; conflict_sequence:number|null; submitted_at:string }\ntype Props = { token: string; userId: number; isAdmin: boolean }
+type TeacherMarkProposal = { id:number; teacher_id:number; teacher_username:string; payload:{exam_id:number;subject_id:number;class_id:number;records:{student_id:number;score:number}[]}; status:string; conflict_sequence:number|null; submitted_at:string }
+type Props = { token: string; userId: number; isAdmin: boolean }
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
 
 function deviceStorageKey(userId: number) {
