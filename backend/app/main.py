@@ -2328,6 +2328,9 @@ def confirm_password_reset(data: PasswordResetConfirm, db: Session = Depends(get
 def current_account(user=Depends(get_current_user), db: Session = Depends(get_db)):
     staff_profile = db.get(models.StaffMember, user.staff_id) if user.staff_id else None
     profile_complete = bool(staff_profile and staff_profile.first_name.strip() and staff_profile.last_name.strip() and staff_profile.photo_data)
+    if staff_profile and staff_profile.category == "Teaching":
+        has_class_assignment = db.query(models.TeacherAssignment.id).filter_by(teacher_id=user.id).first() or db.query(models.ClassTeacherAssignment.id).filter_by(teacher_id=user.id).first()
+        profile_complete = profile_complete and bool(has_class_assignment)
     return {
         "id": user.id,
         "staff_profile_complete": profile_complete if user.role in {"teacher", "staff"} else True,
