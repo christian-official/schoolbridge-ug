@@ -19,7 +19,7 @@ async function request<T>(path: string, token: string, options: RequestInit = {}
   if (!response.ok) throw new Error(result.detail || `Request failed: ${response.status}`)
   return result as T
 }
-export default function MyStaffProfile({ token }: { token: string }) {
+export default function MyStaffProfile({ token, onComplete }: { token: string; onComplete?: () => void }) {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [firstName, setFirstName] = useState('')
   const [phone, setPhone] = useState('')
@@ -72,7 +72,7 @@ export default function MyStaffProfile({ token }: { token: string }) {
     event.preventDefault(); setSaving(true); setError(''); setMessage('')
     try {
       const result = await request<{message:string;profile:Profile}>('me/staff-profile', token, { method: 'PATCH', body: JSON.stringify({ first_name: firstName, phone, email, photo_data: photoData }) })
-      setProfile(result.profile); setMessage(result.message)
+      setProfile(result.profile); setMessage(result.message); onComplete?.()
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to update your profile.') }
     finally { setSaving(false) }
   }
@@ -85,6 +85,7 @@ export default function MyStaffProfile({ token }: { token: string }) {
         special_roles:specialRoles,
       })})
       setMessage(result.message)
+      onComplete?.()
     } catch(e) { setError(e instanceof Error ? e.message : 'Unable to save your teaching assignments.') }
     finally { setAssignmentsSaving(false) }
   }
