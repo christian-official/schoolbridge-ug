@@ -5,6 +5,7 @@ from unittest.mock import Mock
 import pytest
 
 from backup_postgres import create_postgres_backup, prune_old_backups
+from restore_postgres import restore_postgres_backup
 
 
 def test_postgres_backup_is_verified_before_being_published(tmp_path):
@@ -78,3 +79,73 @@ def test_retention_removes_only_expired_schoolbridge_archives(tmp_path):
     assert not old.exists()
     assert recent.exists()
     assert unrelated.exists()
+
+
+
+def test_postgres_restore_validates_archive_and_restores_to_separate_database(tmp_path):
+    archive = tmp_path / "schoolbridge-postgres-test.dump"
+    archive.write_bytes(b"custom archive")
+    calls = []
+
+    def fake_runner(command, **kwargs):
+        calls.append(command)
+        if command[0] == "psql":
+            return Mock(stdout="true")
+        return Mock(stdout="")
+
+    result = restore_postgres_backup(
+        archive,
+        "schoolbridge_restore_test",
+        database_url="postgresql://school:secret@db.example:5432/school",
+        runner=fake_runner,
+    )
+
+    assert result == {
+        "database": "schoolbridge_restore_test",
+        "validated": True,
+        "source_archive": archive.name,
+    }
+    assert calls[0][:2] == ["pg_restore", "--list"]
+    assert calls[1][0] == "createdb"
+    assert calls[2][0] == "pg_restore"
+    assert "--dbname" in calls[2] and "schoolbridge_restore_test" in calls[2]
+    assert calls[3][0] == "psql"
+    assert not any(command[0] == "dropdb" for command in calls)
+
+
+def test_postgres_restore_drops_staging_database_when_validation_fails(tmp_path):
+    archive = tmp_path / "schoolbridge-postgres-invalid.dump"
+    archive.write_bytes(b"custom archive")
+    calls = []
+
+    def fake_runner(command, **kwargs):
+        calls.append(command)
+        if command[0] == "psql":
+            return Mock(stdout="false")
+        return Mock(stdout="")
+
+    with pytest.raises(RuntimeError, match="missing required SchoolBridge tables"):
+        restore_postgres_backup(
+            archive,
+            "schoolbridge_restore_failed",
+            database_url="postgresql://school:secret@db.example:5432/school",
+            runner=fake_runner,
+        )
+
+    assert any(command[0] == "dropdb" and command[-1] == "schoolbridge_restore_failed" for command in calls)
+
+
+def test_postgres_restore_refuses_to_target_active_database(tmp_path):
+    archive = tmp_path / "schoolbridge-postgres-active.dump"
+    archive.write_bytes(b"custom archive")
+    runner = Mock()
+
+    with pytest.raises(ValueError, match="new database"):
+        restore_postgres_backup(
+            archive,
+            "school",
+            database_url="postgresql://school:secret@db.example:5432/school",
+            runner=runner,
+        )
+
+    runner.assert_not_called()
