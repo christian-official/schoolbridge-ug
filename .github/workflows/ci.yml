@@ -162,7 +162,8 @@ jobs:
           $files = @(
             "scripts/prepare-usb.ps1",
             "scripts/install-schoolbridge.ps1",
-            "scripts/check-school-host.ps1"
+            "scripts/check-school-host.ps1",
+            "scripts/prepare-school-host.ps1"
           )
           foreach ($file in $files) {
             $tokens = $null

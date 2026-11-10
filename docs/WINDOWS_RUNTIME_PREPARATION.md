@@ -21,9 +21,7 @@ Run:
 
 The checker reports the Windows build, 64-bit support, memory, CPU virtualization, WSL version, Docker CLI and running Docker Engine. Current Docker Desktop Windows requirements include a supported Windows 10/11 release, WSL 2.1.5 or later for the WSL backend, at least 8 GB RAM and hardware virtualization enabled. Check the current official documentation because requirements change.
 
-If WSL is not installed or Windows optional features are disabled, a school administrator may need to enable **Windows Subsystem for Linux** and **Virtual Machine Platform**, install the supplied WSL MSI, and restart Windows. This may require administrator permission and a restart; the USB cannot remove those Windows requirements.
-
-After WSL is ready, run the Docker Desktop installer from the USB, choose the WSL 2 backend, complete the installation, open Docker Desktop and accept its licence terms. Docker Desktop can run offline after setup, although features that require internet or sign-in will not be available. Wait until its engine is running, then run the host checker again.
+Run `./prepare-school-host.ps1` from an elevated PowerShell window on the school computer. It checks the supported Windows version, memory and hardware virtualisation; enables the WSL and Virtual Machine Platform Windows features; installs the staged WSL MSI when needed; and launches the official Docker Desktop installer. The Docker setup remains interactive so the authorised school operator can review and accept its licence terms. The script does not silently accept third-party terms or force a restart. If Windows requests a restart, restart and open Docker Desktop, wait for its engine, then run `./check-school-host.ps1` again.
 
 ## Important
 

@@ -26,6 +26,7 @@ try {
     Set-Content (Join-Path $PackageDir "docker-compose.yml") $PackageCompose -Encoding UTF8
     Copy-Item (Join-Path $PSScriptRoot "install-schoolbridge.ps1") $PackageDir -Force
     Copy-Item (Join-Path $PSScriptRoot "check-school-host.ps1") $PackageDir -Force
+    Copy-Item (Join-Path $PSScriptRoot "prepare-school-host.ps1") $PackageDir -Force
     $RuntimeSource = Join-Path $RepoRoot "runtime"
     if (Test-Path $RuntimeSource) {
         Copy-Item $RuntimeSource (Join-Path $PackageDir "runtime") -Recurse -Force
