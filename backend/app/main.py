@@ -5075,6 +5075,12 @@ def update_my_teaching_assignments(data: MyTeachingAssignmentsUpdate, user=Depen
     invalid_roles = set(data.special_roles) - ALLOWED_STAFF_RESPONSIBILITIES
     if invalid_roles:
         raise HTTPException(422, "Choose only the listed school responsibilities. Administrative system roles cannot be self-assigned.")
+    conflicting_class_teacher = db.query(models.ClassTeacherAssignment).filter(
+        models.ClassTeacherAssignment.class_id.in_(data.class_teacher_class_ids),
+        models.ClassTeacherAssignment.teacher_id != user.id,
+    ).first() if data.class_teacher_class_ids else None
+    if conflicting_class_teacher:
+        raise HTTPException(409, "One of the selected classes already has a class teacher. Contact school management to resolve the existing assignment.")
     db.query(models.TeacherAssignment).filter_by(teacher_id=user.id).delete(synchronize_session=False)
     db.query(models.ClassTeacherAssignment).filter_by(teacher_id=user.id).delete(synchronize_session=False)
     for row in data.class_subjects:
