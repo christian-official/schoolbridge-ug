@@ -177,6 +177,7 @@ class StaffMember(Base):
     subjects: Mapped[str | None] = mapped_column(Text, nullable=True)
     house: Mapped[str | None] = mapped_column(String(80), nullable=True)
     photo_data: Mapped[str | None] = mapped_column(Text, nullable=True)
+    special_roles_json: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 class FeeCharge(Base):
     __tablename__ = "fee_charges"
