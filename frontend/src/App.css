@@ -2378,3 +2378,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .first-setup-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .first-setup-card .login-button{width:100%;margin-top:8px}
 @media(max-width:560px){.first-setup-grid{grid-template-columns:1fr}.first-setup-page{padding:14px 10px}.first-setup-card{padding:22px 18px}}
+
+.owner-correction-panel{display:grid;gap:9px;margin-top:10px;padding:14px;border:1px solid #d7e2ee;border-radius:12px;background:#f7fafc}
+.owner-correction-panel strong{color:#29445f;font-size:13px}
+.owner-correction-panel p{margin:0;color:#64748b;font-size:12px;line-height:1.5}
+.owner-correction-panel textarea{width:100%;border:1px solid #d5deea;border-radius:9px;padding:10px;font:inherit;resize:vertical;background:#fff}
+.owner-correction-panel .secondary-button{justify-self:start}

@@ -1979,7 +1979,7 @@ def activate_school_installation(data: SchoolActivationRequest, db: Session = De
         raise HTTPException(429, "Too many invalid activation attempts. Try again after the temporary security lock expires.")
     try:
         claims = verify_activation_license(data.license)
-        if claims.get("installation_id") != state.installation_id or claims.get("product") != "SchoolBridge":
+        if claims.get("installation_id") != state.installation_id or claims.get("product") != "SchoolBridge" or claims.get("action", "activate") != "activate":
             raise ValueError("License is for another installation.")
     except (ValueError, RuntimeError):
         state.activation_attempts = (state.activation_attempts or 0) + 1

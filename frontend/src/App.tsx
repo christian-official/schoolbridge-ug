@@ -1944,6 +1944,9 @@ function SchoolProfileSettings({token,onSaved}:{token:string;onSaved:()=>void}) 
   const [profileTab,setProfileTab]=useState<'identity'|'contact'|'houses'|'branding'>('identity')
   const [form,setForm]=useState({name:'',address:'',phone:'',email:'',motto:'',school_type:'Secondary',country:'',school_structure:'',a_level_combinations:'',o_level_optional_subjects:'',a_level_subsidiary_subjects:'',report_logo:'',house_names:''})
   const [identityLocked,setIdentityLocked]=useState(false)
+  const [correctionLicense,setCorrectionLicense]=useState('')
+  const [correctionBusy,setCorrectionBusy]=useState(false)
+  const [profileReload,setProfileReload]=useState(0)
   const [message,setMessage]=useState('')
   const [error,setError]=useState('')
   const [busy,setBusy]=useState(false)
@@ -1968,7 +1971,21 @@ function SchoolProfileSettings({token,onSaved}:{token:string;onSaved:()=>void}) 
       setLoaded(true)
     }).catch(e=>{if(!cancelled)setError(e instanceof Error?e.message:'Unable to load school profile.')})
     return ()=>{cancelled=true}
-  },[token])
+  },[token,profileReload])
+
+  async function applyIdentityCorrection(){
+    if(correctionLicense.trim().length<20)return
+    setCorrectionBusy(true);setError('');setMessage('')
+    try{
+      await api('setup/identity-correction',token,{method:'POST',body:JSON.stringify({license:correctionLicense.trim()})})
+      setCorrectionLicense('')
+      setIdentityLocked(true)
+      setMessage('Owner-authorised school identity correction applied.')
+      setProfileReload(value=>value+1)
+      onSaved()
+    }catch(e){setError(e instanceof Error?e.message:'Unable to apply the owner correction license.')}
+    finally{setCorrectionBusy(false)}
+  }
 
   async function save(e:React.FormEvent<HTMLFormElement>){
     e.preventDefault()
@@ -2005,6 +2022,7 @@ function SchoolProfileSettings({token,onSaved}:{token:string;onSaved:()=>void}) 
           <label>Country *<input required disabled={identityLocked} maxLength={80} value={form.country} onChange={e=>setForm({...form,country:e.target.value})} placeholder="Country"/></label>
           <label>School structure<select disabled={identityLocked} value={form.school_structure} onChange={e=>setForm({...form,school_structure:e.target.value})}><option value="">Not specified</option><option>Day</option><option>Boarding</option><option>Both</option></select></label>
           <label>School motto<input maxLength={200} value={form.motto} onChange={e=>setForm({...form,motto:e.target.value})} placeholder="Enter the school motto (optional)"/></label>
+          {identityLocked&&<div className="owner-correction-panel field-span-full"><strong>Owner-authorised identity correction</strong><p>For a legitimate legal or structural change, obtain a one-time signed correction license from the SchoolBridge owner and paste it here.</p><textarea rows={3} value={correctionLicense} onChange={e=>setCorrectionLicense(e.target.value)} placeholder="Paste the owner-signed correction license"/><button type="button" className="secondary-button" disabled={correctionBusy||correctionLicense.trim().length<20} onClick={()=>void applyIdentityCorrection()}>{correctionBusy?'Verifying owner authorisation...':'Apply authorised correction'}</button></div>}
         </div>
       </div>
       <div className="form-section" style={{display:profileTab==='contact'?'block':'none'}}>
