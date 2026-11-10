@@ -2477,14 +2477,14 @@ def submit_sync_change_proposal(data: SyncChangeProposalCreate, db: Session = De
         conflict=db.query(models.SyncChange).filter(models.SyncChange.entity_type==data.entity_type,models.SyncChange.entity_id==data.entity_id,models.SyncChange.id>data.base_sequence).order_by(models.SyncChange.id.desc()).first()
     row=models.SyncChangeProposal(user_id=user.id,device_id=device.device_id,idempotency_key=data.idempotency_key,entity_type=data.entity_type,entity_id=data.entity_id,operation=data.operation,payload_json=payload,base_sequence=data.base_sequence,status="conflict" if conflict else "pending_review",conflict_sequence=conflict.id if conflict else None)
     db.add(row)
-    # Allocate the proposal ID before writing its audit event so the audit
-    # trail points to the exact proposal rather than the previous placeholder.
-    db.flush()
-    write_audit(
-        db, user, "sync_proposal_submitted", "sync_change_proposal", row.id,
-        f"proposal_entity={data.entity_type}; entity_id={data.entity_id}; operation={data.operation}; base_sequence={data.base_sequence}; status={row.status}",
-    )
     try:
+        # Allocate the proposal ID before writing its audit event so the audit
+        # trail points to the exact proposal rather than the previous placeholder.
+        db.flush()
+        write_audit(
+            db, user, "sync_proposal_submitted", "sync_change_proposal", row.id,
+            f"proposal_entity={data.entity_type}; entity_id={data.entity_id}; operation={data.operation}; base_sequence={data.base_sequence}; status={row.status}",
+        )
         db.commit(); db.refresh(row)
     except IntegrityError:
         db.rollback()
