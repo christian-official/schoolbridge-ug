@@ -4609,7 +4609,7 @@ def list_fee_charges(search: str = "", class_id: int | None = None, stream: str 
         models.SchoolClass, models.SchoolClass.id == models.Student.class_id
     ).outerjoin(
         payment_totals, payment_totals.c.charge_id == models.FeeCharge.id
-    )
+    ).filter(models.Student.status == "active")
     if class_id is not None:
         query = query.filter(models.Student.class_id == class_id)
     if stream:
