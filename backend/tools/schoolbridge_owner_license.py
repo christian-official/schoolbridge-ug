@@ -11,6 +11,12 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 
+def read_passphrase(prompt: str) -> str:
+    """Read a passphrases non-interactively in CI, otherwise prompt securely."""
+    configured = os.environ.get("SCHOOLBRIDGE_OWNER_KEY_PASSPHRASE")
+    return configured if configured is not None else getpass(prompt)
+
+
 def encode(value: bytes) -> str:
     return base64.urlsafe_b64encode(value).decode("ascii").rstrip("=")
 
@@ -54,10 +60,10 @@ def main() -> None:
             parser.error("--private-key and --public-key must be different files.")
         if private_path.exists() or public_path.exists():
             parser.error("Key output files must not already exist; refusing to overwrite an existing key.")
-        passphrase = getpass("Create a strong private-key passphrase: ")
+        passphrase = read_passphrase("Create a strong private-key passphrase: ")
         if len(passphrase) < 14:
             parser.error("The private-key passphrase must be at least 14 characters.")
-        if passphrase != getpass("Confirm private-key passphrase: "):
+        if passphrase != read_passphrase("Confirm private-key passphrase: "):
             parser.error("Passphrases do not match.")
         key = Ed25519PrivateKey.generate()
         private = key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.BestAvailableEncryption(passphrase.encode("utf-8")))
@@ -69,7 +75,7 @@ def main() -> None:
         print(base64.b64encode(public).decode("ascii"))
         return
 
-    passphrase = getpass("Private-key passphrase: ")
+    passphrase = read_passphrase("Private-key passphrase: ")
     key = serialization.load_pem_private_key(Path(args.private_key).read_bytes(), password=passphrase.encode("utf-8"))
     claims = {
         "product": "SchoolBridge",
