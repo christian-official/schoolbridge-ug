@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test:offline": "node --test tests/*.test.js"
+    "test:offline": "node --test tests/*.test.js",
+    "test:offline:browser": "node --test tests/service-worker.browser.test.js"
   },
   "dependencies": {
     "lucide-react": "^1.70.0",
