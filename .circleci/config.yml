@@ -306,6 +306,38 @@ jobs:
             (cd "$pkg" && find . -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt)
             cd /tmp
             zip -qr SchoolBridge-USB.zip SchoolBridge-USB
+            unzip -t SchoolBridge-USB.zip
+            python3 - <<'PY'
+            from pathlib import Path
+            from zipfile import ZipFile
+            import hashlib
+            archive = Path("/tmp/SchoolBridge-USB.zip")
+            with ZipFile(archive) as package:
+                names = set(package.namelist())
+                required = {
+                    "SchoolBridge-USB/schoolbridge-images.tar",
+                    "SchoolBridge-USB/docker-compose.yml",
+                    "SchoolBridge-USB/install-schoolbridge.ps1",
+                    "SchoolBridge-USB/check-school-host.ps1",
+                    "SchoolBridge-USB/prepare-school-host.ps1",
+                    "SchoolBridge-USB/runtime/Docker Desktop Installer.exe",
+                    "SchoolBridge-USB/runtime/wsl.msi",
+                    "SchoolBridge-USB/SHA256SUMS.txt",
+                    "SchoolBridge-USB/docs/USB_INSTALLATION.md",
+                }
+                missing = required - names
+                assert not missing, f"USB archive missing: {sorted(missing)}"
+                root = "SchoolBridge-USB/"
+                manifest = package.read("SchoolBridge-USB/SHA256SUMS.txt").decode("ascii").splitlines()
+                assert manifest, "SHA256 manifest is empty"
+                for entry in manifest:
+                    digest, relative = entry.split("  ", 1)
+                    payload = package.read(root + relative)
+                    actual = hashlib.sha256(payload).hexdigest()
+                    assert actual.lower() == digest.lower(), f"SHA256 mismatch: {relative}"
+            assert archive.stat().st_size > 100_000_000, "USB image archive is unexpectedly small"
+            print(f"USB ZIP verified: {archive.stat().st_size:,} bytes; {len(manifest)} manifest entries")
+            PY
       - store_artifacts:
           path: /tmp/SchoolBridge-USB.zip
           destination: SchoolBridge-USB.zip
@@ -326,6 +358,25 @@ jobs:
               "scripts/check-school-host.ps1",
               "scripts/prepare-school-host.ps1"
             )
+            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+            $runtime = Join-Path $env:TEMP "schoolbridge-runtime-validation"
+            New-Item -ItemType Directory -Force -Path $runtime | Out-Null
+            $dockerPath = Join-Path $runtime "Docker Desktop Installer.exe"
+            $wslPath = Join-Path $runtime "wsl.msi"
+            Invoke-WebRequest -Uri "https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe" -OutFile $dockerPath -UseBasicParsing
+            $release = Invoke-RestMethod -Uri "https://api.github.com/repos/microsoft/WSL/releases/latest"
+            $wslAssets = @($release.assets | Where-Object { $_.name.ToLowerInvariant().EndsWith(".x64.msi") })
+            if ($wslAssets.Count -ne 1) { throw "Could not identify exactly one official stable x64 WSL MSI." }
+            Invoke-WebRequest -Uri $wslAssets[0].browser_download_url -OutFile $wslPath -UseBasicParsing
+            foreach ($runtimeFile in @(
+              @{ Path = $dockerPath; Publisher = "Docker" },
+              @{ Path = $wslPath; Publisher = "Microsoft Corporation" }
+            )) {
+              $signature = Get-AuthenticodeSignature -FilePath $runtimeFile.Path
+              if ($signature.Status -ne "Valid") { throw "Invalid Authenticode signature: $($runtimeFile.Path) ($($signature.Status))" }
+              if ($signature.SignerCertificate.Subject -notmatch $runtimeFile.Publisher) { throw "Unexpected signer for $($runtimeFile.Path): $($signature.SignerCertificate.Subject)" }
+              Write-Host "Authenticode signature verified: $($runtimeFile.Path) — $($signature.SignerCertificate.Subject)"
+            }
             foreach ($file in $files) {
               $tokens = $null
               $errors = $null
