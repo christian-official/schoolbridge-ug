@@ -896,7 +896,7 @@ def test_parent_portal_only_exposes_linked_child_records_and_audience_announceme
         db.add_all([child, unrelated])
         db.flush()
         charge = models.FeeCharge(student_id=child.id, term="Term 1", year=2026, amount=1000)
-        exam = models.Exam(name="Mid-Term", term="Term 1", year=2026, class_id=school_class.id)
+        exam = models.Exam(name="Mid-Term", term="Term 1", year=2026, class_id=school_class.id, closed=True)
         db.add_all([charge, exam])
         db.flush()
         db.add(models.FeePayment(charge_id=charge.id, amount=300, payment_date=date(2026, 2, 10)))
