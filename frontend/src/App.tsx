@@ -454,7 +454,7 @@ function DirectorOfStudiesDashboard({token,onNavigate,summary,summaryAvailable,a
       <div className="dos-responsibility-heading"><div><p className="eyebrow">CORE DOS RESPONSIBILITIES</p><h3>Academic staffing & programme coordination</h3><p>Manage the teaching programme from staff registration through class allocation and timetable formation.</p></div><div className="dos-academic-illustration" aria-hidden="true"><span><Users size={24}/></span><span><CalendarDays size={25}/></span><span><BookOpen size={22}/></span></div></div>
       <div className="dos-responsibility-actions">
         {can('Staff')&&<button type="button" className="dos-responsibility-card" onClick={()=>onNavigate('Staff')}><span className="dos-responsibility-icon staff"><UserPlus size={21}/></span><span><strong>Register & manage teachers</strong><small>Maintain teaching staff records and registered teaching subjects.</small></span><ArrowUpRight size={17}/></button>}
-        {can('Staff')&&<button type="button" className="dos-responsibility-card" onClick={()=>onNavigate('Staff')}><span className="dos-responsibility-icon assignment"><Users size={21}/></span><span><strong>Assign teachers to classes</strong><small>Coordinate teacher class and subject assignments using registered subjects.</small></span><ArrowUpRight size={17}/></button>}
+        {can('Staff')&&<button type="button" className="dos-responsibility-card" onClick={()=>onNavigate('Staff')}><span className="dos-responsibility-icon assignment"><Users size={21}/></span><span><strong>Review staff onboarding</strong><small>Manage staff profiles and access. Teachers select their own class assignments.</small></span><ArrowUpRight size={17}/></button>}
         {can('Timetable')&&<button type="button" className="dos-responsibility-card" onClick={()=>onNavigate('Timetable')}><span className="dos-responsibility-icon timetable"><CalendarDays size={21}/></span><span><strong>Form the school timetable</strong><small>Build and organise the school teaching timetable and periods.</small></span><ArrowUpRight size={17}/></button>}
       </div>
     </section>
@@ -1589,7 +1589,7 @@ function App() {
               )}
               {settingsSection === 'school' && <SchoolProfileAdmissionsHub token={token} onProfileSaved={() => { api<any>('settings/school-profile',token).then(setSchoolConfig).catch(()=>{}) }} />}
               {settingsSection === 'academy' && <AcademySettingsHub token={token} schoolType={schoolConfig.school_type === 'Combined' ? 'Combined' : schoolConfig.school_type !== 'Primary' ? 'Secondary' : 'Primary'} onSaved={() => setSettingsSection('home')} />}
-              {settingsSection === 'users' && <TeacherUsersSettings token={token} classes={classes} onSaved={() => { setRefreshKey(value => value + 1) }} />}
+              {settingsSection === 'users' && <TeacherUsersSettings token={token} onSaved={() => { setRefreshKey(value => value + 1) }} />}
               {settingsSection === 'backups' && <BackupSettings token={token} />}
               {settingsSection === 'audit' && <AuditLogSettings token={token} />}
             </div>
@@ -2213,15 +2213,11 @@ function AcademicCurriculumSettings({token,onSaved}:{token:string;onSaved:()=>vo
   return <section className="panel settings-panel"><div className="panel-heading"><div><h2>Academic & curriculum settings</h2><p>Enter one option per line. These choices will appear during student registration.</p></div></div>{message&&<div className="success-notice">{message}</div>}<form className="student-form" onSubmit={save}><div className="student-form-grid"><label>A-Level Arts combinations<textarea rows={6} value={form.arts_combinations} onChange={e=>setForm({...form,arts_combinations:e.target.value})} placeholder={'e.g. HEG\nLEG\nHED'}/><small className="field-hint">Enter Arts combinations, one per line.</small></label><label>A-Level Sciences combinations<textarea rows={6} value={form.sciences_combinations} onChange={e=>setForm({...form,sciences_combinations:e.target.value})} placeholder={'e.g. PCM\nBCM\nPCB'}/><small className="field-hint">Enter Sciences combinations, one per line.</small></label><label className="field-span-full">O-Level optional subjects<textarea rows={6} value={form.o_level_optional_subjects} onChange={e=>setForm({...form,o_level_optional_subjects:e.target.value})} placeholder={'e.g. Agriculture\nComputer Studies\nFine Art'}/></label><label className="field-span-full">A-Level subsidiary subjects<textarea rows={4} value={form.a_level_subsidiary_subjects} onChange={e=>setForm({...form,a_level_subsidiary_subjects:e.target.value})} placeholder={'e.g. General Paper\nSub Mathematics'}/></label></div><div className="form-actions"><button className="primary-button" disabled={busy}>{busy?'Saving...':'Save academic options'}</button></div></form></section>
 }
 
-function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:RecordItem[];onSaved:()=>void}) {
+function TeacherUsersSettings({token,onSaved}:{token:string;onSaved:()=>void}) {
   const [users,setUsers]=useState<any[]>([])
   const [staff,setStaff]=useState<any[]>([])
-  const [subjects,setSubjects]=useState<any[]>([])
-  const [catalog,setCatalog]=useState<any>({sections:[],presets:{}})
-  const [assignment,setAssignment]=useState({teacher_id:'',class_id:'',subject_id:''})
-  const [classTeacherAssignments,setClassTeacherAssignments]=useState<any[]>([])
-  const [classTeacherForm,setClassTeacherForm]=useState({teacher_id:'',class_id:''})
-  const [selectedId,setSelectedId]=useState('')
+    const [catalog,setCatalog]=useState<any>({sections:[],presets:{}})
+    const [selectedId,setSelectedId]=useState('')
   const [roleLabel,setRoleLabel]=useState('')
   const [roleType,setRoleType]=useState<'teacher'|'staff'>('staff')
   const [permissions,setPermissions]=useState<Record<string,string[]>>({})
@@ -2232,14 +2228,14 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
   const [resetPasscode,setResetPasscode]=useState<{username:string;password:string}|null>(null)
   const [staffLoginSearch,setStaffLoginSearch]=useState('')
   const [otherLoginSearch,setOtherLoginSearch]=useState('')
-  const [accountTab,setAccountTab]=useState<'access'|'assignments'|'staff'|'other'>('staff')
+  const [accountTab,setAccountTab]=useState<'access'|'staff'|'other'>('staff')
   async function load() {
     setLoading(true);setError('')
     try {
-      const [u,st,sub,permissionData,classTeacherRows]=await Promise.all([
-        api<any[]>('auth/users',token),api<any>('staff?page=1&page_size=100',token),api<any[]>('subjects',token),api<any>('auth/permissions',token),api<any[]>('class-teacher-assignments',token)
+      const [u,st,permissionData]=await Promise.all([
+        api<any[]>('auth/users',token),api<any>('staff?page=1&page_size=100',token),api<any>('auth/permissions',token)
       ])
-      setUsers(u);setStaff(st.items||[]);setSubjects(sub);setCatalog(permissionData);setClassTeacherAssignments(classTeacherRows)
+      setUsers(u);setStaff(st.items||[]);setCatalog(permissionData)
       const first=u.find((item:any)=>item.role!=='admin'&&item.role!=='parent')
       if(first&&!selectedId){setSelectedId(String(first.id));setRoleLabel(first.role_label||first.role);setRoleType(first.role==='teacher'?'teacher':'staff');setPermissions(first.permissions||{})}
     } catch(e) {setError(e instanceof Error?e.message:'Unable to load staff accounts.')}
@@ -2306,38 +2302,6 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
     } catch(e) {setError(e instanceof Error?e.message:'Unable to reset this staff password.')}
     finally {setBusy(false)}
   }
-  async function assignClassTeacher(e:React.FormEvent) {
-    e.preventDefault()
-    if(!classTeacherForm.teacher_id||!classTeacherForm.class_id){setError('Select a teacher and class for class-teacher responsibility.');return}
-    setBusy(true);setError('');setMessage('')
-    try {
-      await api('class-teacher-assignments',token,{method:'POST',body:JSON.stringify({teacher_id:Number(classTeacherForm.teacher_id),class_id:Number(classTeacherForm.class_id)})})
-      setClassTeacherForm({teacher_id:'',class_id:''});setClassTeacherAssignments(await api<any[]>('class-teacher-assignments',token));setMessage('Class-teacher responsibility assigned. This is separate from subject teaching assignments.')
-    } catch(e) {setError(e instanceof Error?e.message:'Unable to assign class teacher.')}
-    finally {setBusy(false)}
-  }
-  async function removeClassTeacher(id:number) {
-    setBusy(true);setError('');setMessage('')
-    try { await api('class-teacher-assignments/'+id,token,{method:'DELETE'});setClassTeacherAssignments(await api<any[]>('class-teacher-assignments',token));setMessage('Class-teacher responsibility removed.') }
-    catch(e) {setError(e instanceof Error?e.message:'Unable to remove class teacher.')}
-    finally {setBusy(false)}
-  }
-  async function assign(e:React.FormEvent) {
-    e.preventDefault()
-    if(!assignment.teacher_id||!assignment.class_id||!assignment.subject_id){setError('Select a teacher, class and one of their registered subjects before saving.');return}
-    if(!availableAssignmentSubjects.some((subject:any)=>String(subject.id)===assignment.subject_id)){setError('The selected subject was not registered under this teacher. Update the teacher profile first.');return}
-    setBusy(true);setError('');setMessage('')
-    try {
-      await api('teacher-assignments',token,{method:'POST',body:JSON.stringify({teacher_id:Number(assignment.teacher_id),class_id:Number(assignment.class_id),subject_id:Number(assignment.subject_id)})})
-      setAssignment({teacher_id:'',class_id:'',subject_id:''});setMessage('Teacher class and subject assignment saved.')
-    } catch(e) {setError(e instanceof Error?e.message:'Unable to assign teacher.')}
-    finally {setBusy(false)}
-  }
-  const activeTeachers=users.filter(u=>u.role==='teacher'&&u.active)
-  const selectedAssignmentTeacher=activeTeachers.find((u:any)=>String(u.id)===assignment.teacher_id)
-  const selectedAssignmentStaff=staff.find((p:any)=>p.id===selectedAssignmentTeacher?.staff_id)
-  const registeredTeacherSubjects=String(selectedAssignmentStaff?.subjects||'').split(',').map((name:string)=>name.trim()).filter(Boolean)
-  const availableAssignmentSubjects=subjects.filter((subject:any)=>registeredTeacherSubjects.includes(subject.name))
   const editableUsers=users.filter(u=>u.role!=='admin'&&u.role!=='parent')
   const otherAccounts=users.filter(u=>u.role==='admin'||u.role==='parent')
   const staffLoginMatches=editableUsers.filter(u=>{
@@ -2352,10 +2316,9 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
   return <section className="panel settings-panel">
     <div className="panel-heading"><div><h2>Staff accounts & access</h2><p>Staff login details are created automatically when you register a staff member in the Staff directory.</p></div><button type="button" className="secondary-button" onClick={()=>void load()} disabled={loading||busy}>{loading?'Loading...':'Refresh'}</button></div>
     {error&&<div className="form-error" role="alert">{error}</div>}{message&&<div className="success-notice" role="status">{message}</div>}
-    <div className="form-hint">Register employees from the Staff directory. This workspace manages access, assignments and existing accounts.</div>
+    <div className="form-hint">Register employees from the Staff directory. This workspace manages access and existing accounts. Teaching staff choose their own classes, subjects and school responsibilities in My Profile.</div>
     <div className="account-management-tabs" role="tablist" aria-label="User and permission settings">
       <button type="button" role="tab" aria-selected={accountTab==="access"} className={accountTab==="access"?"active":""} onClick={()=>setAccountTab("access")}>Access & roles</button>
-      <button type="button" role="tab" aria-selected={accountTab==="assignments"} className={accountTab==="assignments"?"active":""} onClick={()=>setAccountTab("assignments")}>Teacher assignments</button>
       <button type="button" role="tab" aria-selected={accountTab==="staff"} className={accountTab==="staff"?"active":""} onClick={()=>setAccountTab("staff")}>Staff logins <span>{editableUsers.length}</span></button>
       <button type="button" role="tab" aria-selected={accountTab==="other"} className={accountTab==="other"?"active":""} onClick={()=>setAccountTab("other")}>Other accounts <span>{otherAccounts.length}</span></button>
     </div>
@@ -2377,21 +2340,6 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
       <div className="form-actions"><button type="button" className="secondary-button" onClick={()=>void resetSelectedPassword()} disabled={busy||!selectedId}>{busy?'Working...':'Reset login passcode'}</button></div>
       {resetPasscode&&<div className="success-notice password-reset-result" role="status"><strong>Temporary passcode for {resetPasscode.username}</strong><code>{resetPasscode.password}</code><button type="button" className="secondary-button" onClick={()=>void navigator.clipboard.writeText('Username: '+resetPasscode.username+'\nTemporary passcode: '+resetPasscode.password)}>Copy login details</button><small>Shown once. Share it privately; the staff member must change it at their next sign-in.</small></div>}
     </>}
-    </div>}
-    {accountTab==='assignments'&&<div className="account-tab-panel">
-    <h3>Assign classes and subjects to teachers</h3><p className="form-hint">A teacher can be assigned to multiple classes and multiple subjects, but each subject must first be selected in that teacher’s Staff registration profile.</p>
-    <form className="student-form" onSubmit={assign}><div className="student-form-grid">
-      <label>Teacher *<select required value={assignment.teacher_id} onChange={e=>setAssignment({...assignment,teacher_id:e.target.value,subject_id:''})}><option value="">Select teacher</option>{activeTeachers.map(u=>{const person=staff.find((p:any)=>p.id===u.staff_id);return <option key={u.id} value={u.id}>{person?person.first_name+' '+person.last_name:u.username}</option>})}</select></label>
-      <label>Class *<select required value={assignment.class_id} onChange={e=>setAssignment({...assignment,class_id:e.target.value})}><option value="">Select class</option>{classes.map(item=><option key={item.id} value={item.id}>{item.name}{item.section?' — '+item.section:''}</option>)}</select></label>
-      <label>Registered subject *<select required value={assignment.subject_id} onChange={e=>setAssignment({...assignment,subject_id:e.target.value})} disabled={!assignment.teacher_id||!availableAssignmentSubjects.length}><option value="">{!assignment.teacher_id?'Choose a teacher first':availableAssignmentSubjects.length?'Select one of this teacher’s subjects':'No subjects recorded for this teacher'}</option>{availableAssignmentSubjects.map((sub:any)=><option key={sub.id} value={sub.id}>{sub.name}</option>)}</select><small className="field-hint">Only subjects recorded in the selected teacher’s staff profile are listed.</small></label>
-    </div><div className="form-actions"><button className="primary-button" disabled={busy||loading||!activeTeachers.length||!subjects.length||!classes.length}>{busy?'Saving...':'Save teacher assignment'}</button></div></form>
-    <h3>Assign class teachers</h3>
-    <p className="form-hint">This is a separate responsibility from teaching individual subjects. Each class has one assigned class teacher, who is authorised to manage that class's attendance register.</p>
-    <form className="student-form" onSubmit={assignClassTeacher}><div className="student-form-grid">
-      <label>Class teacher *<select required value={classTeacherForm.teacher_id} onChange={e=>setClassTeacherForm({...classTeacherForm,teacher_id:e.target.value})}><option value="">Select teacher</option>{activeTeachers.map(u=>{const person=staff.find((p:any)=>p.id===u.staff_id);return <option key={u.id} value={u.id}>{person?person.first_name+' '+person.last_name:u.username}</option>})}</select></label>
-      <label>Responsible class *<select required value={classTeacherForm.class_id} onChange={e=>setClassTeacherForm({...classTeacherForm,class_id:e.target.value})}><option value="">Select class</option>{classes.map(item=><option key={item.id} value={item.id}>{item.name}{item.section?' — '+item.section:''}</option>)}</select></label>
-    </div><div className="form-actions"><button className="primary-button" disabled={busy||loading||!activeTeachers.length||!classes.length}>{busy?'Saving...':'Assign class teacher'}</button></div></form>
-    <div className="table-wrap"><table><thead><tr><th>Class</th><th>Assigned class teacher</th><th>Action</th></tr></thead><tbody>{classTeacherAssignments.map(row=><tr key={row.id}><td>{row.class_name}{row.section?' — '+row.section:''}</td><td>{staff.find((p:any)=>users.find(u=>u.id===row.teacher_id)?.staff_id===p.id)?.first_name || row.teacher_name} {staff.find((p:any)=>users.find(u=>u.id===row.teacher_id)?.staff_id===p.id)?.last_name || ''}</td><td><button type="button" className="secondary-button" disabled={busy} onClick={()=>void removeClassTeacher(row.id)}>Remove</button></td></tr>)}{!classTeacherAssignments.length&&<tr><td colSpan={3}>No class teachers assigned yet.</td></tr>}</tbody></table></div>
     </div>}
     {accountTab==='staff'&&<div className="account-tab-panel">
     <h3>School staff login accounts</h3>
