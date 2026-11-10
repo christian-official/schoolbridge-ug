@@ -135,6 +135,8 @@ export async function saveEncryptedOfflineSnapshot(userId: number, deviceId: str
   } finally { db.close() }
 }
 
+const OFFLINE_SNAPSHOT_TTL_MS = 24 * 60 * 60 * 1000
+
 export async function loadEncryptedOfflineSnapshot<T>(userId: number, deviceId: string, passphrase: string): Promise<T> {
   if (!passphrase || passphrase.length < 12) throw new Error('Enter the passphrase used to protect these records.')
   if (!crypto?.subtle || typeof indexedDB === 'undefined') throw new Error('This browser does not support protected offline storage.')
@@ -148,6 +150,11 @@ export async function loadEncryptedOfflineSnapshot<T>(userId: number, deviceId: 
     })
   } finally { db.close() }
   if (!record) throw new Error('No encrypted offline record snapshot is saved on this browser.')
+  const age = Date.now() - record.updatedAt
+  if (!Number.isFinite(record.updatedAt) || age < 0 || age >= OFFLINE_SNAPSHOT_TTL_MS) {
+    await deleteEncryptedOfflineSnapshot(userId, deviceId)
+    throw new Error('This offline record snapshot has expired. Reconnect and download a fresh copy.')
+  }
   try {
     const key = await deriveOfflineDraftKey(passphrase, new Uint8Array(record.salt))
     const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: asArrayBuffer(new Uint8Array(record.iv)) }, key, asArrayBuffer(new Uint8Array(record.ciphertext)))
