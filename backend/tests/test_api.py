@@ -1405,6 +1405,40 @@ def test_teacher_can_acknowledge_checkpoint_for_own_device():
         assert acknowledged.json()["last_sync_sequence"] == 0
 
 
+def test_parent_can_acknowledge_checkpoint_for_own_device():
+    reset_database()
+    parent = models.User(
+        username="checkpoint-parent",
+        email="checkpoint-parent@example.invalid",
+        hashed_password=password_hash.hash("ParentPassword123!"),
+        role="parent",
+        is_active=True,
+    )
+    db = SessionLocal()
+    try:
+        db.add(parent)
+        db.commit()
+        db.refresh(parent)
+        parent_id = parent.id
+    finally:
+        db.close()
+
+    headers = {"Authorization": f"Bearer {create_access_token(SimpleNamespace(id=parent_id, role="parent"))}"}
+    device_id = "00000000-0000-4000-8000-000000000204"
+
+    with TestClient(app) as client:
+        registered = client.post("/api/sync/devices", headers=headers, json={
+            "device_id": device_id, "device_name": "Parent checkpoint device",
+        })
+        assert registered.status_code == 200
+        acknowledged = client.post(
+            f"/api/sync/devices/{device_id}/checkpoint?sequence=0",
+            headers=headers,
+        )
+        assert acknowledged.status_code == 200
+        assert acknowledged.json()["last_sync_sequence"] == 0
+
+
 def test_sync_device_checkpoint_rejects_negative_sequence():
     reset_database()
     admin = create_admin()
