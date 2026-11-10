@@ -1905,7 +1905,7 @@ async def protect_school_data(request: Request, call_next):
             # Self-service profile, password and personal dashboard endpoints
             # are scoped to the authenticated account.
             pass
-        elif path == "/api/sync/devices" or path.startswith("/api/sync/devices/") or path in {"/api/sync/changes", "/api/sync/students", "/api/sync/classes", "/api/sync/attendance", "/api/sync/exams", "/api/sync/marks", "/api/sync/fees", "/api/sync/proposals", "/api/sync/attendance-baseline", "/api/sync/attendance-batches"} or path.startswith("/api/sync/teacher-mark-proposals"):
+        elif path == "/api/sync/devices" or path.startswith("/api/sync/devices/") or path in {"/api/sync/changes", "/api/sync/students", "/api/sync/classes", "/api/sync/attendance", "/api/sync/exams", "/api/sync/marks", "/api/sync/fees", "/api/sync/proposals", "/api/sync/attendance-baseline", "/api/sync/attendance-batches", "/api/sync/finance-payments"} or path.startswith("/api/sync/teacher-mark-proposals"):
             # Sync routes enforce account, device and record scope in each handler.
             pass
         elif path.startswith("/api/teacher/"):
@@ -4053,6 +4053,18 @@ class FeePaymentCreate(BaseModel):
     method: str = Field(default="Cash", max_length=30)
     reference: str | None = Field(default=None, max_length=80)
 
+class OfflineFinancePaymentCreate(BaseModel):
+    device_id: UUID
+    idempotency_key: str = Field(min_length=16, max_length=100)
+    charge_id: int = Field(ge=1)
+    amount: int = Field(gt=0)
+    payment_date: date = Field(default_factory=date.today)
+    method: str = Field(default="Cash", max_length=30)
+    reference: str | None = Field(default=None, max_length=80)
+    base_sequence: int = Field(ge=0)
+
+
+
 def upgrade_existing_database():
     from sqlalchemy import inspect, text
     inspector = inspect(engine)
@@ -4564,6 +4576,81 @@ def list_fee_charges(search: str = "", class_id: int | None = None, stream: str 
             "balance": balance
         })
     return results
+
+@app.post("/api/sync/finance-payments", tags=["Offline Synchronisation"])
+def submit_offline_finance_payment(data: OfflineFinancePaymentCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    """Idempotently apply an offline fee payment after current balance and scope checks."""
+    device = _sync_active_device(db, user, data.device_id)
+    if data.base_sequence > device.last_issued_sequence:
+        raise HTTPException(409, "The finance snapshot has not been issued to this device.")
+    if user.role != "admin" and "add" not in user_permissions(user).get("Fees & Finance", set()):
+        raise HTTPException(403, "You do not have permission to record fee payments.")
+    payload = json.dumps({"charge_id": data.charge_id, "amount": data.amount,
+        "payment_date": data.payment_date.isoformat(), "method": data.method,
+        "reference": data.reference}, sort_keys=True, separators=(",", ":"))
+    old = db.query(models.SyncChangeProposal).filter_by(user_id=user.id, idempotency_key=data.idempotency_key).first()
+    if old:
+        same = (old.device_id == str(data.device_id) and old.entity_type == "FinancePayment"
+                and old.entity_id == data.charge_id and old.operation == "create"
+                and old.base_sequence == data.base_sequence and old.payload_json == payload)
+        if not same:
+            raise HTTPException(409, "Idempotency key already used for different payment content.")
+        return {"proposal_id": old.id, "status": old.status, "duplicate": True,
+                "applied": old.status == "applied", "payment_id": json.loads(old.resolution or "{}").get("payment_id")}
+    charge = db.query(models.FeeCharge).filter_by(id=data.charge_id).with_for_update().first()
+    if not charge:
+        raise HTTPException(404, "Fee charge not found.")
+    payment_ids = [row[0] for row in db.query(models.FeePayment.id).filter_by(charge_id=charge.id).all()]
+    changed = db.query(models.SyncChange).filter(
+        models.SyncChange.id > data.base_sequence,
+        models.SyncChange.entity_type.in_(["FeeCharge", "FeePayment"]),
+        models.SyncChange.entity_id.in_([charge.id] + payment_ids),
+    ).order_by(models.SyncChange.id.desc()).first()
+    if changed:
+        proposal = models.SyncChangeProposal(user_id=user.id, device_id=device.device_id,
+            idempotency_key=data.idempotency_key, entity_type="FinancePayment", entity_id=charge.id,
+            operation="create", payload_json=payload, base_sequence=data.base_sequence,
+            status="conflict", conflict_sequence=changed.id, resolution="system_conflict",
+            resolved_at=datetime.utcnow())
+        db.add(proposal)
+        db.flush()
+        write_audit(db, user, "offline_finance_payment_conflict", "sync_change_proposal", proposal.id,
+                    f"charge={charge.id}; conflict_sequence={changed.id}")
+        db.commit()
+        return {"proposal_id": proposal.id, "status": "conflict", "duplicate": False,
+                "applied": False, "payment_id": None, "conflict_sequence": changed.id}
+    paid = db.query(func.coalesce(func.sum(models.FeePayment.amount), 0)).filter(models.FeePayment.charge_id == charge.id).scalar() or 0
+    if data.amount > charge.amount - paid:
+        raise HTTPException(409, "The outstanding balance has changed; refresh the finance snapshot before retrying.")
+    proposal = models.SyncChangeProposal(user_id=user.id, device_id=device.device_id,
+        idempotency_key=data.idempotency_key, entity_type="FinancePayment", entity_id=charge.id,
+        operation="create", payload_json=payload, base_sequence=data.base_sequence,
+        status="applied", resolution="system_auto_apply", resolved_at=datetime.utcnow())
+    db.add(proposal)
+    try:
+        db.flush()
+        payment = models.FeePayment(charge_id=charge.id, amount=data.amount, payment_date=data.payment_date,
+            method=data.method, reference=data.reference, received_by=user.username,
+            receipt_number="RCPT-" + str(date.today().year) + "-" + uuid4().hex[:8].upper())
+        db.add(payment)
+        db.flush()
+        proposal.resolution = json.dumps({"payment_id": payment.id, "receipt_number": payment.receipt_number})
+        parent_ids = [row[0] for row in db.query(models.ParentStudentLink.user_id).filter_by(student_id=charge.student_id).all()]
+        db.add(models.SyncChange(entity_type="FeePayment", entity_id=payment.id, operation="create",
+            scope_json=json.dumps({"parent_user_ids": parent_ids})))
+        write_audit(db, user, "offline_fee_payment_received", "fee_payment", payment.id,
+                    f"Receipt {payment.receipt_number}; amount {payment.amount}; charge {charge.id}")
+        db.commit()
+        return {"proposal_id": proposal.id, "status": "applied", "duplicate": False,
+                "applied": True, "payment_id": payment.id, "receipt_number": payment.receipt_number}
+    except IntegrityError:
+        db.rollback()
+        old = db.query(models.SyncChangeProposal).filter_by(user_id=user.id, idempotency_key=data.idempotency_key).first()
+        if old and old.device_id == str(data.device_id) and old.payload_json == payload:
+            return {"proposal_id": old.id, "status": old.status, "duplicate": True,
+                    "applied": old.status == "applied", "payment_id": json.loads(old.resolution or "{}").get("payment_id")}
+        raise HTTPException(409, "Offline payment key collision; retry with the same request.")
+
 
 @app.post("/api/finance/payments", tags=["Finance"])
 def record_fee_payment(data: FeePaymentCreate, db: Session = Depends(get_db), admin=Depends(require_admin)):
