@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Users, Plus, Search, Wallet, ReceiptText, RefreshCw, Building2, CloudUpload, LockKeyhole } from 'lucide-react'
 import { saveEncryptedFinanceQueue, loadEncryptedFinanceQueue } from './syncStorage'
 
-type Staff = { id:number; staff_number:string; first_name:string; last_name:string; category:string; position?:string; department?:string; subjects?:string|null; phone?:string; email?:string; house?:string|null; salary_amount?:number|null; salary_frequency?:string; status?:string }
+type Staff = { id:number; staff_number:string; first_name:string; last_name:string; category:string; position?:string; department?:string; subjects?:string|null; phone?:string; email?:string; house?:string|null; salary_amount?:number|null; salary_frequency?:string; status?:string; login_allowed?:boolean }
 type Page<T> = { items:T[]; total:number; page:number; pages:number }
 type Summary = { fees_expected:number; fees_collected:number; outstanding:number; salary_expenses?:number; other_expenses?:number; total_expenses?:number; net_cash_position?:number }
 type Charge = { id:number; student_id:number; student_name:string; admission_number:string; class_id?:number|null; class_name?:string; stream?:string; term:string; year:number; amount:number; paid:number; balance:number }
@@ -37,7 +37,7 @@ export default function StaffFinance({token,active,classes=[],refreshKey=0,initi
   const [editingStaff,setEditingStaff]=useState<number|null>(null)
   const [message,setMessage]=useState('')
   const [newStaffLogin,setNewStaffLogin]=useState<{name:string;username:string;email:string;temporary_passcode:string}|null>(null)
-  const emptyStaffForm={full_name:'',category:'Teaching',position:'',department:'',subjects:'',phone:'',email:'',house:'',salary_amount:'',salary_frequency:'Monthly'}
+  const emptyStaffForm={full_name:'',category:'Teaching',position:'',department:'',subjects:'',phone:'',email:'',house:'',salary_amount:'',salary_frequency:'Monthly',create_login:true}
   const [form,setForm]=useState(emptyStaffForm)
   const [summary,setSummary]=useState<Summary>({fees_expected:0,fees_collected:0,outstanding:0})
   const [charges,setCharges]=useState<Charge[]>([])
@@ -141,15 +141,23 @@ export default function StaffFinance({token,active,classes=[],refreshKey=0,initi
     if(missingStaffFields.length){setMessage('Cannot save staff member. Complete: '+missingStaffFields.join(', ')+'.');return}
     setMessage('');setSavingStaff(true)
     try {
-      const payload={...(()=>{const names=form.full_name.trim().split(/\s+/);return {first_name:names.shift()||'',last_name:names.join(' ')||'—'}})(),...form,house:form.house||null,salary_amount:form.salary_amount===''?null:Number(form.salary_amount),subjects:form.category==='Teaching'?form.subjects:null}
+      const basePayload={...(()=>{const names=form.full_name.trim().split(/\s+/);return {first_name:names.shift()||'',last_name:names.join(' ')||'—'}})(),...form,house:form.house||null,salary_amount:form.salary_amount===''?null:Number(form.salary_amount),subjects:form.category==='Teaching'?form.subjects:null}
       if(editingStaff){
+        const payload={...basePayload,login_allowed:form.create_login}
+        delete (payload as any).create_login
         await request('staff/'+editingStaff,token,{method:'PATCH',body:JSON.stringify(payload)})
         setMessage('Staff profile updated.')
         setNewStaffLogin(null)
       }else{
-        const created=await request<{staff:Staff;login:{username:string;email:string;temporary_passcode:string}}>('staff',token,{method:'POST',body:JSON.stringify(payload)})
-        setNewStaffLogin({name:form.full_name,...created.login})
-        setMessage('Staff member registered and login account created. Copy the temporary passcode now; it will not be shown again.')
+        const payload={...basePayload,create_login:form.create_login}
+        const created=await request<{staff:Staff;login:{username:string;email:string;temporary_passcode:string}|null}>('staff',token,{method:'POST',body:JSON.stringify(payload)})
+        if(created.login){
+          setNewStaffLogin({name:form.full_name,...created.login})
+          setMessage('Staff member registered and login account created. Copy the temporary passcode now; it will not be shown again.')
+        }else{
+          setNewStaffLogin(null)
+          setMessage('Staff member registered without a login account, as selected.')
+        }
       }
       setEditingStaff(null);setForm(emptyStaffForm);setShowForm(false)
       const p=new URLSearchParams({search,page:'1',page_size:'5'});if(category)p.set('category',category);const r=await request<Page<Staff>>('staff?'+p.toString(),token);setStaff(r.items);setStaffTotal(r.total)
@@ -248,9 +256,10 @@ export default function StaffFinance({token,active,classes=[],refreshKey=0,initi
       <div className="form-heading"><div><h3>{editingStaff?'Update staff profile':'Register a staff member'}</h3><p>Enter the employee's details. Fields marked * are compulsory.</p></div><span className="required-note">* Required</span></div>
       <section className="form-section"><div className="form-section-heading"><span className="form-section-number">01</span><div><h4>Biodata</h4><p>Enter the employee's full legal name.</p></div></div><div className="student-form-grid"><label className="field-span-full">Full name *<input autoComplete="name" required value={form.full_name} onChange={e=>setForm({...form,full_name:e.target.value})} placeholder="Enter employee's full name"/></label></div></section>
       <section className="form-section"><div className="form-section-heading"><span className="form-section-number">02</span><div><h4>Professional information</h4><p>Set the employee's category, school role, department and teaching subjects.</p></div></div><div className="student-form-grid">
-        <label>Staff category *<select required value={form.category} onChange={e=>setForm({...form,category:e.target.value})}><option>Teaching</option><option>Non-teaching</option></select></label>
+        <label>Staff category *<select required value={form.category} onChange={e=>setForm({...form,category:e.target.value,create_login:e.target.value==='Teaching'})}><option>Teaching</option><option>Non-teaching</option></select></label>
         <label>Job title / position *<input required list="school-staff-roles" value={form.position} onChange={e=>setForm({...form,position:e.target.value})} placeholder="Choose or type a role"/><datalist id="school-staff-roles">{(form.category==='Teaching'?['Head Teacher','Deputy Head Teacher','Director of Studies','Class Teacher','Subject Teacher','Senior Teacher','Head of Department','Examinations Officer','Guidance and Counselling Teacher','Special Needs Teacher']:['School Administrator','Bursar','Accountant','Secretary','Librarian','Laboratory Technician','ICT Technician','Nurse','Matron','Warden','Driver','Security Officer','Cook','Cleaner','Groundskeeper','Storekeeper','Procurement Officer']).map(x=><option key={x} value={x}/>)}</datalist></label>
         <label>Department *<input required list="school-departments" value={form.department} onChange={e=>setForm({...form,department:e.target.value})} placeholder="Choose or type a department"/><datalist id="school-departments">{['Administration','Academics','Languages','Sciences','Humanities','Mathematics','ICT','Examinations','Finance and Accounts','Human Resources','Library','Laboratory','Student Affairs','Guidance and Counselling','Sports and Games','Health Services','Catering','Transport','Maintenance','Security','Boarding'].map(x=><option key={x} value={x}/>)}</datalist></label>
+        <label className="field-span-full staff-login-eligibility"><input type="checkbox" checked={form.create_login} onChange={e=>setForm({...form,create_login:e.target.checked})}/> Create a SchoolBridge login account for this staff member <small>{form.create_login?'This person will receive a username and temporary passcode.':'This person will be registered in staff records without login access. You can allow access later.'}</small></label>
         {form.category==='Teaching'&&<div className="field-span-full staff-subject-picker"><div className="staff-subject-picker-heading"><strong>Subjects this teacher is qualified to teach *</strong><span>{selectedStaffSubjects.length} selected</span></div><p className="field-hint">Select every subject assigned to this teacher during registration. You can select more than one. Only these subjects will be available when assigning classes.</p><div className="permission-choice-grid staff-subject-choice-grid">{subjectOptions.map(subject=><button type="button" key={subject.id} className={selectedStaffSubjects.includes(subject.name)?'permission-choice active':'permission-choice'} aria-pressed={selectedStaffSubjects.includes(subject.name)} onClick={()=>toggleStaffSubject(subject.name)}><span>{subject.name}</span><small>{selectedStaffSubjects.includes(subject.name)?'Selected':'Select subject'}</small></button>)}</div>{!subjectOptions.length&&<small className="field-hint">No registered subjects are available. Add subjects under Examinations before registering a subject teacher.</small>}{!selectedStaffSubjects.length&&<small className="field-error">Select at least one subject for this teaching staff member.</small>}</div>}
       </div></section>
       <section className="form-section"><div className="form-section-heading"><span className="form-section-number">03</span><div><h4>Contact information</h4><p>How the school can contact this employee.</p></div></div><div className="student-form-grid">
@@ -266,7 +275,7 @@ export default function StaffFinance({token,active,classes=[],refreshKey=0,initi
     </form>}
     <div className="table-tools student-tools"><div className="search-box"><Search size={17}/><input placeholder="Search name or staff number..." value={search} onChange={e=>setSearch(e.target.value)}/></div><div className="staff-category-options" role="group" aria-label="Filter staff category">{[{label:'All staff',value:''},{label:'Teaching',value:'Teaching'},{label:'Non-teaching',value:'Non-teaching'}].map(option=><button key={option.value||'all'} type="button" className={category===option.value?'staff-category-option active':'staff-category-option'} onClick={()=>setCategory(option.value)}>{option.label}</button>)}</div></div>
     <p className="staff-list-count">Showing {staff.length} of {staffTotal} staff members{search.trim()?' matching your search':'. Search to find other staff members.'}</p>
-    <div className="table-wrap"><table><thead><tr><th>Staff member</th><th>Staff number</th><th>Category</th><th>Position</th><th>Department</th><th>House</th><th>Phone</th><th>Salary (UGX)</th><th>Status</th><th>Actions</th></tr></thead><tbody>{staff.map(s=><tr key={s.id}><td>{s.first_name} {s.last_name}</td><td>{s.staff_number}</td><td>{s.category}</td><td>{s.position||'—'}{s.subjects?' · '+s.subjects:''}</td><td>{s.department||'—'}</td><td>{s.house||'—'}</td><td>{s.phone||'—'}</td><td>{s.salary_amount?.toLocaleString()||'—'} {s.salary_frequency||''}</td><td>{s.status||'active'}</td><td><button type="button" className="secondary-button" onClick={()=>{setEditingStaff(s.id);setForm({full_name:[s.first_name,s.last_name].filter(Boolean).join(' '),category:s.category,position:s.position||'',department:s.department||'',subjects:s.subjects||'',phone:s.phone||'',email:s.email||'',salary_amount:s.salary_amount==null?'':String(s.salary_amount),salary_frequency:s.salary_frequency||'Monthly',house:s.house||''});setShowForm(true)}}>Edit</button>{s.status!=='archived'&&<button type="button" className="secondary-button" onClick={()=>void archiveStaff(s.id)}>Archive</button>}</td></tr>)}</tbody></table></div>
+    <div className="table-wrap"><table><thead><tr><th>Staff member</th><th>Staff number</th><th>Category</th><th>Position</th><th>Department</th><th>House</th><th>Phone</th><th>Salary (UGX)</th><th>Login access</th><th>Status</th><th>Actions</th></tr></thead><tbody>{staff.map(s=><tr key={s.id}><td>{s.first_name} {s.last_name}</td><td>{s.staff_number}</td><td>{s.category}</td><td>{s.position||'—'}{s.subjects?' · '+s.subjects:''}</td><td>{s.department||'—'}</td><td>{s.house||'—'}</td><td>{s.phone||'—'}</td><td>{s.salary_amount?.toLocaleString()||'—'} {s.salary_frequency||''}</td><td>{s.login_allowed===false?'Not allowed':'Allowed'}</td><td>{s.status||'active'}</td><td><button type="button" className="secondary-button" onClick={()=>{setEditingStaff(s.id);setForm({full_name:[s.first_name,s.last_name].filter(Boolean).join(' '),category:s.category,position:s.position||'',department:s.department||'',subjects:s.subjects||'',phone:s.phone||'',email:s.email||'',salary_amount:s.salary_amount==null?'':String(s.salary_amount),salary_frequency:s.salary_frequency||'Monthly',house:s.house||'',create_login:s.login_allowed!==false});setShowForm(true)}}>Edit</button>{s.status!=='archived'&&<button type="button" className="secondary-button" onClick={()=>void archiveStaff(s.id)}>Archive</button>}</td></tr>)}</tbody></table></div>
     {!staff.length&&<div className="empty-state"><Users size={30}/><p>No staff members match this search.</p></div>}
   </section>
 
