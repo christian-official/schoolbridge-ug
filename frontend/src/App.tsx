@@ -617,11 +617,43 @@ function FirstTimeSetupWizard({status,onStatusChange}:{status:FirstSetupStatus;o
   const [license,setLicense]=useState('')
   const [busy,setBusy]=useState(false)
   const [error,setError]=useState('')
-  const [school,setSchool]=useState({
-    school_name:'', school_type:'Secondary', country:'', school_structure:'Day',
-    address:'', phone:'', email:'', motto:'', report_logo:'', house_names:'',
-    admin_username:'', admin_email:'', admin_password:'',
+  const draftKey=`schoolbridge-first-setup-draft:${status.installation_id}`
+  const [school,setSchool]=useState(()=>{
+    const defaults={
+      school_name:'', school_type:'Secondary', country:'', school_structure:'Day',
+      address:'', phone:'', email:'', motto:'', report_logo:'', house_names:'',
+      admin_username:'', admin_email:'', admin_password:'',
+    }
+    let draft:Record<string,unknown>={}
+    try {
+      const saved=typeof window!=='undefined'?window.sessionStorage.getItem(draftKey):null
+      const parsed=saved?JSON.parse(saved):null
+      if(parsed&&typeof parsed==='object')draft=parsed
+    } catch { /* Browser storage may be unavailable; setup can continue without a saved draft. */ }
+    return {
+      ...defaults,
+      school_name:typeof draft.school_name==='string'?draft.school_name:defaults.school_name,
+      school_type:typeof draft.school_type==='string'?draft.school_type:defaults.school_type,
+      country:typeof draft.country==='string'?draft.country:defaults.country,
+      school_structure:typeof draft.school_structure==='string'?draft.school_structure:defaults.school_structure,
+      address:typeof draft.address==='string'?draft.address:defaults.address,
+      phone:typeof draft.phone==='string'?draft.phone:defaults.phone,
+      email:typeof draft.email==='string'?draft.email:defaults.email,
+      motto:typeof draft.motto==='string'?draft.motto:defaults.motto,
+      house_names:typeof draft.house_names==='string'?draft.house_names:defaults.house_names,
+    }
   })
+  useEffect(()=>{
+    // Persist only non-secret school profile fields for this browser tab/session.
+    // Never persist the activation code, logo data, administrator identity or password.
+    const draft={
+      school_name:school.school_name,school_type:school.school_type,country:school.country,
+      school_structure:school.school_structure,address:school.address,phone:school.phone,
+      email:school.email,motto:school.motto,house_names:school.house_names,
+    }
+    try { window.sessionStorage.setItem(draftKey,JSON.stringify(draft)) }
+    catch { /* Setup remains usable if browser storage is disabled or full. */ }
+  },[draftKey,school])
   function handleSchoolLogo(event:React.ChangeEvent<HTMLInputElement>) {
     const file=event.target.files?.[0]
     if(!file)return
@@ -667,6 +699,7 @@ function FirstTimeSetupWizard({status,onStatusChange}:{status:FirstSetupStatus;o
       })
       const result=await response.json().catch(()=>({}))
       if(!response.ok)throw new Error(result.detail||'School setup could not be completed.')
+      try { window.sessionStorage.removeItem(draftKey) } catch { /* Ignore unavailable browser storage. */ }
       onStatusChange({...status,setup_completed:true,activated:true,identity_locked:true,error:''})
       setSchool({...school,admin_password:''})
       setLicense('')
@@ -692,6 +725,7 @@ function FirstTimeSetupWizard({status,onStatusChange}:{status:FirstSetupStatus;o
       </> : <>
         <h1>Set up your school</h1>
         <p className="muted">Enter the school's official details and create its first administrator account. The original school identity will be protected after setup.</p>
+        <p className="form-hint">If this page is refreshed, school identity and contact fields are restored in this browser tab. The activation code, logo file and administrator credentials are not saved; keep the code available and re-enter those details if needed.</p>
         <form onSubmit={completeSetup}>
           <div className="first-setup-section"><h3>Owner authorisation</h3>
             <label htmlFor="schoolbridge-license-confirm">Confirm CHRISTIAN Owner Key activation code</label>
