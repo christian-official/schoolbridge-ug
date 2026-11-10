@@ -4,7 +4,9 @@
 
 SchoolBridge is local-first. Each school has its own local database and runs the frontend and backend on its own computer. Render is a preview/development service only. Internet is not required for local installation, login or ordinary school operations. A LAN/router is optional and is needed only when additional devices must connect to the host; one-computer operation requires no network equipment.
 
-**Current implementation status:** the repository has a local PostgreSQL + backend + frontend Compose stack and same-origin Nginx API proxy. The service worker caches the application shell only; it does not provide complete offline record access or offline writes across all modules. The scripts below package application container images so they do not need to be downloaded at the school. They do not yet make a clean Windows computer self-installing: a compatible Docker Engine and Compose v2 runtime must already be installed. Bundling a supported runtime and passing a clean-machine, internet-disconnected acceptance test remain release blockers. This is a USB image-packaging foundation, not a finished turnkey offline installer.
+**Important distinction:** when SchoolBridge is installed on a school computer, its local frontend, API and database run together. Login and ordinary school work use that local API/database; they do not depend on Render, internet, Wi-Fi or a LAN. LAN is only for connecting additional computers or phones. The service-worker browser cache is a different fallback: if the local SchoolBridge server itself is stopped or unreachable, it currently provides the app shell and limited encrypted snapshots/drafts, not every record and every editing workflow.
+
+**Current installation status:** the USB package exports the frontend, backend and PostgreSQL images, and includes a Windows runtime-preparation helper. The helper can enable WSL features, install a staged WSL MSI and launch the staged Docker Desktop installer, but Docker setup remains interactive for licence acceptance and Windows may require a restart. The official Docker/WSL installers must be staged in the repository `runtime` folder before preparing the USB; they are not downloaded automatically. A clean Windows computer with internet disconnected has not yet passed the complete acceptance test, so this is not yet a certified turnkey offline installer.
 
 ## 1. Prepare the USB package
 
@@ -20,7 +22,7 @@ Never put the owner's private signing key or passphrase on the USB. Only the pub
 
 ## 2. Install on one computer without LAN or internet
 
-1. Run `./check-school-host.ps1` from the USB package. If Docker/WSL is missing, follow [Windows runtime preparation](WINDOWS_RUNTIME_PREPARATION.md) using the official installers staged in the USB `runtime` folder. Runtime installation may require administrator rights, licence acceptance and a Windows restart.
+1. Run `./prepare-school-host.ps1` from an elevated PowerShell window on the school computer. It uses the official installers staged in the USB `runtime` folder. Complete Docker Desktop setup and licence acceptance, and restart Windows if requested. Then run `./check-school-host.ps1` and confirm every check passes.
 2. Copy the USB's `SchoolBridge-USB` folder to a local folder on the computer, such as `C:\\SchoolBridge`. Do not run the database from the USB itself.
 3. Open PowerShell in that local folder and run `./install-schoolbridge.ps1`.
 4. The installer rechecks host readiness, creates a local `.env` with fresh random database/application secrets, asks for the owner's Base64 **public** verification key, validates it, imports the saved images, and asks you to type `START` before starting services. It does not need the owner's private key or passphrase.
