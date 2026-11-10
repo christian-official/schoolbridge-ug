@@ -14,7 +14,7 @@ import OperationsManagement from './OperationsManagement'
 import Phase4Workspace from './Phase4Workspace'
 import ParentLiaisonWorkspace from './ParentLiaison'
 import SyncDevices from './SyncDevices'
-import { clearLocalSyncData, saveEncryptedOfflineDraft, loadEncryptedOfflineDraft, deleteEncryptedOfflineDraft } from './syncStorage'
+import { clearLocalSyncData, saveEncryptedOfflineDraft, loadEncryptedOfflineDraft, deleteEncryptedOfflineDraft, loadEncryptedOfflineSnapshot } from './syncStorage'
 import './App.css'
 import './DashboardRedesign.css'
 
@@ -739,12 +739,48 @@ function FirstTimeSetupWizard({status,onStatusChange}:{status:FirstSetupStatus;o
   </main>
 }
 
+type OfflineWorkspaceSnapshot = {
+  version:number; userId:number; deviceId:string; username:string; role:string; role_label?:string;
+  permissions?:Record<string,string[]>; downloadedAt:number; expiresAt:number;
+  students:any[]; classes:any[]; attendance:any[]; exams:any[]; marks:any[];
+  charges:any[]; payments:any[]; class_fees:any[];
+}
+function OfflineWorkspace({snapshot,onExit}:{snapshot:OfflineWorkspaceSnapshot;onExit:()=>void}) {
+  const [section,setSection]=useState<'students'|'classes'|'attendance'|'exams'|'marks'|'finance'>('students')
+  const labels:{key:typeof section;label:string;rows:any[]}[]=[
+    {key:'students',label:'Students',rows:snapshot.students||[]},{key:'classes',label:'Classes',rows:snapshot.classes||[]},
+    {key:'attendance',label:'Attendance',rows:snapshot.attendance||[]},{key:'exams',label:'Examinations',rows:snapshot.exams||[]},
+    {key:'marks',label:'Results',rows:snapshot.marks||[]},
+    {key:'finance',label:'Finance',rows:[...(snapshot.charges||[]),...(snapshot.payments||[]),...(snapshot.class_fees||[])]},
+  ]
+  const current=labels.find(item=>item.key===section)!
+  const fields=section==='students'?['name','first_name','last_name','admission_number','class_name','section']:
+    section==='classes'?['name','section']:section==='attendance'?['student_name','date','status','class_name']:
+    section==='exams'?['name','term','year','class_name']:section==='marks'?['student_name','subject_name','score','grade','verified']:
+    ['student_name','description','amount','date','status']
+  const value=(row:any,key:string)=>{const v=row?.[key];return v===null||v===undefined?'—':typeof v==='object'?JSON.stringify(v):String(v)}
+  return <main className="login-page"><section className="login-card" style={{width:'min(1100px,96vw)',maxWidth:1100,textAlign:'left'}}>
+    <div className="brand-name">School<span>Bridge</span></div><h1>Offline workspace</h1>
+    <p className="muted">Signed in locally as {snapshot.username} · {snapshot.role_label||snapshot.role}</p>
+    <p className="form-hint">Read-only copy from {new Date(snapshot.downloadedAt).toLocaleString()}. Expires {new Date(snapshot.expiresAt).toLocaleString()}. Reconnect to validate access and synchronise changes.</p>
+    <div style={{display:'flex',flexWrap:'wrap',gap:8,margin:'16px 0'}}>{labels.map(item=><button key={item.key} type="button" className={section===item.key?'primary-button':'secondary-button'} onClick={()=>setSection(item.key)}>{item.label} ({item.rows.length})</button>)}</div>
+    <div className="table-wrap"><table><thead><tr>{fields.map(field=><th key={field}>{field.replace(/_/g,' ')}</th>)}</tr></thead><tbody>
+      {current.rows.slice(0,500).map((row:any,index:number)=><tr key={row.id??index}>{fields.map(field=><td key={field}>{value(row,field)}</td>)}</tr>)}
+      {!current.rows.length&&<tr><td colSpan={fields.length}>No {current.label.toLowerCase()} were included in this offline copy.</td></tr>}
+    </tbody></table></div>
+    {current.rows.length>500&&<p className="form-hint">Showing the first 500 records. Reconnect for the complete school data.</p>}
+    <p className="form-hint">Offline mode is read-only. Creating or changing school records requires a verified connection.</p>
+    <button type="button" className="secondary-button" onClick={onExit}>Return to sign in</button>
+  </section></main>
+}
+
 function App() {
   const [token, setToken] = useState(sessionStorage.getItem('sb_token') || '')
   const [user, setUser] = useState<User | null>(null)
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [loginError, setLoginError] = useState('')
+  const [offlineWorkspace, setOfflineWorkspace] = useState<OfflineWorkspaceSnapshot | null>(null)
   const [showRecovery, setShowRecovery] = useState(false)
   const [loading, setLoading] = useState(false)
   const [active, setActive] = useState('Overview')
@@ -1160,7 +1196,23 @@ function App() {
       setToken(result.access_token)
       setPassword('')
     } catch (error) {
-      setLoginError(error instanceof Error ? error.message : 'Unable to sign in')
+      // Only a network outage may activate the local read-only sign-in path.
+      if (error instanceof TypeError || !navigator.onLine) {
+        try {
+          const raw=localStorage.getItem('schoolbridge-offline-login-index')
+          if(!raw) throw new Error('Offline sign-in has not been prepared on this browser. Connect and save an encrypted offline copy first.')
+          const index=JSON.parse(raw) as {userId:number;deviceId:string;username:string}
+          if(!index.userId||!index.deviceId||index.username.toLowerCase()!==username.trim().toLowerCase()) throw new Error('Use the exact account username saved during online sign-in.')
+          const snapshot=await loadEncryptedOfflineSnapshot<OfflineWorkspaceSnapshot>(index.userId,index.deviceId,password)
+          if(snapshot.version!==1||snapshot.userId!==index.userId||snapshot.deviceId!==index.deviceId||snapshot.username?.toLowerCase()!==username.trim().toLowerCase()) throw new Error('The encrypted offline copy does not match this account or device.')
+          if(!snapshot.expiresAt||snapshot.expiresAt<Date.now()||snapshot.downloadedAt>Date.now()+60000) throw new Error('The offline copy has expired. Reconnect and download a fresh copy.')
+          setOfflineWorkspace(snapshot)
+          setPassword('')
+          setLoginError('')
+        } catch (offlineError) {
+          setLoginError(offlineError instanceof Error ? offlineError.message : 'Offline sign-in is unavailable. Reconnect and try again.')
+        }
+      } else setLoginError(error instanceof Error ? error.message : 'Unable to sign in')
     } finally {
       setLoading(false)
     }
@@ -1180,6 +1232,8 @@ function App() {
   const className = (selectedClass?.name || '').toLowerCase().replace(/[.\s_-]/g, '')
   const selectedAcademicLevel = /^(s|senior\s*)[56]$/.test(className) || /senior\s*[56]/.test(className) ? 'A-Level' : /^(s|senior\s*)[1-4]$/.test(className) || /senior\s*[1-4]/.test(className) ? 'O-Level' : ''
   const [artsCombinations, sciencesCombinations] = (schoolConfig.a_level_combinations || '').split(/\r?\n/).reduce((groups: string[][], line: string) => { const match = line.match(/^(ARTS|SCIENCES)::(.*)$/i); if (match && match[2].trim()) groups[match[1].toUpperCase() === 'ARTS' ? 0 : 1].push(match[2].trim()); return groups }, [[], []])
+
+  if (offlineWorkspace) return <OfflineWorkspace snapshot={offlineWorkspace} onExit={()=>setOfflineWorkspace(null)}/>;
 
   if (!token || !user) {
     if(setupStatus.loading) return <main className="login-page"><section className="login-card"><div className="brand-name">School<span>Bridge</span></div><p className="muted">Checking school installation...</p></section></main>
