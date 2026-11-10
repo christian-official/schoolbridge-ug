@@ -10,7 +10,7 @@ Do not place the owner's private signing key or passphrase in the repository or 
 
 ## School computer readiness
 
-The school computer needs supported 64-bit Windows 10 22H2 or Windows 11 23H2 or later, at least 8 GB RAM, hardware virtualization enabled, WSL 2.1.5 or later, and a compatible Docker Desktop installation. These are the current project preflight baselines; check Docker and Microsoft requirements before deployment because vendor requirements can change.
+The school computer needs a currently supported 64-bit Windows release that Docker Desktop supports, at least 8 GB RAM, hardware virtualization enabled, WSL 2.1.5 or later, and a compatible Docker Desktop installation. The scripts enforce the project's current minimum Windows build checks; before deployment, also confirm that the school's Windows edition and release are still within Microsoft's servicing timeline and Docker's support policy.
 
 From an elevated PowerShell window in the USB package folder, run:
 
@@ -18,7 +18,7 @@ From an elevated PowerShell window in the USB package folder, run:
 .\prepare-school-host.ps1
 ```
 
-The script enables Windows Subsystem for Linux and Virtual Machine Platform, installs the staged WSL MSI if the required WSL version is not ready, and launches the official Docker Desktop installer when Docker Desktop is not installed in its expected machine-wide location. The authorised school operator must complete Docker's interactive setup and accept its licence terms. Restart Windows if requested, open Docker Desktop, and wait for its engine to become ready.
+The script enables Windows Subsystem for Linux and Virtual Machine Platform, installs the staged WSL MSI if the required WSL version is not ready, and checks both Docker Desktop's recommended per-user installation location and its all-users installation location. If Docker Desktop is not found in either location, it launches the official installer. The authorised school operator must complete Docker's interactive setup and accept its licence terms. Restart Windows if requested, open Docker Desktop, and wait for its engine to become ready.
 
 Then run:
 
