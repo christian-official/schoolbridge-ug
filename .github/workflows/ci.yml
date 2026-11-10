@@ -23,6 +23,39 @@ jobs:
       - name: Run backend API tests
         run: PYTHONPATH=backend pytest -q backend/tests
 
+  postgres-recovery-integration:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: schoolbridge
+          POSTGRES_PASSWORD: ci-postgres-password
+          POSTGRES_DB: schoolbridge_restore_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U schoolbridge -d schoolbridge_restore_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      SCHOOLBRIDGE_DATABASE_URL: sqlite:///./schoolbridge_ci.db
+      SCHOOLBRIDGE_SECRET_KEY: ci-only-secret-key-not-for-production
+      SCHOOLBRIDGE_POSTGRES_INTEGRATION_URL: postgresql+psycopg://schoolbridge:ci-postgres-password@127.0.0.1:5432/schoolbridge_restore_ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install PostgreSQL client and backend test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+          pip install -r backend/requirements-dev.txt
+      - name: Run real PostgreSQL backup and restore drill
+        run: PYTHONPATH=backend pytest -q backend/tests/test_postgres_restore_integration.py
+
   frontend-build:
     runs-on: ubuntu-24.04
     defaults:
