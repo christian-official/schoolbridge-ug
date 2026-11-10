@@ -16,3 +16,5 @@ services:
         value: sqlite:///./schoolbridge.db
       - key: SCHOOLBRIDGE_CORS_ORIGINS
         value: "*"
+      - key: SCHOOLBRIDGE_SEED_DEMO_DATA
+        value: "false"
