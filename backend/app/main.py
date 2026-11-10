@@ -2015,7 +2015,8 @@ def apply_school_identity_correction(
     profile.school_type = school_type
     profile.country = country
     profile.school_structure = school_structure
-    state.original_identity_json = json.dumps(new_identity, sort_keys=True)
+    # Preserve the immutable first-install identity snapshot. Current identity
+    # lives in SchoolProfile; each authorised change is recorded separately.
     db.add(models.SchoolIdentityCorrection(
         license_hash=fingerprint,
         license_id=str(claims["license_id"]),
@@ -5002,20 +5003,20 @@ def save_school_profile(data: SchoolProfileUpdate, db: Session = Depends(get_db)
             updates[optional_identity_field] = None
     state = db.get(models.SchoolSetupState, 1)
     if state and state.setup_completed_at and state.original_identity_json:
-        original = json.loads(state.original_identity_json)
-        requested_identity = {
-            "school_name": updates.get("name", profile.name),
-            "school_type": updates.get("school_type", profile.school_type),
-            "country": updates.get("country", profile.country),
-            "school_structure": updates.get("school_structure", profile.school_structure),
+        # Protect the current registered identity, not the immutable first-install
+        # snapshot. Owner-authorised corrections update the current profile while
+        # preserving the original snapshot and correction history.
+        identity_fields = {
+            "name": profile.name,
+            "school_type": profile.school_type,
+            "country": profile.country,
+            "school_structure": profile.school_structure,
         }
-        protected_identity = {
-            "school_name": original.get("school_name"),
-            "school_type": original.get("school_type"),
-            "country": original.get("country"),
-            "school_structure": original.get("school_structure"),
-        }
-        if requested_identity != protected_identity:
+        changed_identity = [
+            field for field, current_value in identity_fields.items()
+            if field in updates and updates[field] != current_value
+        ]
+        if changed_identity:
             raise HTTPException(403, "Official school identity is protected after first-time setup. Contact the SchoolBridge owner for an authorised, audited correction.")
     for key, value in updates.items():
         setattr(profile, key, value)

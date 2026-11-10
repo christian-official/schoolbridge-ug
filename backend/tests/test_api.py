@@ -2213,8 +2213,24 @@ def test_owner_signed_identity_correction_is_audited_and_one_time(monkeypatch):
         assert applied.status_code == 200, applied.text
         replay = client.post("/api/setup/identity-correction", headers=headers, json={"license": correction})
         assert replay.status_code == 409
+        profile_update = client.put("/api/settings/school-profile", headers=headers, json={
+            "name": "Corrected School Name", "school_type": "Combined",
+            "country": "Uganda", "school_structure": "Both",
+            "address": "Kampala", "motto": "Learning together",
+        })
+        assert profile_update.status_code == 200, profile_update.text
+        rejected_identity_edit = client.put("/api/settings/school-profile", headers=headers, json={
+            "name": "Unapproved Name", "school_type": "Combined",
+            "country": "Uganda", "school_structure": "Both",
+        })
+        assert rejected_identity_edit.status_code == 403
         with SessionLocal() as db:
             profile = db.get(models.SchoolProfile, 1)
             assert profile.name == "Corrected School Name"
             assert db.query(models.SchoolIdentityCorrection).count() == 1
             assert db.query(models.AuditLog).filter_by(action="school_identity_corrected").count() == 1
+            state = db.get(models.SchoolSetupState, 1)
+            original = json.loads(state.original_identity_json)
+            assert original["school_name"] == "Original School"
+            assert original["school_type"] == "Secondary"
+            assert original["school_structure"] == "Day"
