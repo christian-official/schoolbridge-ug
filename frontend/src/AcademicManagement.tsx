@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { BookOpen, Plus, RefreshCw, Save, Printer } from 'lucide-react'
+import { BookOpen, Plus, RefreshCw, Save, Printer, LockKeyhole, Download, Upload } from 'lucide-react'
+import { saveEncryptedOfflineDraft, loadEncryptedOfflineDraft, deleteEncryptedOfflineDraft } from './syncStorage'
 
 type SchoolClass = { id: number; name?: string; section?: string }
 type Subject = { id: number; name: string; code?: string | null }
@@ -91,7 +92,7 @@ async function fetchClassStudents(token: string, classId: number | null): Promis
   return [first, ...remaining].flatMap(page => page.items)
 }
 
-export default function AcademicManagement({ token, classes, canVerify = false }: { token: string; classes: SchoolClass[]; canVerify?: boolean }) {
+export default function AcademicManagement({ token, classes, canVerify = false, userId, isTeacher = false }: { token: string; classes: SchoolClass[]; canVerify?: boolean; userId: number; isTeacher?: boolean }) {
   const [exams, setExams] = useState<Exam[]>([])
   const [subjects, setSubjects] = useState<Subject[]>([])
   const [students, setStudents] = useState<Student[]>([])
@@ -124,6 +125,10 @@ export default function AcademicManagement({ token, classes, canVerify = false }
   const [saveProgress, setSaveProgress] = useState(0)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+  const [offlinePassphrase, setOfflinePassphrase] = useState('')
+  const [offlineMarkMessage, setOfflineMarkMessage] = useState('')
+  const [offlineMarkBusy, setOfflineMarkBusy] = useState(false)
+  const [markSyncBaseline, setMarkSyncBaseline] = useState<{deviceId:string;baseSequence:number}|null>(null)
 
   async function loadSetup() {
     setLoading(true)
@@ -170,16 +175,17 @@ export default function AcademicManagement({ token, classes, canVerify = false }
     Promise.all([
       fetchClassStudents(token, selectedExam.class_id),
       request<Mark[]>(`marks?exam_id=${selectedExam.id}`, token),
-    ]).then(([studentRows, markRows]) => {
+    ]).then(async ([studentRows, markRows]) => {
       if (cancelled) return
       setStudents(studentRows)
       setMarks(markRows)
       setMarkDrafts(Object.fromEntries(markRows.map(mark => [String(mark.student_id) + ':' + String(mark.subject_id), String(Math.round(mark.score))])))
+      if(isTeacher){const deviceId=localStorage.getItem('schoolbridge-sync-device-'+userId)||'';if(deviceId){try{const result=await request<{devices:Array<{device_id:string;active:boolean;last_issued_sequence:number}>}>('sync/devices',token);const device=result.devices.find(row=>row.device_id===deviceId&&row.active);setMarkSyncBaseline(device?{deviceId,baseSequence:device.last_issued_sequence}:null)}catch{setMarkSyncBaseline(null)}}else setMarkSyncBaseline(null)}
     }).catch(e => {
       if (!cancelled) setError(e instanceof Error ? e.message : 'Unable to load this examination.')
     })
     return () => { cancelled = true }
-  }, [selectedExamId, token, selectedExam?.class_id])
+  }, [selectedExamId, token, selectedExam?.class_id, userId, isTeacher])
 
   useEffect(() => {
     if (!historyStudentId) {
@@ -324,6 +330,12 @@ export default function AcademicManagement({ token, classes, canVerify = false }
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to submit subject results.') }
     finally { setSaving(false) }
   }
+
+  async function saveOfflineMarkDraft(){if(!selectedExam||!selectedSubjectId||!eligibleStudents.length){setOfflineMarkMessage('Select an examination and subject with students first.');return}if(offlinePassphrase.length<12){setOfflineMarkMessage('Use the 12-character-or-longer offline passphrase.');return}if(!markSyncBaseline){setOfflineMarkMessage('Connect, register this device and reload the examination to obtain a sync baseline.');return}try{const subjectId=Number(selectedSubjectId);const records=eligibleStudents.map(student=>{const raw=markDrafts[String(student.id)+':'+selectedSubjectId];const score=raw===undefined||raw.trim()===''?0:Number(raw);if(!Number.isInteger(score)||score<0||score>100)throw new Error('Enter a whole-number score from 0 to 100 for '+studentName(student)+'.');return{student_id:student.id,score}});const baseMarkIds=Object.fromEntries(eligibleStudents.map(student=>{const existing=marks.find(mark=>mark.student_id===student.id&&mark.subject_id===subjectId);return[String(student.id),existing?.id??null]}));if(eligibleStudents.some(student=>marks.some(mark=>mark.student_id===student.id&&mark.subject_id===subjectId&&mark.verified)))throw new Error('This subject contains verified results and cannot be saved as an offline draft.');const draft={version:1,userId,deviceId:markSyncBaseline.deviceId,examId:selectedExam.id,subjectId,baseSequence:markSyncBaseline.baseSequence,baseMarkIds,records,idempotencyKey:crypto.randomUUID(),savedAt:Date.now(),expiresAt:Date.now()+24*60*60*1000};await saveEncryptedOfflineDraft(userId,markSyncBaseline.deviceId,offlinePassphrase,draft,false);setOfflineMarkMessage('Encrypted marks draft saved. Official results have not been changed.')}catch(error){setOfflineMarkMessage(error instanceof Error?error.message:'Unable to save the encrypted marks draft.')}}
+
+  async function unlockOfflineMarkDraft(){const deviceId=localStorage.getItem('schoolbridge-sync-device-'+userId)||'';if(!deviceId||offlinePassphrase.length<12){setOfflineMarkMessage('Register this device and enter the offline passphrase.');return}setOfflineMarkBusy(true);try{const draft=await loadEncryptedOfflineDraft<any>(userId,deviceId,offlinePassphrase);if(draft.version!==1||draft.userId!==userId||draft.deviceId!==deviceId||draft.expiresAt<=Date.now())throw new Error('This marks draft is expired or belongs to another account or device.');if(!exams.some(exam=>exam.id===draft.examId)||!subjects.some(subject=>subject.id===draft.subjectId))throw new Error('The examination or subject is no longer available.');setSelectedExamId(String(draft.examId));setSelectedSubjectId(String(draft.subjectId));setMarkDrafts(current=>({...current,...Object.fromEntries(draft.records.map((row:any)=>[String(row.student_id)+':'+String(draft.subjectId),String(row.score)]))}));setOfflineMarkMessage('Encrypted marks draft unlocked. Review scores before submitting.')}catch(error){setOfflineMarkMessage(error instanceof Error?error.message:'Unable to unlock the marks draft.')}finally{setOfflineMarkBusy(false)}}
+
+  async function submitOfflineMarkDraft(){const deviceId=localStorage.getItem('schoolbridge-sync-device-'+userId)||'';if(!deviceId||offlinePassphrase.length<12){setOfflineMarkMessage('Register this device and enter the offline passphrase.');return}setOfflineMarkBusy(true);try{const draft=await loadEncryptedOfflineDraft<any>(userId,deviceId,offlinePassphrase);if(draft.version!==1||draft.userId!==userId||draft.deviceId!==deviceId||draft.expiresAt<=Date.now())throw new Error('This marks draft is expired or belongs to another account or device.');const result=await request<{proposal_id:number;status:string;applied:boolean;saved:number}>('sync/teacher-mark-proposals',token,{method:'POST',body:JSON.stringify({device_id:deviceId,idempotency_key:draft.idempotencyKey,exam_id:draft.examId,subject_id:draft.subjectId,base_sequence:draft.baseSequence,base_mark_ids:draft.baseMarkIds,records:draft.records})});if(result.applied){await deleteEncryptedOfflineDraft(userId,deviceId);setOfflineMarkMessage(result.saved+' marks synchronised as unverified results; normal verification still applies.');if(selectedExamId===String(draft.examId)){const next=await request<Mark[]>('marks?exam_id='+draft.examId,token);setMarks(next);setMarkDrafts(Object.fromEntries(next.map(mark=>[String(mark.student_id)+':'+String(mark.subject_id),String(Math.round(mark.score))])))}}else setOfflineMarkMessage('Submission #'+result.proposal_id+' was not applied because a conflict was detected. The encrypted draft is retained.')}catch(error){setOfflineMarkMessage(error instanceof Error?error.message:'Unable to submit offline marks. The encrypted draft remains saved.')}finally{setOfflineMarkBusy(false)}}
 
   async function setSubjectVerification(subjectId: number, verified: boolean) {
     if (!selectedExam) { setError('Choose an examination first.'); return }
@@ -530,6 +542,7 @@ export default function AcademicManagement({ token, classes, canVerify = false }
         {!subjects.length && <p className="form-hint">No subjects are configured for this school type.</p>}
         {!!students.length && !selectedSubjectId && <div className="subject-marks-empty"><BookOpen size={25}/><strong>Choose a subject to begin</strong><span>The student list and score boxes will appear here. Submit the subject once all scores are ready; blank scores are recorded as No score (0).</span></div>}
         {!!students.length && !!selectedSubjectId && !eligibleStudents.length && <div className="subject-marks-empty"><BookOpen size={25}/><strong>No students offer this subject</strong><span>Check each A-Level student's combination and subsidiary/optional subjects.</span></div>}
+        {isTeacher && <div className="offline-attendance-tools"><h3>Offline marks</h3><p className="form-hint">Save an encrypted marks draft while disconnected. When reconnected, SchoolBridge rechecks your device, current assignment, permissions, student eligibility, verification locks and record conflicts. Valid marks remain unverified.</p><input type="password" autoComplete="new-password" value={offlinePassphrase} onChange={event=>setOfflinePassphrase(event.target.value)} placeholder="Offline passphrase (12+ characters)"/><div className="form-actions"><button className="secondary-button" type="button" disabled={offlineMarkBusy||saving} onClick={()=>void saveOfflineMarkDraft()}><LockKeyhole size={15}/> Save encrypted draft</button><button className="secondary-button" type="button" disabled={offlineMarkBusy} onClick={()=>void unlockOfflineMarkDraft()}><Download size={15}/> Unlock draft</button><button className="primary-button" type="button" disabled={offlineMarkBusy} onClick={()=>void submitOfflineMarkDraft()}><Upload size={15}/> Submit when connected</button></div>{offlineMarkMessage&&<p className="form-hint" role="status">{offlineMarkMessage}</p>}</div>}
         {!!students.length && !!selectedSubjectId && !!eligibleStudents.length && <div className="student-score-list">
           <div className="student-score-list-heading"><span>STUDENT</span><span>ADMISSION NUMBER</span><span>SCORE / 100</span><span>STATUS</span></div>
           {eligibleStudents.map((student, index) => {
