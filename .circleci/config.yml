@@ -76,7 +76,11 @@ jobs:
       image: ubuntu-2404:current
     steps:
       - checkout
-      - run: python3 -m venv .venv && .venv/bin/pip install -r backend/requirements-dev.txt
+      - run:
+          name: Install only database test dependencies
+          command: |
+            python3 -m venv .venv
+            .venv/bin/pip install --disable-pip-version-check pytest "sqlalchemy>=2.0,<3.0" "cryptography>=42.0,<46.0"
       - run:
           name: Database and licensing tests
           command: PYTHONPATH=backend SCHOOLBRIDGE_DATABASE_URL=sqlite:///./schoolbridge_ci.db SCHOOLBRIDGE_SECRET_KEY=ci-only-secret-key-not-for-production .venv/bin/python -m pytest -q backend/tests/test_database.py backend/tests/test_owner_license_tool.py
