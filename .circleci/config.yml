@@ -291,10 +291,14 @@ jobs:
             SCHOOLBRIDGE_BACKUP_RETENTION_DAYS=30
             SCHOOLBRIDGE_BACKUP_INTERVAL_HOURS=24
             EOF
+            (
+              release_json="$(curl --fail --location --retry 3 https://api.github.com/repos/microsoft/WSL/releases/latest)"
+              wsl_url="$(printf '%s' "$release_json" | python3 -c 'import json,sys; d=json.load(sys.stdin); a=[x["browser_download_url"] for x in d.get("assets",[]) if x["name"].lower().endswith(".x64.msi")]; assert len(a)==1, "Expected exactly one x64 WSL MSI"; print(a[0])')"
+              curl --fail --location --retry 3 "$wsl_url" -o "$pkg/runtime/wsl.msi"
+            ) &
+            wsl_download_pid=$!
             curl --fail --location --retry 3 "https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe" -o "$pkg/runtime/Docker Desktop Installer.exe"
-            release_json="$(curl --fail --location --retry 3 https://api.github.com/repos/microsoft/WSL/releases/latest)"
-            wsl_url="$(printf '%s' "$release_json" | python3 -c 'import json,sys; d=json.load(sys.stdin); a=[x["browser_download_url"] for x in d.get("assets",[]) if x["name"].lower().endswith(".x64.msi")]; assert len(a)==1, "Expected exactly one x64 WSL MSI"; print(a[0])')"
-            curl --fail --location --retry 3 "$wsl_url" -o "$pkg/runtime/wsl.msi"
+            wait "$wsl_download_pid"
             (cd "$pkg" && find . -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt)
             cd /tmp
             zip -qr SchoolBridge-USB.zip SchoolBridge-USB
