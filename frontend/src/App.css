@@ -2420,3 +2420,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .promotion-order-list li { display:flex; align-items:center; justify-content:space-between; gap:12px; border:1px solid var(--line); border-radius:8px; padding:9px 12px; background:#fff; }
 .promotion-order-list li > span:first-child { display:grid; gap:3px; color:#34445e; font-size:12px; }
 .promotion-order-list small { color:#8a651f; font-size:10px; }
+
+.report-template-locked { display:grid; gap:4px; align-content:center; min-height:42px; color:#34445e; font-size:12px; }
+.report-template-locked span { color:#7b8799; font-size:10px; text-transform:capitalize; }
