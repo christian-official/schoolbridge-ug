@@ -1803,3 +1803,101 @@ def test_teacher_offline_marks_detect_baseline_conflicts_without_overwriting():
             assert row.status == "conflict" and row.resolution == "system_conflict"
             audit = db.query(models.AuditLog).filter_by(action="offline_teacher_marks_rejected").one()
             assert audit is not None
+
+
+
+def test_offline_attendance_batch_is_automatically_applied_and_idempotent():
+    reset_database()
+    admin = create_admin()
+    headers = {"Authorization": f"Bearer {create_access_token(admin)}"}
+    device = "00000000-0000-4000-8000-000000000501"
+    with SessionLocal() as db:
+        school_class = models.SchoolClass(name="Offline Register S1", section="A")
+        db.add(school_class); db.flush()
+        student = models.Student(admission_number="OFF-ATT-001", first_name="Amina", last_name="Test", class_id=school_class.id, status="active")
+        db.add(student); db.commit()
+        class_id, student_id = school_class.id, student.id
+    with TestClient(app) as client:
+        assert client.post("/api/sync/devices", headers=headers, json={"device_id":device,"device_name":"Attendance laptop"}).status_code == 200
+        baseline = client.get(f"/api/sync/attendance-baseline?device_id={device}&class_id={class_id}&attendance_date=2026-11-10", headers=headers)
+        assert baseline.status_code == 200, baseline.text
+        body = {"device_id":device,"idempotency_key":"offline-attendance-0001","class_id":class_id,
+                "attendance_date":"2026-11-10","base_sequence":baseline.json()["base_sequence"],
+                "base_attendance_ids":baseline.json()["base_attendance_ids"],
+                "records":[{"student_id":student_id,"status":"Present"}]}
+        applied = client.post("/api/sync/attendance-batches", headers=headers, json=body)
+        assert applied.status_code == 200, applied.text
+        assert applied.json()["applied"] is True and applied.json()["saved"] == 1
+        repeated = client.post("/api/sync/attendance-batches", headers=headers, json=body)
+        assert repeated.status_code == 200 and repeated.json()["duplicate"] is True
+        with SessionLocal() as db:
+            row = db.query(models.Attendance).filter_by(student_id=student_id, attendance_date=date(2026, 11, 10)).one()
+            assert row.status == "Present"
+            audit = db.query(models.AuditLog).filter_by(action="offline_attendance_auto_applied").one()
+            assert audit is not None
+
+
+def test_offline_attendance_batch_detects_conflicts_without_overwriting():
+    reset_database()
+    admin = create_admin()
+    headers = {"Authorization": f"Bearer {create_access_token(admin)}"}
+    device = "00000000-0000-4000-8000-000000000502"
+    with SessionLocal() as db:
+        school_class = models.SchoolClass(name="Offline Register S2", section="A")
+        db.add(school_class); db.flush()
+        student = models.Student(admission_number="OFF-ATT-002", first_name="Brian", last_name="Test", class_id=school_class.id, status="active")
+        db.add(student); db.commit()
+        class_id, student_id = school_class.id, student.id
+    with TestClient(app) as client:
+        client.post("/api/sync/devices", headers=headers, json={"device_id":device,"device_name":"Attendance laptop"})
+        baseline = client.get(f"/api/sync/attendance-baseline?device_id={device}&class_id={class_id}&attendance_date=2026-11-10", headers=headers)
+        assert baseline.status_code == 200
+        with SessionLocal() as db:
+            db.add(models.Attendance(student_id=student_id, attendance_date=date(2026, 11, 10), status="Absent"))
+            db.commit()
+        body = {"device_id":device,"idempotency_key":"offline-attendance-0002","class_id":class_id,
+                "attendance_date":"2026-11-10","base_sequence":baseline.json()["base_sequence"],
+                "base_attendance_ids":baseline.json()["base_attendance_ids"],
+                "records":[{"student_id":student_id,"status":"Present"}]}
+        conflict = client.post("/api/sync/attendance-batches", headers=headers, json=body)
+        assert conflict.status_code == 200 and conflict.json()["status"] == "conflict"
+        assert conflict.json()["applied"] is False
+        with SessionLocal() as db:
+            row = db.query(models.Attendance).filter_by(student_id=student_id, attendance_date=date(2026, 11, 10)).one()
+            assert row.status == "Absent"
+            assert db.query(models.AuditLog).filter_by(action="offline_attendance_rejected").count() == 1
+
+
+def test_offline_attendance_batch_rejects_revoked_device_and_removed_class_assignment():
+    reset_database()
+    teacher = create_teacher()
+    headers = {"Authorization": f"Bearer {create_access_token(teacher)}"}
+    device = "00000000-0000-4000-8000-000000000503"
+    with SessionLocal() as db:
+        db.get(models.User, teacher.id).permissions_json = json.dumps({"My Attendance":["view","add","edit"]})
+        school_class = models.SchoolClass(name="Offline Register S3", section="A")
+        db.add(school_class); db.flush()
+        student = models.Student(admission_number="OFF-ATT-003", first_name="Grace", last_name="Test", class_id=school_class.id, status="active")
+        db.add(student); db.flush()
+        assignment = models.ClassTeacherAssignment(teacher_id=teacher.id, class_id=school_class.id)
+        db.add(assignment); db.commit()
+        class_id, student_id, assignment_id = school_class.id, student.id, assignment.id
+    with TestClient(app) as client:
+        client.post("/api/sync/devices", headers=headers, json={"device_id":device,"device_name":"Teacher attendance device"})
+        baseline = client.get(f"/api/sync/attendance-baseline?device_id={device}&class_id={class_id}&attendance_date=2026-11-10", headers=headers)
+        assert baseline.status_code == 200
+        body = {"device_id":device,"idempotency_key":"offline-attendance-0003","class_id":class_id,
+                "attendance_date":"2026-11-10","base_sequence":baseline.json()["base_sequence"],
+                "base_attendance_ids":baseline.json()["base_attendance_ids"],
+                "records":[{"student_id":student_id,"status":"Late"}]}
+        with SessionLocal() as db:
+            db.delete(db.get(models.ClassTeacherAssignment, assignment_id)); db.commit()
+        assert client.post("/api/sync/attendance-batches", headers=headers, json=body).status_code == 403
+        with SessionLocal() as db:
+            assignment = models.ClassTeacherAssignment(teacher_id=teacher.id, class_id=class_id)
+            db.add(assignment)
+            device_row = db.query(models.SyncDevice).filter_by(user_id=teacher.id, device_id=device).one()
+            device_row.revoked_at = datetime.utcnow()
+            db.commit()
+        body["idempotency_key"] = "offline-attendance-0004"
+        assert client.post("/api/sync/attendance-batches", headers=headers, json=body).status_code == 403
