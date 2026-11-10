@@ -5190,6 +5190,10 @@ def update_staff(staff_id: int, data: StaffUpdate, db: Session = Depends(get_db)
     changes = data.model_dump(exclude_unset=True)
     for key, value in changes.items():
         setattr(staff, key, value)
+    if changes.get("login_allowed") is False:
+        linked_user = db.query(models.User).filter_by(staff_id=staff.id).first()
+        if linked_user:
+            linked_user.is_active = False
     write_audit(db, admin, "staff_updated", "staff", staff.id, ", ".join(changes.keys()))
     db.commit()
     db.refresh(staff)
