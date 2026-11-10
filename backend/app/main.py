@@ -919,8 +919,11 @@ def create_student(data: StudentCreate, db: Session = Depends(get_db), admin=Dep
     return item
 
 @app.get("/api/students", response_model=list[StudentOut], tags=["Students"])
-def list_students(db: Session = Depends(get_db)):
-    return db.query(models.Student).order_by(models.Student.last_name).all()
+def list_students(include_inactive: bool = False, db: Session = Depends(get_db)):
+    query = db.query(models.Student)
+    if not include_inactive:
+        query = query.filter(models.Student.status == "active")
+    return query.order_by(models.Student.last_name, models.Student.first_name).all()
 
 
 def get_current_user(
@@ -1065,6 +1068,28 @@ def list_exams(class_id: int | None = None, year: int | None = None, db: Session
     return query.order_by(models.Exam.year.desc(), models.Exam.term, models.Exam.name).all()
 
 
+@app.post("/api/exams/{exam_id}/close", tags=["Exams"])
+def close_exam(exam_id: int, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    exam = db.get(models.Exam, exam_id)
+    if not exam:
+        raise HTTPException(404, "Examination not found.")
+    exam.closed = True
+    write_audit(db, admin, "exam_closed", "exam", exam.id, "Verified results released to linked parent accounts.")
+    db.commit()
+    return {"message": "Examination closed. Verified results are now visible to parents.", "closed": True}
+
+
+@app.post("/api/exams/{exam_id}/reopen", tags=["Exams"])
+def reopen_exam(exam_id: int, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    exam = db.get(models.Exam, exam_id)
+    if not exam:
+        raise HTTPException(404, "Examination not found.")
+    exam.closed = False
+    write_audit(db, admin, "exam_reopened", "exam", exam.id, "Parent result visibility paused.")
+    db.commit()
+    return {"message": "Examination reopened. Parent result visibility is paused.", "closed": False}
+
+
 @app.post("/api/marks", response_model=MarkOut, tags=["Marks"])
 def record_mark(data: MarkCreate, db: Session = Depends(get_db)):
     student = db.get(models.Student, data.student_id)
@@ -1076,6 +1101,8 @@ def record_mark(data: MarkCreate, db: Session = Depends(get_db)):
         raise HTTPException(404, "Subject not found.")
     if not exam:
         raise HTTPException(404, "Exam not found.")
+    if exam.closed:
+        raise HTTPException(409, "This examination is closed. Reopen it before changing marks.")
     if exam.class_id is not None and student.class_id != exam.class_id:
         raise HTTPException(422, "The selected student does not belong to this examination's class.")
     item = models.Mark(**data.model_dump())
@@ -3285,7 +3312,7 @@ def parent_children(db: Session = Depends(get_db), parent=Depends(require_parent
     output = []
     for link in links:
         student = db.get(models.Student, link.student_id)
-        if not student:
+        if not student or student.status != "active":
             continue
         school_class = db.get(models.SchoolClass, student.class_id) if student.class_id else None
         charges = db.query(models.FeeCharge).filter_by(student_id=student.id).all()
@@ -3302,7 +3329,9 @@ def parent_child_results(student_id: int, db: Session = Depends(get_db), parent=
     rows = db.query(models.Mark, models.Exam, models.Subject).join(
         models.Exam, models.Exam.id == models.Mark.exam_id
     ).join(models.Subject, models.Subject.id == models.Mark.subject_id).filter(
-        models.Mark.student_id == student.id, models.Mark.verified.is_(True)
+        models.Mark.student_id == student.id,
+        models.Mark.verified.is_(True),
+        models.Exam.closed.is_(True),
     ).order_by(models.Exam.year.desc(), models.Exam.term, models.Exam.name, models.Subject.name).all()
     return [{"exam": exam.name, "term": exam.term, "year": exam.year, "subject": subject.name, "score": mark.score} for mark, exam, subject in rows]
 
@@ -4177,7 +4206,7 @@ upgrade_class_stream_uniqueness()
 @app.get("/api/students/search", tags=["Students"])
 def search_students(page: int = 1, page_size: int = 25, search: str = "", class_id: int | None = None, db: Session = Depends(get_db)):
     page_size = min(max(page_size, 1), 100)
-    query = db.query(models.Student)
+    query = db.query(models.Student).filter(models.Student.status == "active")
     if search.strip():
         term = "%" + search.strip() + "%"
         query = query.filter(or_(models.Student.admission_number.ilike(term), models.Student.first_name.ilike(term), models.Student.middle_name.ilike(term), models.Student.last_name.ilike(term)))
@@ -4868,9 +4897,27 @@ def change_student_status(student_id: int, status: str, db: Session = Depends(ge
     if not student:
         raise HTTPException(404, "Student not found.")
     student.status = status
-    write_audit(db, admin, "student_status_changed", "student", student.id, status)
+    affected_parent_accounts = 0
+    if status == "dismissed":
+        links = db.query(models.ParentStudentLink).filter_by(student_id=student.id).all()
+        for link in links:
+            parent = db.get(models.User, link.user_id)
+            if not parent or parent.role != "parent":
+                continue
+            remaining_active = db.query(models.Student.id).join(
+                models.ParentStudentLink, models.ParentStudentLink.student_id == models.Student.id
+            ).filter(
+                models.ParentStudentLink.user_id == parent.id,
+                models.Student.status == "active",
+            ).first()
+            if not remaining_active and parent.is_active:
+                parent.is_active = False
+                affected_parent_accounts += 1
+    write_audit(db, admin, "student_status_changed", "student", student.id,
+                f"{status}; parent accounts deactivated={affected_parent_accounts}")
     db.commit()
-    return {"message": "Student status updated. Historical academic and financial records were retained.", "status": status}
+    return {"message": "Student status updated. Historical academic and financial records were retained.",
+            "status": status, "parent_accounts_deactivated": affected_parent_accounts}
 
 
 class StaffUpdate(BaseModel):
