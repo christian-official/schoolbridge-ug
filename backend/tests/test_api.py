@@ -2463,7 +2463,7 @@ def test_dismissing_student_hides_record_and_deactivates_last_parent_account():
             f"/api/students/{student_id}/status?status=dismissed",
             headers={"Authorization": f"Bearer {token}"},
         )
-        visible = client.get("/api/students")
+        visible = client.get("/api/students", headers={"Authorization": f"Bearer {token}"})
 
     assert changed.status_code == 200
     assert changed.json()["parent_accounts_deactivated"] == 1
