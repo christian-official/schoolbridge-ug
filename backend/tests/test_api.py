@@ -1147,6 +1147,52 @@ def test_sync_change_feed_tracks_ordered_mutations_and_deletions():
         assert revoked_feed.status_code == 403
 
 
+def test_sync_change_feed_filters_parent_and_teacher_history_scopes():
+    reset_database()
+    admin = create_admin()
+    teacher = create_teacher()
+    parent = None
+    with SessionLocal() as db:
+        assigned_class = models.SchoolClass(name="Scope S1", section="A")
+        unrelated_class = models.SchoolClass(name="Scope S2", section="B")
+        subject = models.Subject(name="Scope Biology", school_type="Secondary")
+        parent = models.User(username="scope-parent", email="scope-parent@example.invalid",
+            hashed_password=password_hash.hash("ParentPassword123!"), role="parent", is_active=True)
+        db.add_all([assigned_class, unrelated_class, subject, parent]); db.flush()
+        assigned_student = models.Student(admission_number="SCOPE-001", first_name="A", last_name="Assigned", class_id=assigned_class.id)
+        unrelated_student = models.Student(admission_number="SCOPE-002", first_name="B", last_name="Other", class_id=unrelated_class.id)
+        db.add_all([assigned_student, unrelated_student]); db.flush()
+        db.add_all([
+            models.TeacherAssignment(teacher_id=teacher.id, class_id=assigned_class.id, subject_id=subject.id),
+            models.ParentStudentLink(user_id=parent.id, student_id=assigned_student.id),
+        ])
+        db.commit()
+        class_id, other_id, subject_id = assigned_class.id, unrelated_class.id, subject.id
+        student_id, other_student_id, parent_id = assigned_student.id, unrelated_student.id, parent.id
+    admin_headers = {"Authorization": f"Bearer {create_access_token(admin)}"}
+    teacher_headers = {"Authorization": f"Bearer {create_access_token(teacher)}"}
+    parent_headers = {"Authorization": f"Bearer " + create_access_token(parent)}
+    admin_device = "00000000-0000-4000-8000-000000000111"
+    teacher_device = "00000000-0000-4000-8000-000000000112"
+    parent_device = "00000000-0000-4000-8000-000000000113"
+    with TestClient(app) as client:
+        for headers, device in ((admin_headers, admin_device), (teacher_headers, teacher_device), (parent_headers, parent_device)):
+            assert client.post("/api/sync/devices", headers=headers, json={"device_id":device,"device_name":"Scope device"}).status_code == 200
+        with SessionLocal() as db:
+            # The journal records historical relationships, including the parent link and teacher assignment.
+            db.get(models.Student, student_id).last_name = "Changed"
+            db.get(models.Student, other_student_id).last_name = "Unrelated changed"
+            db.add(models.Mark(student_id=student_id, subject_id=subject_id, exam_id=None, score=88, verified=False))
+            db.commit()
+        teacher_feed = client.get(f"/api/sync/changes?device_id={teacher_device}", headers=teacher_headers)
+        parent_feed = client.get(f"/api/sync/changes?device_id={parent_device}", headers=parent_headers)
+        assert teacher_feed.status_code == 200 and parent_feed.status_code == 200
+        teacher_ids = {item["entity_id"] for item in teacher_feed.json()["changes"] if item["entity_type"] == "Student"}
+        parent_ids = {item["entity_id"] for item in parent_feed.json()["changes"] if item["entity_type"] == "Student"}
+        assert student_id in teacher_ids and other_student_id not in teacher_ids
+        assert student_id in parent_ids and other_student_id not in parent_ids
+
+
 def test_sync_change_feed_rejects_invalid_cursor_and_limit():
     reset_database()
     admin = create_admin()

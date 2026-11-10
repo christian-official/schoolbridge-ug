@@ -62,7 +62,7 @@ This is a controlled offline synchronisation foundation. General school-record c
 
 The API records append-only change metadata for supported school records (students, classes, subjects, staff, attendance, examinations, marks, fee records, expenses, salaries and timetable entries). Each insert, update or delete receives a monotonically increasing database sequence. Deletes remain represented as tombstones in the journal; the source row is not required to remain present.
 
-The initial change-feed endpoint returns metadata only, paginated by sequence cursor. It does not include student or financial record contents. Feed access is restricted to administrators with an active registered device. Role-scoped snapshots are available separately. The journal is not permission to cache broad school records or edit official records offline.
+The change-feed endpoint returns metadata only, paginated by sequence cursor, and is scoped to the authenticated account's current role permissions plus historical relationship scope captured when each event is written. It does not include student or financial record contents. Parent link removals, teacher assignment changes, class moves and deleted records retain enough scope metadata to deliver invalidation events to the previously authorised account. The journal is not itself permission to cache broad school records or edit official records offline.
 
 
 ### Per-device synchronisation checkpoints

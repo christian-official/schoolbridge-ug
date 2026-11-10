@@ -5,7 +5,7 @@ from sqlalchemy import event, select, inspect as sa_inspect
 from . import models
 
 _TRACKED_MODELS = (
-    models.Student, models.SchoolClass, models.Subject, models.StaffMember,
+    models.User, models.Student, models.SchoolClass, models.Subject, models.StaffMember,
     models.TeacherAssignment, models.ClassTeacherAssignment, models.ParentStudentLink,
     models.Attendance, models.StaffAttendance, models.Exam, models.Mark,
     models.FeeCharge, models.FeePayment, models.ClassFee, models.SalaryPayment,
@@ -44,7 +44,9 @@ def _scope_for_target(connection, target):
         if include_students:
             students = connection.execute(select(models.Student.id).where(models.Student.class_id == class_id)).all()
             for item in students: add_student(item[0], class_id)
-    if isinstance(target, models.Student):
+    if isinstance(target, models.User):
+        scope["teacher_user_ids"].add(int(target.id))
+    elif isinstance(target, models.Student):
         add_student(target.id, target.class_id)
         try:
             history = sa_inspect(target).attrs.class_id.history

@@ -2006,9 +2006,20 @@ def _sync_change_visible_to_user(row, user):
         if entity in {"Mark", "MarkScope"}: return scope.get("verified") is True
         return entity in {"Student","SchoolClass","Attendance","Exam","Mark","MarkScope","FeeCharge","FeePayment","ClassFee","ParentStudentLink"}
     if user.role == "teacher":
+        if entity in {"UserAccess"}:
+            return user.id in scope.get("teacher_user_ids", [])
         if teacher_visible:
-            return entity in {"Student","SchoolClass","Subject","TeacherAssignment","ClassTeacherAssignment","Attendance","Exam","Mark","MarkScope","TimetableEntry"}
-        return entity in {"Student","SchoolClass"} and "view" in permissions.get("Students", set())
+            if entity in {"Student", "SchoolClass"}:
+                return "view" in permissions.get("My Classes", set()) or "view" in permissions.get("Students", set())
+            if entity in {"Subject", "Exam", "Mark", "MarkScope"}:
+                return "view" in permissions.get("My Results", set()) or "view" in permissions.get("Examinations", set())
+            if entity == "Attendance":
+                return "view" in permissions.get("My Attendance", set()) or "view" in permissions.get("Attendance", set())
+            if entity in {"TeacherAssignment", "ClassTeacherAssignment"}:
+                return "view" in permissions.get("My Classes", set())
+            if entity == "TimetableEntry":
+                return "view" in permissions.get("Timetable", set())
+        return entity in {"Student", "SchoolClass"} and "view" in permissions.get("Students", set())
     section_by_entity = {
         "Student":"Students","SchoolClass":"Students","StaffMember":"Staff",
         "Attendance":"Attendance","StaffAttendance":"Staff Attendance",
@@ -2018,6 +2029,7 @@ def _sync_change_visible_to_user(row, user):
         "OtherExpense":"Fees & Finance","TimetableEntry":"Timetable",
     }
     section = section_by_entity.get(entity)
+    if entity == "UserAccess": return user.id in scope.get("teacher_user_ids", [])
     if not section or "view" not in permissions.get(section, set()): return False
     return entity != "OtherExpense" or bool(scope.get("finance_only"))
 
