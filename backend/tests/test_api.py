@@ -2157,3 +2157,14 @@ def test_environment_admin_bootstrap_cannot_bypass_first_time_setup(monkeypatch)
     main_module.bootstrap_initial_admin()
     with SessionLocal() as db:
         assert db.query(models.User).count() == 0
+
+
+
+def test_partial_legacy_admin_environment_is_ignored_before_first_setup(monkeypatch):
+    reset_new_installation()
+    monkeypatch.setenv("SCHOOLBRIDGE_INITIAL_ADMIN_USERNAME", "partial-admin")
+    monkeypatch.delenv("SCHOOLBRIDGE_INITIAL_ADMIN_EMAIL", raising=False)
+    monkeypatch.delenv("SCHOOLBRIDGE_INITIAL_ADMIN_PASSWORD", raising=False)
+    main_module.bootstrap_initial_admin()
+    with SessionLocal() as db:
+        assert db.query(models.User).count() == 0

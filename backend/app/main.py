@@ -1218,7 +1218,15 @@ def update_grading_scale(data: GradingScaleUpdate, db: Session = Depends(get_db)
 # ========== AUTHENTICATION AND USER MANAGEMENT ==========
 
 def bootstrap_initial_admin():
-    """Create the first administrator only when explicitly configured by environment."""
+    """Retain legacy environment bootstrap only for already-initialised installations."""
+    setup_probe = SessionLocal()
+    try:
+        setup_state = setup_probe.get(models.SchoolSetupState, 1)
+        if not setup_state or not setup_state.setup_completed_at:
+            return
+    finally:
+        setup_probe.close()
+
     username = os.getenv("SCHOOLBRIDGE_INITIAL_ADMIN_USERNAME", "").strip()
     email = os.getenv("SCHOOLBRIDGE_INITIAL_ADMIN_EMAIL", "").strip()
     initial_password = os.getenv("SCHOOLBRIDGE_INITIAL_ADMIN_PASSWORD", "")
