@@ -86,7 +86,7 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
         if (rawMeta) {
           try {
             const meta = JSON.parse(rawMeta) as { fingerprint:string; sequence:number }
-            const account = await request<{role:string;permissions:Record<string,string[]>}>('auth/me', token)
+            const account = await request<{username:string;role:string;role_label?:string;permissions:Record<string,string[]>}>('auth/me', token)
             const fingerprint = JSON.stringify({role:account.role,permissions:Object.fromEntries(Object.entries(account.permissions||{}).sort(([a],[b])=>a.localeCompare(b)))})
             const changes = await request<{changes:unknown[];has_more:boolean}>('sync/changes?device_id='+encodeURIComponent(storedId)+'&cursor='+meta.sequence+'&limit=500', token)
             if (meta.fingerprint !== fingerprint || changes.changes.length > 0 || changes.has_more) {
@@ -202,7 +202,7 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
       const can=(section:string)=>account.role==='admin'||(permissions[section]||[]).includes('view')
       const parent=account.role==='parent', teacher=account.role==='teacher'
       const sequences:number[]=[]
-      const snapshot:any={version:1,userId,deviceId,permissionFingerprint:permissionFingerprint(account),downloadedAt:Date.now(),expiresAt:Date.now()+24*60*60*1000,sequence:0,students:[],classes:[],attendance:[],exams:[],marks:[],charges:[],payments:[],class_fees:[]}
+      const snapshot:any={version:1,userId,deviceId,username:account.username,role:account.role,role_label:account.role_label||account.role,permissions:account.permissions||{},permissionFingerprint:permissionFingerprint(account),downloadedAt:Date.now(),expiresAt:Date.now()+24*60*60*1000,sequence:0,students:[],classes:[],attendance:[],exams:[],marks:[],charges:[],payments:[],class_fees:[]}
       const tasks:Promise<void>[]=[]
       if(parent||can('Students')||(teacher&&can('My Classes'))){
         tasks.push(collectSnapshotPages<any>('students','students',deviceId,sequences).then(rows=>{snapshot.students=rows}))
@@ -237,6 +237,8 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
       snapshot.sequence=sequences[0]
       await saveEncryptedOfflineSnapshot(userId,deviceId,offlinePassphrase,snapshot)
       localStorage.setItem('schoolbridge-offline-snapshot-meta-'+userId+'-'+deviceId,JSON.stringify({fingerprint:snapshot.permissionFingerprint,sequence:snapshot.sequence}))
+      // Lookup metadata is not an authenticator; the account and records stay encrypted in IndexedDB.
+      localStorage.setItem('schoolbridge-offline-login-index',JSON.stringify({userId,deviceId,username:account.username}))
       setOfflineSnapshot(snapshot)
       setOfflineStatus('Authorised records were encrypted and saved on this browser. The copy expires in 24 hours and is cleared if changed permissions or records are detected after reconnecting.')
     }catch(error){setOfflineStatus(error instanceof Error?error.message:'Unable to create the encrypted offline snapshot.')}
