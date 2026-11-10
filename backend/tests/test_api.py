@@ -1883,9 +1883,10 @@ def test_offline_attendance_batch_rejects_revoked_device_and_removed_class_assig
         db.add(assignment); db.commit()
         class_id, student_id, assignment_id = school_class.id, student.id, assignment.id
     with TestClient(app) as client:
-        client.post("/api/sync/devices", headers=headers, json={"device_id":device,"device_name":"Teacher attendance device"})
+        registered = client.post("/api/sync/devices", headers=headers, json={"device_id":device,"device_name":"Teacher attendance device"})
+        assert registered.status_code == 200, registered.text
         baseline = client.get(f"/api/sync/attendance-baseline?device_id={device}&class_id={class_id}&attendance_date=2026-11-10", headers=headers)
-        assert baseline.status_code == 200
+        assert baseline.status_code == 200, baseline.text
         body = {"device_id":device,"idempotency_key":"offline-attendance-0003","class_id":class_id,
                 "attendance_date":"2026-11-10","base_sequence":baseline.json()["base_sequence"],
                 "base_attendance_ids":baseline.json()["base_attendance_ids"],
