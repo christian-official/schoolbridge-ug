@@ -325,6 +325,7 @@ export default function AcademicManagement({ token, classes, canVerify = false, 
   }
 
   async function saveClassMarks() {
+    if (selectedExam?.closed) { setError('This examination is closed. Reopen it before changing marks.'); return }
     if (!selectedExam || !eligibleStudents.length || !selectedSubjectId) {
       setError('Select a subject before entering marks.')
       return
@@ -590,7 +591,7 @@ export default function AcademicManagement({ token, classes, canVerify = false, 
         <div className="subject-marks-toolbar">
           <div className="academic-exam-select"><strong>Subject to enter</strong><div className="exam-pill-options subject-choice-options">{subjects.map(subject => <button type="button" key={subject.id} className={String(subject.id) === selectedSubjectId ? 'exam-pill active' : 'exam-pill'} onClick={() => setSelectedSubjectId(String(subject.id))}>{subject.name}</button>)}</div></div>
           <div className="subject-marks-count"><strong>{selectedSubjectId ? eligibleStudents.length : students.length}</strong><span>{selectedSubjectId ? 'students offering this subject' : 'students in this class'}</span></div>
-          <button type="button" className="primary-button" onClick={() => void saveClassMarks()} disabled={saving || !eligibleStudents.length || !selectedSubjectId}><Save size={15}/>{saving ? 'Submitting…' : 'Submit class results'}</button>
+          <button type="button" className="primary-button" onClick={() => void saveClassMarks()} disabled={saving || selectedExam.closed || !eligibleStudents.length || !selectedSubjectId}><Save size={15}/>{saving ? 'Submitting…' : 'Submit class results'}</button>
         </div>
         {!students.length && <p className="form-hint">No students are registered in this class yet.</p>}
         {!subjects.length && <p className="form-hint">No subjects are configured for this school type.</p>}
