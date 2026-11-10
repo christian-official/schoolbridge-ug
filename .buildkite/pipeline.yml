@@ -37,7 +37,7 @@ steps:
       export DEBIAN_FRONTEND=noninteractive
       if command -v sudo >/dev/null 2>&1; then
         sudo -n apt-get update
-        sudo -n apt-get install -y python3-venv
+        sudo -n apt-get install -y python3-venv postgresql-client
       else
         apt-get update
         apt-get install -y python3-venv
