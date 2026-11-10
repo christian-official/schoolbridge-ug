@@ -1684,7 +1684,7 @@ function TeacherWorkspace({token,active,userId}:{token:string;active:string;user
       }else{
         await deleteEncryptedOfflineDraft(userId,deviceId)
         setOfflineDraftUnlocked(false)
-        setOfflineDraftMessage('Draft submitted as proposal #'+result.proposal_id+' ('+result.status+'). An administrator must review it; official marks have not been changed.')
+        setOfflineDraftMessage('Offline marks #'+result.proposal_id+' were automatically applied by the system. '+(result.saved||0)+' marks were saved and remain unverified for normal academic verification.')
         setOfflinePassphrase('')
         await refreshTeacherOfflineProposals()
       }
