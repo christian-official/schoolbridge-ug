@@ -1797,6 +1797,8 @@ def test_sync_offline_proposals_are_idempotent_scoped_and_not_applied():
         try:
             submitted_audits=db.query(models.AuditLog).filter_by(action="sync_proposal_submitted").all()
             assert len(submitted_audits)==1
+            assert submitted_audits[0].entity_type == "sync_change_proposal"
+            assert submitted_audits[0].entity_id == first.json()["proposal_id"]
             assert f"proposal_entity=Student; entity_id={sid}; operation=update" in submitted_audits[0].details
             assert "Offline edit" not in submitted_audits[0].details
         finally: db.close()
