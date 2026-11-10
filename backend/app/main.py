@@ -4854,6 +4854,15 @@ def apply_offline_teacher_mark_proposal(proposal_id: int, db: Session = Depends(
                     "Teacher account, examination or class context is no longer valid.")
         db.commit()
         raise HTTPException(409, "The teacher or examination context is no longer valid; proposal rejected.")
+    teacher_permissions = user_permissions(teacher).get("My Results", set())
+    if not ({"add", "edit"} & teacher_permissions):
+        row.status = "rejected"
+        row.resolution = "reject_permission_changed"
+        row.resolved_at = datetime.utcnow()
+        write_audit(db, admin, "offline_teacher_marks_rejected", "sync_change_proposal", row.id,
+                    "Teacher no longer has permission to submit examination results.")
+        db.commit()
+        raise HTTPException(409, "Teacher result-entry permission has changed. Proposal rejected; no marks were applied.")
     assignment = db.query(models.TeacherAssignment.id).filter_by(
         teacher_id=teacher.id, class_id=exam.class_id, subject_id=subject.id
     ).first()
