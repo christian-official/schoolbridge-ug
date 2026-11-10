@@ -112,22 +112,28 @@ export async function deleteEncryptedOfflineDraft(userId: number, deviceId: stri
 }
 
 
-type EncryptedSnapshotRecord = { salt: number[]; iv: number[]; ciphertext: number[]; updatedAt: number }
+type EncryptedSnapshotRecord = { version: 2; salt: number[]; iv: number[]; ciphertext: number[]; updatedAt: number }
 
 export async function saveEncryptedOfflineSnapshot(userId: number, deviceId: string, passphrase: string, value: unknown) {
   if (!passphrase || passphrase.length < 12) throw new Error('Use a passphrase of at least 12 characters.')
   if (!crypto?.subtle || typeof indexedDB === 'undefined') throw new Error('This browser does not support protected offline storage.')
   const salt = crypto.getRandomValues(new Uint8Array(16))
   const iv = crypto.getRandomValues(new Uint8Array(12))
+  const updatedAt = Date.now()
   const key = await deriveOfflineDraftKey(passphrase, salt)
   const plaintext = new TextEncoder().encode(JSON.stringify(value))
-  const ciphertext = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: asArrayBuffer(iv) }, key, asArrayBuffer(plaintext)))
+  const additionalData = new TextEncoder().encode('schoolbridge-offline-snapshot-v2:' + updatedAt)
+  const ciphertext = new Uint8Array(await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv: asArrayBuffer(iv), additionalData: asArrayBuffer(additionalData) },
+    key,
+    asArrayBuffer(plaintext),
+  ))
   const db = await openOfflineDatabase(userId, deviceId)
   try {
     await new Promise<void>((resolve, reject) => {
       const transaction = db.transaction('snapshots', 'readwrite')
       transaction.objectStore('snapshots').put({
-        salt: Array.from(salt), iv: Array.from(iv), ciphertext: Array.from(ciphertext), updatedAt: Date.now(),
+        version: 2, salt: Array.from(salt), iv: Array.from(iv), ciphertext: Array.from(ciphertext), updatedAt,
       } satisfies EncryptedSnapshotRecord, 'authorised-records')
       transaction.oncomplete = () => resolve()
       transaction.onerror = () => reject(new Error('Unable to save the encrypted offline records.'))
@@ -151,13 +157,18 @@ export async function loadEncryptedOfflineSnapshot<T>(userId: number, deviceId: 
   } finally { db.close() }
   if (!record) throw new Error('No encrypted offline record snapshot is saved on this browser.')
   const age = Date.now() - record.updatedAt
-  if (!Number.isFinite(record.updatedAt) || age < 0 || age >= OFFLINE_SNAPSHOT_TTL_MS) {
+  if (record.version !== 2 || !Number.isFinite(record.updatedAt) || age < 0 || age >= OFFLINE_SNAPSHOT_TTL_MS) {
     await deleteEncryptedOfflineSnapshot(userId, deviceId)
-    throw new Error('This offline record snapshot has expired. Reconnect and download a fresh copy.')
+    throw new Error('This offline record snapshot has expired or needs refreshing. Reconnect and download a fresh copy.')
   }
   try {
     const key = await deriveOfflineDraftKey(passphrase, new Uint8Array(record.salt))
-    const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: asArrayBuffer(new Uint8Array(record.iv)) }, key, asArrayBuffer(new Uint8Array(record.ciphertext)))
+    const additionalData = new TextEncoder().encode('schoolbridge-offline-snapshot-v2:' + record.updatedAt)
+    const plaintext = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: asArrayBuffer(new Uint8Array(record.iv)), additionalData: asArrayBuffer(additionalData) },
+      key,
+      asArrayBuffer(new Uint8Array(record.ciphertext)),
+    )
     return JSON.parse(new TextDecoder().decode(plaintext)) as T
   } catch {
     throw new Error('Unable to unlock offline records. Check the passphrase and try again.')
