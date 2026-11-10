@@ -2433,3 +2433,82 @@ def test_combined_school_supports_both_curricula_and_secondary_academic_levels()
         })
         assert primary_student.status_code == 200, primary_student.text
         assert primary_student.json()["academic_level"] is None
+
+
+def test_parent_change_feed_invalidates_previously_verified_marks_when_unverified():
+    reset_database()
+    parent = models.User(
+        username="mark-revocation-parent",
+        email="mark-revocation-parent@example.invalid",
+        hashed_password=password_hash.hash("ParentPassword123!"),
+        role="parent",
+        is_active=True,
+    )
+    with SessionLocal() as db:
+        school_class = models.SchoolClass(name="Revocation S2", section="A")
+        subject = models.Subject(name="Revocation Biology", school_type="Secondary")
+        db.add_all([parent, school_class, subject])
+        db.flush()
+        student = models.Student(
+            admission_number="MARK-REVOKE-001",
+            first_name="Amina",
+            last_name="Learner",
+            class_id=school_class.id,
+        )
+        db.add(student)
+        db.flush()
+        exam = models.Exam(
+            name="Revocation test", term="Term 1", year=2026,
+            class_id=school_class.id,
+        )
+        db.add(exam)
+        db.flush()
+        mark = models.Mark(
+            student_id=student.id, subject_id=subject.id, exam_id=exam.id,
+            score=85, verified=True,
+        )
+        db.add_all([
+            mark,
+            models.ParentStudentLink(user_id=parent.id, student_id=student.id),
+        ])
+        db.commit()
+        parent_id = parent.id
+        mark_id = mark.id
+
+    headers = {"Authorization": "Bearer " + create_access_token(
+        SimpleNamespace(id=parent_id, role="parent")
+    )}
+    device_id = "00000000-0000-4000-8000-000000000914"
+    with TestClient(app) as client:
+        registered = client.post(
+            "/api/sync/devices", headers=headers,
+            json={"device_id": device_id, "device_name": "Parent mark revocation"},
+        )
+        assert registered.status_code == 200, registered.text
+        initial = client.get(
+            f"/api/sync/changes?device_id={device_id}", headers=headers,
+        )
+        assert initial.status_code == 200, initial.text
+        assert any(
+            item["entity_type"].startswith("MarkScope")
+            and item["entity_id"] == mark_id
+            and item["operation"] == "insert"
+            for item in initial.json()["changes"]
+        )
+
+        with SessionLocal() as db:
+            db.get(models.Mark, mark_id).verified = False
+            db.commit()
+
+        revoked = client.get(
+            f"/api/sync/changes?device_id={device_id}&cursor={initial.json()['next_cursor']}",
+            headers=headers,
+        )
+        assert revoked.status_code == 200, revoked.text
+        invalidations = [
+            item for item in revoked.json()["changes"]
+            if item["entity_type"].startswith("MarkScope")
+            and item["entity_id"] == mark_id
+        ]
+        assert len(invalidations) == 1
+        assert invalidations[0]["operation"] == "delete"
