@@ -4808,9 +4808,10 @@ def submit_offline_teacher_marks(data: OfflineTeacherMarkBatch, db: Session = De
         status="conflict" if conflict else "pending_review", conflict_sequence=conflict_sequence,
     )
     db.add(row)
-    write_audit(db, teacher, "offline_teacher_marks_submitted", "sync_change_proposal", 0,
-                f"exam={exam.id}; class={exam.class_id}; subject={subject.id}; records={len(data.records)}; status={row.status}")
     try:
+        db.flush()
+        write_audit(db, teacher, "offline_teacher_marks_submitted", "sync_change_proposal", row.id,
+                    f"exam={exam.id}; class={exam.class_id}; subject={subject.id}; records={len(data.records)}; status={row.status}")
         db.commit()
         db.refresh(row)
     except IntegrityError:
@@ -4873,6 +4874,17 @@ def apply_offline_teacher_mark_proposal(proposal_id: int, db: Session = Depends(
                     "Teacher account, examination or class context is no longer valid.")
         db.commit()
         raise HTTPException(409, "The teacher or examination context is no longer valid; proposal rejected.")
+    submitting_device = db.query(models.SyncDevice).filter_by(
+        user_id=teacher.id, device_id=row.device_id
+    ).first()
+    if not submitting_device or submitting_device.revoked_at is not None:
+        row.status = "rejected"
+        row.resolution = "reject_device_revoked"
+        row.resolved_at = datetime.utcnow()
+        write_audit(db, admin, "offline_teacher_marks_rejected", "sync_change_proposal", row.id,
+                    "Submitting device was revoked before administrator approval.")
+        db.commit()
+        raise HTTPException(409, "The submitting device has been revoked. Proposal rejected; no marks were applied.")
     assignment = db.query(models.TeacherAssignment.id).filter_by(
         teacher_id=teacher.id, class_id=exam.class_id, subject_id=subject.id
     ).first()
@@ -4914,12 +4926,6 @@ def apply_offline_teacher_mark_proposal(proposal_id: int, db: Session = Depends(
                     "Teacher no longer has permission for every add/edit operation in this batch.")
         db.commit()
         raise HTTPException(409, "Teacher result-entry permissions changed. Proposal rejected; no marks were applied.")
-    locked = db.query(models.Mark.id).filter(
-        models.Mark.exam_id == exam.id, models.Mark.subject_id == subject.id,
-        models.Mark.verified.is_(True)
-    ).first()
-    if locked:
-        raise HTTPException(409, "Results have been verified and locked. Unlock them before approving this submission.")
     has_conflict, conflict_sequence = _offline_teacher_mark_conflict(
         db, exam.id, subject.id, entries, payload.get("base_mark_ids", {}), row.base_sequence
     )
@@ -4928,6 +4934,18 @@ def apply_offline_teacher_mark_proposal(proposal_id: int, db: Session = Depends(
         row.conflict_sequence = conflict_sequence
         db.commit()
         raise HTTPException(409, "One or more marks were added, changed or deleted after the offline snapshot. Review and resubmit against a fresh snapshot.")
+    locked = db.query(models.Mark.id).filter(
+        models.Mark.exam_id == exam.id, models.Mark.subject_id == subject.id,
+        models.Mark.verified.is_(True)
+    ).first()
+    if locked:
+        row.status = "rejected"
+        row.resolution = "reject_results_locked"
+        row.resolved_at = datetime.utcnow()
+        write_audit(db, admin, "offline_teacher_marks_rejected", "sync_change_proposal", row.id,
+                    "Results were already locked at the proposal baseline.")
+        db.commit()
+        raise HTTPException(409, "Results are verified and locked. Proposal rejected; no marks were applied.")
     saved = 0
     for entry in entries:
         mark = db.query(models.Mark).filter_by(

@@ -1,7 +1,7 @@
 import os
 import json
 import sqlite3
-from datetime import date
+from datetime import date, datetime
 
 # Configure an isolated SQLite database before importing the application.
 os.environ["SCHOOLBRIDGE_DATABASE_URL"] = "sqlite:///./schoolbridge_test.db"
@@ -1626,6 +1626,11 @@ def test_teacher_offline_marks_are_queued_then_revalidated_and_applied_by_admin(
         queued = client.post("/api/sync/teacher-mark-proposals", headers=th, json=body)
         assert queued.status_code == 200, queued.text
         assert queued.json()["applied"] is False
+        with SessionLocal() as check:
+            submission_audit = check.query(models.AuditLog).filter_by(
+                action="offline_teacher_marks_submitted"
+            ).order_by(models.AuditLog.id.desc()).first()
+            assert submission_audit.entity_id == queued.json()["proposal_id"]
         assert client.post("/api/sync/teacher-mark-proposals", headers=th, json=body).json()["duplicate"] is True
         with SessionLocal() as check:
             assert check.query(models.Mark).filter_by(student_id=student_id, exam_id=exam_id, subject_id=subject_id).first() is None
@@ -1768,6 +1773,47 @@ def test_offline_teacher_marks_require_add_or_edit_permission_for_each_record():
         })
         assert edit_mark.status_code == 403
 
+
+def test_offline_teacher_mark_proposal_is_rejected_if_its_device_is_revoked():
+    reset_database()
+    admin = create_admin()
+    teacher = create_teacher()
+    ah = {"Authorization": f"Bearer {create_access_token(admin)}"}
+    th = {"Authorization": f"Bearer {create_access_token(teacher)}"}
+    device = "00000000-0000-4000-8000-000000000408"
+    with SessionLocal() as db:
+        db.get(models.User, teacher.id).permissions_json = json.dumps({"My Results": ["view", "add"]})
+        school_class = models.SchoolClass(name="Offline S8", section="A")
+        subject = models.Subject(name="Economics", school_type="Secondary")
+        db.add_all([school_class, subject]); db.flush()
+        exam = models.Exam(name="Term Test", term="Term 2", year=2026, class_id=school_class.id)
+        student = models.Student(admission_number="OFFLINE-MARK-8", first_name="David", last_name="Test", class_id=school_class.id, status="active")
+        db.add_all([exam, student]); db.flush()
+        db.add(models.TeacherAssignment(teacher_id=teacher.id, class_id=school_class.id, subject_id=subject.id))
+        db.commit()
+        exam_id, subject_id, student_id = exam.id, subject.id, student.id
+    with TestClient(app) as client:
+        assert client.post("/api/sync/devices", headers=th, json={"device_id": device, "device_name": "Teacher laptop"}).status_code == 200
+        snapshot = client.get(f"/api/sync/marks?device_id={device}", headers=th)
+        queued = client.post("/api/sync/teacher-mark-proposals", headers=th, json={
+            "device_id": device, "idempotency_key": "teacher-offline-marks-0009",
+            "exam_id": exam_id, "subject_id": subject_id,
+            "base_sequence": snapshot.json()["snapshot_sequence"],
+            "records": [{"student_id": student_id, "score": 79}],
+        })
+        assert queued.status_code == 200, queued.text
+        with SessionLocal() as db:
+            registered = db.query(models.SyncDevice).filter_by(user_id=teacher.id, device_id=device).one()
+            registered.revoked_at = datetime.utcnow()
+            db.commit()
+        rejected = client.post(f"/api/sync/teacher-mark-proposals/{queued.json()['proposal_id']}/apply", headers=ah)
+        assert rejected.status_code == 409
+        with SessionLocal() as db:
+            assert db.query(models.Mark).filter_by(student_id=student_id, exam_id=exam_id, subject_id=subject_id).first() is None
+            proposal = db.get(models.SyncChangeProposal, queued.json()["proposal_id"])
+            assert proposal.status == "rejected"
+            assert proposal.resolution == "reject_device_revoked"
+
 def test_offline_teacher_marks_detect_deleted_baseline_mark_as_conflict():
     reset_database()
     admin = create_admin()
@@ -1776,7 +1822,7 @@ def test_offline_teacher_marks_detect_deleted_baseline_mark_as_conflict():
     th = {"Authorization": f"Bearer {create_access_token(teacher)}"}
     device = "00000000-0000-4000-8000-000000000403"
     with SessionLocal() as db:
-        db.get(models.User, teacher.id).permissions_json = json.dumps({"My Results": ["view", "add"]})
+        db.get(models.User, teacher.id).permissions_json = json.dumps({"My Results": ["view", "add", "edit"]})
         school_class = models.SchoolClass(name="Offline S3", section="A")
         subject = models.Subject(name="Physics", school_type="Secondary")
         db.add_all([school_class, subject]); db.flush()
