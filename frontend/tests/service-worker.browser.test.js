@@ -40,6 +40,11 @@ test('real Chromium verifies the offline service-worker boundary', async () => {
     // once so the worker can observe and cache the built JS/CSS requests.
     await page.reload({ waitUntil: 'networkidle' })
     assert.equal(await page.title(), 'SchoolBridge')
+    assert.equal(
+      await page.evaluate(() => navigator.serviceWorker.controller !== null),
+      true,
+      'the reloaded page should remain controlled by the service worker',
+    )
 
     const cachedAssets = await page.evaluate(async () => {
       const cache = await caches.open('schoolbridge-shell-v1')
@@ -48,17 +53,16 @@ test('real Chromium verifies the offline service-worker boundary', async () => {
     })
     assert.ok(cachedAssets.some(path => path.startsWith('/assets/')), 'built static assets should be cached')
 
+    // A page fetch() has an empty request destination, so it is deliberately
+    // outside the worker's script/style caching rule. Navigate instead: the
+    // browser requests the built JS/CSS with their real destinations.
     await context.setOffline(true)
-
-    const cachedAssetPath = cachedAssets.find(path => path.startsWith('/assets/'))
-    const cachedAssetResponse = await page.evaluate(async path => {
-      const response = await fetch(path)
-      return { ok: response.ok, status: response.status }
-    }, cachedAssetPath)
-    assert.equal(cachedAssetResponse.ok, true, 'cached static asset should remain available offline')
-
     await page.goto(new URL('/students', baseUrl).toString())
     assert.equal(await page.title(), 'SchoolBridge', 'offline navigation should fall back to the app shell')
+    await page.waitForFunction(
+      () => document.querySelector('#root')?.childElementCount > 0,
+      { timeout: 5000 },
+    )
 
     const apiResult = await page.evaluate(async () => {
       try {
