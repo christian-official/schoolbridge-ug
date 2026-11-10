@@ -37,18 +37,35 @@ Write-Host "Importing SchoolBridge images from USB..."
 docker load -i $ImageArchive
 if ($LASTEXITCODE -ne 0) { throw "Image import failed." }
 
-$envLines = Get-Content $EnvFile
-$publicKeyLine = $envLines | Where-Object { $_ -match '^SCHOOLBRIDGE_LICENSE_PUBLIC_KEY=' } | Select-Object -First 1
-if (-not $publicKeyLine -or $publicKeyLine -eq 'SCHOOLBRIDGE_LICENSE_PUBLIC_KEY=') {
-    $publicKey = Read-Host "Paste the owner's Base64 public verification key (not the private key)"
-    if ([string]::IsNullOrWhiteSpace($publicKey)) { throw "The owner's public verification key is required before first activation." }
-    try { [void][Convert]::FromBase64String($publicKey) } catch { throw "The public verification key must be valid Base64." }
-    if ([Convert]::FromBase64String($publicKey).Length -ne 32) { throw "The Ed25519 public key must decode to exactly 32 bytes." }
-    $envLines = $envLines | ForEach-Object {
-        if ($_ -match '^SCHOOLBRIDGE_LICENSE_PUBLIC_KEY=') { "SCHOOLBRIDGE_LICENSE_PUBLIC_KEY=$publicKey" } else { $_ }
-    }
-    Set-Content $EnvFile $envLines -Encoding ASCII
+$envLines = @(Get-Content $EnvFile)
+$keyIndex = -1
+for ($index = 0; $index -lt $envLines.Count; $index++) {
+    if ($envLines[$index] -match '^SCHOOLBRIDGE_LICENSE_PUBLIC_KEY=(.*)
+$confirmation = Read-Host "Start the local SchoolBridge services now? Type START"
+if ($confirmation -cne "START") { Write-Host "Images imported. Start later with: docker compose up -d"; exit 0 }
+
+Push-Location $PackageDir
+try {
+    docker compose up -d --no-build
+    if ($LASTEXITCODE -ne 0) { throw "SchoolBridge failed to start. Inspect docker compose logs." }
+    Write-Host "SchoolBridge startup requested. Open http://localhost:8080 on this computer."
+    Write-Host "Check service health with: docker compose ps"
 }
+finally { Pop-Location }
+) { $keyIndex = $index; $publicKey = $Matches[1]; break }
+}
+if ($keyIndex -lt 0 -or [string]::IsNullOrWhiteSpace($publicKey)) {
+    $publicKey = Read-Host "Paste the owner's Base64 public verification key (not the private key)"
+}
+if ([string]::IsNullOrWhiteSpace($publicKey)) { throw "The owner's public verification key is required before first activation." }
+try { $decodedPublicKey = [Convert]::FromBase64String($publicKey) } catch { throw "The public verification key must be valid Base64." }
+if ($decodedPublicKey.Length -ne 32) { throw "The Ed25519 public key must decode to exactly 32 bytes." }
+if ($keyIndex -ge 0) {
+    $envLines[$keyIndex] = "SCHOOLBRIDGE_LICENSE_PUBLIC_KEY=$publicKey"
+} else {
+    $envLines += "SCHOOLBRIDGE_LICENSE_PUBLIC_KEY=$publicKey"
+}
+Set-Content $EnvFile $envLines -Encoding ASCII
 $confirmation = Read-Host "Start the local SchoolBridge services now? Type START"
 if ($confirmation -cne "START") { Write-Host "Images imported. Start later with: docker compose up -d"; exit 0 }
 
