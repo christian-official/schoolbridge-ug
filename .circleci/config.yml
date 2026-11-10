@@ -332,7 +332,7 @@ jobs:
                 assert manifest, "SHA256 manifest is empty"
                 for entry in manifest:
                     digest, relative = entry.split("  ", 1)
-                    payload = package.read(root + relative)
+                    payload = package.read(root + relative.removeprefix("./"))
                     actual = hashlib.sha256(payload).hexdigest()
                     assert actual.lower() == digest.lower(), f"SHA256 mismatch: {relative}"
             assert archive.stat().st_size > 100_000_000, "USB image archive is unexpectedly small"
