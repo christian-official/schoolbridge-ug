@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 
 type Visitor = {
   id: number
@@ -30,11 +30,11 @@ export default function VisitorRegister({ token, isAdmin = false }: { token: str
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
 
-  async function load() {
+  const load = useCallback(async () => {
     try { setRows(await request<Visitor[]>('visitors', token)) }
     catch (e) { setError(e instanceof Error ? e.message : 'Unable to load visitor register.') }
-  }
-  useEffect(() => { void load() }, [token])
+  }, [token])
+  useEffect(() => { void load() }, [load])
 
   async function checkIn(event: FormEvent) {
     event.preventDefault(); setBusy(true); setError(''); setMessage('')
