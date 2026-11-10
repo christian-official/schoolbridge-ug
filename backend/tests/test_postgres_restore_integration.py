@@ -66,7 +66,7 @@ def test_fresh_postgres_install_runs_owner_activation_and_school_setup(tmp_path,
             }
             payload = json.dumps(claims, sort_keys=True, separators=(",", ":")).encode()
             encode = lambda value: base64.urlsafe_b64encode(value).decode().rstrip("=")
-            license_token = encode(payload) + "." + encode(private_key.sign(payload))
+            license_token = "CHRISTIAN:" + encode(payload) + "." + encode(private_key.sign(payload))
 
             activated = client.post("/api/setup/activate", json={"license": license_token})
             assert activated.status_code == 200, activated.text
