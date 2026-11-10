@@ -5029,6 +5029,22 @@ class MyStaffProfileUpdate(BaseModel):
     photo_data: str | None = Field(default=None, max_length=1_800_000)
 
 
+class StaffClassSubjects(BaseModel):
+    class_id: int
+    subject_ids: list[int] = Field(default_factory=list, max_length=100)
+
+
+class MyTeachingAssignmentsUpdate(BaseModel):
+    class_subjects: list[StaffClassSubjects] = Field(default_factory=list, max_length=40)
+    class_teacher_class_ids: list[int] = Field(default_factory=list, max_length=40)
+    special_roles: list[str] = Field(default_factory=list, max_length=10)
+
+
+ALLOWED_STAFF_RESPONSIBILITIES = {
+    "Class Teacher", "House Patron", "Club Patron", "Sports Coach", "Duty Teacher",
+}
+
+
 class MyPasswordUpdate(BaseModel):
     current_password: str = Field(min_length=1)
     new_password: str = Field(min_length=8, max_length=128)
@@ -5080,6 +5096,64 @@ def update_my_staff_profile(data: MyStaffProfileUpdate, user=Depends(get_current
         "photo_data": staff.photo_data,
         "username": user.username,
     }}
+
+
+@app.get("/api/me/teaching-assignments", tags=["Staff"])
+def get_my_teaching_assignments(user=Depends(get_current_user), db: Session = Depends(get_db)):
+    if user.role not in {"teacher", "staff"} or not user.staff_id:
+        raise HTTPException(403, "A linked teaching staff account is required.")
+    staff = db.get(models.StaffMember, user.staff_id)
+    if not staff or staff.category != "Teaching":
+        raise HTTPException(403, "Only teaching staff may declare class and subject assignments.")
+    assignments = db.query(models.TeacherAssignment).filter_by(teacher_id=user.id).all()
+    class_teacher_ids = [row.class_id for row in db.query(models.ClassTeacherAssignment).filter_by(teacher_id=user.id).all()]
+    try:
+        special_roles = json.loads(staff.special_roles_json or "[]")
+    except (TypeError, ValueError):
+        special_roles = []
+    grouped = {}
+    for row in assignments:
+        grouped.setdefault(row.class_id, []).append(row.subject_id)
+    return {
+        "class_subjects": [{"class_id": class_id, "subject_ids": subject_ids} for class_id, subject_ids in grouped.items()],
+        "class_teacher_class_ids": class_teacher_ids,
+        "special_roles": special_roles if isinstance(special_roles, list) else [],
+    }
+
+
+@app.put("/api/me/teaching-assignments", tags=["Staff"])
+def update_my_teaching_assignments(data: MyTeachingAssignmentsUpdate, user=Depends(get_current_user), db: Session = Depends(get_db)):
+    if user.role not in {"teacher", "staff"} or not user.staff_id:
+        raise HTTPException(403, "A linked teaching staff account is required.")
+    staff = db.get(models.StaffMember, user.staff_id)
+    if not staff or staff.category != "Teaching":
+        raise HTTPException(403, "Only teaching staff may declare class and subject assignments.")
+    if len({row.class_id for row in data.class_subjects}) != len(data.class_subjects):
+        raise HTTPException(422, "Each class may be selected only once.")
+    class_ids = {row.class_id for row in data.class_subjects} | set(data.class_teacher_class_ids)
+    valid_classes = {row.id for row in db.query(models.SchoolClass).filter(models.SchoolClass.id.in_(class_ids)).all()} if class_ids else set()
+    if valid_classes != class_ids:
+        raise HTTPException(404, "One or more selected classes do not exist.")
+    subject_ids = {subject_id for row in data.class_subjects for subject_id in row.subject_ids}
+    valid_subjects = {row.id for row in db.query(models.Subject).filter(models.Subject.id.in_(subject_ids)).all()} if subject_ids else set()
+    if valid_subjects != subject_ids:
+        raise HTTPException(404, "One or more selected subjects do not exist.")
+    invalid_roles = set(data.special_roles) - ALLOWED_STAFF_RESPONSIBILITIES
+    if invalid_roles:
+        raise HTTPException(422, "Choose only the listed school responsibilities. Administrative system roles cannot be self-assigned.")
+    db.query(models.TeacherAssignment).filter_by(teacher_id=user.id).delete(synchronize_session=False)
+    db.query(models.ClassTeacherAssignment).filter_by(teacher_id=user.id).delete(synchronize_session=False)
+    for row in data.class_subjects:
+        for subject_id in set(row.subject_ids):
+            db.add(models.TeacherAssignment(teacher_id=user.id, class_id=row.class_id, subject_id=subject_id))
+    for class_id in set(data.class_teacher_class_ids):
+        db.add(models.ClassTeacherAssignment(teacher_id=user.id, class_id=class_id))
+    staff.special_roles_json = json.dumps(sorted(set(data.special_roles)))
+    write_audit(db, user, "staff_assignments_self_declared", "staff", staff.id,
+                f"classes={len(class_ids)}; subjects={len(subject_ids)}; responsibilities={','.join(sorted(set(data.special_roles)))}")
+    db.commit()
+    return {"message": "Your teaching classes, subjects and school responsibilities have been saved.",
+            "classes": len(class_ids), "subjects": len(subject_ids), "special_roles": sorted(set(data.special_roles))}
 
 
 @app.put("/api/me/password", tags=["Authentication"])
