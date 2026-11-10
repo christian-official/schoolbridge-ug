@@ -106,6 +106,8 @@ jobs:
         run: |
           test -s scripts/prepare-usb.ps1
           test -s scripts/install-schoolbridge.ps1
+          test -s scripts/prepare-school-host.ps1
+          grep -q 'prepare-school-host.ps1' scripts/prepare-usb.ps1
           test -s docs/USB_INSTALLATION.md
           grep -q 'proxy_pass http://backend:8001' frontend/nginx.conf
           grep -q 'SCHOOLBRIDGE_LICENSE_PUBLIC_KEY' scripts/install-schoolbridge.ps1
