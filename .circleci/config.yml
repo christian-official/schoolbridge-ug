@@ -190,7 +190,7 @@ jobs:
             cp /tmp/schoolbridge-usb/docker-compose.yml "$pkg/docker-compose.yml"
             cp scripts/install-schoolbridge.ps1 scripts/check-school-host.ps1 scripts/prepare-school-host.ps1 "$pkg/"
             cp docs/USB_INSTALLATION.md docs/WINDOWS_RUNTIME_PREPARATION.md docs/SCHOOL_READINESS_AND_INSTALLATION.md "$pkg/docs/"
-            cat > "$pkg/.env.example" <<'EOF'
+            cat > "$pkg/.env.example" \<<'EOF'
             SCHOOLBRIDGE_LICENSE_PUBLIC_KEY=
             SCHOOLBRIDGE_PORT=8080
             SCHOOLBRIDGE_BACKUP_RETENTION_DAYS=30
