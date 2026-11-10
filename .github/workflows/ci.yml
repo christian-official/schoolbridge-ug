@@ -176,7 +176,21 @@ jobs:
             if curl --fail --silent http://127.0.0.1:18080/api/health >/dev/null; then success=1; break; fi
             sleep 2
           done
-          if [ "$success" -ne 1 ]; then dc logs; exit 1; fi
+          if [ "$success" -ne 1 ]; then
+            echo "=== Compose status ==="
+            dc ps
+            echo "=== Published frontend ports ==="
+            dc port frontend 80 || true
+            echo "=== Host-side HTTP diagnostics ==="
+            curl --verbose --max-time 10 http://127.0.0.1:18080/api/health || true
+            echo "=== Frontend loopback diagnostics ==="
+            dc exec -T frontend wget -S -O- http://127.0.0.1/api/health || true
+            echo "=== Frontend-to-backend diagnostics ==="
+            dc exec -T frontend wget -S -O- http://backend:8001/api/health || true
+            echo "=== Container logs ==="
+            dc logs
+            exit 1
+          fi
           curl --fail --silent http://127.0.0.1:18080/ | grep -qi 'schoolbridge'
           dc exec -T database psql -U schoolbridge -d schoolbridge -c "CREATE TABLE usb_ci_persistence_check (id integer primary key, marker text); INSERT INTO usb_ci_persistence_check VALUES (1, 'survives-restart')"
           dc restart backend database
