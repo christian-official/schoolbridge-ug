@@ -97,3 +97,107 @@ test('real Chromium verifies the offline service-worker boundary', async () => {
     server.kill()
   }
 })
+
+
+test('real Chromium completes the first-install owner activation and school setup wizard', async () => {
+  const server = spawn('npm', ['run', 'preview', '--', '--host', '127.0.0.1', '--port', '4173', '--strictPort'], {
+    stdio: 'ignore',
+    shell: process.platform === 'win32',
+  })
+  let browser
+
+  try {
+    let ready = false
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      try {
+        const response = await fetch(baseUrl)
+        if (response.ok) {
+          ready = true
+          break
+        }
+      } catch {
+        // Vite preview is still starting.
+      }
+      await delay(500)
+    }
+    assert.equal(ready, true, 'Vite preview should become available')
+
+    browser = await chromium.launch({ headless: true })
+    const page = await browser.newPage()
+    const installationId = 'a2b3c4d5-e6f7-4890-8123-456789abcdef'
+    let activationPayload
+    let setupPayload
+
+    await page.route('**/api/setup/status', route => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        installation_id: installationId,
+        activated: false,
+        setup_completed: false,
+        requires_activation: true,
+        requires_setup: true,
+        identity_locked: false,
+      }),
+    }))
+    await page.route('**/api/setup/activate', async route => {
+      activationPayload = route.request().postDataJSON()
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ message: 'SchoolBridge installation activated.', activated: true }),
+      })
+    })
+    await page.route('**/api/setup/complete', async route => {
+      setupPayload = route.request().postDataJSON()
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          message: 'School setup completed.',
+          school: {
+            school_name: setupPayload.school_name,
+            school_type: setupPayload.school_type,
+            country: setupPayload.country,
+            school_structure: setupPayload.school_structure,
+            installation_id: installationId,
+          },
+        }),
+      })
+    })
+
+    await page.goto(baseUrl)
+    await page.getByRole('heading', { name: 'Activate this installation' }).waitFor()
+    assert.equal(await page.getByText(installationId).count(), 1)
+    await page.getByLabel('Owner-signed activation license').fill('signed-owner-license-token')
+    await page.getByRole('button', { name: 'Activate installation' }).click()
+    await page.getByRole('heading', { name: 'Set up your school' }).waitFor()
+    assert.deepEqual(activationPayload, { license: 'signed-owner-license-token' })
+
+    await page.getByLabel('Official school name *').fill('River Valley School')
+    await page.getByLabel('School type *').selectOption('Combined')
+    await page.getByLabel('School structure *').selectOption('Both')
+    await page.getByLabel('Country *').fill('Uganda')
+    await page.getByLabel('Physical address').fill('Kampala')
+    await page.getByLabel('School phone').fill('+256700000000')
+    await page.getByLabel('School email').fill('office@example.invalid')
+    await page.getByLabel('School motto').fill('Learning together')
+    await page.getByLabel('Administrator username *').fill('first-admin')
+    await page.getByLabel('Administrator email *').fill('admin@example.invalid')
+    await page.getByLabel('Private password *').fill('LongTestPassword123!')
+    await page.getByRole('button', { name: 'Complete school setup' }).click()
+    await page.getByRole('heading', { name: 'Welcome back' }).waitFor()
+
+    assert.equal(setupPayload.school_name, 'River Valley School')
+    assert.equal(setupPayload.school_type, 'Combined')
+    assert.equal(setupPayload.school_structure, 'Both')
+    assert.equal(setupPayload.country, 'Uganda')
+    assert.equal(setupPayload.admin_username, 'first-admin')
+    assert.equal(setupPayload.admin_email, 'admin@example.invalid')
+    assert.equal(setupPayload.admin_password, 'LongTestPassword123!')
+    assert.equal(await page.getByLabel('Password').count(), 1)
+  } finally {
+    if (browser) await browser.close()
+    server.kill()
+  }
+})
