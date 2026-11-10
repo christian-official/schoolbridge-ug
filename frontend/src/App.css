@@ -2456,3 +2456,13 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 /* Remove legacy arrow buttons from every scroll bar while preserving scrolling. */
 *::-webkit-scrollbar-button { display:none !important; width:0 !important; height:0 !important; }
+
+@media print {
+  body[data-schoolbridge-print="report"] .academic-report-print > .report-card-sheet,
+  body[data-schoolbridge-print="class-reports"] .class-reports-print-batch .report-card-sheet {
+    break-inside:avoid !important; page-break-inside:avoid !important;
+  }
+  body[data-schoolbridge-print="class-reports"] .class-reports-print-batch .report-card-sheet + .report-card-sheet {
+    break-before:page !important; page-break-before:always !important;
+  }
+}
