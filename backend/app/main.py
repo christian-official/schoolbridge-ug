@@ -1215,6 +1215,8 @@ def verify_exam_results_batch(
     exam = db.get(models.Exam, exam_id)
     if not exam:
         raise HTTPException(404, "Examination not found.")
+    if exam.closed:
+        raise HTTPException(409, "This examination is closed. Reopen it before changing verification.")
     query = db.query(models.Mark).filter(models.Mark.exam_id == exam_id)
     if exam.class_id is not None:
         query = query.join(models.Student, models.Student.id == models.Mark.student_id).filter(
