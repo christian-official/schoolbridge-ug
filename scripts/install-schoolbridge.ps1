@@ -3,6 +3,22 @@ $ErrorActionPreference = "Stop"
 $PackageDir = $PSScriptRoot
 $ImageArchive = Join-Path $PackageDir "schoolbridge-images.tar"
 $EnvFile = Join-Path $PackageDir ".env"
+$ComposeFile = Join-Path $PackageDir "docker-compose.yml"
+$HostCheck = Join-Path $PackageDir "check-school-host.ps1"
+
+if (-not (Test-Path $ComposeFile)) {
+    throw "Missing docker-compose.yml. Recreate the complete SchoolBridge USB package."
+}
+if (-not (Test-Path $HostCheck)) {
+    throw "Missing check-school-host.ps1. Recreate the complete SchoolBridge USB package."
+}
+
+Write-Host "Checking this computer before installing SchoolBridge..."
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $HostCheck
+$hostCheckExit = $LASTEXITCODE
+if ($hostCheckExit -ne 0) {
+    throw "This computer is not ready for installation. Resolve the host-check blockers above, then rerun install-schoolbridge.ps1. If Docker/WSL is missing, follow runtime/WINDOWS_RUNTIME_PREPARATION.md or the supplied preparation guide."
+}
 
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
     throw "Docker Engine is not installed. Use the official runtime installers supplied in the USB runtime folder, then rerun this installer."
