@@ -2626,3 +2626,19 @@ def test_teaching_staff_can_self_declare_classes_subjects_and_responsibilities()
     assert loaded.json()["class_teacher_class_ids"] == [class_id]
     assert loaded.json()["class_subjects"][0]["subject_ids"] == [subject_id]
     assert set(loaded.json()["special_roles"]) == {"House Patron", "Duty Teacher"}
+
+
+def test_non_teaching_staff_can_be_registered_without_a_login_account():
+    reset_database()
+    admin = create_admin()
+    token = create_access_token(admin)
+    with TestClient(app) as client:
+        response = client.post("/api/staff", json={
+            "first_name": "Peter", "last_name": "Cleaner", "category": "Non-teaching",
+            "position": "Cleaner", "department": "Maintenance", "create_login": False,
+        }, headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 200
+    assert response.json()["login"] is None
+    assert response.json()["login_allowed"] is False
+    with SessionLocal() as db:
+        assert db.query(models.User).filter_by(staff_id=response.json()["id"]).first() is None
