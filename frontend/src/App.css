@@ -2444,3 +2444,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .report-header-align-center .report-school-title { text-align:center !important; }
 .report-header-align-right .report-school-title { text-align:right !important; }
 .report-card-sheet { border-top:4px solid var(--report-accent, #315ee8); }
+
+.success-notice,.form-error,.notice { border-left:4px solid currentColor; border-radius:8px; padding:12px 15px; box-shadow:0 4px 14px rgba(23,43,77,.07); animation:schoolbridge-notice-in .22s ease-out; }
+.success-notice { border-left-color:#159b69; background:#effaf5; color:#176b4e; }
+.form-error { border-left-color:#d43d3d; background:#fff1f1; color:#9f2525; }
+.notice { border-left-color:#d78a18; background:#fff7e9; color:#8b5c12; }
+.connection-disconnected { color:#b42318 !important; background:#fff0ee; border:1px solid #ffd2cd; border-radius:20px; padding:6px 10px; font-weight:800; animation:schoolbridge-alert-pulse 1.8s ease-in-out infinite; }
+@keyframes schoolbridge-notice-in { from { opacity:.55; transform:translateY(-3px); } to { opacity:1; transform:translateY(0); } }
+@keyframes schoolbridge-alert-pulse { 0%,100% { box-shadow:0 0 0 0 rgba(212,61,61,.08); } 50% { box-shadow:0 0 0 5px rgba(212,61,61,.12); } }
+@media (prefers-reduced-motion:reduce) { .success-notice,.form-error,.notice,.connection-disconnected { animation:none !important; } }
