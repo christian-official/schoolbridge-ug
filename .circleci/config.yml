@@ -1,7 +1,7 @@
 version: 2.1
 
 jobs:
-  backend-tests:
+  backend-api-tests:
     machine:
       image: ubuntu-2404:current
     steps:
@@ -18,7 +18,38 @@ jobs:
           command: .venv/bin/python -m compileall -q backend/app
       - run:
           name: Run backend API tests
-          command: PYTHONPATH=backend SCHOOLBRIDGE_DATABASE_URL=sqlite:///./schoolbridge_ci.db SCHOOLBRIDGE_SECRET_KEY=ci-only-secret-key-not-for-production .venv/bin/python -m pytest -vv -s --durations=25 backend/tests
+          command: PYTHONPATH=backend SCHOOLBRIDGE_DATABASE_URL=sqlite:///./schoolbridge_ci.db SCHOOLBRIDGE_SECRET_KEY=ci-only-secret-key-not-for-production .venv/bin/python -m pytest -vv -s --durations=25 backend/tests/test_api.py
+
+  backend-migration-tests:
+    machine:
+      image: ubuntu-2404:current
+    steps:
+      - checkout
+      - run:
+          name: Install backend test dependencies
+          command: |
+            python3 -m venv .venv
+            .venv/bin/pip install --upgrade pip
+            .venv/bin/pip install -r backend/requirements-dev.txt
+      - run:
+          name: Run database migration tests
+          command: PYTHONPATH=backend SCHOOLBRIDGE_DATABASE_URL=sqlite:///./schoolbridge_ci.db SCHOOLBRIDGE_SECRET_KEY=ci-only-secret-key-not-for-production .venv/bin/python -m pytest -vv -s --durations=25 backend/tests/test_migrations.py
+
+  backend-support-tests:
+    machine:
+      image: ubuntu-2404:current
+    steps:
+      - checkout
+      - run:
+          name: Install backend test dependencies
+          command: |
+            python3 -m venv .venv
+            .venv/bin/pip install --upgrade pip
+            .venv/bin/pip install -r backend/requirements-dev.txt
+      - run:
+          name: Run backend support tests
+          command: |
+            PYTHONPATH=backend SCHOOLBRIDGE_DATABASE_URL=sqlite:///./schoolbridge_ci.db SCHOOLBRIDGE_SECRET_KEY=ci-only-secret-key-not-for-production .venv/bin/python -m pytest -vv -s --durations=25               backend/tests/test_backup_scheduler.py               backend/tests/test_database.py               backend/tests/test_database_health.py               backend/tests/test_owner_license_tool.py               backend/tests/test_postgres_backup.py               backend/tests/test_restore_postgres.py               backend/tests/test_sqlite_backup.py
 
   postgres-recovery-integration:
     machine:
@@ -237,7 +268,9 @@ jobs:
 workflows:
   schoolbridge-ci:
     jobs:
-      - backend-tests
+      - backend-api-tests
+      - backend-migration-tests
+      - backend-support-tests
       - postgres-recovery-integration
       - frontend-build
       - local-deployment-package
