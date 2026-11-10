@@ -1069,7 +1069,9 @@ def list_exams(class_id: int | None = None, year: int | None = None, db: Session
 
 
 @app.post("/api/exams/{exam_id}/close", tags=["Exams"])
-def close_exam(exam_id: int, db: Session = Depends(get_db), admin=Depends(require_admin)):
+def close_exam(exam_id: int, db: Session = Depends(get_db), admin=Depends(get_current_user)):
+    if admin.role != "admin" and "approve" not in user_permissions(admin).get("Examinations", set()):
+        raise HTTPException(403, "Examination approval permission is required to close results.")
     exam = db.get(models.Exam, exam_id)
     if not exam:
         raise HTTPException(404, "Examination not found.")
@@ -1080,7 +1082,9 @@ def close_exam(exam_id: int, db: Session = Depends(get_db), admin=Depends(requir
 
 
 @app.post("/api/exams/{exam_id}/reopen", tags=["Exams"])
-def reopen_exam(exam_id: int, db: Session = Depends(get_db), admin=Depends(require_admin)):
+def reopen_exam(exam_id: int, db: Session = Depends(get_db), admin=Depends(get_current_user)):
+    if admin.role != "admin" and "approve" not in user_permissions(admin).get("Examinations", set()):
+        raise HTTPException(403, "Examination approval permission is required to reopen results.")
     exam = db.get(models.Exam, exam_id)
     if not exam:
         raise HTTPException(404, "Examination not found.")
