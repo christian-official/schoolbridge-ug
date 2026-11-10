@@ -9,8 +9,14 @@ if ($LASTEXITCODE -ne 0) { throw "Docker Compose v2 is required." }
 if (-not (Test-Path $ImageArchive)) { throw "Missing schoolbridge-images.tar. Recreate the USB package." }
 
 if (-not (Test-Path $EnvFile)) {
-    $dbPassword = [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
-    $appSecret = [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(48))
+    $dbBytes = New-Object byte[] 32
+    $appBytes = New-Object byte[] 48
+    $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+    $rng.GetBytes($dbBytes)
+    $rng.GetBytes($appBytes)
+    $dbPassword = [BitConverter]::ToString($dbBytes).Replace("-", "").ToLowerInvariant()
+    $appSecret = [BitConverter]::ToString($appBytes).Replace("-", "").ToLowerInvariant()
+    $rng.Dispose()
     @"
 POSTGRES_DB=schoolbridge
 POSTGRES_USER=schoolbridge
