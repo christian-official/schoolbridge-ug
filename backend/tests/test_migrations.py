@@ -214,7 +214,7 @@ def test_legacy_school_with_users_is_grandfathered_by_setup_migration(tmp_path):
     connection = sqlite3.connect(database_path)
     try:
         state = connection.execute(
-            "SELECT activated_at, setup_completed_at, activation_license_hash, original_identity_json FROM school_setup_state WHERE id=1"
+            "SELECT installation_id, activated_at, setup_completed_at, activation_license_hash, original_identity_json FROM school_setup_state WHERE id=1"
         ).fetchone()
         existing_user = connection.execute(
             "SELECT username FROM users WHERE id=1"
@@ -222,11 +222,14 @@ def test_legacy_school_with_users_is_grandfathered_by_setup_migration(tmp_path):
     finally:
         connection.close()
 
-    identity = json.loads(state[3])
+    import uuid
+    identity = json.loads(state[4])
     assert existing_user == "legacy-admin"
-    assert state[0] is not None
+    assert str(uuid.UUID(state[0])) == state[0]
+    assert identity["installation_id"] == state[0]
     assert state[1] is not None
-    assert state[2] is None
+    assert state[2] is not None
+    assert state[3] is None
     assert identity["school_name"] == "Legacy Academy"
     assert identity["school_type"] == "Secondary"
     assert identity["country"] is None

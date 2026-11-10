@@ -2,6 +2,7 @@
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy import inspect, text
+from uuid import uuid4
 
 revision = "0025_first_school_setup"
 down_revision = "0024_sync_change_scopes"
@@ -62,11 +63,17 @@ def upgrade() -> None:
             "installation_id": "legacy-existing-installation",
         }
         import json
+        legacy_installation_id = str(uuid4())
+        if identity is not None:
+            identity["installation_id"] = legacy_installation_id
         bind.execute(text("""
             INSERT INTO school_setup_state
             (id, installation_id, activated_at, activation_license_hash, setup_completed_at, original_identity_json)
-            VALUES (1, 'legacy-existing-installation', CURRENT_TIMESTAMP, NULL, CURRENT_TIMESTAMP, :identity)
-        """), {"identity": json.dumps(identity, sort_keys=True) if identity else None})
+            VALUES (1, :installation_id, CURRENT_TIMESTAMP, NULL, CURRENT_TIMESTAMP, :identity)
+        """), {
+            "installation_id": legacy_installation_id,
+            "identity": json.dumps(identity, sort_keys=True) if identity else None,
+        })
 
 
 def downgrade() -> None:
