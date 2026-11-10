@@ -1599,6 +1599,7 @@ function TeacherWorkspace({token,active,userId}:{token:string;active:string;user
         version:1,device_id:deviceId,idempotency_key:crypto.randomUUID(),
         exam:selectedTeacherExam,subject_id:Number(selectedSubjectId),base_sequence:resultSnapshotSequence,
         students:resultStudents,scores:resultScores,records,
+        base_mark_ids:Object.fromEntries(resultStudents.map(student=>[student.id,resultMarks.find(mark=>mark.student_id===student.id&&mark.subject_id===Number(selectedSubjectId))?.id??null])),
       })
       setOfflineDraftMessage('Encrypted offline draft saved on this browser. It has not changed official results.')
     }catch(error){setOfflineDraftMessage(error instanceof Error?error.message:'Unable to save the encrypted offline draft.')}
@@ -1629,7 +1630,7 @@ function TeacherWorkspace({token,active,userId}:{token:string;active:string;user
       const draft=await loadEncryptedOfflineDraft<any>(userId,deviceId,offlinePassphrase)
       const result=await api<{proposal_id:number;status:string;duplicate:boolean}>('sync/teacher-mark-proposals',token,{method:'POST',body:JSON.stringify({
         device_id:draft.device_id,idempotency_key:draft.idempotency_key,exam_id:draft.exam.id,
-        subject_id:draft.subject_id,base_sequence:draft.base_sequence,records:draft.records,
+        subject_id:draft.subject_id,base_sequence:draft.base_sequence,base_mark_ids:draft.base_mark_ids||{},records:draft.records,
       })})
       await deleteEncryptedOfflineDraft(userId,deviceId)
       setOfflineDraftMessage('Draft submitted as proposal #'+result.proposal_id+' ('+result.status+'). An administrator must review it; official marks have not been changed.')

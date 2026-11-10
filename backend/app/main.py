@@ -4677,6 +4677,33 @@ def adjust_fee_charge(charge_id: int, data: FeeChargeUpdate, db: Session = Depen
     return {"message": "Fee charge adjusted and recorded in the audit log.", "charge_id": charge.id, "amount": charge.amount, "paid": paid, "balance": charge.amount-paid}
 
 
+def _offline_teacher_mark_conflict(db: Session, exam_id: int, subject_id: int, entries: list, base_mark_ids: dict, base_sequence: int):
+    """Detect updates, inserts and deletions against each student's mark baseline."""
+    conflict = False
+    conflict_sequence = None
+    for entry in entries:
+        student_id = int(entry["student_id"] if isinstance(entry, dict) else entry.student_id)
+        baseline_id = base_mark_ids.get(str(student_id), base_mark_ids.get(student_id))
+        current = db.query(models.Mark).filter_by(student_id=student_id, exam_id=exam_id, subject_id=subject_id).first()
+        if baseline_id is None:
+            if current is not None:
+                conflict = True
+                changed = db.query(func.max(models.SyncChange.id)).filter(
+                    models.SyncChange.entity_type == "Mark", models.SyncChange.entity_id == current.id,
+                    models.SyncChange.id > base_sequence).scalar()
+                conflict_sequence = max(conflict_sequence or 0, changed or 0) or conflict_sequence
+        else:
+            if current is None or current.id != int(baseline_id):
+                conflict = True
+            changed = db.query(func.max(models.SyncChange.id)).filter(
+                models.SyncChange.entity_type == "Mark", models.SyncChange.entity_id == int(baseline_id),
+                models.SyncChange.id > base_sequence).scalar()
+            if changed:
+                conflict = True
+                conflict_sequence = max(conflict_sequence or 0, changed)
+    return conflict, conflict_sequence
+
+
 class OfflineTeacherMarkEntry(BaseModel):
     student_id: int = Field(ge=1)
     score: float = Field(ge=0, le=100)
@@ -4688,6 +4715,7 @@ class OfflineTeacherMarkBatch(BaseModel):
     exam_id: int = Field(ge=1)
     subject_id: int = Field(ge=1)
     base_sequence: int = Field(ge=0)
+    base_mark_ids: dict[int, int | None] = Field(default_factory=dict)
     records: list[OfflineTeacherMarkEntry] = Field(min_length=1, max_length=500)
 
 
@@ -4729,6 +4757,7 @@ def submit_offline_teacher_marks(data: OfflineTeacherMarkBatch, db: Session = De
     payload = json.dumps({
         "class_id": exam.class_id, "exam_id": exam.id, "subject_id": subject.id,
         "records": [entry.model_dump() for entry in data.records],
+        "base_mark_ids": {str(key): value for key, value in data.base_mark_ids.items()},
     }, sort_keys=True, separators=(",", ":"))
     if len(payload.encode("utf-8")) > 32768:
         raise HTTPException(413, "Offline marks payload exceeds 32 KB.")
@@ -4742,21 +4771,9 @@ def submit_offline_teacher_marks(data: OfflineTeacherMarkBatch, db: Session = De
         if not same:
             raise HTTPException(409, "Idempotency key already used for different content.")
         return {"proposal_id": old.id, "status": old.status, "duplicate": True, "applied": False}
-    changed_ids = [row[0] for row in db.query(models.SyncChange.entity_id).filter(
-        models.SyncChange.entity_type == "Mark", models.SyncChange.id > data.base_sequence
-    ).all()]
-    changed_students = set()
-    if changed_ids:
-        changed_students = {
-            row[0] for row in db.query(models.Mark.student_id).filter(
-                models.Mark.id.in_(changed_ids), models.Mark.exam_id == exam.id,
-                models.Mark.subject_id == subject.id
-            ).all()
-        }
-    conflict = bool(changed_students & set(student_ids))
-    conflict_sequence = db.query(func.max(models.SyncChange.id)).filter(
-        models.SyncChange.entity_type == "Mark", models.SyncChange.id > data.base_sequence
-    ).scalar() if conflict else None
+    conflict, conflict_sequence = _offline_teacher_mark_conflict(
+        db, exam.id, subject.id, data.records, data.base_mark_ids, data.base_sequence
+    )
     row = models.SyncChangeProposal(
         user_id=teacher.id, device_id=device.device_id, idempotency_key=data.idempotency_key,
         entity_type="TeacherMarkBatch", entity_id=exam.id, operation="update",
@@ -4865,23 +4882,14 @@ def apply_offline_teacher_mark_proposal(proposal_id: int, db: Session = Depends(
     ).first()
     if locked:
         raise HTTPException(409, "Results have been verified and locked. Unlock them before approving this submission.")
-    latest_changes = db.query(models.SyncChange).filter(
-        models.SyncChange.entity_type == "Mark", models.SyncChange.id > row.base_sequence
-    ).all()
-    changed_ids = [change.entity_id for change in latest_changes]
-    changed_students = set()
-    if changed_ids:
-        changed_students = {
-            item[0] for item in db.query(models.Mark.student_id).filter(
-                models.Mark.id.in_(changed_ids), models.Mark.exam_id == exam.id,
-                models.Mark.subject_id == subject.id
-            ).all()
-        }
-    if changed_students & set(student_ids):
+    has_conflict, conflict_sequence = _offline_teacher_mark_conflict(
+        db, exam.id, subject.id, entries, payload.get("base_mark_ids", {}), row.base_sequence
+    )
+    if has_conflict:
         row.status = "conflict"
-        row.conflict_sequence = max(change.id for change in latest_changes)
+        row.conflict_sequence = conflict_sequence
         db.commit()
-        raise HTTPException(409, "One or more marks changed after the offline snapshot. Review the conflict before retrying.")
+        raise HTTPException(409, "One or more marks were added, changed or deleted after the offline snapshot. Review and resubmit against a fresh snapshot.")
     saved = 0
     for entry in entries:
         mark = db.query(models.Mark).filter_by(
