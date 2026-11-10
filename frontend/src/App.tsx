@@ -1251,8 +1251,9 @@ function App() {
             <form onSubmit={login}>
               <label htmlFor="username">Username</label>
               <input id="username" value={username} onChange={e => setUsername(e.target.value)} placeholder="Enter staff number or surname" required />
-              <label htmlFor="password">Password</label>
-              <input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter your password" required />
+              <label htmlFor="password">Password / offline passphrase</label>
+              <input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter your password or offline passphrase" required />
+              <p className="form-hint">Offline sign-in works only after you register this browser and save an encrypted offline copy under Settings → Registered devices. Use that offline passphrase when disconnected.</p>
               {loginError && <p className="error">{loginError}</p>}
               <button className="primary-button login-button" disabled={loading}>
                 {loading ? <><LoaderCircle className="spin" size={18} /> Signing in...</> : 'Sign in'}
