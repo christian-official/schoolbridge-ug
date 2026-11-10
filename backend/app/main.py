@@ -5083,6 +5083,13 @@ def update_my_teaching_assignments(data: MyTeachingAssignmentsUpdate, user=Depen
     for class_id in set(data.class_teacher_class_ids):
         db.add(models.ClassTeacherAssignment(teacher_id=user.id, class_id=class_id))
     staff.special_roles_json = json.dumps(sorted(set(data.special_roles)))
+    if user.role == "teacher":
+        permissions = user_permissions(user)
+        if data.class_teacher_class_ids:
+            permissions["Attendance"] = {"view", "add", "edit"}
+        else:
+            permissions.pop("Attendance", None)
+        user.permissions_json = json.dumps({key: sorted(value) for key, value in permissions.items()})
     write_audit(db, user, "staff_assignments_self_declared", "staff", staff.id,
                 f"classes={len(class_ids)}; subjects={len(subject_ids)}; responsibilities={','.join(sorted(set(data.special_roles)))}")
     db.commit()
