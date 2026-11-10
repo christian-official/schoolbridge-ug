@@ -43,7 +43,7 @@ def create_scheduled_backup(database_url=None, backup_directory=None, retention_
         raise ValueError("Backup retention must be at least one day.")
     directory.mkdir(parents=True, exist_ok=True)
     if url.get_backend_name() == "postgresql":
-        return create_postgres_backup(str(url), str(directory), retention, now=now)
+        return create_postgres_backup(url.render_as_string(hide_password=False), str(directory), retention)
     if url.get_backend_name() != "sqlite":
         raise ValueError("Automatic backups support SQLite and PostgreSQL only.")
     if not url.database or url.database == ":memory:":
