@@ -2068,7 +2068,25 @@ def test_first_install_requires_activation_and_creates_admin_atomically(monkeypa
         assert activated.status_code == 200, activated.text
         assert client.post("/api/setup/activate", json={"license": license_token}).status_code == 409
 
+        # Activation alone must not let a different browser visitor claim the
+        # first administrator without the exact owner-signed license.
+        different_license = _signed_test_license(installation_id, private_key, {
+            "license_id": "different-owner-license",
+        })
+        unauthorised_setup = client.post("/api/setup/complete", json={
+            "activation_license": different_license,
+            "school_name": "Unapproved School",
+            "school_type": "Secondary",
+            "country": "Uganda",
+            "school_structure": "Day",
+            "admin_username": "unauthorised-admin",
+            "admin_email": "unauthorised@example.invalid",
+            "admin_password": "LongTestPassword123!",
+        })
+        assert unauthorised_setup.status_code == 403
+
         completed = client.post("/api/setup/complete", json={
+            "activation_license": license_token,
             "school_name": "River Valley School",
             "school_type": "Combined",
             "country": "Uganda",
@@ -2192,6 +2210,7 @@ def test_owner_signed_identity_correction_is_audited_and_one_time(monkeypatch):
         activation = _signed_test_license(installation_id, private_key)
         assert client.post("/api/setup/activate", json={"license": activation}).status_code == 200
         setup = client.post("/api/setup/complete", json={
+            "activation_license": activation,
             "school_name": "Original School", "school_type": "Secondary",
             "country": "Uganda", "school_structure": "Day",
             "admin_username": "identity-admin", "admin_email": "identity@example.invalid",

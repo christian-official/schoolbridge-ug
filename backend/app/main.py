@@ -1944,6 +1944,7 @@ class SchoolActivationRequest(BaseModel):
 
 
 class FirstSchoolSetupRequest(BaseModel):
+    activation_license: str = Field(min_length=20, max_length=4096)
     school_name: str = Field(min_length=2, max_length=160)
     school_type: str = Field(pattern="^(Primary|Secondary|Combined)$")
     country: str = Field(min_length=2, max_length=80)
@@ -2083,6 +2084,8 @@ def complete_first_school_setup(data: FirstSchoolSetupRequest, db: Session = Dep
     state = get_or_create_setup_state(db)
     if not state.activated_at:
         raise HTTPException(403, "Activate this installation before completing school setup.")
+    if license_fingerprint(data.activation_license) != state.activation_license_hash:
+        raise HTTPException(403, "The owner activation license used for this installation is required to create the first administrator.")
     if state.setup_completed_at or db.query(models.User).count():
         raise HTTPException(409, "First-time setup has already been completed.")
     if db.get(models.SchoolProfile, 1):

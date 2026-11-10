@@ -625,7 +625,6 @@ function FirstTimeSetupWizard({status,onStatusChange}:{status:FirstSetupStatus;o
       const result=await response.json().catch(()=>({}))
       if(!response.ok)throw new Error(result.detail||'Installation activation failed.')
       onStatusChange({...status,activated:true,error:''})
-      setLicense('')
     } catch(e) { setError(e instanceof Error?e.message:'Installation activation failed.') }
     finally { setBusy(false) }
   }
@@ -634,12 +633,13 @@ function FirstTimeSetupWizard({status,onStatusChange}:{status:FirstSetupStatus;o
     try {
       const response=await fetch(`${API_BASE_URL}/api/setup/complete`,{
         method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify(school),
+        body:JSON.stringify({...school,activation_license:license}),
       })
       const result=await response.json().catch(()=>({}))
       if(!response.ok)throw new Error(result.detail||'School setup could not be completed.')
       onStatusChange({...status,setup_completed:true,activated:true,identity_locked:true,error:''})
       setSchool({...school,admin_password:''})
+      setLicense('')
     } catch(e) { setError(e instanceof Error?e.message:'School setup could not be completed.') }
     finally { setBusy(false) }
   }
@@ -663,6 +663,11 @@ function FirstTimeSetupWizard({status,onStatusChange}:{status:FirstSetupStatus;o
         <h1>Set up your school</h1>
         <p className="muted">Enter the school's official details and create its first administrator account. The original school identity will be protected after setup.</p>
         <form onSubmit={completeSetup}>
+          <div className="first-setup-section"><h3>Owner authorisation</h3>
+            <label htmlFor="schoolbridge-license-confirm">Confirm owner-signed activation license</label>
+            <textarea id="schoolbridge-license-confirm" value={license} onChange={e=>setLicense(e.target.value)} required rows={3} placeholder="Paste the same owner license used to activate this installation"/>
+            <p className="form-hint">The same owner license is required to create the first administrator. It is held only in this page until setup is complete.</p>
+          </div>
           <div className="first-setup-section"><h3>School identity</h3>
             <label>Official school name *<input required minLength={2} maxLength={160} value={school.school_name} onChange={e=>setSchool({...school,school_name:e.target.value})}/></label>
             <div className="first-setup-grid">

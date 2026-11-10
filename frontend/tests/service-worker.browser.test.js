@@ -173,6 +173,7 @@ test('real Chromium completes the first-install owner activation and school setu
     await page.getByRole('button', { name: 'Activate installation' }).click()
     await page.getByRole('heading', { name: 'Set up your school' }).waitFor()
     assert.deepEqual(activationPayload, { license: 'signed-owner-license-token' })
+    assert.equal(await page.getByLabel('Confirm owner-signed activation license').inputValue(), 'signed-owner-license-token')
 
     await page.getByLabel('Official school name *').fill('River Valley School')
     await page.getByLabel('School type *').selectOption('Combined')
@@ -195,6 +196,7 @@ test('real Chromium completes the first-install owner activation and school setu
     assert.equal(setupPayload.admin_username, 'first-admin')
     assert.equal(setupPayload.admin_email, 'admin@example.invalid')
     assert.equal(setupPayload.admin_password, 'LongTestPassword123!')
+    assert.equal(setupPayload.activation_license, 'signed-owner-license-token')
     assert.equal(await page.getByLabel('Password').count(), 1)
   } finally {
     if (browser) await browser.close()
