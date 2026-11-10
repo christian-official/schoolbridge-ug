@@ -239,6 +239,7 @@ export async function saveEncryptedOfflineAttendanceDraft(userId:number,deviceId
 
 export async function loadEncryptedOfflineAttendanceDraft<T>(userId:number,deviceId:string,passphrase:string):Promise<T>{
   if(!passphrase||passphrase.length<12)throw new Error('Enter the passphrase used to protect the attendance draft.')
+  if(!crypto?.subtle||typeof indexedDB==='undefined')throw new Error('This browser does not support protected offline storage.')
   const db=await openOfflineDatabase(userId,deviceId)
   let record:any
   try{
@@ -250,7 +251,7 @@ export async function loadEncryptedOfflineAttendanceDraft<T>(userId:number,devic
   }finally{db.close()}
   if(!record)throw new Error('No encrypted attendance draft is saved on this browser.')
   const age=Date.now()-record.updatedAt
-  if(record.version!==2||!Number.isFinite(record.updatedAt)||age<0||age>=OFFLINE_DRAFT_TTL_MS){
+  if(record.version!==2||!Array.isArray(record.salt)||!Array.isArray(record.iv)||!Array.isArray(record.ciphertext)||!Number.isFinite(record.updatedAt)||age<0||age>=OFFLINE_DRAFT_TTL_MS){
     await deleteEncryptedOfflineAttendanceDraft(userId,deviceId)
     throw new Error('This offline attendance draft has expired or needs refreshing. Reconnect and save a fresh register.')
   }
