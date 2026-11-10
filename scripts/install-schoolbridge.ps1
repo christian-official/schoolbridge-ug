@@ -5,54 +5,43 @@ $ImageArchive = Join-Path $PackageDir "schoolbridge-images.tar"
 $EnvFile = Join-Path $PackageDir ".env"
 $ComposeFile = Join-Path $PackageDir "docker-compose.yml"
 $HostCheck = Join-Path $PackageDir "check-school-host.ps1"
+$RuntimePreparation = Join-Path $PackageDir "prepare-school-host.ps1"
 
-if (-not (Test-Path $ComposeFile)) {
-    throw "Missing docker-compose.yml. Recreate the complete SchoolBridge USB package."
+foreach ($required in @($ComposeFile, $HostCheck, $RuntimePreparation, $ImageArchive)) {
+    if (-not (Test-Path $required -PathType Leaf)) {
+        throw "Incomplete SchoolBridge USB package. Missing: $required. Recreate the complete USB package."
+    }
 }
-if (-not (Test-Path $HostCheck)) {
-    throw "Missing check-school-host.ps1. Recreate the complete SchoolBridge USB package."
+
+if (-not (Test-Path (Join-Path $PackageDir "runtime/Docker Desktop Installer.exe") -PathType Leaf) -or
+    -not (Test-Path (Join-Path $PackageDir "runtime/wsl.msi") -PathType Leaf)) {
+    throw "The official Docker Desktop and WSL installers are missing. This package is not ready for offline installation."
+}
+
+if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
+    throw "Docker is not installed. First run prepare-school-host.ps1 from an elevated PowerShell window, complete the interactive Docker setup, restart if requested, then rerun this installer."
 }
 
 Write-Host "Checking this computer before installing SchoolBridge..."
 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $HostCheck
 $hostCheckExit = $LASTEXITCODE
 if ($hostCheckExit -ne 0) {
-    throw "This computer is not ready for installation. Resolve the host-check blockers above, then rerun install-schoolbridge.ps1. If Docker/WSL is missing, follow runtime/WINDOWS_RUNTIME_PREPARATION.md or the supplied preparation guide."
-}
-
-if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
-    throw "Docker Engine is not installed. Use the official runtime installers supplied in the USB runtime folder, then rerun this installer."
+    throw "This computer is not ready for installation. Run prepare-school-host.ps1 elevated, resolve the reported blockers, then rerun this installer."
 }
 
 docker compose version | Out-Null
-if ($LASTEXITCODE -ne 0) {
-    throw "Docker Compose v2 is required."
-}
-
+if ($LASTEXITCODE -ne 0) { throw "Docker Compose v2 is required." }
 docker info *> $null
-if ($LASTEXITCODE -ne 0) {
-    throw "Docker Engine is not running. Start Docker Desktop and wait for its engine to become ready."
-}
-
-if (-not (Test-Path $ImageArchive)) {
-    throw "Missing schoolbridge-images.tar. Recreate the USB package."
-}
+if ($LASTEXITCODE -ne 0) { throw "Docker Engine is not running. Start Docker Desktop and wait for its engine to become ready." }
 
 if (-not (Test-Path $EnvFile)) {
     $dbBytes = New-Object byte[] 32
     $appBytes = New-Object byte[] 48
     $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
-    try {
-        $rng.GetBytes($dbBytes)
-        $rng.GetBytes($appBytes)
-    }
-    finally {
-        $rng.Dispose()
-    }
-
+    try { $rng.GetBytes($dbBytes); $rng.GetBytes($appBytes) }
+    finally { $rng.Dispose() }
     $dbPassword = [BitConverter]::ToString($dbBytes).Replace("-", "").ToLowerInvariant()
     $appSecret = [BitConverter]::ToString($appBytes).Replace("-", "").ToLowerInvariant()
-
     @"
 POSTGRES_DB=schoolbridge
 POSTGRES_USER=schoolbridge
@@ -64,54 +53,31 @@ SCHOOLBRIDGE_CORS_ORIGINS=*
 SCHOOLBRIDGE_BACKUP_RETENTION_DAYS=30
 SCHOOLBRIDGE_BACKUP_INTERVAL_HOURS=24
 "@ | Set-Content $EnvFile -Encoding ASCII
-
     Write-Host "Created local .env with fresh random database and application secrets."
 }
 
 $envLines = @(Get-Content $EnvFile)
 $keyIndex = -1
 $publicKey = ""
-
 for ($index = 0; $index -lt $envLines.Count; $index++) {
     if ($envLines[$index] -match '^SCHOOLBRIDGE_LICENSE_PUBLIC_KEY=(.*)$') {
-        $keyIndex = $index
-        $publicKey = $Matches[1]
-        break
+        $keyIndex = $index; $publicKey = $Matches[1]; break
     }
 }
-
 if ([string]::IsNullOrWhiteSpace($publicKey)) {
     $publicKey = Read-Host "Paste the owner's Base64 public verification key (not the private key)"
 }
-
-if ([string]::IsNullOrWhiteSpace($publicKey)) {
-    throw "The owner's public verification key is required before first activation."
-}
-
-try {
-    $decodedPublicKey = [Convert]::FromBase64String($publicKey)
-}
-catch {
-    throw "The public verification key must be valid Base64."
-}
-
-if ($decodedPublicKey.Length -ne 32) {
-    throw "The Ed25519 public key must decode to exactly 32 bytes."
-}
-
-if ($keyIndex -ge 0) {
-    $envLines[$keyIndex] = "SCHOOLBRIDGE_LICENSE_PUBLIC_KEY=$publicKey"
-}
-else {
-    $envLines += "SCHOOLBRIDGE_LICENSE_PUBLIC_KEY=$publicKey"
-}
+if ([string]::IsNullOrWhiteSpace($publicKey)) { throw "The owner's public verification key is required before first activation." }
+try { $decodedPublicKey = [Convert]::FromBase64String($publicKey) }
+catch { throw "The public verification key must be valid Base64." }
+if ($decodedPublicKey.Length -ne 32) { throw "The Ed25519 public key must decode to exactly 32 bytes." }
+if ($keyIndex -ge 0) { $envLines[$keyIndex] = "SCHOOLBRIDGE_LICENSE_PUBLIC_KEY=$publicKey" }
+else { $envLines += "SCHOOLBRIDGE_LICENSE_PUBLIC_KEY=$publicKey" }
 Set-Content $EnvFile $envLines -Encoding ASCII
 
 Write-Host "Importing SchoolBridge images from USB..."
 docker load -i $ImageArchive
-if ($LASTEXITCODE -ne 0) {
-    throw "Image import failed."
-}
+if ($LASTEXITCODE -ne 0) { throw "Image import failed." }
 
 $confirmation = Read-Host "Start local SchoolBridge services now? Type START"
 if ($confirmation -cne "START") {
@@ -122,13 +88,8 @@ if ($confirmation -cne "START") {
 Push-Location $PackageDir
 try {
     docker compose up -d --no-build
-    if ($LASTEXITCODE -ne 0) {
-        throw "SchoolBridge failed to start. Inspect docker compose logs."
-    }
-
+    if ($LASTEXITCODE -ne 0) { throw "SchoolBridge failed to start. Inspect docker compose logs." }
     Write-Host "SchoolBridge startup requested. Open http://localhost:8080 on this computer."
     Write-Host "Check service health with: docker compose ps"
 }
-finally {
-    Pop-Location
-}
+finally { Pop-Location }
