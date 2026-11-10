@@ -15,7 +15,9 @@ export async function clearLocalSyncData(userId: number, deviceId: string) {
 }
 
 
-type EncryptedDraftRecord = { salt: number[]; iv: number[]; ciphertext: number[]; updatedAt: number }
+type EncryptedDraftRecord = { version: 2; salt: number[]; iv: number[]; ciphertext: number[]; updatedAt: number }
+
+const OFFLINE_DRAFT_TTL_MS = 24 * 60 * 60 * 1000
 
 function offlineDatabaseName(userId: number, deviceId: string) {
   return 'schoolbridge-offline-' + userId + '-' + deviceId
@@ -55,9 +57,15 @@ export async function saveEncryptedOfflineDraft(userId: number, deviceId: string
   if (!crypto?.subtle || typeof indexedDB === 'undefined') throw new Error('This browser does not support protected offline storage.')
   const salt = crypto.getRandomValues(new Uint8Array(16))
   const iv = crypto.getRandomValues(new Uint8Array(12))
+  const updatedAt = Date.now()
   const key = await deriveOfflineDraftKey(passphrase, salt)
   const plaintext = new TextEncoder().encode(JSON.stringify(value))
-  const ciphertext = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: asArrayBuffer(iv) }, key, asArrayBuffer(plaintext)))
+  const additionalData = new TextEncoder().encode('schoolbridge-offline-draft-v2:teacher-mark-draft:' + updatedAt)
+  const ciphertext = new Uint8Array(await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv: asArrayBuffer(iv), additionalData: asArrayBuffer(additionalData) },
+    key,
+    asArrayBuffer(plaintext),
+  ))
   const db = await openOfflineDatabase(userId, deviceId)
   try {
     await new Promise<void>((resolve, reject) => {
@@ -67,7 +75,7 @@ export async function saveEncryptedOfflineDraft(userId: number, deviceId: string
       let alreadySaved = false
       existing.onsuccess = () => {
         if (existing.result && !replaceExisting) { alreadySaved = true; transaction.abort(); return }
-        store.put({ salt: Array.from(salt), iv: Array.from(iv), ciphertext: Array.from(ciphertext), updatedAt: Date.now() } satisfies EncryptedDraftRecord, 'teacher-mark-draft')
+        store.put({ version: 2, salt: Array.from(salt), iv: Array.from(iv), ciphertext: Array.from(ciphertext), updatedAt } satisfies EncryptedDraftRecord, 'teacher-mark-draft')
       }
       transaction.oncomplete = () => resolve()
       transaction.onerror = () => reject(new Error('Unable to save the encrypted offline draft.'))
@@ -89,10 +97,20 @@ export async function loadEncryptedOfflineDraft<T>(userId: number, deviceId: str
     })
   } finally { db.close() }
   if (!record) throw new Error('No encrypted teacher marks draft is saved on this browser.')
+  const age = Date.now() - record.updatedAt
+  if (record.version !== 2 || !Number.isFinite(record.updatedAt) || age < 0 || age >= OFFLINE_DRAFT_TTL_MS) {
+    await deleteEncryptedOfflineDraft(userId, deviceId)
+    throw new Error('This offline marks draft has expired or needs refreshing. Reconnect and save a fresh draft.')
+  }
   try {
     const salt = new Uint8Array(record.salt), iv = new Uint8Array(record.iv), ciphertext = new Uint8Array(record.ciphertext)
     const key = await deriveOfflineDraftKey(passphrase, salt)
-    const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: asArrayBuffer(iv) }, key, asArrayBuffer(ciphertext))
+    const additionalData = new TextEncoder().encode('schoolbridge-offline-draft-v2:teacher-mark-draft:' + record.updatedAt)
+    const plaintext = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: asArrayBuffer(iv), additionalData: asArrayBuffer(additionalData) },
+      key,
+      asArrayBuffer(ciphertext),
+    )
     return JSON.parse(new TextDecoder().decode(plaintext)) as T
   } catch {
     throw new Error('Unable to unlock the draft. Check the passphrase and try again.')
@@ -192,9 +210,13 @@ export async function saveEncryptedOfflineAttendanceDraft(userId:number,deviceId
   if(!passphrase||passphrase.length<12)throw new Error('Use a passphrase of at least 12 characters.')
   if(!crypto?.subtle||typeof indexedDB==='undefined')throw new Error('This browser does not support protected offline storage.')
   const salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12))
+  const updatedAt=Date.now()
   const key=await deriveOfflineDraftKey(passphrase,salt)
   const plaintext=new TextEncoder().encode(JSON.stringify(value))
-  const ciphertext=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv:asArrayBuffer(iv)},key,asArrayBuffer(plaintext)))
+  const additionalData=new TextEncoder().encode('schoolbridge-offline-draft-v2:attendance-register-draft:'+updatedAt)
+  const ciphertext=new Uint8Array(await crypto.subtle.encrypt(
+    {name:'AES-GCM',iv:asArrayBuffer(iv),additionalData:asArrayBuffer(additionalData)},key,asArrayBuffer(plaintext),
+  ))
   const db=await openOfflineDatabase(userId,deviceId)
   try{
     await new Promise<void>((resolve,reject)=>{
@@ -203,7 +225,7 @@ export async function saveEncryptedOfflineAttendanceDraft(userId:number,deviceId
       const existing=store.get('attendance-register-draft')
       existing.onsuccess=()=>{
         if(existing.result&&!replaceExisting){transaction.abort();return}
-        store.put({salt:Array.from(salt),iv:Array.from(iv),ciphertext:Array.from(ciphertext),updatedAt:Date.now()},'attendance-register-draft')
+        store.put({version:2,salt:Array.from(salt),iv:Array.from(iv),ciphertext:Array.from(ciphertext),updatedAt},'attendance-register-draft')
       }
       transaction.oncomplete=()=>resolve()
       transaction.onerror=()=>reject(new Error('Unable to save the encrypted attendance draft.'))
@@ -224,9 +246,19 @@ export async function loadEncryptedOfflineAttendanceDraft<T>(userId:number,devic
     })
   }finally{db.close()}
   if(!record)throw new Error('No encrypted attendance draft is saved on this browser.')
+  const age=Date.now()-record.updatedAt
+  if(record.version!==2||!Number.isFinite(record.updatedAt)||age<0||age>=OFFLINE_DRAFT_TTL_MS){
+    await deleteEncryptedOfflineAttendanceDraft(userId,deviceId)
+    throw new Error('This offline attendance draft has expired or needs refreshing. Reconnect and save a fresh register.')
+  }
   try{
     const key=await deriveOfflineDraftKey(passphrase,new Uint8Array(record.salt))
-    const plaintext=await crypto.subtle.decrypt({name:'AES-GCM',iv:asArrayBuffer(new Uint8Array(record.iv))},key,asArrayBuffer(new Uint8Array(record.ciphertext)))
+    const additionalData=new TextEncoder().encode('schoolbridge-offline-draft-v2:attendance-register-draft:'+record.updatedAt)
+    const plaintext=await crypto.subtle.decrypt(
+      {name:'AES-GCM',iv:asArrayBuffer(new Uint8Array(record.iv)),additionalData:asArrayBuffer(additionalData)},
+      key,
+      asArrayBuffer(new Uint8Array(record.ciphertext)),
+    )
     return JSON.parse(new TextDecoder().decode(plaintext)) as T
   }catch{throw new Error('Unable to unlock the attendance draft. Check the passphrase and try again.')}
 }
