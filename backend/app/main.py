@@ -5115,6 +5115,8 @@ def get_my_teaching_assignments(user=Depends(get_current_user), db: Session = De
     for row in assignments:
         grouped.setdefault(row.class_id, []).append(row.subject_id)
     return {
+        "classes": [{"id": row.id, "name": row.name, "section": row.section} for row in db.query(models.SchoolClass).order_by(models.SchoolClass.name, models.SchoolClass.section).all()],
+        "subjects": [{"id": row.id, "name": row.name, "school_type": row.school_type} for row in db.query(models.Subject).order_by(models.Subject.name).all()],
         "class_subjects": [{"class_id": class_id, "subject_ids": subject_ids} for class_id, subject_ids in grouped.items()],
         "class_teacher_class_ids": class_teacher_ids,
         "special_roles": special_roles if isinstance(special_roles, list) else [],
