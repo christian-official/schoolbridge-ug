@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Printer, RefreshCw, Save, Download, Upload, LockKeyhole } from 'lucide-react'
 import { saveEncryptedOfflineAttendanceDraft, loadEncryptedOfflineAttendanceDraft, deleteEncryptedOfflineAttendanceDraft } from './syncStorage'
 
@@ -35,6 +35,7 @@ export default function AttendanceManagement({ token, userId, canEdit = true }: 
   const [offlineDraftMessage, setOfflineDraftMessage] = useState('')
   const [offlineBusy, setOfflineBusy] = useState(false)
   const [attendanceBaseline, setAttendanceBaseline] = useState<{base_sequence:number;base_attendance_ids:Record<string,number|null>}|null>(null)
+  const skipNextRegisterReload = useRef(false)
 
   async function load() {
     setLoading(true); setError('')
@@ -75,7 +76,7 @@ export default function AttendanceManagement({ token, userId, canEdit = true }: 
   }
 
   useEffect(() => { void load() }, [token])
-  useEffect(() => { if (classId) void loadRegister() }, [classId, attendanceDate])
+  useEffect(() => { if (classId) { if(skipNextRegisterReload.current){skipNextRegisterReload.current=false;return} void loadRegister() } }, [classId, attendanceDate])
 
   const classStudents = useMemo(() => students.filter(student => String(student.class_id) === classId).sort((a, b) => a.last_name.localeCompare(b.last_name) || a.first_name.localeCompare(b.first_name)), [students, classId])
 
@@ -111,7 +112,7 @@ export default function AttendanceManagement({ token, userId, canEdit = true }: 
     const draft={version:1,userId,deviceId,classId:Number(classId),attendanceDate,baseSequence:attendanceBaseline.base_sequence,
       baseAttendanceIds:attendanceBaseline.base_attendance_ids,students:classStudents,
       records:classStudents.map(student=>({student_id:student.id,status:statuses[student.id]})),
-      idempotencyKey:crypto.randomUUID(),savedAt:Date.now()}
+      idempotencyKey:crypto.randomUUID(),savedAt:Date.now(),expiresAt:Date.now()+24*60*60*1000}
     try{
       try{await saveEncryptedOfflineAttendanceDraft(userId,deviceId,offlinePassphrase,draft,false)}
       catch(error){
@@ -132,6 +133,8 @@ export default function AttendanceManagement({ token, userId, canEdit = true }: 
     try{
       const draft=await loadEncryptedOfflineAttendanceDraft<any>(userId,deviceId,offlinePassphrase)
       if(draft.version!==1||draft.userId!==userId||draft.deviceId!==deviceId)throw new Error('This attendance draft belongs to another account or device.')
+      if(!draft.expiresAt||draft.expiresAt<Date.now()){await deleteEncryptedOfflineAttendanceDraft(userId,deviceId);throw new Error('The offline attendance draft has expired. Refresh the register and save a new draft.')}
+      skipNextRegisterReload.current=true
       setClassId(String(draft.classId));setAttendanceDate(draft.attendanceDate)
       setStudents(draft.students||[])
       setStatuses(Object.fromEntries((draft.records||[]).map((row:any)=>[row.student_id,row.status])))
@@ -150,6 +153,7 @@ export default function AttendanceManagement({ token, userId, canEdit = true }: 
     try{
       const draft=await loadEncryptedOfflineAttendanceDraft<any>(userId,deviceId,offlinePassphrase)
       if(draft.userId!==userId||draft.deviceId!==deviceId)throw new Error('This attendance draft belongs to another account or device.')
+      if(!draft.expiresAt||draft.expiresAt<Date.now()){await deleteEncryptedOfflineAttendanceDraft(userId,deviceId);throw new Error('The offline attendance draft has expired. Refresh the register and save a new draft.')}
       const result=await request<{proposal_id:number;status:string;applied:boolean;saved:number}>('sync/attendance-batches',token,{
         method:'POST',body:JSON.stringify({device_id:deviceId,idempotency_key:draft.idempotencyKey,class_id:draft.classId,
           attendance_date:draft.attendanceDate,base_sequence:draft.baseSequence,base_attendance_ids:draft.baseAttendanceIds,records:draft.records})
