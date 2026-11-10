@@ -1190,8 +1190,11 @@ function App() {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body,
       })
-      const result = await response.json()
-      if (!response.ok) throw new Error(result.detail || 'Login failed')
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        if (response.status >= 500) throw new TypeError('SchoolBridge server is temporarily unavailable.')
+        throw new Error(result.detail || 'Login failed')
+      }
       sessionStorage.setItem('sb_token', result.access_token)
       setToken(result.access_token)
       setPassword('')
