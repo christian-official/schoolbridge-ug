@@ -2053,6 +2053,7 @@ function SchoolCommunityWorkspace({token}:{token:string}) {
   const [data,setData]=useState<{houses:string[];students:CommunityStudent[];staff:CommunityStaff[]}>({houses:[],students:[],staff:[]})
   const [tab,setTab]=useState('All members')
   const [search,setSearch]=useState('')
+  const [sortBy,setSortBy]=useState('name')
   const [loading,setLoading]=useState(true)
   const [error,setError]=useState('')
   const [refresh,setRefresh]=useState(0)
@@ -2075,13 +2076,22 @@ function SchoolCommunityWorkspace({token}:{token:string}) {
     const q=search.trim().toLowerCase()
     return !q||[member.name,member.member_type,member.house||'',('class_name' in member?member.class_name:''),('admission_number' in member?member.admission_number:''),('staff_number' in member?member.staff_number:''),('position' in member?member.position:'')].join(' ').toLowerCase().includes(q)
   })
+  const sortedFiltered=[...filtered].sort((a,b)=>{
+    const value=(member:CommunityStudent|CommunityStaff)=>{
+      if(sortBy==='house')return member.house||'Unassigned'
+      if(sortBy==='type')return member.member_type
+      if(sortBy==='class')return 'class_name' in member?member.class_name:member.position
+      return member.name
+    }
+    return value(a).localeCompare(value(b),undefined,{numeric:true,sensitivity:'base'})
+  })
   return <section className="panel school-community-workspace">
-    <div className="panel-heading"><div><h2>School Community</h2><p>Explore enrolled learners and active staff by house, study arrangement or membership type.</p></div><button type="button" className="secondary-button" onClick={()=>setRefresh(v=>v+1)} disabled={loading}><RefreshCw size={15}/>{loading?'Refreshing...':'Refresh'}</button></div>
+    <div className="panel-heading"><div><h2>School Community</h2><p>Explore enrolled learners and active staff by house, study arrangement or membership type.</p></div><div className="form-actions"><button type="button" className="secondary-button" onClick={()=>window.print()}>Print list</button><button type="button" className="secondary-button" onClick={()=>setRefresh(v=>v+1)} disabled={loading}><RefreshCw size={15}/>{loading?'Refreshing...':'Refresh'}</button></div></div>
     <div className="community-summary-grid"><div><span className="community-summary-icon"><Users size={18}/></span><div><small>ALL MEMBERS</small><strong>{all.length}</strong></div></div><div><span className="community-summary-icon"><GraduationCap size={18}/></span><div><small>STUDENTS</small><strong>{data.students.length}</strong></div></div><div><span className="community-summary-icon"><Briefcase size={18}/></span><div><small>STAFF</small><strong>{data.staff.length}</strong></div></div><div><span className="community-summary-icon"><ShieldCheck size={18}/></span><div><small>HOUSES</small><strong>{data.houses.length}</strong></div></div></div>
-    <div className="community-toolbar"><label className="community-search"><Search size={17}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search name, admission number, class or house"/></label><span className="community-result-count">{filtered.length} members shown</span></div>
+    <div className="community-toolbar"><label className="community-search"><Search size={17}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search name, admission number, class or house"/></label><label className="date-field">Sort by<select value={sortBy} onChange={e=>setSortBy(e.target.value)}><option value="name">Name</option><option value="class">Class / position</option><option value="house">House</option><option value="type">Member type</option></select></label><span className="community-result-count">{sortedFiltered.length} members shown</span></div>
     <div className="community-tabs" role="tablist" aria-label="School community categories">{tabs.map(item=><button key={item} type="button" role="tab" aria-selected={tab===item} className={tab===item?'active':''} onClick={()=>setTab(item)}>{item}</button>)}</div>
     {error&&<div className="form-error" role="alert">{error}</div>}
-    {loading?<div className="empty-state"><LoaderCircle className="spin" size={25}/><p>Loading school community...</p></div>:filtered.length?<div className="table-wrap community-table"><table><thead><tr><th>Member</th><th>Category</th><th>Class / Position</th><th>Study mode</th><th>House</th><th>Reference</th></tr></thead><tbody>{filtered.map(member=><tr key={member.member_type+'-'+member.id}><td><div className="student-cell"><div className="student-avatar">{member.photo_data?<img src={member.photo_data} alt=""/>:member.name.slice(0,1).toUpperCase()}</div><strong>{member.name}</strong></div></td><td><span className={'community-member-type '+member.member_type.toLowerCase()}>{member.member_type}</span></td><td>{'class_name' in member?member.class_name:member.position}</td><td>{'study_mode' in member?member.study_mode:'—'}</td><td>{member.house||'Unassigned'}</td><td>{'admission_number' in member?member.admission_number:member.staff_number}</td></tr>)}</tbody></table></div>:<div className="empty-state"><Users size={27}/><p>No members match this community view.</p><small>Try another category or search term.</small></div>}
+    {loading?<div className="empty-state"><LoaderCircle className="spin" size={25}/><p>Loading school community...</p></div>:sortedFiltered.length?<div className="table-wrap community-table"><table><thead><tr><th>Member</th><th>Category</th><th>Class / Position</th><th>Study mode</th><th>House</th><th>Reference</th></tr></thead><tbody>{sortedFiltered.map(member=><tr key={member.member_type+'-'+member.id}><td><div className="student-cell"><div className="student-avatar">{member.photo_data?<img src={member.photo_data} alt=""/>:member.name.slice(0,1).toUpperCase()}</div><strong>{member.name}</strong></div></td><td><span className={'community-member-type '+member.member_type.toLowerCase()}>{member.member_type}</span></td><td>{'class_name' in member?member.class_name:member.position}</td><td>{'study_mode' in member?member.study_mode:'—'}</td><td>{member.house||'Unassigned'}</td><td>{'admission_number' in member?member.admission_number:member.staff_number}</td></tr>)}</tbody></table></div>:<div className="empty-state"><Users size={27}/><p>No members match this community view.</p><small>Try another category or search term.</small></div>}
   </section>
 }
 
