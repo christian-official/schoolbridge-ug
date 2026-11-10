@@ -72,18 +72,16 @@ jobs:
           command: PYTHONPATH=backend SCHOOLBRIDGE_DATABASE_URL=sqlite:///./schoolbridge_ci.db SCHOOLBRIDGE_SECRET_KEY=ci-only-secret-key-not-for-production .venv/bin/python -m pytest -q backend/tests/test_migrations.py -k "baseline_adds or existing_database or current_database or legacy_school or partial_school_setup"
 
   backend-support-database:
-    machine:
-      image: ubuntu-2404:current
+    docker:
+      - image: cimg/python:3.12
     steps:
       - checkout
       - run:
           name: Install only database test dependencies
-          command: |
-            python3 -m venv .venv
-            .venv/bin/pip install --disable-pip-version-check pytest "sqlalchemy>=2.0,<3.0" "cryptography>=42.0,<46.0"
+          command: python -m pip install --disable-pip-version-check pytest "sqlalchemy>=2.0,<3.0" "cryptography>=42.0,<46.0"
       - run:
           name: Database and licensing tests
-          command: PYTHONPATH=backend SCHOOLBRIDGE_DATABASE_URL=sqlite:///./schoolbridge_ci.db SCHOOLBRIDGE_SECRET_KEY=ci-only-secret-key-not-for-production .venv/bin/python -m pytest -q backend/tests/test_database.py backend/tests/test_owner_license_tool.py
+          command: PYTHONPATH=backend SCHOOLBRIDGE_DATABASE_URL=sqlite:///./schoolbridge_ci.db SCHOOLBRIDGE_SECRET_KEY=ci-only-secret-key-not-for-production python -m pytest -q backend/tests/test_database.py backend/tests/test_owner_license_tool.py
 
   backend-support-sqlite-backup:
     machine:
