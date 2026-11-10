@@ -1,0 +1,240 @@
+version: 2.1
+
+jobs:
+  backend-tests:
+    machine:
+      image: ubuntu-2404:current
+    steps:
+      - checkout
+      - run:
+          name: Install backend test dependencies
+          command: |
+            python3 --version
+            python3 -m pip install --upgrade pip
+            python3 -m pip install -r backend/requirements-dev.txt
+      - run:
+          name: Compile backend
+          command: python3 -m compileall -q backend/app
+      - run:
+          name: Run backend API tests
+          command: PYTHONPATH=backend SCHOOLBRIDGE_DATABASE_URL=sqlite:///./schoolbridge_ci.db SCHOOLBRIDGE_SECRET_KEY=ci-only-secret-key-not-for-production python3 -m pytest -q backend/tests
+
+  postgres-recovery-integration:
+    machine:
+      image: ubuntu-2404:current
+    steps:
+      - checkout
+      - run:
+          name: Install PostgreSQL client and Python dependencies
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y postgresql-client
+            python3 -m pip install --upgrade pip
+            python3 -m pip install -r backend/requirements-dev.txt
+      - run:
+          name: Start PostgreSQL 16
+          command: |
+            docker run -d --name schoolbridge-ci-postgres \
+              -e POSTGRES_USER=schoolbridge \
+              -e POSTGRES_PASSWORD=ci-postgres-password \
+              -e POSTGRES_DB=schoolbridge_restore_ci \
+              -p 5432:5432 postgres:16
+            for attempt in $(seq 1 60); do
+              if pg_isready -h 127.0.0.1 -U schoolbridge -d schoolbridge_restore_ci; then exit 0; fi
+              sleep 2
+            done
+            docker logs schoolbridge-ci-postgres
+            exit 1
+      - run:
+          name: Run real PostgreSQL backup and restore drill
+          command: |
+            PYTHONPATH=backend \
+            SCHOOLBRIDGE_DATABASE_URL=sqlite:///./schoolbridge_ci.db \
+            SCHOOLBRIDGE_SECRET_KEY=ci-only-secret-key-not-for-production \
+            SCHOOLBRIDGE_POSTGRES_INTEGRATION_URL=postgresql+psycopg://schoolbridge:ci-postgres-password@127.0.0.1:5432/schoolbridge_restore_ci \
+            python3 -m pytest -q backend/tests/test_postgres_restore_integration.py
+
+  frontend-build:
+    machine:
+      image: ubuntu-2404:current
+    working_directory: ~/project/frontend
+    steps:
+      - checkout:
+          path: ~/project
+      - run:
+          name: Install Node.js 22
+          command: |
+            source /opt/circleci/.nvm/nvm.sh
+            nvm install 22
+            nvm use 22
+            node --version
+            npm --version
+      - run:
+          name: Install frontend dependencies
+          command: |
+            source /opt/circleci/.nvm/nvm.sh
+            nvm use 22
+            npm ci
+      - run:
+          name: Lint, test and build frontend
+          command: |
+            source /opt/circleci/.nvm/nvm.sh
+            nvm use 22
+            npm run lint
+            npm run test:offline
+            npm run test:pwa
+            npm run build
+      - run:
+          name: Run real-browser offline tests
+          command: |
+            source /opt/circleci/.nvm/nvm.sh
+            nvm use 22
+            npm install --no-save --no-package-lock playwright@1.56.1
+            npx playwright install --with-deps chromium
+            npm run test:offline:browser
+
+  local-deployment-package:
+    machine:
+      image: ubuntu-2404:current
+    environment:
+      POSTGRES_DB: schoolbridge
+      POSTGRES_USER: schoolbridge
+      POSTGRES_PASSWORD: ci-only-postgres-password
+      SCHOOLBRIDGE_SECRET_KEY: ci-only-application-secret
+      SCHOOLBRIDGE_LICENSE_PUBLIC_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      SCHOOLBRIDGE_PORT: "18080"
+    steps:
+      - checkout
+      - run:
+          name: Validate local Compose deployment configuration
+          command: docker compose config --quiet
+      - run:
+          name: Build and export all images as the USB workflow does
+          command: |
+            docker pull postgres:16-alpine
+            docker compose build backend frontend
+            docker image inspect schoolbridge/backend:local schoolbridge/frontend:local postgres:16-alpine
+            docker save -o /tmp/schoolbridge-images.tar postgres:16-alpine schoolbridge/backend:local schoolbridge/frontend:local
+            docker image rm schoolbridge/backend:local schoolbridge/frontend:local
+            docker load -i /tmp/schoolbridge-images.tar
+      - run:
+          name: Verify scripts and build a source-free USB Compose package
+          command: |
+            test -s scripts/prepare-usb.ps1
+            test -s scripts/install-schoolbridge.ps1
+            test -s scripts/prepare-school-host.ps1
+            grep -q 'prepare-school-host.ps1' scripts/prepare-usb.ps1
+            grep -q 'Docker Desktop Installer.exe' scripts/prepare-usb.ps1
+            grep -q 'wsl.msi' scripts/prepare-usb.ps1
+            grep -q 'SHA256SUMS.txt' scripts/prepare-usb.ps1
+            grep -q 'USB_INSTALLATION.md' scripts/prepare-usb.ps1
+            grep -q 'prepare-school-host.ps1' scripts/install-schoolbridge.ps1
+            grep -q 'Get-FileHash' scripts/install-schoolbridge.ps1
+            grep -q 'SHA256SUMS.txt' docs/USB_INSTALLATION.md
+            test -s docs/USB_INSTALLATION.md
+            grep -q 'proxy_pass http://backend:8001' frontend/nginx.conf
+            grep -q 'SCHOOLBRIDGE_LICENSE_PUBLIC_KEY' scripts/install-schoolbridge.ps1
+            python3 - <<'PY'
+            from pathlib import Path
+            import re
+            source = Path("docker-compose.yml").read_text()
+            package = re.sub(r"(?m)^    build:\\r?\\n      context: \\./(backend|frontend)\\r?\\n", "", source)
+            assert "context: ./backend" not in package
+            assert "context: ./frontend" not in package
+            assert "image: schoolbridge/backend:local" in package
+            assert "image: schoolbridge/frontend:local" in package
+            assert "image: postgres:16-alpine" in package
+            Path("/tmp/schoolbridge-usb").mkdir(exist_ok=True)
+            Path("/tmp/schoolbridge-usb/docker-compose.yml").write_text(package)
+            Path("/tmp/schoolbridge-usb/.env").write_text(
+                "POSTGRES_DB=schoolbridge\\nPOSTGRES_USER=schoolbridge\\n"
+                "POSTGRES_PASSWORD=ci-only-postgres-password\\n"
+                "SCHOOLBRIDGE_SECRET_KEY=ci-only-application-secret\\n"
+                "SCHOOLBRIDGE_LICENSE_PUBLIC_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\\n"
+                "SCHOOLBRIDGE_PORT=18080\\nSCHOOLBRIDGE_BACKUP_INTERVAL_HOURS=24\\n"
+            )
+            PY
+            docker compose --env-file /tmp/schoolbridge-usb/.env -f /tmp/schoolbridge-usb/docker-compose.yml config --quiet
+      - run:
+          name: Boot packaged application without source folders
+          command: |
+            dc() { docker compose --env-file /tmp/schoolbridge-usb/.env -p schoolbridge-usb-ci -f /tmp/schoolbridge-usb/docker-compose.yml "$@"; }
+            dc up -d --no-build
+            success=0
+            for attempt in $(seq 1 90); do
+              if curl --fail --silent http://127.0.0.1:18080/api/health >/dev/null; then success=1; break; fi
+              sleep 2
+            done
+            if [ "$success" -ne 1 ]; then dc logs; exit 1; fi
+            curl --fail --silent http://127.0.0.1:18080/ | grep -qi 'schoolbridge'
+            dc exec -T database psql -U schoolbridge -d schoolbridge -c "CREATE TABLE usb_ci_persistence_check (id integer primary key, marker text); INSERT INTO usb_ci_persistence_check VALUES (1, 'survives-restart')"
+            dc restart backend database
+            for attempt in $(seq 1 60); do
+              if curl --fail --silent http://127.0.0.1:18080/api/health >/dev/null; then break; fi
+              sleep 2
+            done
+            marker=$(dc exec -T database psql -U schoolbridge -d schoolbridge -tAc "SELECT marker FROM usb_ci_persistence_check WHERE id=1" | tr -d '[:space:]')
+            if [ "$marker" != "survives-restart" ]; then dc logs; exit 1; fi
+            curl --fail --silent http://127.0.0.1:18080/api/health >/dev/null
+      - run:
+          name: Assemble downloadable offline USB package
+          command: |
+            set -euo pipefail
+            pkg="/tmp/SchoolBridge-USB"
+            mkdir -p "$pkg/runtime" "$pkg/docs"
+            cp /tmp/schoolbridge-images.tar "$pkg/schoolbridge-images.tar"
+            cp /tmp/schoolbridge-usb/docker-compose.yml "$pkg/docker-compose.yml"
+            cp scripts/install-schoolbridge.ps1 scripts/check-school-host.ps1 scripts/prepare-school-host.ps1 "$pkg/"
+            cp docs/USB_INSTALLATION.md docs/WINDOWS_RUNTIME_PREPARATION.md docs/SCHOOL_READINESS_AND_INSTALLATION.md "$pkg/docs/"
+            cat > "$pkg/.env.example" <<'EOF'
+            SCHOOLBRIDGE_LICENSE_PUBLIC_KEY=
+            SCHOOLBRIDGE_PORT=8080
+            SCHOOLBRIDGE_BACKUP_RETENTION_DAYS=30
+            SCHOOLBRIDGE_BACKUP_INTERVAL_HOURS=24
+            EOF
+            curl --fail --location --retry 3 "https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe" -o "$pkg/runtime/Docker Desktop Installer.exe"
+            release_json="$(curl --fail --location --retry 3 https://api.github.com/repos/microsoft/WSL/releases/latest)"
+            wsl_url="$(printf '%s' "$release_json" | python3 -c 'import json,sys; d=json.load(sys.stdin); a=[x["browser_download_url"] for x in d.get("assets",[]) if x["name"].lower().endswith(".x64.msi")]; assert len(a)==1, "Expected exactly one x64 WSL MSI"; print(a[0])')"
+            curl --fail --location --retry 3 "$wsl_url" -o "$pkg/runtime/wsl.msi"
+            (cd "$pkg" && find . -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt)
+            cd /tmp
+            zip -qr SchoolBridge-USB.zip SchoolBridge-USB
+      - store_artifacts:
+          path: /tmp/SchoolBridge-USB.zip
+          destination: SchoolBridge-USB.zip
+
+  windows-installer-script-validation:
+    machine:
+      image: windows-server-2022-gui:current
+      shell: powershell.exe -ExecutionPolicy Bypass
+    resource_class: windows.medium
+    steps:
+      - checkout
+      - run:
+          name: Parse all Windows PowerShell installer scripts
+          command: |
+            $files = @(
+              "scripts/prepare-usb.ps1",
+              "scripts/install-schoolbridge.ps1",
+              "scripts/check-school-host.ps1",
+              "scripts/prepare-school-host.ps1"
+            )
+            foreach ($file in $files) {
+              $tokens = $null
+              $errors = $null
+              [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file), [ref]$tokens, [ref]$errors) | Out-Null
+              if ($errors.Count -gt 0) {
+                $errors | ForEach-Object { Write-Error $_.Message }
+                throw "PowerShell syntax validation failed for $file"
+              }
+              Write-Host "PowerShell syntax OK: $file"
+            }
+
+workflows:
+  schoolbridge-ci:
+    jobs:
+      - backend-tests
+      - postgres-recovery-integration
+      - frontend-build
+      - local-deployment-package
+      - windows-installer-script-validation
