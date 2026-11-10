@@ -44,7 +44,14 @@ def upgrade() -> None:
         )
     tables = set(inspect(bind).get_table_names())
     has_existing_use = False
-    if "users" in tables:
+    # A previously-created school profile is evidence that this database was
+    # already configured, even if an administrator account has since been
+    # removed or the school has not yet entered student/staff records.
+    if "school_profile" in tables:
+        has_existing_use = bind.execute(
+            text("SELECT 1 FROM school_profile LIMIT 1")
+        ).first() is not None
+    if not has_existing_use and "users" in tables:
         has_existing_use = bind.execute(text("SELECT 1 FROM users LIMIT 1")).first() is not None
     if not has_existing_use:
         for table in ("students", "staff_members", "classes"):

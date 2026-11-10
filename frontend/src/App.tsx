@@ -923,8 +923,8 @@ function App() {
       !studentForm.gender ? 'Gender' : '',
       !studentForm.guardian_name.trim() ? 'Parent / guardian name' : '',
       !studentForm.guardian_phone.trim() ? 'Guardian phone number' : '',
-      schoolConfig.school_type === 'Secondary' && selectedAcademicLevel === 'A-Level' && !studentForm.a_level_stream ? 'A-Level stream' : '',
-      schoolConfig.school_type === 'Secondary' && selectedAcademicLevel === 'A-Level' && !studentForm.combination ? 'A-Level combination' : '',
+      schoolConfig.school_type !== 'Primary' && selectedAcademicLevel === 'A-Level' && !studentForm.a_level_stream ? 'A-Level stream' : '',
+      schoolConfig.school_type !== 'Primary' && selectedAcademicLevel === 'A-Level' && !studentForm.combination ? 'A-Level combination' : '',
     ].filter(Boolean)
     if (missingStudentFields.length) {
       setStudentError('Cannot register student. Complete: ' + missingStudentFields.join(', ') + '.')
@@ -958,7 +958,7 @@ function App() {
           date_of_birth: studentForm.date_of_birth || null,
           class_id: Number(studentForm.class_id),
           fee_amount: studentForm.fee_amount === '' ? null : Number(studentForm.fee_amount),
-          academic_level: schoolConfig.school_type==='Secondary' ? selectedAcademicLevel || null : null,
+          academic_level: schoolConfig.school_type!=='Primary' ? selectedAcademicLevel || null : null,
           combination: selectedAcademicLevel==='A-Level' && studentForm.a_level_stream && studentForm.combination ? `${studentForm.a_level_stream} — ${studentForm.combination}` : null,
           optional_subjects: selectedAcademicLevel==='O-Level' ? studentForm.optional_subjects || null : null,
           subsidiary_subjects: selectedAcademicLevel==='A-Level' ? studentForm.subsidiary_subjects || null : null,
@@ -1346,7 +1346,7 @@ function App() {
                     </div>
                   </section>
 
-                  {schoolConfig.school_type==='Secondary'&&selectedAcademicLevel==='A-Level'&&<section className="form-section"><div className="form-section-heading"><span className="form-section-number">05</span><div><h4>A-Level subject choices</h4><p>The selected class determines A-Level automatically. Choose Arts or Sciences, then its combinations.</p></div></div><div className="student-form-grid"><label>A-Level stream *<select required value={studentForm.a_level_stream} onChange={e=>setStudentForm({...studentForm,a_level_stream:e.target.value,combination:''})}><option value="">Choose Arts or Sciences</option><option value="Arts">Arts</option><option value="Sciences">Sciences</option></select></label>{studentForm.a_level_stream&&<label>Combination *<select required value={studentForm.combination} onChange={e=>setStudentForm({...studentForm,combination:e.target.value})}><option value="">Select combination</option>{(studentForm.a_level_stream==='Arts'?artsCombinations:sciencesCombinations).map((x:string)=><option key={x}>{x}</option>)}</select></label>}<label className="field-span-full">Subsidiary subjects<select multiple size={5} value={studentForm.subsidiary_subjects?studentForm.subsidiary_subjects.split(',').filter(Boolean):[]} onChange={e=>setStudentForm({...studentForm,subsidiary_subjects:Array.from(e.target.selectedOptions).map(o=>o.value).join(',')})}>{(schoolConfig.a_level_subsidiary_subjects||'').split(/\r?\n/).map((x:string)=>x.trim()).filter(Boolean).map((x:string)=><option key={x}>{x}</option>)}</select><small className="field-hint">Select more than one subsidiary subject using Ctrl/Command-click.</small></label></div></section>}{schoolConfig.school_type==='Secondary'&&selectedAcademicLevel==='O-Level'&&<section className="form-section"><div className="form-section-heading"><span className="form-section-number">05</span><div><h4>O-Level optional subjects</h4><p>The selected class determines O-Level automatically.</p></div></div><div className="student-form-grid"><label className="field-span-full">Optional subjects<select multiple size={5} value={studentForm.optional_subjects?studentForm.optional_subjects.split(',').filter(Boolean):[]} onChange={e=>setStudentForm({...studentForm,optional_subjects:Array.from(e.target.selectedOptions).map(o=>o.value).join(',')})}>{(schoolConfig.o_level_optional_subjects||'').split(/\r?\n/).map((x:string)=>x.trim()).filter(Boolean).map((x:string)=><option key={x}>{x}</option>)}</select><small className="field-hint">Select more than one optional subject using Ctrl/Command-click.</small></label></div></section>}
+                  {schoolConfig.school_type!=='Primary'&&selectedAcademicLevel==='A-Level'&&<section className="form-section"><div className="form-section-heading"><span className="form-section-number">05</span><div><h4>A-Level subject choices</h4><p>The selected class determines A-Level automatically. Choose Arts or Sciences, then its combinations.</p></div></div><div className="student-form-grid"><label>A-Level stream *<select required value={studentForm.a_level_stream} onChange={e=>setStudentForm({...studentForm,a_level_stream:e.target.value,combination:''})}><option value="">Choose Arts or Sciences</option><option value="Arts">Arts</option><option value="Sciences">Sciences</option></select></label>{studentForm.a_level_stream&&<label>Combination *<select required value={studentForm.combination} onChange={e=>setStudentForm({...studentForm,combination:e.target.value})}><option value="">Select combination</option>{(studentForm.a_level_stream==='Arts'?artsCombinations:sciencesCombinations).map((x:string)=><option key={x}>{x}</option>)}</select></label>}<label className="field-span-full">Subsidiary subjects<select multiple size={5} value={studentForm.subsidiary_subjects?studentForm.subsidiary_subjects.split(',').filter(Boolean):[]} onChange={e=>setStudentForm({...studentForm,subsidiary_subjects:Array.from(e.target.selectedOptions).map(o=>o.value).join(',')})}>{(schoolConfig.a_level_subsidiary_subjects||'').split(/\r?\n/).map((x:string)=>x.trim()).filter(Boolean).map((x:string)=><option key={x}>{x}</option>)}</select><small className="field-hint">Select more than one subsidiary subject using Ctrl/Command-click.</small></label></div></section>}{schoolConfig.school_type!=='Primary'&&selectedAcademicLevel==='O-Level'&&<section className="form-section"><div className="form-section-heading"><span className="form-section-number">05</span><div><h4>O-Level optional subjects</h4><p>The selected class determines O-Level automatically.</p></div></div><div className="student-form-grid"><label className="field-span-full">Optional subjects<select multiple size={5} value={studentForm.optional_subjects?studentForm.optional_subjects.split(',').filter(Boolean):[]} onChange={e=>setStudentForm({...studentForm,optional_subjects:Array.from(e.target.selectedOptions).map(o=>o.value).join(',')})}>{(schoolConfig.o_level_optional_subjects||'').split(/\r?\n/).map((x:string)=>x.trim()).filter(Boolean).map((x:string)=><option key={x}>{x}</option>)}</select><small className="field-hint">Select more than one optional subject using Ctrl/Command-click.</small></label></div></section>}
                   {classes.length === 0 && <p className="form-hint">No classes are available yet. Add a class under Settings → Classes & Streams before registering students.</p>}
                   <div className="form-actions registration-actions"><button type="button" className="secondary-button" onClick={() => setShowStudentForm(false)}>Cancel</button><button className="primary-button" disabled={savingStudent || classes.length === 0}>{savingStudent ? <><LoaderCircle className="spin" size={16} /> Saving student...</> : 'Register student'}</button></div>
                 </form>
@@ -1479,7 +1479,7 @@ function App() {
             </section>
               )}
               {settingsSection === 'school' && <SchoolProfileAdmissionsHub token={token} onProfileSaved={() => { api<any>('settings/school-profile',token).then(setSchoolConfig).catch(()=>{}) }} />}
-              {settingsSection === 'academy' && <AcademySettingsHub token={token} schoolType={schoolConfig.school_type === 'Secondary' ? 'Secondary' : 'Primary'} onSaved={() => setSettingsSection('home')} />}
+              {settingsSection === 'academy' && <AcademySettingsHub token={token} schoolType={schoolConfig.school_type === 'Combined' ? 'Combined' : schoolConfig.school_type !== 'Primary' ? 'Secondary' : 'Primary'} onSaved={() => setSettingsSection('home')} />}
               {settingsSection === 'users' && <TeacherUsersSettings token={token} classes={classes} onSaved={() => { setRefreshKey(value => value + 1) }} />}
               {settingsSection === 'backups' && <BackupSettings token={token} />}
               {settingsSection === 'audit' && <AuditLogSettings token={token} />}
@@ -1546,7 +1546,7 @@ function AdmissionNumberSettings({token}:{token:string}) {
   return <section className="panel settings-panel"><div className="panel-heading"><div><h2>Student admission setup</h2><p>Configure the admission number generated for each newly registered student.</p></div></div>{error&&<div className="form-error" role="alert">{error}</div>}{message&&<div className="success-notice" role="status">{message}</div>}<form className="student-form" onSubmit={save}><div className="student-form-grid"><label>School prefix *<input required maxLength={20} value={settings.admission_prefix} onChange={e=>setSettings({...settings,admission_prefix:e.target.value})}/></label><label>Separator<select value={settings.admission_separator} onChange={e=>setSettings({...settings,admission_separator:e.target.value})}><option value="-">Hyphen (-)</option><option value="/">Slash (/)</option><option value="">None</option></select></label><label>Number of digits<select value={settings.admission_padding} onChange={e=>setSettings({...settings,admission_padding:Number(e.target.value)})}>{[3,4,5,6,7,8].map(n=><option key={n} value={n}>{n} digits</option>)}</select></label><label>Next sequence number<input type="number" min="1" required value={settings.next_admission_number} onChange={e=>setSettings({...settings,next_admission_number:Math.max(1,Number(e.target.value))})}/></label></div><button type="button" className={settings.include_year?'choice-toggle active':'choice-toggle'} aria-pressed={settings.include_year} onClick={()=>setSettings({...settings,include_year:!settings.include_year})}>Include current year · {settings.include_year?'Yes':'No'}</button><div className="number-preview"><span>Next student admission number</span><strong>{[settings.admission_prefix.trim(),...(settings.include_year?[String(new Date().getFullYear())]:[]),String(settings.next_admission_number).padStart(settings.admission_padding,'0')].filter(Boolean).join(settings.admission_separator)}</strong></div><div className="form-actions"><button className="primary-button" disabled={busy}>{busy?'Saving...':'Save student admission setup'}</button></div></form></section>
 }
 
-function AcademySettingsHub({token,schoolType,onSaved}:{token:string;schoolType:'Primary'|'Secondary';onSaved:()=>void}) {
+function AcademySettingsHub({token,schoolType,onSaved}:{token:string;schoolType:'Primary'|'Secondary'|'Combined';onSaved:()=>void}) {
   const [tab,setTab]=useState<'calendar'|'curriculum'>('calendar')
   return <section className="settings-hub-subpage"><div className="settings-section-tabs" role="tablist" aria-label="Academy settings"><button type="button" role="tab" aria-selected={tab==='calendar'} className={tab==='calendar'?'active':''} onClick={()=>setTab('calendar')}>Academic Year & Terms</button><button type="button" role="tab" aria-selected={tab==='curriculum'} className={tab==='curriculum'?'active':''} onClick={()=>setTab('curriculum')}>Curriculum & Subjects</button></div>{tab==='calendar'&&<AcademicSettings token={token} onSaved={onSaved}/>}{tab==='curriculum'&&<><AcademicCurriculumSettings token={token} onSaved={onSaved}/><SubjectSettings token={token} schoolType={schoolType}/></>}</section>
 }
@@ -2374,8 +2374,10 @@ const SECONDARY_SUBJECT_CATALOGUE = [
   { group: 'Business and technical', names: ['Commerce', 'Entrepreneurship Education', 'Economics', 'Accounting', 'Business Studies', 'Food and Nutrition', 'Home Economics', 'Art and Design', 'Fine Art', 'Music', 'Physical Education', 'Agriculture and Nutrition', 'Technical Drawing', 'Woodwork', 'Metalwork', 'ICT'] },
 ]
 
-function SubjectSettings({token,schoolType}:{token:string;schoolType:'Primary'|'Secondary'}) {
-  const catalogue = schoolType === 'Primary' ? PRIMARY_SUBJECT_CATALOGUE : SECONDARY_SUBJECT_CATALOGUE;
+function SubjectSettings({token,schoolType}:{token:string;schoolType:'Primary'|'Secondary'|'Combined'}) {
+  const [curriculumType,setCurriculumType]=useState<'Primary'|'Secondary'>(schoolType==='Secondary'?'Secondary':'Primary')
+  const effectiveSchoolType=schoolType==='Combined'?curriculumType:schoolType
+  const catalogue = effectiveSchoolType === 'Primary' ? PRIMARY_SUBJECT_CATALOGUE : SECONDARY_SUBJECT_CATALOGUE
   const [subjects,setSubjects]=useState<any[]>([])
   const [selected,setSelected]=useState<string[]>([])
   const [customName,setCustomName]=useState('')
@@ -2391,9 +2393,10 @@ function SubjectSettings({token,schoolType}:{token:string;schoolType:'Primary'|'
     catch(e) { setError(e instanceof Error?e.message:'Unable to load subjects.') }
     finally { setLoading(false) }
   }
-  useEffect(()=>{void load()},[token])
+  useEffect(()=>{void load()},[token,schoolType])
 
-  const existingNames=new Set(subjects.map(subject=>String(subject.name).trim().toLocaleLowerCase()))
+  const currentCurriculumSubjects=subjects.filter(subject=>subject.school_type===effectiveSchoolType)
+  const existingNames=new Set(currentCurriculumSubjects.map(subject=>String(subject.name).trim().toLocaleLowerCase()))
   const available=(name:string)=>!existingNames.has(name.trim().toLocaleLowerCase())
   const visibleGroups=catalogue.map(group=>({
     ...group,
@@ -2421,7 +2424,7 @@ function SubjectSettings({token,schoolType}:{token:string;schoolType:'Primary'|'
     try {
       for(const subjectName of toCreate) {
         try {
-          await api('subjects',token,{method:'POST',body:JSON.stringify({name:subjectName,code:null})})
+          await api('subjects',token,{method:'POST',body:JSON.stringify({name:subjectName,code:null,school_type:effectiveSchoolType})})
           added.push(subjectName)
         } catch(err) {
           const reason=err instanceof Error?err.message:'Unable to add subject.'
@@ -2440,13 +2443,14 @@ function SubjectSettings({token,schoolType}:{token:string;schoolType:'Primary'|'
   }
 
   return <section className="panel settings-panel">
-    <div className="panel-heading"><div><h2>{schoolType} school subjects</h2><p>Only the {schoolType.toLowerCase()} curriculum is shown here. Primary and secondary subject lists are kept separate.</p></div><button type="button" className="secondary-button" onClick={()=>void load()} disabled={loading||busy}>{loading?'Loading...':'Refresh subjects'}</button></div>
+    <div className="panel-heading"><div><h2>{schoolType==='Combined'?'Combined school subjects':effectiveSchoolType+' school subjects'}</h2><p>{schoolType==='Combined'?'Manage Primary and Secondary subjects separately for the two parts of your school.':'Only the '+effectiveSchoolType.toLowerCase()+' curriculum is shown here.'}</p></div><button type="button" className="secondary-button" onClick={()=>void load()} disabled={loading||busy}>{loading?'Loading...':'Refresh subjects'}</button></div>
+    {schoolType==='Combined'&&<div className="settings-section-tabs" role="tablist" aria-label="School curriculum"><button type="button" role="tab" aria-selected={curriculumType==='Primary'} className={curriculumType==='Primary'?'active':''} onClick={()=>{setCurriculumType('Primary');setSelected([]);setCustomName('');setSearch('')}}>Primary curriculum</button><button type="button" role="tab" aria-selected={curriculumType==='Secondary'} className={curriculumType==='Secondary'?'active':''} onClick={()=>{setCurriculumType('Secondary');setSelected([]);setCustomName('');setSearch('')}}>Secondary curriculum</button></div>}
     {error&&<div className="form-error" role="alert">{error}</div>}
     {message&&<div className="success-notice" role="status">{message}</div>}
     <details className="form-disclosure" open><summary>Add school subjects</summary>
       <form className="student-form" onSubmit={addSelected}>
         <label>Find a subject<input type="search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search the subject list"/></label>
-        <p className="form-hint">Tap each subject you want to add. Selected subjects are highlighted; subjects already registered are hidden.</p>
+        <p className="form-hint">Tap each subject you want to add. Selected subjects are highlighted; subjects already registered in this curriculum are hidden.</p>
         {loading?<p className="form-hint">Loading available subjects...</p>:<div className="subject-catalogue">
           {visibleGroups.map(group=><fieldset className="subject-catalogue-group" key={group.group}>
             <legend>{group.group}</legend>
@@ -2463,10 +2467,10 @@ function SubjectSettings({token,schoolType}:{token:string;schoolType:'Primary'|'
         <div className="form-actions"><button className="primary-button" disabled={busy||loading||(!selected.length&&!customName.trim())}>{busy?'Adding subjects...':'Confirm and add selected subjects'}</button></div>
       </form>
     </details>
-    <div className="panel-heading"><div><h3>Registered subjects</h3><p>{subjects.length} subject{subjects.length===1?'':'s'} currently available</p></div></div>
-    {loading?<p className="form-hint">Loading subjects...</p>:<div className="table-wrap"><table><thead><tr><th>Subject</th><th>Code</th></tr></thead><tbody>
-      {subjects.map(subject=><tr key={subject.id}><td>{subject.name}</td><td>{subject.code||'—'}</td></tr>)}
-      {!subjects.length&&<tr><td colSpan={2}>No subjects have been added yet.</td></tr>}
+    <div className="panel-heading"><div><h3>Registered subjects</h3><p>{currentCurriculumSubjects.length} {effectiveSchoolType.toLowerCase()} subject{currentCurriculumSubjects.length===1?'':'s'} currently available</p></div></div>
+    {loading?<p className="form-hint">Loading subjects...</p>:<div className="table-wrap"><table><thead><tr>{schoolType==='Combined'&&<th>Curriculum</th>}<th>Subject</th><th>Code</th></tr></thead><tbody>
+      {currentCurriculumSubjects.map(subject=><tr key={subject.id}>{schoolType==='Combined'&&<td>{subject.school_type}</td>}<td>{subject.name}</td><td>{subject.code||'—'}</td></tr>)}
+      {!currentCurriculumSubjects.length&&<tr><td colSpan={schoolType==='Combined'?3:2}>No subjects have been added to this curriculum yet.</td></tr>}
     </tbody></table></div>}
   </section>
 }

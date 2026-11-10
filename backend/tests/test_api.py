@@ -2270,3 +2270,62 @@ def test_owner_signed_identity_correction_is_audited_and_one_time(monkeypatch):
             assert original["school_name"] == "Original School"
             assert original["school_type"] == "Secondary"
             assert original["school_structure"] == "Day"
+
+
+
+def test_combined_school_supports_both_curricula_and_secondary_academic_levels():
+    reset_database()
+    admin = create_admin()
+    headers = {"Authorization": f"Bearer {create_access_token(admin)}"}
+    with SessionLocal() as db:
+        db.add(models.SchoolProfile(
+            id=1, name="Combined Academy", school_type="Combined",
+            country="Uganda", school_structure="Both",
+        ))
+        primary_class = models.SchoolClass(name="Primary 7", section="")
+        senior_class = models.SchoolClass(name="Senior 5", section="")
+        db.add_all([primary_class, senior_class])
+        db.commit()
+        primary_class_id = primary_class.id
+        senior_class_id = senior_class.id
+
+    with TestClient(app) as client:
+        missing_curriculum = client.post("/api/subjects", headers=headers, json={"name": "Mathematics"})
+        assert missing_curriculum.status_code == 422
+        primary_subject = client.post("/api/subjects", headers=headers, json={
+            "name": "Mathematics", "school_type": "Primary",
+        })
+        secondary_subject = client.post("/api/subjects", headers=headers, json={
+            "name": "Mathematics", "school_type": "Secondary",
+        })
+        assert primary_subject.status_code == 200, primary_subject.text
+        assert secondary_subject.status_code == 200, secondary_subject.text
+        assert primary_subject.json()["school_type"] == "Primary"
+        assert secondary_subject.json()["school_type"] == "Secondary"
+        subjects = client.get("/api/subjects", headers=headers)
+        assert subjects.status_code == 200
+        assert {(item["name"], item["school_type"]) for item in subjects.json()} == {
+            ("Mathematics", "Primary"), ("Mathematics", "Secondary"),
+        }
+
+        base_student = {
+            "first_name": "Amina", "last_name": "Learner",
+            "gender": "Female", "guardian_name": "Parent",
+            "guardian_phone": "0700000000",
+        }
+        invalid_senior = client.post("/api/students", headers=headers, json={
+            **base_student, "class_id": senior_class_id,
+        })
+        assert invalid_senior.status_code == 422
+        assert "A-Level" in invalid_senior.json()["detail"]
+        senior_student = client.post("/api/students", headers=headers, json={
+            **base_student, "class_id": senior_class_id,
+            "combination": "Arts — History",
+        })
+        assert senior_student.status_code == 200, senior_student.text
+        assert senior_student.json()["academic_level"] == "A-Level"
+        primary_student = client.post("/api/students", headers=headers, json={
+            **base_student, "first_name": "Brian", "class_id": primary_class_id,
+        })
+        assert primary_student.status_code == 200, primary_student.text
+        assert primary_student.json()["academic_level"] is None

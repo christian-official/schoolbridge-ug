@@ -127,21 +127,23 @@ test('real Chromium completes the first-install owner activation and school setu
     const installationId = 'a2b3c4d5-e6f7-4890-8123-456789abcdef'
     let activationPayload
     let setupPayload
+    let installationActivated = false
 
     await page.route('**/api/setup/status', route => route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
         installation_id: installationId,
-        activated: false,
+        activated: installationActivated,
         setup_completed: false,
-        requires_activation: true,
+        requires_activation: !installationActivated,
         requires_setup: true,
         identity_locked: false,
       }),
     }))
     await page.route('**/api/setup/activate', async route => {
       activationPayload = route.request().postDataJSON()
+      installationActivated = true
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -169,11 +171,27 @@ test('real Chromium completes the first-install owner activation and school setu
     await page.goto(baseUrl)
     await page.getByRole('heading', { name: 'Activate this installation' }).waitFor()
     assert.equal(await page.getByText(installationId).count(), 1)
+    await page.setViewportSize({ width: 360, height: 800 })
+    const activationLayout = await page.evaluate(() => ({ viewport: innerWidth, document: document.documentElement.scrollWidth }))
+    assert.ok(activationLayout.document <= activationLayout.viewport, `activation page must fit mobile viewport: ${JSON.stringify(activationLayout)}`)
+    await page.setViewportSize({ width: 1280, height: 900 })
     await page.getByLabel('Owner-signed activation license').fill('signed-owner-license-token')
     await page.getByRole('button', { name: 'Activate installation' }).click()
     await page.getByRole('heading', { name: 'Set up your school' }).waitFor()
     assert.deepEqual(activationPayload, { license: 'signed-owner-license-token' })
     assert.equal(await page.getByLabel('Confirm owner-signed activation license').inputValue(), 'signed-owner-license-token')
+    await page.setViewportSize({ width: 360, height: 800 })
+    const schoolSetupLayout = await page.evaluate(() => ({ viewport: innerWidth, document: document.documentElement.scrollWidth }))
+    assert.ok(schoolSetupLayout.document <= schoolSetupLayout.viewport, `school setup page must fit mobile viewport: ${JSON.stringify(schoolSetupLayout)}`)
+    await page.setViewportSize({ width: 1280, height: 900 })
+
+    // A refresh intentionally clears the signed license from page memory.
+    // The server remembers activation; the owner license is pasted again
+    // before the first administrator is created.
+    await page.reload({ waitUntil: 'networkidle' })
+    await page.getByRole('heading', { name: 'Set up your school' }).waitFor()
+    assert.equal(await page.getByLabel('Confirm owner-signed activation license').inputValue(), '')
+    await page.getByLabel('Confirm owner-signed activation license').fill('signed-owner-license-token')
 
     await page.getByLabel('Official school name *').fill('River Valley School')
     await page.getByLabel('School type *').selectOption('Combined')

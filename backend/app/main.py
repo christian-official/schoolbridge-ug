@@ -218,24 +218,30 @@ def seed_demo_data_if_empty():
         school_type = profile.school_type or "Secondary"
 
         classes = db.query(models.SchoolClass).all()
+        if school_type == "Combined":
+            class_names = [f"Primary {i}" for i in range(1, 8)] + [f"Senior {i}" for i in range(1, 7)]
+        elif school_type == "Secondary":
+            class_names = [f"S{i}" for i in range(1, 7)]
+        else:
+            class_names = [f"P{i}" for i in range(1, 8)]
         if not classes:
-            class_names = [f"S{i}" for i in range(1, 7)] if school_type == "Secondary" else [f"P{i}" for i in range(1, 8)]
             classes = [models.SchoolClass(name=name, section="") for name in class_names]
             db.add_all(classes)
             db.flush()
 
+        subject_types = ["Primary", "Secondary"] if school_type == "Combined" else [school_type]
         existing_subjects = {
-            item.name.lower()
-            for item in db.query(models.Subject).filter(models.Subject.school_type == school_type).all()
+            (item.school_type, item.name.lower())
+            for item in db.query(models.Subject).filter(models.Subject.school_type.in_(subject_types)).all()
         }
-        subject_names = (
-            ["Mathematics", "English", "Biology", "Chemistry", "Physics", "Geography", "History", "Christian Religious Education"]
-            if school_type == "Secondary"
-            else ["English", "Mathematics", "Science", "Social Studies", "Literacy", "Religious Education"]
-        )
-        for name in subject_names:
-            if name.lower() not in existing_subjects:
-                db.add(models.Subject(name=name, school_type=school_type))
+        subject_catalogues = {
+            "Secondary": ["Mathematics", "English", "Biology", "Chemistry", "Physics", "Geography", "History", "Christian Religious Education"],
+            "Primary": ["English", "Mathematics", "Science", "Social Studies", "Literacy", "Religious Education"],
+        }
+        for subject_type in subject_types:
+            for name in subject_catalogues[subject_type]:
+                if (subject_type, name.lower()) not in existing_subjects:
+                    db.add(models.Subject(name=name, school_type=subject_type))
 
         class_by_name = {item.name.upper(): item for item in classes}
         existing_demo_admissions = {
@@ -253,10 +259,6 @@ def seed_demo_data_if_empty():
             "Demo", "Sample", "Test", "Preview", "Nabirye", "Okello", "Namutebi", "Kato",
             "Akena", "Atim", "Mugisha", "Nansubuga", "Ssemanda", "Auma", "Tumusiime"
         ]
-        class_names = (
-            [f"S{i}" for i in range(1, 7)] if school_type == "Secondary"
-            else [f"P{i}" for i in range(1, 8)]
-        )
         for index in range(1, 31):
             admission_number = f"DEMO-{date.today().year}-{index:03d}"
             if admission_number in existing_demo_admissions:
@@ -267,8 +269,9 @@ def seed_demo_data_if_empty():
                 continue
             level = None
             combination = None
-            if school_type == "Secondary":
-                level = "A-Level" if class_name in {"S5", "S6"} else "O-Level"
+            secondary_grade = re.search(r"(?:senior|s)[\s._-]*([1-6])$", class_name, re.IGNORECASE)
+            if school_type in {"Secondary", "Combined"} and secondary_grade:
+                level = "A-Level" if int(secondary_grade.group(1)) in {5, 6} else "O-Level"
                 if level == "A-Level":
                     combination = "Sciences — PCB"
             first = first_names[index - 1]
@@ -313,8 +316,8 @@ def seed_demo_data_if_empty():
             models.StaffMember.status == "active"
         ).order_by(models.StaffMember.id).all()
         timetable_subjects = demo_subjects_for_school = db.query(models.Subject).filter(
-            models.Subject.school_type == school_type
-        ).order_by(models.Subject.id).all()
+            models.Subject.school_type.in_(subject_types)
+        ).order_by(models.Subject.school_type, models.Subject.id).all()
         lesson_slots = [
             ("08:00", "08:40"), ("08:40", "09:20"),
             ("09:40", "10:20"), ("10:20", "11:00"),
@@ -332,7 +335,9 @@ def seed_demo_data_if_empty():
                     ).first()
                     if exists:
                         continue
-                    subject = timetable_subjects[(day * 2 + period) % len(timetable_subjects)] if timetable_subjects else None
+                    class_curriculum = "Secondary" if re.search(r"(?:senior|s)[\s._-]*[1-6]$", school_class.name, re.IGNORECASE) else "Primary"
+                    class_subjects = [item for item in timetable_subjects if item.school_type == class_curriculum] if school_type == "Combined" else timetable_subjects
+                    subject = class_subjects[(day * 2 + period) % len(class_subjects)] if class_subjects else None
                     teacher = demo_teachers[(day + period) % len(demo_teachers)] if demo_teachers else None
                     db.add(models.TimetableEntry(
                         class_id=school_class.id,
@@ -394,8 +399,8 @@ def seed_demo_data_if_empty():
 
         # Demo exams, marks and a usable grading scale.
         demo_subjects = db.query(models.Subject).filter(
-            models.Subject.school_type == school_type
-        ).order_by(models.Subject.id).all()
+            models.Subject.school_type.in_(subject_types)
+        ).order_by(models.Subject.school_type, models.Subject.id).all()
         for school_class in demo_classes:
             exam = db.query(models.Exam).filter_by(
                 name="DEMO End of Term Assessment",
@@ -411,8 +416,10 @@ def seed_demo_data_if_empty():
                 db.add(exam)
                 db.flush()
             class_students = [s for s in demo_students if s.class_id == school_class.id]
+            class_curriculum = "Secondary" if re.search(r"(?:senior|s)[\s._-]*[1-6]$", school_class.name, re.IGNORECASE) else "Primary"
+            class_demo_subjects = [item for item in demo_subjects if item.school_type == class_curriculum] if school_type == "Combined" else demo_subjects
             for student in class_students:
-                for subject_index, subject in enumerate(demo_subjects[:4]):
+                for subject_index, subject in enumerate(class_demo_subjects[:4]):
                     if db.query(models.Mark).filter_by(
                         student_id=student.id, subject_id=subject.id, exam_id=exam.id
                     ).first():
@@ -466,8 +473,9 @@ class ClassCreate(BaseModel):
 
 
 class SubjectCreate(BaseModel):
-    name: str
-    code: str | None = None
+    name: str = Field(min_length=1, max_length=100)
+    code: str | None = Field(default=None, max_length=20)
+    school_type: str | None = Field(default=None, pattern="^(Primary|Secondary)$")
 
 
 class StudentCreate(BaseModel):
@@ -787,13 +795,21 @@ def list_classes(db: Session = Depends(get_db)):
 def create_subject(data: SubjectCreate, db: Session = Depends(get_db)):
     profile = db.get(models.SchoolProfile, 1)
     school_type = profile.school_type if profile else "Secondary"
+    if school_type == "Combined":
+        if data.school_type not in {"Primary", "Secondary"}:
+            raise HTTPException(422, "Choose whether this subject belongs to the Primary or Secondary curriculum.")
+        subject_type = data.school_type
+    else:
+        subject_type = school_type
+        if data.school_type and data.school_type != subject_type:
+            raise HTTPException(422, "The selected subject curriculum does not match this school's type.")
     existing = db.query(models.Subject).filter(
-        models.Subject.school_type == school_type,
+        models.Subject.school_type == subject_type,
         func.lower(models.Subject.name) == data.name.strip().lower(),
     ).first()
     if existing:
-        raise HTTPException(409, "That subject already exists for this school type.")
-    item = models.Subject(**{**data.model_dump(), "name": data.name.strip()}, school_type=school_type)
+        raise HTTPException(409, "That subject already exists for this curriculum.")
+    item = models.Subject(name=data.name.strip(), code=data.code, school_type=subject_type)
     db.add(item)
     try:
         db.commit()
@@ -808,9 +824,10 @@ def create_subject(data: SubjectCreate, db: Session = Depends(get_db)):
 def list_subjects(db: Session = Depends(get_db)):
     profile = db.get(models.SchoolProfile, 1)
     school_type = profile.school_type if profile else "Secondary"
+    allowed_types = ["Primary", "Secondary"] if school_type == "Combined" else [school_type]
     return db.query(models.Subject).filter(
-        models.Subject.school_type == school_type
-    ).order_by(models.Subject.name).all()
+        models.Subject.school_type.in_(allowed_types)
+    ).order_by(models.Subject.school_type, models.Subject.name).all()
 
 
 @app.post("/api/students", response_model=StudentOut, tags=["Students"])
@@ -834,7 +851,7 @@ def create_student(data: StudentCreate, db: Session = Depends(get_db), admin=Dep
     school_type = profile.school_type if profile else "Secondary"
     class_label = re.sub(r"[\s._-]+", "", selected_class.name.lower())
     level_match = re.search(r"(?:senior|s)?([1-6])$", class_label)
-    if school_type == "Secondary" and level_match:
+    if school_type in {"Secondary", "Combined"} and level_match:
         grade = int(level_match.group(1))
         derived_level = "A-Level" if grade in (5, 6) else "O-Level"
         if data.academic_level and data.academic_level != derived_level:

@@ -234,3 +234,51 @@ def test_legacy_school_with_users_is_grandfathered_by_setup_migration(tmp_path):
     assert identity["school_type"] == "Secondary"
     assert identity["country"] is None
     assert identity["school_structure"] is None
+
+
+
+def test_legacy_school_profile_without_users_is_grandfathered(tmp_path):
+    import sqlite3
+
+    database_path = tmp_path / "legacy-profile-only.sqlite3"
+    database_url = f"sqlite:///{database_path}"
+    connection = sqlite3.connect(database_path)
+    try:
+        connection.execute("""
+            CREATE TABLE users (
+                id INTEGER PRIMARY KEY,
+                username VARCHAR(80) NOT NULL UNIQUE,
+                email VARCHAR(150) NOT NULL UNIQUE,
+                hashed_password VARCHAR(255) NOT NULL,
+                role VARCHAR(20) NOT NULL DEFAULT 'teacher',
+                is_active BOOLEAN NOT NULL DEFAULT 1
+            )
+        """)
+        connection.execute("""
+            CREATE TABLE school_profile (
+                id INTEGER PRIMARY KEY,
+                name VARCHAR(160) NOT NULL,
+                school_type VARCHAR(20) NOT NULL DEFAULT 'Secondary'
+            )
+        """)
+        connection.execute(
+            "INSERT INTO school_profile (id, name, school_type) VALUES (1, ?, ?)",
+            ("Configured School Without Accounts", "Primary"),
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    upgrade_database(database_url)
+
+    connection = sqlite3.connect(database_path)
+    try:
+        state = connection.execute(
+            "SELECT activated_at, setup_completed_at, original_identity_json FROM school_setup_state WHERE id=1"
+        ).fetchone()
+    finally:
+        connection.close()
+
+    assert state[0] is not None
+    assert state[1] is not None
+    assert "Configured School Without Accounts" in state[2]
