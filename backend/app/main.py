@@ -1965,6 +1965,7 @@ def school_setup_status(db: Session = Depends(get_db)):
         "setup_completed": bool(state.setup_completed_at),
         "requires_activation": not bool(state.activated_at),
         "requires_setup": not bool(state.setup_completed_at),
+        "identity_locked": bool(state.original_identity_json),
     }
 
 

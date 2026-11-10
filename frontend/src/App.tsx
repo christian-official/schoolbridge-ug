@@ -602,6 +602,7 @@ type FirstSetupStatus = {
   setup_completed: boolean
   activated: boolean
   installation_id: string
+  identity_locked: boolean
   error: string
 }
 
@@ -637,7 +638,7 @@ function FirstTimeSetupWizard({status,onStatusChange}:{status:FirstSetupStatus;o
       })
       const result=await response.json().catch(()=>({}))
       if(!response.ok)throw new Error(result.detail||'School setup could not be completed.')
-      onStatusChange({...status,setup_completed:true,activated:true,error:''})
+      onStatusChange({...status,setup_completed:true,activated:true,identity_locked:true,error:''})
       setSchool({...school,admin_password:''})
     } catch(e) { setError(e instanceof Error?e.message:'School setup could not be completed.') }
     finally { setBusy(false) }
@@ -705,14 +706,14 @@ function App() {
   const [overviewShortcuts, setOverviewShortcuts] = useState<string[]>([])
   const [serverConnection, setServerConnection] = useState<'checking' | 'connected' | 'disconnected'>('checking')
   const [syncDeviceRevoked, setSyncDeviceRevoked] = useState(false)
-  const [setupStatus,setSetupStatus] = useState<FirstSetupStatus>({loading:true,setup_completed:false,activated:false,installation_id:'',error:''})
+  const [setupStatus,setSetupStatus] = useState<FirstSetupStatus>({loading:true,setup_completed:false,activated:false,installation_id:'',identity_locked:false,error:''})
   useEffect(()=>{
     let cancelled=false
     fetch(`${API_BASE_URL}/api/setup/status`).then(async response=>{
       const result=await response.json().catch(()=>({}))
       if(!response.ok)throw new Error(result.detail||'Unable to check installation setup.')
-      if(!cancelled)setSetupStatus({loading:false,setup_completed:Boolean(result.setup_completed),activated:Boolean(result.activated),installation_id:result.installation_id||'',error:''})
-    }).catch(e=>{if(!cancelled)setSetupStatus({loading:false,setup_completed:false,activated:false,installation_id:'',error:e instanceof Error?e.message:'Unable to check installation setup.'})})
+      if(!cancelled)setSetupStatus({loading:false,setup_completed:Boolean(result.setup_completed),activated:Boolean(result.activated),installation_id:result.installation_id||'',identity_locked:Boolean(result.identity_locked),error:''})
+    }).catch(e=>{if(!cancelled)setSetupStatus({loading:false,setup_completed:false,activated:false,installation_id:'',identity_locked:false,error:e instanceof Error?e.message:'Unable to check installation setup.'})})
     return ()=>{cancelled=true}
   },[])
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -1941,11 +1942,16 @@ function SchoolCommunityWorkspace({token}:{token:string}) {
 
 function SchoolProfileSettings({token,onSaved}:{token:string;onSaved:()=>void}) {
   const [profileTab,setProfileTab]=useState<'identity'|'contact'|'houses'|'branding'>('identity')
-  const [form,setForm]=useState({name:'',address:'',phone:'',email:'',motto:'',school_type:'Secondary',a_level_combinations:'',o_level_optional_subjects:'',a_level_subsidiary_subjects:'',report_logo:'',house_names:''})
+  const [form,setForm]=useState({name:'',address:'',phone:'',email:'',motto:'',school_type:'Secondary',country:'',school_structure:'Day',a_level_combinations:'',o_level_optional_subjects:'',a_level_subsidiary_subjects:'',report_logo:'',house_names:''})
+  const [identityLocked,setIdentityLocked]=useState(false)
   const [message,setMessage]=useState('')
   const [error,setError]=useState('')
   const [busy,setBusy]=useState(false)
   const [loaded,setLoaded]=useState(false)
+
+  useEffect(()=>{
+    api<any>('setup/status',token).then(s=>setIdentityLocked(Boolean(s.identity_locked))).catch(()=>{})
+  },[token])
 
   useEffect(()=>{
     let cancelled=false
@@ -1954,6 +1960,7 @@ function SchoolProfileSettings({token,onSaved}:{token:string;onSaved:()=>void}) 
       setForm({
         name:p.name||'',address:p.address||'',phone:p.phone||'',email:p.email||'',house_names:p.house_names||'',
         motto:p.motto||'',school_type:p.school_type||'Secondary',
+        country:p.country||'',school_structure:p.school_structure||'Day',
         a_level_combinations:p.a_level_combinations||'',
         o_level_optional_subjects:p.o_level_optional_subjects||'',
         a_level_subsidiary_subjects:p.a_level_subsidiary_subjects||'',report_logo:p.report_logo||''
@@ -1976,6 +1983,7 @@ function SchoolProfileSettings({token,onSaved}:{token:string;onSaved:()=>void}) 
         email:email||null,motto:form.motto.trim()||null,report_logo:form.report_logo||null,house_names:form.house_names.split(/\r?\n/).map((h:string)=>h.trim()).filter(Boolean).join('\n')||null
       })})
       setMessage('School profile saved successfully.')
+      setIdentityLocked(true)
       onSaved()
     }catch(e){setError(e instanceof Error?e.message:'Unable to save school profile.')}
     finally{setBusy(false)}
@@ -1991,9 +1999,12 @@ function SchoolProfileSettings({token,onSaved}:{token:string;onSaved:()=>void}) 
       <div className="form-section" style={{display:profileTab==='identity'?'block':'none'}}>
         <div className="form-section-heading"><span className="form-section-number">01</span><div><h4>School identity</h4><p>These details identify your institution in the school workspace.</p></div></div>
         <div className="student-form-grid">
-          <label className="field-span-full">Official school name *<input required maxLength={120} autoComplete="organization" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} placeholder="Enter the registered school name"/></label>
-          <label>School type *<select required value={form.school_type} onChange={e=>setForm({...form,school_type:e.target.value})}><option value="Primary">Primary</option><option value="Secondary">Secondary</option></select><small className="field-hint">This controls the class options and academic levels used during student registration. Existing classes will not be changed.</small></label>
-          <label>School motto<input maxLength={180} value={form.motto} onChange={e=>setForm({...form,motto:e.target.value})} placeholder="Enter the school motto (optional)"/></label>
+          {identityLocked&&<p className="form-hint field-span-full">The official school identity was recorded during first-time setup and is now protected. Contact the SchoolBridge owner for an authorised correction.</p>}
+          <label className="field-span-full">Official school name *<input required disabled={identityLocked} maxLength={160} autoComplete="organization" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} placeholder="Enter the registered school name"/></label>
+          <label>School type *<select required disabled={identityLocked} value={form.school_type} onChange={e=>setForm({...form,school_type:e.target.value})}><option value="Primary">Primary</option><option value="Secondary">Secondary</option><option value="Combined">Combined</option></select><small className="field-hint">This controls the class options and academic levels used during student registration.</small></label>
+          <label>Country *<input required disabled={identityLocked} maxLength={80} value={form.country} onChange={e=>setForm({...form,country:e.target.value})} placeholder="Country"/></label>
+          <label>School structure *<select disabled={identityLocked} value={form.school_structure} onChange={e=>setForm({...form,school_structure:e.target.value})}><option>Day</option><option>Boarding</option><option>Both</option></select></label>
+          <label>School motto<input maxLength={200} value={form.motto} onChange={e=>setForm({...form,motto:e.target.value})} placeholder="Enter the school motto (optional)"/></label>
         </div>
       </div>
       <div className="form-section" style={{display:profileTab==='contact'?'block':'none'}}>
@@ -2013,7 +2024,7 @@ function SchoolProfileSettings({token,onSaved}:{token:string;onSaved:()=>void}) 
         {form.report_logo && <div className="school-logo-settings-preview"><img src={form.report_logo} alt="School logo preview"/><button type="button" className="secondary-button" onClick={()=>setForm(current=>({...current,report_logo:''}))}>Remove logo</button></div>}
       </div>
       <div className="form-actions"><button type="button" className="secondary-button" onClick={onSaved}>Cancel</button><button className="primary-button" disabled={busy||!loaded}>{busy?'Saving school profile...':'Save school profile'}</button></div>
-      <p className="form-hint">Only the school name and school type are compulsory. Optional contact fields can be left blank.</p>
+      <p className="form-hint">Official identity fields are protected after setup. Contact details, motto, houses and branding can be updated by authorised administrators.</p>
     </form>
   </section>
 }
