@@ -1631,7 +1631,7 @@ function TeacherWorkspace({token,active,userId}:{token:string;active:string;user
     try{
       const draft=await loadEncryptedOfflineDraft<any>(userId,deviceId,offlinePassphrase)
       const currentDraftIsOpen=selectedTeacherExam?.id===draft.exam.id&&Number(selectedSubjectId)===draft.subject_id&&resultStudents.length>0
-      const currentRecords=currentDraftIsOpen?resultStudents.map(student=>({student_id:student.id,score:resultScores[student.id]===undefined||resultScores[student.id].trim()===''?0:Number(resultScores[student.id])})):draft.records
+      const currentRecords:{student_id:number;score:number}[]=currentDraftIsOpen?resultStudents.map(student=>({student_id:student.id,score:resultScores[student.id]===undefined||resultScores[student.id].trim()===''?0:Number(resultScores[student.id])})):draft.records
       if(currentRecords.some(record=>!Number.isFinite(record.score)||record.score<0||record.score>100))throw new Error('Every score must be between 0 and 100.')
       const result=await api<{proposal_id:number;status:string;duplicate:boolean}>('sync/teacher-mark-proposals',token,{method:'POST',body:JSON.stringify({
         device_id:draft.device_id,idempotency_key:draft.idempotency_key,exam_id:draft.exam.id,
