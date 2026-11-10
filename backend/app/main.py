@@ -2851,6 +2851,7 @@ def list_sync_exam_snapshot(
     if user.role == "admin":
         scope = "school"
     elif user.role == "parent":
+        query = query.filter(models.Exam.closed.is_(True))
         student_ids = _sync_linked_student_ids(db, user)
         class_ids = {
             row[0] for row in db.query(models.Student.class_id).filter(
@@ -2903,7 +2904,7 @@ def list_sync_mark_snapshot(
     snapshot_start_sequence = _sync_snapshot_sequence(db)
     query = db.query(models.Mark).join(
         models.Student, models.Student.id == models.Mark.student_id
-    )
+    ).join(models.Exam, models.Exam.id == models.Mark.exam_id)
     scope = None
     if user.role == "admin":
         scope = "school"
@@ -2912,6 +2913,7 @@ def list_sync_mark_snapshot(
         query = query.filter(
             models.Mark.student_id.in_(student_ids) if student_ids else models.Mark.id == -1,
             models.Mark.verified.is_(True),
+            models.Exam.closed.is_(True),
         )
         scope = "linked_verified_results"
     elif user.role == "teacher":
