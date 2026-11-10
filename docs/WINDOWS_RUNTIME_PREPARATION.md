@@ -1,28 +1,42 @@
-# Preparing the Windows runtime for an offline school visit
+# Preparing the Windows runtime for an offline school installation
 
-The USB application archive contains SchoolBridge's frontend, backend and PostgreSQL images. Those images run under a local container engine. The current package does not bundle the Windows container runtime by default.
+## What is included in the USB package
 
-## Before the visit
+Run `scripts/prepare-usb.ps1` on the online preparation computer. The script downloads the official Docker Desktop Windows x64 installer and the latest stable Microsoft WSL x64 MSI when they are not already staged in the repository's `runtime` folder. It checks both installers' Authenticode signatures and expected publishers before packaging them.
 
-On the preparation computer, create a folder named `runtime` in the repository root and place the following official installers inside it:
+The preparation computer must have PowerShell, Docker Engine/Desktop and Compose v2 available and running. It pulls PostgreSQL, builds the SchoolBridge backend and frontend images, exports those images, and copies the runtime installers and installation guides into `dist/SchoolBridge-USB`. It creates `SHA256SUMS.txt` for the package files.
 
-- `Docker Desktop Installer.exe` — the Windows x64 installer obtained from Docker's official Windows installation page.
-- `wsl.msi` — the current stable WSL MSI from Microsoft's official WSL GitHub Releases page, when the school computer needs an offline WSL installation/update.
-
-The USB preparation script copies this folder into the USB package. It does not download or redistribute third-party installers automatically. Confirm the installers' integrity and licence terms before including them. Docker Desktop terms must be accepted by the school/host operator; do not silently accept them on another person's behalf.
+Do not place the owner's private signing key or passphrase in the repository or USB package. Only the public verification key is entered into the school's local configuration.
 
 ## School computer readiness
 
-Current Docker Desktop Windows requirements include a supported Windows 10/11 release, WSL 2.1.5 or later for the WSL backend, at least 8 GB RAM and hardware virtualization enabled. Check the current official documentation because requirements change.
+The school computer needs supported 64-bit Windows 10 22H2 or Windows 11 23H2 or later, at least 8 GB RAM, hardware virtualization enabled, WSL 2.1.5 or later, and a compatible Docker Desktop installation. These are the current project preflight baselines; check Docker and Microsoft requirements before deployment because vendor requirements can change.
 
-First run `./prepare-school-host.ps1` from an elevated PowerShell window on the school computer. It checks the supported Windows version, memory and hardware virtualisation; enables the WSL and Virtual Machine Platform Windows features; installs the staged WSL MSI when needed; and launches the official Docker Desktop installer. The Docker setup remains interactive so the authorised school operator can review and accept its licence terms. The script does not silently accept third-party terms or force a restart. If Windows requests a restart, restart and open Docker Desktop, wait for its engine, then run `./check-school-host.ps1` again.
+From an elevated PowerShell window in the USB package folder, run:
 
-## Important
+```powershell
+.\prepare-school-host.ps1
+```
 
-- No internet or LAN is required to install or run SchoolBridge once the local Windows runtime is ready and all images are on the USB.
-- A single-computer installation needs no router, Wi-Fi or LAN.
-- Multi-device access uses an optional local network.
-- Docker Desktop's licensing and hardware requirements must be checked for each school. If Docker Desktop is unsuitable, the SchoolBridge team must provide and test a different supported local runtime before promising installation on that computer.
+The script enables Windows Subsystem for Linux and Virtual Machine Platform, installs the staged WSL MSI if the required WSL version is not ready, and launches the official Docker Desktop installer when Docker Desktop is not installed in its expected machine-wide location. The authorised school operator must complete Docker's interactive setup and accept its licence terms. Restart Windows if requested, open Docker Desktop, and wait for its engine to become ready.
+
+Then run:
+
+```powershell
+.\check-school-host.ps1
+```
+
+Every preflight check must pass before installing SchoolBridge. If Docker is already installed but the preflight cannot find its CLI or engine, resolve that host setup issue before continuing.
+
+## Network requirements
+
+No internet or LAN is required to install or run SchoolBridge on one computer once the local Windows runtime is ready and all application/database images are on the USB. The runtime installers and image archive are staged in advance.
+
+A local router, Wi-Fi hotspot or wired LAN is optional and is needed only when additional devices must connect to the host computer. Internet is not required for that local connection.
+
+## Licensing and support boundary
+
+Docker Desktop terms must be reviewed and accepted by the authorised school/host operator. The preparation and installation scripts do not silently accept third-party licence terms. Confirm Docker Desktop licensing suitability for each deploying organisation. If Docker Desktop is unsuitable, a different supported local runtime must be implemented and tested before promising installation on that computer.
 
 ## Official references
 
