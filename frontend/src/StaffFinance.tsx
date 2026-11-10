@@ -1,11 +1,13 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Users, Plus, Search, Wallet, ReceiptText, RefreshCw, Building2 } from 'lucide-react'
+import { Users, Plus, Search, Wallet, ReceiptText, RefreshCw, Building2, CloudUpload, LockKeyhole } from 'lucide-react'
+import { saveEncryptedFinanceQueue, loadEncryptedFinanceQueue } from './syncStorage'
 
 type Staff = { id:number; staff_number:string; first_name:string; last_name:string; category:string; position?:string; department?:string; subjects?:string|null; phone?:string; email?:string; house?:string|null; salary_amount?:number|null; salary_frequency?:string; status?:string }
 type Page<T> = { items:T[]; total:number; page:number; pages:number }
 type Summary = { fees_expected:number; fees_collected:number; outstanding:number; salary_expenses?:number; other_expenses?:number; total_expenses?:number; net_cash_position?:number }
 type Charge = { id:number; student_id:number; student_name:string; admission_number:string; class_id?:number|null; class_name?:string; stream?:string; term:string; year:number; amount:number; paid:number; balance:number }
 type StudentMatch = { id:number; first_name:string; middle_name?:string|null; last_name:string; admission_number:string; class_id?:number|null; status?:string }
+type OfflineFinancePayment = { idempotency_key:string; charge_id:number; amount:number; method:string; reference:string|null; payment_date:string; base_sequence:number; student_name:string; admission_number:string; term:string; year:number }
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 
@@ -55,6 +57,10 @@ export default function StaffFinance({token,active,classes=[],refreshKey=0,initi
   const [payment,setPayment]=useState({charge_id:'',amount:'',method:'Cash',reference:''})
   const [receipt,setReceipt]=useState<{receipt_number:string;charge:Charge;amount:number;method:string;date:string}|null>(null)
   const [schoolProfile,setSchoolProfile]=useState<{name:string;phone?:string;email?:string;address?:string;house_names?:string}>({name:'SchoolBridge'})
+  const [offlineFinancePassphrase,setOfflineFinancePassphrase]=useState('')
+  const [offlineFinanceQueue,setOfflineFinanceQueue]=useState<OfflineFinancePayment[]>([])
+  const [offlineFinanceStatus,setOfflineFinanceStatus]=useState('')
+  const [offlineFinanceBusy,setOfflineFinanceBusy]=useState(false)
 
   useEffect(()=>{
     if(active!=='Staff' && active!=='Fees & Finance') return
@@ -188,6 +194,42 @@ export default function StaffFinance({token,active,classes=[],refreshKey=0,initi
     try {await request('finance/charges/'+charge.id,token,{method:'PATCH',body:JSON.stringify({amount,reason:reason.trim()})});setMessage('Fee charge adjusted and audit record saved.');await refreshFinance()}
     catch(e){setMessage(e instanceof Error?e.message:'Unable to adjust fee charge.')}
   }
+  async function saveOfflinePayment(){
+    if(!selectedPaymentStudent||!payment.charge_id||!Number.isInteger(Number(payment.amount))||Number(payment.amount)<=0){setOfflineFinanceStatus('Select a student charge and enter a valid whole-number amount.');return}
+    if(offlineFinancePassphrase.length<12){setOfflineFinanceStatus('Enter a passphrase of at least 12 characters.');return}
+    setOfflineFinanceBusy(true);setOfflineFinanceStatus('')
+    try{
+      const account=await request<{id:number}>('auth/me',token)
+      const deviceId=localStorage.getItem('schoolbridge-sync-device-'+account.id)||''
+      if(!deviceId)throw new Error('Register this browser under Device synchronisation before saving offline payments.')
+      const metaRaw=localStorage.getItem('schoolbridge-offline-snapshot-meta-'+account.id+'-'+deviceId)
+      if(!metaRaw)throw new Error('Download a current encrypted offline snapshot before preparing payments.')
+      const meta=JSON.parse(metaRaw) as {sequence:number}
+      if(!Number.isInteger(meta.sequence)||meta.sequence<0)throw new Error('The offline snapshot sequence is invalid. Download it again.')
+      const charge=selectedStudentCharges.find(item=>item.id===Number(payment.charge_id))
+      if(!charge)throw new Error('The selected fee charge is unavailable.')
+      const item:OfflineFinancePayment={idempotency_key:crypto.randomUUID(),charge_id:charge.id,amount:Number(payment.amount),method:payment.method,reference:payment.reference||null,payment_date:new Date().toISOString().slice(0,10),base_sequence:meta.sequence,student_name:[selectedPaymentStudent.first_name,selectedPaymentStudent.middle_name,selectedPaymentStudent.last_name].filter(Boolean).join(' '),admission_number:selectedPaymentStudent.admission_number,term:charge.term,year:charge.year}
+      const existing=await loadEncryptedFinanceQueue<OfflineFinancePayment[]>(account.id,deviceId,offlineFinancePassphrase).catch(()=>[])
+      const next=[...existing,item];await saveEncryptedFinanceQueue(account.id,deviceId,offlineFinancePassphrase,next)
+      setOfflineFinanceQueue(next);setOfflineFinanceStatus('Payment securely queued. It has NOT been recorded by the school yet.')
+    }catch(error){setOfflineFinanceStatus(error instanceof Error?error.message:'Unable to save offline payment.')}
+    finally{setOfflineFinanceBusy(false)}
+  }
+  async function syncOfflinePayments(){
+    if(offlineFinancePassphrase.length<12){setOfflineFinanceStatus('Enter the passphrase used to protect the queue.');return}
+    setOfflineFinanceBusy(true);setOfflineFinanceStatus('')
+    try{
+      const account=await request<{id:number}>('auth/me',token);const deviceId=localStorage.getItem('schoolbridge-sync-device-'+account.id)||''
+      if(!deviceId)throw new Error('This browser has no registered sync device.')
+      const queue=await loadEncryptedFinanceQueue<OfflineFinancePayment[]>(account.id,deviceId,offlineFinancePassphrase)
+      const remaining:OfflineFinancePayment[]=[];let applied=0,conflicts=0
+      for(const item of queue){try{const result=await request<{status:string}>('sync/finance-payments',token,{method:'POST',body:JSON.stringify({device_id:deviceId,idempotency_key:item.idempotency_key,charge_id:item.charge_id,amount:item.amount,method:item.method,reference:item.reference,payment_date:item.payment_date,base_sequence:item.base_sequence})});if(result.status==='applied')applied++;else{conflicts++;remaining.push(item)}}catch(error){remaining.push(item);if(error instanceof Error&&error.message.includes('409'))conflicts++}}
+      await saveEncryptedFinanceQueue(account.id,deviceId,offlineFinancePassphrase,remaining);setOfflineFinanceQueue(remaining)
+      setOfflineFinanceStatus(applied+' payment(s) synchronised; '+conflicts+' conflict(s) retained for review; '+remaining.length+' remain queued.')
+      if(applied)await refreshFinance()
+    }catch(error){setOfflineFinanceStatus(error instanceof Error?error.message:'Unable to synchronise offline payments.')}
+    finally{setOfflineFinanceBusy(false)}
+  }
   async function pay(e:FormEvent){
     e.preventDefault();setMessage('');setSavingPayment(true)
     try { const saved=await request<{receipt_number:string;amount:number;payment_date:string}>('finance/payments',token,{method:'POST',body:JSON.stringify({charge_id:Number(payment.charge_id),amount:Number(payment.amount),method:payment.method,reference:payment.reference||null})});const charge=selectedStudentCharges.find(c=>c.id===Number(payment.charge_id));if(charge)setReceipt({receipt_number:saved.receipt_number,charge,amount:saved.amount,method:payment.method,date:saved.payment_date});setPayment({charge_id:'',amount:'',method:'Cash',reference:''});setShowPaymentForm(false);setSelectedPaymentStudent(null);setSelectedStudentCharges([]);setStudentMatches([]);setMessage('Payment recorded. Receipt generated.');await refreshFinance() }
@@ -253,7 +295,8 @@ export default function StaffFinance({token,active,classes=[],refreshKey=0,initi
         <label>Payment method<select value={payment.method} onChange={e=>setPayment({...payment,method:e.target.value})}><option>Cash</option><option>Bank</option><option>Mobile Money</option><option>Cheque</option></select></label>
         <label className="field-span-full">Reference / transaction ID<input value={payment.reference} onChange={e=>setPayment({...payment,reference:e.target.value})} placeholder="Optional bank or mobile money reference"/></label>
       </div></section>
-      <div className="form-actions"><button className="primary-button" disabled={savingPayment||!selectedStudentCharges.some(c=>c.balance>0)||!payment.charge_id||Number(payment.amount)<=0}>{savingPayment?'Recording payment...':'Record payment and issue receipt'}</button></div>
+      <div className="form-actions"><button className="primary-button" disabled={savingPayment||!selectedStudentCharges.some(c=>c.balance>0)||!payment.charge_id||Number(payment.amount)<=0}>{savingPayment?'Recording payment...':'Record payment and issue receipt'}</button><button type="button" className="secondary-button" disabled={offlineFinanceBusy||!payment.charge_id||Number(payment.amount)<=0} onClick={()=>void saveOfflinePayment()}><LockKeyhole size={15}/> Save encrypted offline draft</button></div>
+      <section className="form-section"><div className="form-section-heading"><span className="form-section-number">OFFLINE</span><div><h4>Offline payment queue</h4><p>Encrypted on this browser. Drafts expire after 24 hours. A queued item is not a receipt or confirmed payment until accepted by the server.</p></div></div><label className="field-span-full">Offline queue passphrase<input type="password" autoComplete="off" value={offlineFinancePassphrase} onChange={e=>setOfflineFinancePassphrase(e.target.value)} placeholder="At least 12 characters"/></label><div className="form-actions"><button type="button" className="secondary-button" disabled={offlineFinanceBusy} onClick={()=>void syncOfflinePayments()}><CloudUpload size={15}/> Synchronise queued payments</button><span>{offlineFinanceQueue.length} loaded draft(s)</span></div>{offlineFinanceStatus&&<p className="field-hint" role="status">{offlineFinanceStatus}</p>}</section>
     </form>}
     {receipt&&<section className="panel receipt-print"><div className="panel-heading"><div><h2>{schoolProfile.name||'SchoolBridge'}</h2><p>Official fee payment receipt · {schoolProfile.phone||''} {schoolProfile.email||''}</p></div><button className="secondary-button" type="button" onClick={()=>window.print()}>Print receipt</button></div><div className="receipt-details"><strong>Receipt: {receipt.receipt_number}</strong><p>Student: {receipt.charge.student_name}</p><p>Admission number: {receipt.charge.admission_number}</p><p>Class: {receipt.charge.class_name||'—'} {receipt.charge.stream||''}</p><p>Fee: {receipt.charge.term} {receipt.charge.year}</p><p>Amount received: UGX {receipt.amount.toLocaleString()}</p><p>Payment method: {receipt.method}</p><p>Date: {receipt.date}</p></div></section>}
     </>}
