@@ -69,15 +69,35 @@ jobs:
           name: Legacy database migration tests
           command: PYTHONPATH=backend SCHOOLBRIDGE_DATABASE_URL=sqlite:///./schoolbridge_ci.db SCHOOLBRIDGE_SECRET_KEY=ci-only-secret-key-not-for-production .venv/bin/python -m pytest -q backend/tests/test_migrations.py -k "baseline_adds or existing_database or current_database or legacy_school or partial_school_setup"
 
-  backend-support-tests:
+  backend-support-database:
     machine:
       image: ubuntu-2404:current
     steps:
       - checkout
       - run: python3 -m venv .venv && .venv/bin/pip install -r backend/requirements-dev.txt
       - run:
-          name: Backup, database and licensing tests
-          command: PYTHONPATH=backend SCHOOLBRIDGE_DATABASE_URL=sqlite:///./schoolbridge_ci.db SCHOOLBRIDGE_SECRET_KEY=ci-only-secret-key-not-for-production .venv/bin/python -m pytest -q backend/tests/test_backup_scheduler.py backend/tests/test_database.py backend/tests/test_database_health.py backend/tests/test_owner_license_tool.py backend/tests/test_postgres_backup.py backend/tests/test_restore_postgres.py backend/tests/test_sqlite_backup.py
+          name: Database and licensing tests
+          command: PYTHONPATH=backend SCHOOLBRIDGE_DATABASE_URL=sqlite:///./schoolbridge_ci.db SCHOOLBRIDGE_SECRET_KEY=ci-only-secret-key-not-for-production .venv/bin/python -m pytest -q backend/tests/test_database.py backend/tests/test_database_health.py backend/tests/test_owner_license_tool.py
+
+  backend-support-sqlite-backup:
+    machine:
+      image: ubuntu-2404:current
+    steps:
+      - checkout
+      - run: python3 -m venv .venv && .venv/bin/pip install -r backend/requirements-dev.txt
+      - run:
+          name: Scheduler and SQLite backup tests
+          command: PYTHONPATH=backend SCHOOLBRIDGE_DATABASE_URL=sqlite:///./schoolbridge_ci.db SCHOOLBRIDGE_SECRET_KEY=ci-only-secret-key-not-for-production .venv/bin/python -m pytest -q backend/tests/test_backup_scheduler.py backend/tests/test_sqlite_backup.py
+
+  backend-support-postgres-backup:
+    machine:
+      image: ubuntu-2404:current
+    steps:
+      - checkout
+      - run: python3 -m venv .venv && .venv/bin/pip install -r backend/requirements-dev.txt
+      - run:
+          name: PostgreSQL backup and restore unit tests
+          command: PYTHONPATH=backend SCHOOLBRIDGE_DATABASE_URL=sqlite:///./schoolbridge_ci.db SCHOOLBRIDGE_SECRET_KEY=ci-only-secret-key-not-for-production .venv/bin/python -m pytest -q backend/tests/test_postgres_backup.py backend/tests/test_restore_postgres.py
 
   postgres-recovery-integration:
     machine:
@@ -303,7 +323,9 @@ workflows:
       - backend-api-offline
       - backend-migration-schema
       - backend-migration-legacy
-      - backend-support-tests
+      - backend-support-database
+      - backend-support-sqlite-backup
+      - backend-support-postgres-backup
       - postgres-recovery-integration
       - frontend-build
       - local-deployment-package
