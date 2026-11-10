@@ -2640,9 +2640,14 @@ def test_non_teaching_staff_can_be_registered_without_a_login_account():
             "first_name": "Peter", "last_name": "Cleaner", "category": "Non-teaching",
             "position": "Cleaner", "department": "Maintenance", "create_login": False,
         }, headers={"Authorization": f"Bearer {token}"})
+        login_attempt = client.post("/api/auth/teachers", json={
+            "staff_id": response.json()["id"], "username": "blocked-staff-login",
+            "email": "blocked-staff@example.invalid", "password": "LongEnoughPassword123!",
+        }, headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 200
     assert response.json()["login"] is None
     assert response.json()["login_allowed"] is False
+    assert login_attempt.status_code == 403
     with SessionLocal() as db:
         assert db.query(models.User).filter_by(staff_id=response.json()["id"]).first() is None
 
