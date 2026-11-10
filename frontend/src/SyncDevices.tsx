@@ -197,7 +197,7 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
     if(offlinePassphrase.length<12){setOfflineStatus('Use a passphrase of at least 12 characters. It is never stored.');return}
     setOfflineBusy(true);setOfflineStatus('')
     try{
-      const account=await request<{role:string;permissions:Record<string,string[]>}>('auth/me',token)
+      const account=await request<{username:string;role:string;role_label?:string;permissions:Record<string,string[]>}>('auth/me',token)
       const permissions=account.permissions||{}
       const can=(section:string)=>account.role==='admin'||(permissions[section]||[]).includes('view')
       const parent=account.role==='parent', teacher=account.role==='teacher'
