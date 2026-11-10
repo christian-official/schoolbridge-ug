@@ -29,6 +29,7 @@ type User = {
   permissions?: Record<string, string[]>
   active: boolean
   must_change_password?: boolean
+  staff_profile_complete?: boolean
 }
 
 type StudentPage = { items: RecordItem[]; total: number; page: number; pages: number }
@@ -1152,12 +1153,13 @@ function App() {
     try {
       const profile = await api<User>('auth/me', authToken)
       setUser(profile)
-      if(profile.role==='teacher') setActive('My Classes')
+      if((profile.role==='teacher'||profile.role==='staff') && profile.staff_profile_complete===false) setActive('My Profile')
+      else if(profile.role==='teacher') setActive('My Classes')
       else if(profile.role==='parent') setActive('My Children')
       else if(profile.role==='admin') await loadSchoolData(authToken,profile)
       else {
         const allowedItems = getStaffNavigation(profile)
-        setActive(allowedItems[0]?.label || 'Overview')
+        setActive(profile.staff_profile_complete===false ? 'My Profile' : allowedItems[0]?.label || 'Overview')
         await loadSchoolData(authToken,profile)
       }
     } catch (error) {
