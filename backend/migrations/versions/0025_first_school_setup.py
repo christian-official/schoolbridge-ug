@@ -43,11 +43,11 @@ def upgrade() -> None:
         profile = None
         if "school_profile" in tables:
             profile = bind.execute(text("SELECT name, school_type, country, school_structure FROM school_profile WHERE id=1")).mappings().first()
-        identity = {
-            "school_name": (profile or {}).get("name") or "Existing School",
-            "school_type": (profile or {}).get("school_type") or "Secondary",
-            "country": (profile or {}).get("country"),
-            "school_structure": (profile or {}).get("school_structure"),
+        identity = None if profile is None else {
+            "school_name": profile.get("name") or "Existing School",
+            "school_type": profile.get("school_type") or "Secondary",
+            "country": profile.get("country"),
+            "school_structure": profile.get("school_structure"),
             "installation_id": "legacy-existing-installation",
         }
         import json
@@ -55,7 +55,7 @@ def upgrade() -> None:
             INSERT INTO school_setup_state
             (id, installation_id, activated_at, activation_license_hash, setup_completed_at, original_identity_json)
             VALUES (1, 'legacy-existing-installation', CURRENT_TIMESTAMP, NULL, CURRENT_TIMESTAMP, :identity)
-        """), {"identity": json.dumps(identity, sort_keys=True)})
+        """), {"identity": json.dumps(identity, sort_keys=True) if identity else None})
 
 
 def downgrade() -> None:

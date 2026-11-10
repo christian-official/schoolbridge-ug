@@ -2123,3 +2123,26 @@ def test_activation_attempts_are_rate_limited(monkeypatch):
             assert response.status_code == 403
         locked = client.post("/api/setup/activate", json={"license": "not-a-valid-activation-license"})
         assert locked.status_code == 429
+
+
+
+def test_legacy_install_without_profile_can_set_identity_once():
+    reset_database()
+    admin = create_admin()
+    token = create_access_token(admin)
+    with SessionLocal() as db:
+        state = db.get(models.SchoolSetupState, 1)
+        state.original_identity_json = None
+        db.commit()
+    headers = {"Authorization": f"Bearer {token}"}
+    with TestClient(app) as client:
+        first = client.put("/api/settings/school-profile", headers=headers, json={
+            "name": "Legacy School Name", "school_type": "Primary",
+            "country": "Uganda", "school_structure": "Day",
+        })
+        assert first.status_code == 200, first.text
+        second = client.put("/api/settings/school-profile", headers=headers, json={
+            "name": "Different Name", "school_type": "Primary",
+            "country": "Uganda", "school_structure": "Day",
+        })
+        assert second.status_code == 403

@@ -4913,20 +4913,29 @@ def save_school_profile(data: SchoolProfileUpdate, db: Session = Depends(get_db)
     updates = data.model_dump(exclude_unset=True)
     state = db.get(models.SchoolSetupState, 1)
     if state and state.setup_completed_at and state.original_identity_json:
-        current_identity = {
-            "name": profile.name, "school_type": profile.school_type,
-            "country": profile.country, "school_structure": profile.school_structure,
-        }
+        original = json.loads(state.original_identity_json)
         requested_identity = {
-            "name": updates.get("name", profile.name),
+            "school_name": updates.get("name", profile.name),
             "school_type": updates.get("school_type", profile.school_type),
             "country": updates.get("country", profile.country),
             "school_structure": updates.get("school_structure", profile.school_structure),
         }
-        if requested_identity != current_identity:
+        protected_identity = {
+            "school_name": original.get("school_name"),
+            "school_type": original.get("school_type"),
+            "country": original.get("country"),
+            "school_structure": original.get("school_structure"),
+        }
+        if requested_identity != protected_identity:
             raise HTTPException(403, "Official school identity is protected after first-time setup. Contact the SchoolBridge owner for an authorised, audited correction.")
     for key, value in updates.items():
         setattr(profile, key, value)
+    if state and state.setup_completed_at and not state.original_identity_json:
+        state.original_identity_json = json.dumps({
+            "school_name": profile.name, "school_type": profile.school_type,
+            "country": profile.country, "school_structure": profile.school_structure,
+            "installation_id": state.installation_id,
+        }, sort_keys=True)
     db.flush()
     write_audit(db, admin, "school_profile_updated", "school_profile", profile.id, "School profile and report branding updated.")
     db.commit()
