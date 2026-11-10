@@ -44,6 +44,24 @@ services:
     networks:
       - schoolbridge-internal
 
+  backup:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    command: ["python", "backup_scheduler.py"]
+    environment:
+      SCHOOLBRIDGE_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-schoolbridge}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB:-schoolbridge}
+      SCHOOLBRIDGE_BACKUP_DIR: /backups
+      SCHOOLBRIDGE_BACKUP_RETENTION_DAYS: ${SCHOOLBRIDGE_BACKUP_RETENTION_DAYS:-30}
+      SCHOOLBRIDGE_BACKUP_INTERVAL_HOURS: ${SCHOOLBRIDGE_BACKUP_INTERVAL_HOURS:-24}
+    volumes:
+      - schoolbridge-backups:/backups
+    depends_on:
+      database:
+        condition: service_healthy
+    networks:
+      - schoolbridge-internal
+
   frontend:
     build:
       context: ./frontend
