@@ -25,6 +25,13 @@ try {
     if ($PackageCompose -match '(?m)^    build:') { throw "USB Compose package still contains source build contexts." }
     Set-Content (Join-Path $PackageDir "docker-compose.yml") $PackageCompose -Encoding UTF8
     Copy-Item (Join-Path $PSScriptRoot "install-schoolbridge.ps1") $PackageDir -Force
+    Copy-Item (Join-Path $PSScriptRoot "check-school-host.ps1") $PackageDir -Force
+    $RuntimeSource = Join-Path $RepoRoot "runtime"
+    if (Test-Path $RuntimeSource) {
+        Copy-Item $RuntimeSource (Join-Path $PackageDir "runtime") -Recurse -Force
+    } else {
+        Write-Warning "No runtime folder found. Add the official WSL and Docker Desktop offline installers under runtime before preparing the final school USB."
+    }
     @'
 # Add the owner's Base64 public verification key before starting SchoolBridge.
 SCHOOLBRIDGE_LICENSE_PUBLIC_KEY=
