@@ -16,6 +16,7 @@ COPY migrations ./migrations
 COPY alembic.ini .
 COPY create_admin.py .
 COPY backup_postgres.py .
+COPY restore_postgres.py .
 COPY backup_scheduler.py .
 
 EXPOSE 8001
