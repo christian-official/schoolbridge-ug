@@ -125,7 +125,8 @@ export default function OperationsManagement({ token, active, permissions = {}, 
   const timetableDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
   const timetableClassId = Number(selectedTimetableClass || classes[0]?.id || 0)
   const timetableClassEntries = entries.filter(entry => entry.class_id === timetableClassId)
-  const timetableSlots = Array.from(new Set(timetableClassEntries.map(entry => entry.start_time + '–' + entry.end_time))).sort()
+  const standardTimetableSlots = ['08:00–08:40','08:40–09:20','09:20–10:00','10:20–11:00','11:00–11:40','11:40–12:20','13:00–13:40','13:40–14:20','14:20–15:00','15:00–15:40']
+  const timetableSlots = Array.from(new Set([...standardTimetableSlots, ...timetableClassEntries.map(entry => entry.start_time + '–' + entry.end_time)])).sort()
   const timetableClass = classes.find(item => item.id === timetableClassId)
 
   return <div className="academic-workspace">
