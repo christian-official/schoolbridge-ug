@@ -1198,6 +1198,37 @@ def test_sync_change_feed_filters_parent_and_teacher_history_scopes():
         parent_mark_events = [item for item in parent_feed.json()["changes"] if item["entity_type"].startswith("Mark")]
         assert len(parent_mark_events) == 2
 
+        # Removing a relationship must still deliver an invalidation to the
+        # account that was authorised immediately before the removal.
+        with SessionLocal() as db:
+            db.get(models.User, teacher.id).permissions_json = json.dumps({"My Classes": ["view"], "My Results": ["view"]})
+            db.query(models.ParentStudentLink).filter_by(
+                user_id=parent_id, student_id=student_id
+            ).delete(synchronize_session=False)
+            db.query(models.TeacherAssignment).filter_by(
+                teacher_id=teacher.id, class_id=class_id, subject_id=subject_id
+            ).delete(synchronize_session=False)
+            db.commit()
+
+        teacher_removed = client.get(
+            f"/api/sync/changes?device_id={teacher_device}&cursor={teacher_feed.json()['next_cursor']}",
+            headers=teacher_headers,
+        )
+        parent_removed = client.get(
+            f"/api/sync/changes?device_id={parent_device}&cursor={parent_feed.json()['next_cursor']}",
+            headers=parent_headers,
+        )
+        assert teacher_removed.status_code == 200, teacher_removed.text
+        assert parent_removed.status_code == 200, parent_removed.text
+        assert any(
+            item["entity_type"] == "TeacherAssignment" and item["operation"] == "delete"
+            for item in teacher_removed.json()["changes"]
+        )
+        assert any(
+            item["entity_type"] == "ParentStudentLink" and item["operation"] == "delete"
+            for item in parent_removed.json()["changes"]
+        )
+
 
 def test_sync_change_feed_rejects_invalid_cursor_and_limit():
     reset_database()
