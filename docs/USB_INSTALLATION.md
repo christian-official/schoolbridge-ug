@@ -20,7 +20,7 @@ Never put the owner's private signing key or passphrase on the USB. Only the pub
 
 ## 2. Install on one computer without LAN or internet
 
-1. Confirm that the school computer already has a compatible Docker Engine and Compose v2 installed and running. This runtime is not yet bundled.
+1. Run `./check-school-host.ps1` from the USB package. If Docker/WSL is missing, follow [Windows runtime preparation](WINDOWS_RUNTIME_PREPARATION.md) using the installers staged in the USB `runtime` folder. This step may require administrator rights and a Windows restart.
 2. Copy the USB's `SchoolBridge-USB` folder to a local folder on the computer, such as `C:\SchoolBridge`. Do not run the database from the USB itself.
 3. Open PowerShell in that folder and run `./install-schoolbridge.ps1`.
 4. The script imports the saved images locally and creates a local `.env` with fresh random database and application secrets.
