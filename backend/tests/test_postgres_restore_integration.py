@@ -49,9 +49,19 @@ def test_fresh_postgres_install_runs_owner_activation_and_school_setup(tmp_path,
         monkeypatch.setenv("SCHOOLBRIDGE_LICENSE_PUBLIC_KEY", base64.b64encode(public_key).decode("ascii"))
         monkeypatch.setenv("SCHOOLBRIDGE_SEED_DEMO_DATA", "false")
 
-        from app.database import SessionLocal, engine
-        from app.main import app
+        import importlib
+        import app.database as database_module
+        import app.main as main_module
 
+        # Other backend tests import the application with SQLite first. Reload
+        # the database and application modules after selecting this isolated
+        # PostgreSQL URL so this integration test uses its own engine.
+        database_module.engine.dispose()
+        database_module = importlib.reload(database_module)
+        main_module = importlib.reload(main_module)
+        SessionLocal = database_module.SessionLocal
+        engine = database_module.engine
+        app = main_module.app
         application_engine = engine
         with TestClient(app) as client:
             status = client.get("/api/setup/status")
