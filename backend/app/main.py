@@ -530,7 +530,7 @@ class StudentUpdate(BaseModel):
     admission_date: date | None = None
     class_id: int | None = None
     photo_data: str | None = Field(default=None, max_length=1_800_000)
-    status: str | None = Field(default=None, pattern="^(active|transferred|dismissed|inactive)$")
+    status: str | None = Field(default=None, pattern="^(active|transferred|dismissed|inactive|graduated)$")
     academic_level: str | None = Field(default=None, pattern="^(O-Level|A-Level)$")
     combination: str | None = None
     optional_subjects: str | None = None
@@ -4906,14 +4906,14 @@ def update_student(student_id: int, data: StudentUpdate, db: Session = Depends(g
 
 @app.patch("/api/students/{student_id}/status", tags=["Students"])
 def change_student_status(student_id: int, status: str, db: Session = Depends(get_db), admin=Depends(require_admin)):
-    if status not in {"active", "transferred", "dismissed", "inactive"}:
-        raise HTTPException(422, "Status must be active, transferred, dismissed or inactive.")
+    if status not in {"active", "transferred", "dismissed", "inactive", "graduated"}:
+        raise HTTPException(422, "Status must be active, transferred, dismissed, inactive or graduated.")
     student = db.get(models.Student, student_id)
     if not student:
         raise HTTPException(404, "Student not found.")
     student.status = status
     affected_parent_accounts = 0
-    if status == "dismissed":
+    if status in {"dismissed", "graduated"}:
         links = db.query(models.ParentStudentLink).filter_by(student_id=student.id).all()
         for link in links:
             parent = db.get(models.User, link.user_id)
@@ -4933,6 +4933,52 @@ def change_student_status(student_id: int, status: str, db: Session = Depends(ge
     db.commit()
     return {"message": "Student status updated. Historical academic and financial records were retained.",
             "status": status, "parent_accounts_deactivated": affected_parent_accounts}
+
+
+class StudentPromotionRequest(BaseModel):
+    # The administrator supplies the school's actual class progression order.
+    class_order: list[int] = Field(min_length=2, max_length=40)
+
+
+@app.post("/api/students/promote", tags=["Students"])
+def promote_students(data: StudentPromotionRequest, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    if len(set(data.class_order)) != len(data.class_order):
+        raise HTTPException(422, "Each class may appear only once in the promotion order.")
+    classes = db.query(models.SchoolClass).filter(models.SchoolClass.id.in_(data.class_order)).all()
+    if len(classes) != len(data.class_order):
+        raise HTTPException(404, "One or more classes in the promotion order do not exist.")
+    promoted = 0
+    graduated = 0
+    parent_accounts_deactivated = 0
+    for index, class_id in enumerate(data.class_order):
+        students = db.query(models.Student).filter_by(class_id=class_id, status="active").all()
+        for student in students:
+            if index < len(data.class_order) - 1:
+                student.class_id = data.class_order[index + 1]
+                promoted += 1
+            else:
+                student.status = "graduated"
+                graduated += 1
+                links = db.query(models.ParentStudentLink).filter_by(student_id=student.id).all()
+                for link in links:
+                    parent = db.get(models.User, link.user_id)
+                    if not parent or parent.role != "parent":
+                        continue
+                    other_active = db.query(models.Student.id).join(
+                        models.ParentStudentLink, models.ParentStudentLink.student_id == models.Student.id
+                    ).filter(
+                        models.ParentStudentLink.user_id == parent.id,
+                        models.Student.status == "active",
+                    ).first()
+                    if not other_active and parent.is_active:
+                        parent.is_active = False
+                        parent_accounts_deactivated += 1
+    write_audit(db, admin, "students_promoted", "school", 1,
+                f"promoted={promoted}; graduated={graduated}; order={','.join(map(str, data.class_order))}")
+    db.commit()
+    return {"message": "Annual promotion completed. Final-class learners were marked as graduated.",
+            "promoted": promoted, "graduated": graduated,
+            "parent_accounts_deactivated": parent_accounts_deactivated}
 
 
 class StaffUpdate(BaseModel):
