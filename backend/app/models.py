@@ -79,7 +79,7 @@ class Exam(Base):
     year: Mapped[int] = mapped_column(Integer)
     class_id: Mapped[int | None] = mapped_column(ForeignKey("classes.id"), nullable=True, index=True)
     exam_type: Mapped[str] = mapped_column(String(40), nullable=False, default="Other", server_default="Other")
-    closed: Mapped[bool] = mapped_column(default=False, server_default="0", nullable=False)
+    closed: Mapped[bool] = mapped_column(default=False, server_default="false", nullable=False)
 
 
 class Mark(Base):
