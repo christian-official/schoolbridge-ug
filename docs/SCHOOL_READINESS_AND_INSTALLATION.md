@@ -4,15 +4,17 @@
 
 SchoolBridge is local-first. Each school has its own local database, and its frontend/backend run on the school's computer. Render is only a preview/development service. Internet is not required for installation, login or ordinary local school operations.
 
-A school can install and operate on one standalone computer with no internet, router, Wi-Fi or LAN. A local network is optional and is required only if additional devices must connect to the host. Internet may later support optional updates, remote parent access, external notifications or off-site backups; it must not be a dependency for core operations.
+A school can install and operate on one standalone computer with no internet, router, Wi-Fi or LAN. A local network is optional and is required only if additional devices must connect to the host. Internet may later support optional updates, remote parent access, external notifications or off-site backups; it must not be a dependency for core local operations.
 
-**Honest release status:** the repository has a local PostgreSQL/Compose stack and USB image-packaging scripts. The service worker caches the application shell only; complete offline record access and offline writes across all modules are not implemented. The USB package currently expects a compatible Docker Engine/Compose runtime to be pre-installed; that runtime is not bundled. A clean-machine installation with internet disconnected has not yet passed acceptance testing. Do not call this a finished turnkey offline installer.
+**Honest release status:** the repository contains a local PostgreSQL/Compose stack and USB packaging scripts. The preparation script stages the official Docker Desktop and WSL installers, verifies their signatures, builds and exports the application/database images, and generates a SHA-256 manifest. The school installation workflow uses these staged files without downloading the application images. A clean-machine installation with internet disconnected has not yet passed acceptance testing. The service worker caches the application shell only; complete offline record access and offline writes across all modules are not implemented.
 
 ## 1. Prepare the computer
 
-Planning baseline only (not formally benchmarked): supported 64-bit Windows 10/11 or Linux, 4 CPU cores, 8 GB RAM (16 GB preferred for larger schools), SSD with at least 100 GB free, reliable power and a separate encrypted backup drive.
+Current project preflight baseline: supported 64-bit Windows 10 22H2 or Windows 11 23H2 or later, at least 8 GB RAM, hardware virtualization enabled, WSL 2.1.5 or later, and a compatible Docker Desktop installation. These are project baselines, not a substitute for checking current vendor requirements and licensing.
 
-The current USB package requires Docker Engine and Compose v2 already installed and running. This is a known packaging gap. A supported offline runtime installer and clean-machine test remain required before the USB installer can be declared complete.
+On the online preparation computer, run `scripts/prepare-usb.ps1` as described in [USB installation](USB_INSTALLATION.md). It creates the complete package under `dist/SchoolBridge-USB`. Copy that entire folder to a USB drive and verify its SHA-256 manifest after copying.
+
+At the school, run `prepare-school-host.ps1` from an elevated PowerShell window. Complete Docker Desktop's interactive setup and licence acceptance, restart if requested, start Docker Desktop and wait for its engine. Run `check-school-host.ps1` and resolve all blockers before proceeding.
 
 ## 2. Information to collect from the school
 
@@ -48,9 +50,9 @@ Never share the private key or passphrase.
 
 ## 4. Install from USB
 
-Follow [USB preparation and first installation](USB_INSTALLATION.md). The intended single-computer workflow imports prebuilt images locally, configures local secrets and the owner's public key, starts the services, then completes owner activation and school setup. No LAN or internet is required for single-computer operation.
+Follow [USB preparation and first installation](USB_INSTALLATION.md). The installer verifies the package manifest, checks host readiness, creates local secrets, validates the owner's public verification key, imports the prebuilt images and starts the services after explicit operator confirmation. Copy the package to the school's local disk before running the database; do not run the database from the USB itself.
 
-Current limitation: Docker Engine/Compose must already be installed. The USB package does not yet bundle this runtime.
+The intended single-computer workflow needs no LAN or internet once the supported local runtime is ready and all package files are present.
 
 ## 5. Optional local network
 
