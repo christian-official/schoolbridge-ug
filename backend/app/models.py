@@ -79,6 +79,7 @@ class Exam(Base):
     year: Mapped[int] = mapped_column(Integer)
     class_id: Mapped[int | None] = mapped_column(ForeignKey("classes.id"), nullable=True, index=True)
     exam_type: Mapped[str] = mapped_column(String(40), nullable=False, default="Other", server_default="Other")
+    closed: Mapped[bool] = mapped_column(default=False, server_default="0", nullable=False)
 
 
 class Mark(Base):
@@ -431,3 +432,18 @@ class SchoolIdentityCorrection(Base):
     old_identity_json: Mapped[str] = mapped_column(Text, nullable=False)
     new_identity_json: Mapped[str] = mapped_column(Text, nullable=False)
     corrected_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class VisitorLog(Base):
+    __tablename__ = "visitor_logs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    visitor_name: Mapped[str] = mapped_column(String(160), nullable=False)
+    phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    organisation: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    person_to_see: Mapped[str] = mapped_column(String(160), nullable=False)
+    purpose: Mapped[str] = mapped_column(String(255), nullable=False)
+    vehicle_registration: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    checked_in_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    checked_out_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    recorded_by: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
