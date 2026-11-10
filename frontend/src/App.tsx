@@ -2314,7 +2314,7 @@ function TeacherUsersSettings({token,onSaved}:{token:string;onSaved:()=>void}) {
   const visibleOtherLogins=otherLoginSearch.trim()?otherLoginMatches:otherLoginMatches.slice(0,8)
   const presetNames=Object.keys(catalog.presets||{})
   return <section className="panel settings-panel">
-    <div className="panel-heading"><div><h2>Staff accounts & access</h2><p>Staff login details are created automatically when you register a staff member in the Staff directory.</p></div><button type="button" className="secondary-button" onClick={()=>void load()} disabled={loading||busy}>{loading?'Loading...':'Refresh'}</button></div>
+    <div className="panel-heading"><div><h2>Staff accounts & access</h2><p>Staff login accounts are created only when login access is enabled during staff registration.</p></div><button type="button" className="secondary-button" onClick={()=>void load()} disabled={loading||busy}>{loading?'Loading...':'Refresh'}</button></div>
     {error&&<div className="form-error" role="alert">{error}</div>}{message&&<div className="success-notice" role="status">{message}</div>}
     <div className="form-hint">Register employees from the Staff directory. This workspace manages access and existing accounts. Teaching staff choose their own classes, subjects and school responsibilities in My Profile.</div>
     <div className="account-management-tabs" role="tablist" aria-label="User and permission settings">
