@@ -1591,73 +1591,58 @@ def test_sync_offline_proposals_detect_conflict_and_rebase_without_applying():
         finally: db.close()
 
 
-def test_teacher_offline_marks_are_queued_then_revalidated_and_applied_by_admin():
+def test_teacher_offline_marks_are_automatically_applied_and_idempotent():
     reset_database()
-    admin = create_admin()
     teacher = create_teacher()
-    ah = {"Authorization": f"Bearer {create_access_token(admin)}"}
     th = {"Authorization": f"Bearer {create_access_token(teacher)}"}
     device = "00000000-0000-4000-8000-000000000401"
-    db = SessionLocal()
-    try:
-        user = db.get(models.User, teacher.id)
-        user.permissions_json = json.dumps({"My Results": ["view", "add", "edit"]})
+    with SessionLocal() as db:
+        db.get(models.User, teacher.id).permissions_json = json.dumps({"My Results": ["view", "add", "edit"]})
         school_class = models.SchoolClass(name="Offline S1", section="A")
         subject = models.Subject(name="Biology", school_type="Secondary")
-        db.add_all([school_class, subject])
-        db.flush()
+        db.add_all([school_class, subject]); db.flush()
         exam = models.Exam(name="Midterm", term="Term 1", year=2026, class_id=school_class.id)
         student = models.Student(admission_number="OFFLINE-MARK-1", first_name="Amina", last_name="Test", class_id=school_class.id, status="active")
-        db.add_all([exam, student])
-        db.flush()
+        db.add_all([exam, student]); db.flush()
         db.add(models.TeacherAssignment(teacher_id=teacher.id, class_id=school_class.id, subject_id=subject.id))
         db.commit()
         exam_id, subject_id, student_id = exam.id, subject.id, student.id
-    finally:
-        db.close()
     with TestClient(app) as client:
         assert client.post("/api/sync/devices", headers=th, json={"device_id": device, "device_name": "Teacher laptop"}).status_code == 200
         snapshot = client.get(f"/api/sync/marks?device_id={device}", headers=th)
-        assert snapshot.status_code == 200, snapshot.text
-        base = snapshot.json()["snapshot_sequence"]
         body = {"device_id": device, "idempotency_key": "teacher-offline-marks-0001",
-                "exam_id": exam_id, "subject_id": subject_id, "base_sequence": base,
+                "exam_id": exam_id, "subject_id": subject_id,
+                "base_sequence": snapshot.json()["snapshot_sequence"],
                 "records": [{"student_id": student_id, "score": 87}]}
-        queued = client.post("/api/sync/teacher-mark-proposals", headers=th, json=body)
-        assert queued.status_code == 200, queued.text
-        assert queued.json()["applied"] is False
+        applied = client.post("/api/sync/teacher-mark-proposals", headers=th, json=body)
+        assert applied.status_code == 200, applied.text
+        assert applied.json()["status"] == "applied"
+        assert applied.json()["applied"] is True and applied.json()["saved"] == 1
+        repeated = client.post("/api/sync/teacher-mark-proposals", headers=th, json=body)
+        assert repeated.status_code == 200
+        assert repeated.json()["duplicate"] is True and repeated.json()["applied"] is True
         mine = client.get("/api/sync/teacher-mark-proposals/mine", headers=th)
         assert mine.status_code == 200
-        assert mine.json()["proposals"][0]["id"] == queued.json()["proposal_id"]
+        assert mine.json()["proposals"][0]["status"] == "applied"
         assert "payload" not in mine.json()["proposals"][0]
-        assert client.get("/api/sync/teacher-mark-proposals/mine", headers=ah).status_code == 403
+        assert client.get("/api/sync/teacher-mark-proposals/mine", headers={"Authorization": f"Bearer {create_access_token(create_admin())}"}).status_code == 403
+        assert client.get("/api/sync/teacher-mark-proposals", headers=th).status_code == 404
+        assert client.post("/api/sync/teacher-mark-proposals/1/apply", headers=th).status_code == 404
         with SessionLocal() as check:
-            submission_audit = check.query(models.AuditLog).filter_by(
-                action="offline_teacher_marks_submitted"
-            ).order_by(models.AuditLog.id.desc()).first()
-            assert submission_audit.entity_id == queued.json()["proposal_id"]
-        assert client.post("/api/sync/teacher-mark-proposals", headers=th, json=body).json()["duplicate"] is True
-        with SessionLocal() as check:
-            assert check.query(models.Mark).filter_by(student_id=student_id, exam_id=exam_id, subject_id=subject_id).first() is None
-        listed = client.get("/api/sync/teacher-mark-proposals", headers=ah)
-        assert listed.status_code == 200 and listed.json()["proposals"][0]["teacher_id"] == teacher.id
-        applied = client.post(f"/api/sync/teacher-mark-proposals/{queued.json()['proposal_id']}/apply", headers=ah)
-        assert applied.status_code == 200, applied.text
-        assert applied.json()["saved"] == 1
-        with SessionLocal() as check:
-            mark = check.query(models.Mark).filter_by(student_id=student_id, exam_id=exam_id, subject_id=subject_id).one()
-            assert mark.score == 87 and mark.verified is False
+            marks = check.query(models.Mark).filter_by(student_id=student_id, exam_id=exam_id, subject_id=subject_id).all()
+            assert len(marks) == 1 and marks[0].score == 87 and marks[0].verified is False
+            audit = check.query(models.AuditLog).filter_by(action="offline_teacher_marks_auto_applied").one()
+            assert audit.entity_type == "sync_change_proposal"
 
 
-def test_teacher_offline_marks_rejected_when_assignment_is_removed_before_approval():
+def test_teacher_offline_marks_reject_current_assignment_or_permission_failures():
     reset_database()
-    admin = create_admin()
     teacher = create_teacher()
-    ah = {"Authorization": f"Bearer {create_access_token(admin)}"}
     th = {"Authorization": f"Bearer {create_access_token(teacher)}"}
     device = "00000000-0000-4000-8000-000000000402"
     with SessionLocal() as db:
-        db.get(models.User, teacher.id).permissions_json = json.dumps({"My Results": ["view", "add"]})
+        user = db.get(models.User, teacher.id)
+        user.permissions_json = json.dumps({"My Results": ["view", "add"]})
         school_class = models.SchoolClass(name="Offline S2", section="A")
         subject = models.Subject(name="Chemistry", school_type="Secondary")
         db.add_all([school_class, subject]); db.flush()
@@ -1670,120 +1655,26 @@ def test_teacher_offline_marks_rejected_when_assignment_is_removed_before_approv
     with TestClient(app) as client:
         client.post("/api/sync/devices", headers=th, json={"device_id": device, "device_name": "Teacher laptop"})
         snapshot = client.get(f"/api/sync/marks?device_id={device}", headers=th)
-        base = snapshot.json()["snapshot_sequence"]
-        queued = client.post("/api/sync/teacher-mark-proposals", headers=th, json={
-            "device_id": device, "idempotency_key": "teacher-offline-marks-0002",
-            "exam_id": exam_id, "subject_id": subject_id, "base_sequence": base,
-            "records": [{"student_id": student_id, "score": 76}],
-        })
-        assert queued.status_code == 200, queued.text
+        body = {"device_id": device, "idempotency_key": "teacher-offline-marks-0002",
+                "exam_id": exam_id, "subject_id": subject_id,
+                "base_sequence": snapshot.json()["snapshot_sequence"],
+                "records": [{"student_id": student_id, "score": 76}]}
         with SessionLocal() as db:
             db.delete(db.get(models.TeacherAssignment, assignment_id)); db.commit()
-        rejected = client.post(f"/api/sync/teacher-mark-proposals/{queued.json()['proposal_id']}/apply", headers=ah)
-        assert rejected.status_code == 409
+        rejected = client.post("/api/sync/teacher-mark-proposals", headers=th, json=body)
+        assert rejected.status_code == 403
         with SessionLocal() as db:
             assert db.query(models.Mark).filter_by(student_id=student_id, exam_id=exam_id, subject_id=subject_id).first() is None
-            proposal = db.get(models.SyncChangeProposal, queued.json()["proposal_id"])
-            assert proposal.status == "rejected"
-
-
-
-def test_offline_teacher_marks_rejected_when_result_permission_is_removed_before_approval():
-    reset_database()
-    admin = create_admin()
-    teacher = create_teacher()
-    ah = {"Authorization": f"Bearer {create_access_token(admin)}"}
-    th = {"Authorization": f"Bearer {create_access_token(teacher)}"}
-    device = "00000000-0000-4000-8000-000000000406"
-    with SessionLocal() as db:
-        user = db.get(models.User, teacher.id)
-        user.permissions_json = json.dumps({"My Results": ["view", "add"]})
-        school_class = models.SchoolClass(name="Offline S6", section="A")
-        subject = models.Subject(name="History", school_type="Secondary")
-        db.add_all([school_class, subject]); db.flush()
-        exam = models.Exam(name="Final", term="Term 3", year=2026, class_id=school_class.id)
-        student = models.Student(admission_number="OFFLINE-MARK-6", first_name="Peter", last_name="Test", class_id=school_class.id, status="active")
-        db.add_all([exam, student]); db.flush()
-        db.add(models.TeacherAssignment(teacher_id=teacher.id, class_id=school_class.id, subject_id=subject.id))
-        db.commit()
-        exam_id, subject_id, student_id = exam.id, subject.id, student.id
-    with TestClient(app) as client:
-        assert client.post("/api/sync/devices", headers=th, json={"device_id": device, "device_name": "Teacher laptop"}).status_code == 200
-        snapshot = client.get(f"/api/sync/marks?device_id={device}", headers=th)
-        assert snapshot.status_code == 200, snapshot.text
-        queued = client.post("/api/sync/teacher-mark-proposals", headers=th, json={
-            "device_id": device, "idempotency_key": "teacher-offline-marks-0006",
-            "exam_id": exam_id, "subject_id": subject_id,
-            "base_sequence": snapshot.json()["snapshot_sequence"],
-            "records": [{"student_id": student_id, "score": 81}],
-        })
-        assert queued.status_code == 200, queued.text
-        with SessionLocal() as db:
             db.get(models.User, teacher.id).permissions_json = json.dumps({"My Results": ["view"]})
             db.commit()
-        rejected = client.post(f"/api/sync/teacher-mark-proposals/{queued.json()['proposal_id']}/apply", headers=ah)
-        assert rejected.status_code == 409
-        with SessionLocal() as db:
-            assert db.query(models.Mark).filter_by(student_id=student_id, exam_id=exam_id, subject_id=subject_id).first() is None
-            proposal = db.get(models.SyncChangeProposal, queued.json()["proposal_id"])
-            assert proposal.status == "rejected"
-            assert proposal.resolution == "reject_permission_changed"
-            audit = db.query(models.AuditLog).filter_by(action="offline_teacher_marks_rejected").order_by(models.AuditLog.id.desc()).first()
-            assert audit is not None
+        body["idempotency_key"] = "teacher-offline-marks-0003"
+        rejected_permission = client.post("/api/sync/teacher-mark-proposals", headers=th, json=body)
+        assert rejected_permission.status_code == 403
 
 
-def test_offline_teacher_marks_require_add_or_edit_permission_for_each_record():
+def test_teacher_offline_marks_reject_revoked_devices_and_locked_results():
     reset_database()
     teacher = create_teacher()
-    th = {"Authorization": f"Bearer {create_access_token(teacher)}"}
-    device = "00000000-0000-4000-8000-000000000407"
-    with SessionLocal() as db:
-        user = db.get(models.User, teacher.id)
-        user.permissions_json = json.dumps({"My Results": ["view", "edit"]})
-        school_class = models.SchoolClass(name="Offline S7", section="A")
-        subject = models.Subject(name="Literature", school_type="Secondary")
-        db.add_all([school_class, subject]); db.flush()
-        exam = models.Exam(name="Practice", term="Term 1", year=2026, class_id=school_class.id)
-        student = models.Student(admission_number="OFFLINE-MARK-7", first_name="Martha", last_name="Test", class_id=school_class.id, status="active")
-        db.add_all([exam, student]); db.flush()
-        db.add(models.TeacherAssignment(teacher_id=teacher.id, class_id=school_class.id, subject_id=subject.id))
-        db.commit()
-        exam_id, subject_id, student_id = exam.id, subject.id, student.id
-    with TestClient(app) as client:
-        assert client.post("/api/sync/devices", headers=th, json={"device_id": device, "device_name": "Teacher laptop"}).status_code == 200
-        snapshot = client.get(f"/api/sync/marks?device_id={device}", headers=th)
-        assert snapshot.status_code == 200, snapshot.text
-        new_mark = client.post("/api/sync/teacher-mark-proposals", headers=th, json={
-            "device_id": device, "idempotency_key": "teacher-offline-marks-0007",
-            "exam_id": exam_id, "subject_id": subject_id,
-            "base_sequence": snapshot.json()["snapshot_sequence"],
-            "records": [{"student_id": student_id, "score": 68}],
-        })
-        assert new_mark.status_code == 403
-
-        with SessionLocal() as db:
-            user = db.get(models.User, teacher.id)
-            user.permissions_json = json.dumps({"My Results": ["view", "add"]})
-            mark = models.Mark(student_id=student_id, subject_id=subject_id, exam_id=exam_id, score=40)
-            db.add(mark); db.commit()
-            mark_id = mark.id
-        fresh_snapshot = client.get(f"/api/sync/marks?device_id={device}", headers=th)
-        assert fresh_snapshot.status_code == 200, fresh_snapshot.text
-        edit_mark = client.post("/api/sync/teacher-mark-proposals", headers=th, json={
-            "device_id": device, "idempotency_key": "teacher-offline-marks-0008",
-            "exam_id": exam_id, "subject_id": subject_id,
-            "base_sequence": fresh_snapshot.json()["snapshot_sequence"],
-            "base_mark_ids": {str(student_id): mark_id},
-            "records": [{"student_id": student_id, "score": 72}],
-        })
-        assert edit_mark.status_code == 403
-
-
-def test_offline_teacher_mark_proposal_is_rejected_if_its_device_is_revoked():
-    reset_database()
-    admin = create_admin()
-    teacher = create_teacher()
-    ah = {"Authorization": f"Bearer {create_access_token(admin)}"}
     th = {"Authorization": f"Bearer {create_access_token(teacher)}"}
     device = "00000000-0000-4000-8000-000000000408"
     with SessionLocal() as db:
@@ -1798,32 +1689,29 @@ def test_offline_teacher_mark_proposal_is_rejected_if_its_device_is_revoked():
         db.commit()
         exam_id, subject_id, student_id = exam.id, subject.id, student.id
     with TestClient(app) as client:
-        assert client.post("/api/sync/devices", headers=th, json={"device_id": device, "device_name": "Teacher laptop"}).status_code == 200
+        client.post("/api/sync/devices", headers=th, json={"device_id": device, "device_name": "Teacher laptop"})
         snapshot = client.get(f"/api/sync/marks?device_id={device}", headers=th)
-        queued = client.post("/api/sync/teacher-mark-proposals", headers=th, json={
-            "device_id": device, "idempotency_key": "teacher-offline-marks-0009",
-            "exam_id": exam_id, "subject_id": subject_id,
-            "base_sequence": snapshot.json()["snapshot_sequence"],
-            "records": [{"student_id": student_id, "score": 79}],
-        })
-        assert queued.status_code == 200, queued.text
+        body = {"device_id": device, "idempotency_key": "teacher-offline-marks-0009",
+                "exam_id": exam_id, "subject_id": subject_id,
+                "base_sequence": snapshot.json()["snapshot_sequence"],
+                "records": [{"student_id": student_id, "score": 79}]}
         with SessionLocal() as db:
             registered = db.query(models.SyncDevice).filter_by(user_id=teacher.id, device_id=device).one()
             registered.revoked_at = datetime.utcnow()
             db.commit()
-        rejected = client.post(f"/api/sync/teacher-mark-proposals/{queued.json()['proposal_id']}/apply", headers=ah)
-        assert rejected.status_code == 409
+        assert client.post("/api/sync/teacher-mark-proposals", headers=th, json=body).status_code == 403
         with SessionLocal() as db:
-            assert db.query(models.Mark).filter_by(student_id=student_id, exam_id=exam_id, subject_id=subject_id).first() is None
-            proposal = db.get(models.SyncChangeProposal, queued.json()["proposal_id"])
-            assert proposal.status == "rejected"
-            assert proposal.resolution == "reject_device_revoked"
+            registered = db.query(models.SyncDevice).filter_by(user_id=teacher.id, device_id=device).one()
+            registered.revoked_at = None
+            db.add(models.Mark(student_id=student_id, subject_id=subject_id, exam_id=exam_id, score=79, verified=True))
+            db.commit()
+        body["idempotency_key"] = "teacher-offline-marks-0010"
+        assert client.post("/api/sync/teacher-mark-proposals", headers=th, json=body).status_code == 409
 
-def test_offline_teacher_marks_detect_deleted_baseline_mark_as_conflict():
+
+def test_teacher_offline_marks_detect_baseline_conflicts_without_overwriting():
     reset_database()
-    admin = create_admin()
     teacher = create_teacher()
-    ah = {"Authorization": f"Bearer {create_access_token(admin)}"}
     th = {"Authorization": f"Bearer {create_access_token(teacher)}"}
     device = "00000000-0000-4000-8000-000000000403"
     with SessionLocal() as db:
@@ -1842,52 +1730,19 @@ def test_offline_teacher_marks_detect_deleted_baseline_mark_as_conflict():
         client.post("/api/sync/devices", headers=th, json={"device_id": device, "device_name": "Teacher laptop"})
         snapshot = client.get(f"/api/sync/marks?device_id={device}", headers=th)
         base = snapshot.json()["snapshot_sequence"]
-        queued = client.post("/api/sync/teacher-mark-proposals", headers=th, json={
-            "device_id": device, "idempotency_key": "teacher-offline-marks-0003",
+        with SessionLocal() as db:
+            db.delete(db.get(models.Mark, mark_id)); db.commit()
+        response = client.post("/api/sync/teacher-mark-proposals", headers=th, json={
+            "device_id": device, "idempotency_key": "teacher-offline-marks-0004",
             "exam_id": exam_id, "subject_id": subject_id, "base_sequence": base,
             "base_mark_ids": {str(student_id): mark_id},
             "records": [{"student_id": student_id, "score": 80}],
         })
-        assert queued.status_code == 200 and queued.json()["status"] == "pending_review"
-        with SessionLocal() as db:
-            db.delete(db.get(models.Mark, mark_id)); db.commit()
-        rejected = client.post(f"/api/sync/teacher-mark-proposals/{queued.json()['proposal_id']}/apply", headers=ah)
-        assert rejected.status_code == 409
+        assert response.status_code == 200 and response.json()["status"] == "conflict"
+        assert response.json()["applied"] is False
         with SessionLocal() as db:
             assert db.query(models.Mark).filter_by(student_id=student_id, exam_id=exam_id, subject_id=subject_id).first() is None
-            proposal = db.get(models.SyncChangeProposal, queued.json()["proposal_id"])
-            assert proposal.status == "conflict"
-
-
-def test_offline_teacher_marks_detect_a_mark_created_and_deleted_after_snapshot():
-    reset_database()
-    admin = create_admin()
-    teacher = create_teacher()
-    th = {"Authorization": f"Bearer {create_access_token(teacher)}"}
-    device = "00000000-0000-4000-8000-000000000405"
-    with SessionLocal() as db:
-        db.get(models.User, teacher.id).permissions_json = json.dumps({"My Results": ["view", "add"]})
-        school_class = models.SchoolClass(name="Offline S5", section="A")
-        subject = models.Subject(name="Geography", school_type="Secondary")
-        db.add_all([school_class, subject]); db.flush()
-        exam = models.Exam(name="Midterm", term="Term 2", year=2026, class_id=school_class.id)
-        student = models.Student(admission_number="OFFLINE-MARK-5", first_name="Rita", last_name="Test", class_id=school_class.id, status="active")
-        db.add_all([exam, student]); db.flush()
-        db.add(models.TeacherAssignment(teacher_id=teacher.id, class_id=school_class.id, subject_id=subject.id))
-        db.commit()
-        exam_id, subject_id, student_id = exam.id, subject.id, student.id
-    with TestClient(app) as client:
-        client.post("/api/sync/devices", headers=th, json={"device_id": device, "device_name": "Teacher laptop"})
-        snapshot = client.get(f"/api/sync/marks?device_id={device}", headers=th)
-        base = snapshot.json()["snapshot_sequence"]
-        with SessionLocal() as db:
-            transient = models.Mark(student_id=student_id, subject_id=subject_id, exam_id=exam_id, score=30)
-            db.add(transient); db.commit()
-            db.delete(db.get(models.Mark, transient.id)); db.commit()
-        queued = client.post("/api/sync/teacher-mark-proposals", headers=th, json={
-            "device_id": device, "idempotency_key": "teacher-offline-marks-0005",
-            "exam_id": exam_id, "subject_id": subject_id, "base_sequence": base,
-            "records": [{"student_id": student_id, "score": 90}],
-        })
-        assert queued.status_code == 200
-        assert queued.json()["status"] == "conflict"
+            row = db.get(models.SyncChangeProposal, response.json()["proposal_id"])
+            assert row.status == "conflict" and row.resolution == "system_conflict"
+            audit = db.query(models.AuditLog).filter_by(action="offline_teacher_marks_rejected").one()
+            assert audit is not None

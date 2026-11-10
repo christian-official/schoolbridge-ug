@@ -1674,17 +1674,17 @@ function TeacherWorkspace({token,active,userId}:{token:string;active:string;user
       if(!currentDraftIsOpen)throw new Error('Unlock the saved draft and check its scores before submitting it.')
       const currentRecords:{student_id:number;score:number}[]=resultStudents.map(student=>({student_id:student.id,score:resultScores[student.id]===undefined||resultScores[student.id].trim()===''?0:Number(resultScores[student.id])}))
       if(currentRecords.some(record=>!Number.isFinite(record.score)||record.score<0||record.score>100))throw new Error('Every score must be between 0 and 100.')
-      const result=await api<{proposal_id:number;status:string;duplicate:boolean}>('sync/teacher-mark-proposals',token,{method:'POST',body:JSON.stringify({
+      const result=await api<{proposal_id:number;status:string;duplicate:boolean;applied:boolean;saved:number}>('sync/teacher-mark-proposals',token,{method:'POST',body:JSON.stringify({
         device_id:draft.device_id,idempotency_key:draft.idempotency_key,exam_id:draft.exam.id,
         subject_id:draft.subject_id,base_sequence:draft.base_sequence,base_mark_ids:draft.base_mark_ids||{},records:currentRecords,
       })})
-      if(result.status==='conflict'){
+      if(result.status==='conflict'||!result.applied){
         setOfflineDraftMessage('Proposal #'+result.proposal_id+' has a conflict. Your encrypted draft was kept. Refresh the baseline, review the retained scores, save a new encrypted draft, then submit again.')
         await refreshTeacherOfflineProposals()
       }else{
         await deleteEncryptedOfflineDraft(userId,deviceId)
         setOfflineDraftUnlocked(false)
-        setOfflineDraftMessage('Offline marks #'+result.proposal_id+' were automatically applied by the system. '+(result.saved||0)+' marks were saved and remain unverified for normal academic verification.')
+        setOfflineDraftMessage(result.applied?'Offline marks #'+result.proposal_id+' were automatically applied by the system. '+(result.saved||0)+' marks were saved and remain unverified for normal academic verification.':'Offline marks #'+result.proposal_id+' were not applied because a conflict was detected. Your encrypted draft was kept. Refresh the baseline, review the scores, and save a new draft before resubmitting.')
         setOfflinePassphrase('')
         await refreshTeacherOfflineProposals()
       }
