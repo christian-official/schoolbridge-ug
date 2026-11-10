@@ -168,45 +168,66 @@ def test_sync_change_journal_migrates_historical_scope_column(tmp_path):
 
 def test_legacy_school_with_users_is_grandfathered_by_setup_migration(tmp_path):
     import json
-    from sqlalchemy import create_engine, select
+    import sqlite3
 
     database_path = tmp_path / "legacy-active-school.sqlite3"
     database_url = f"sqlite:///{database_path}"
-    engine = create_engine(database_url)
-    users = Base.metadata.tables["users"]
-    profile = Base.metadata.tables["school_profile"]
-    users.create(bind=engine)
-    profile.create(bind=engine)
-    with engine.begin() as connection:
-        connection.execute(users.insert().values(
-            username="legacy-admin",
-            email="legacy-admin@example.invalid",
-            hashed_password="existing-password-hash",
-            role="admin",
-            is_active=True,
-        ))
-        connection.execute(profile.insert().values(
-            id=1, name="Legacy Academy", school_type="Secondary",
-            country="Uganda", school_structure="Boarding",
-        ))
-    engine.dispose()
+    connection = sqlite3.connect(database_path)
+    try:
+        # Model an older deployed schema so forward migrations, rather than
+        # create_all, add the newer user and profile columns.
+        connection.execute("""
+            CREATE TABLE users (
+                id INTEGER PRIMARY KEY,
+                username VARCHAR(80) NOT NULL UNIQUE,
+                email VARCHAR(150) NOT NULL UNIQUE,
+                hashed_password VARCHAR(255) NOT NULL,
+                role VARCHAR(20) NOT NULL DEFAULT 'teacher',
+                is_active BOOLEAN NOT NULL DEFAULT 1
+            )
+        """)
+        connection.execute("""
+            CREATE TABLE school_profile (
+                id INTEGER PRIMARY KEY,
+                name VARCHAR(160) NOT NULL,
+                address VARCHAR(255),
+                phone VARCHAR(40),
+                email VARCHAR(150),
+                motto VARCHAR(200),
+                school_type VARCHAR(20) NOT NULL DEFAULT 'Secondary'
+            )
+        """)
+        connection.execute(
+            "INSERT INTO users (id, username, email, hashed_password, role, is_active) VALUES (1, ?, ?, ?, ?, 1)",
+            ("legacy-admin", "legacy-admin@example.invalid", "existing-password-hash", "admin"),
+        )
+        connection.execute(
+            "INSERT INTO school_profile (id, name, school_type) VALUES (1, ?, ?)",
+            ("Legacy Academy", "Secondary"),
+        )
+        connection.commit()
+    finally:
+        connection.close()
 
     upgrade_database(database_url)
 
-    engine = create_engine(database_url)
-    with engine.connect() as connection:
-        state = connection.execute(select(
-            Base.metadata.tables["school_setup_state"]
-        )).mappings().one()
-        identity = json.loads(state["original_identity_json"])
-        existing_user = connection.execute(select(users.c.username)).scalar_one()
-    engine.dispose()
+    connection = sqlite3.connect(database_path)
+    try:
+        state = connection.execute(
+            "SELECT activated_at, setup_completed_at, activation_license_hash, original_identity_json FROM school_setup_state WHERE id=1"
+        ).fetchone()
+        existing_user = connection.execute(
+            "SELECT username FROM users WHERE id=1"
+        ).fetchone()[0]
+    finally:
+        connection.close()
 
+    identity = json.loads(state[3])
     assert existing_user == "legacy-admin"
-    assert state["setup_completed_at"] is not None
-    assert state["activated_at"] is not None
-    assert state["activation_license_hash"] is None
+    assert state[0] is not None
+    assert state[1] is not None
+    assert state[2] is None
     assert identity["school_name"] == "Legacy Academy"
     assert identity["school_type"] == "Secondary"
-    assert identity["country"] == "Uganda"
-    assert identity["school_structure"] == "Boarding"
+    assert identity["country"] is None
+    assert identity["school_structure"] is None
