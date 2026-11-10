@@ -20,7 +20,7 @@ def test_owner_license_cli_generates_protected_key_and_signs_activation(tmp_path
             "--private-key", str(private_key_path),
             "--public-key", str(public_key_path),
         ],
-        check=True, capture_output=True, text=True,
+        check=True, capture_output=True, text=True, input="a-very-strong-test-passphrase-123\\na-very-strong-test-passphrase-123\\n",
     )
     assert private_key_path.is_file()
     assert public_key_path.is_file()
@@ -36,7 +36,7 @@ def test_owner_license_cli_generates_protected_key_and_signs_activation(tmp_path
             "--installation-id", "test-installation-123",
             "--license-id", "owner-cli-test-001",
         ],
-        check=True, capture_output=True, text=True,
+        check=True, capture_output=True, text=True, input="a-very-strong-test-passphrase-123\\n",
     )
     token = signed.stdout.strip().splitlines()[-1]
     assert token.startswith("CHRISTIAN:")
@@ -66,7 +66,7 @@ def test_owner_license_cli_generates_protected_key_and_signs_activation(tmp_path
             "--country", "Uganda",
             "--school-structure", "Both",
         ],
-        check=True, capture_output=True, text=True,
+        check=True, capture_output=True, text=True, input="a-very-strong-test-passphrase-123\\n",
     )
     correction_token = correction.stdout.strip().splitlines()[-1]
     assert correction_token.startswith("CHRISTIAN:")
