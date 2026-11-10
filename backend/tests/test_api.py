@@ -13,6 +13,7 @@ from sqlalchemy import func
 
 from app.database import Base, engine, SessionLocal
 from app.main import app, create_access_token, password_hash
+from app import main as main_module
 from app import models
 
 
@@ -1970,3 +1971,29 @@ def test_offline_attendance_batch_rejects_revoked_device_and_removed_class_assig
             db.commit()
         body["idempotency_key"] = "offline-attendance-0004"
         assert client.post("/api/sync/attendance-batches", headers=headers, json=body).status_code == 403
+
+
+
+def test_offline_snapshot_pages_reject_records_changed_during_download(monkeypatch):
+    reset_database()
+    admin = create_admin()
+    headers = {"Authorization": f"Bearer {create_access_token(admin)}"}
+    device_id = "00000000-0000-4000-8000-000000000399"
+
+    with TestClient(app) as client:
+        registered = client.post(
+            "/api/sync/devices", headers=headers,
+            json={"device_id": device_id, "device_name": "Snapshot consistency test"},
+        )
+        assert registered.status_code == 200
+
+        endpoints = ("students", "classes", "attendance", "exams", "marks", "fees")
+        for endpoint in endpoints:
+            sequence = iter((10, 11))
+            monkeypatch.setattr(main_module, "_sync_snapshot_sequence", lambda db, values=sequence: next(values))
+            response = client.get(
+                "/api/sync/" + endpoint + "?device_id=" + device_id,
+                headers=headers,
+            )
+            assert response.status_code == 409, (endpoint, response.text)
+            assert "changed while this snapshot page" in response.json()["detail"]

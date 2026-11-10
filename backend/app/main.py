@@ -2291,6 +2291,11 @@ def resolve_sync_change_proposal(proposal_id: int, data: SyncChangeProposalResol
     return {"proposal_id":row.id,"status":row.status,"base_sequence":row.base_sequence,"resolution":row.resolution,"applied":False}
 
 
+def _sync_snapshot_sequence(db: Session) -> int:
+    """Read the journal high-water mark used to validate one snapshot page."""
+    return db.query(func.max(models.SyncChange.id)).scalar() or 0
+
+
 @app.get("/api/sync/students", tags=["Offline Synchronisation"])
 def list_sync_student_snapshot(
     device_id: UUID,
@@ -2305,6 +2310,7 @@ def list_sync_student_snapshot(
     ).first()
     if device is None or device.revoked_at is not None:
         raise HTTPException(403, "An active registered device is required.")
+    snapshot_start_sequence = _sync_snapshot_sequence(db)
 
     query = db.query(models.Student)
     scope = None
@@ -2365,7 +2371,9 @@ def list_sync_student_snapshot(
         }
         for row in rows
     ]
-    snapshot_sequence = db.query(func.max(models.SyncChange.id)).scalar() or 0
+    snapshot_sequence = _sync_snapshot_sequence(db)
+    if snapshot_sequence != snapshot_start_sequence:
+        raise HTTPException(409, "School records changed while this snapshot page was being prepared. Retry the download.")
     device.last_issued_sequence = max(device.last_issued_sequence, snapshot_sequence)
     device.last_seen_at = datetime.utcnow()
     db.commit()
@@ -2392,6 +2400,7 @@ def list_sync_class_snapshot(
     ).first()
     if device is None or device.revoked_at is not None:
         raise HTTPException(403, "An active registered device is required.")
+    snapshot_start_sequence = _sync_snapshot_sequence(db)
 
     query = db.query(models.SchoolClass)
     scope = None
@@ -2442,7 +2451,9 @@ def list_sync_class_snapshot(
         {"id": row.id, "name": row.name, "section": row.section}
         for row in rows
     ]
-    snapshot_sequence = db.query(func.max(models.SyncChange.id)).scalar() or 0
+    snapshot_sequence = _sync_snapshot_sequence(db)
+    if snapshot_sequence != snapshot_start_sequence:
+        raise HTTPException(409, "School records changed while this snapshot page was being prepared. Retry the download.")
     device.last_issued_sequence = max(device.last_issued_sequence, snapshot_sequence)
     device.last_seen_at = datetime.utcnow()
     db.commit()
@@ -2501,6 +2512,7 @@ def list_sync_attendance_snapshot(
 ):
     """Return minimal attendance records visible to this account."""
     device = _sync_active_device(db, user, device_id)
+    snapshot_start_sequence = _sync_snapshot_sequence(db)
     query = db.query(models.Attendance).join(
         models.Student, models.Student.id == models.Attendance.student_id
     )
@@ -2536,7 +2548,9 @@ def list_sync_attendance_snapshot(
          "attendance_date": row.attendance_date, "status": row.status}
         for row in rows
     ]
-    snapshot_sequence = db.query(func.max(models.SyncChange.id)).scalar() or 0
+    snapshot_sequence = _sync_snapshot_sequence(db)
+    if snapshot_sequence != snapshot_start_sequence:
+        raise HTTPException(409, "School records changed while this snapshot page was being prepared. Retry the download.")
     device.last_issued_sequence = max(device.last_issued_sequence, snapshot_sequence)
     db.commit()
     return {"attendance": payload, "scope": scope, "snapshot_sequence": snapshot_sequence,
@@ -2553,6 +2567,7 @@ def list_sync_exam_snapshot(
 ):
     """Return exam metadata for classes the account is allowed to see."""
     device = _sync_active_device(db, user, device_id)
+    snapshot_start_sequence = _sync_snapshot_sequence(db)
     query = db.query(models.Exam)
     scope = None
     if user.role == "admin":
@@ -2588,7 +2603,9 @@ def list_sync_exam_snapshot(
          "class_id": row.class_id, "exam_type": row.exam_type}
         for row in rows
     ]
-    snapshot_sequence = db.query(func.max(models.SyncChange.id)).scalar() or 0
+    snapshot_sequence = _sync_snapshot_sequence(db)
+    if snapshot_sequence != snapshot_start_sequence:
+        raise HTTPException(409, "School records changed while this snapshot page was being prepared. Retry the download.")
     device.last_issued_sequence = max(device.last_issued_sequence, snapshot_sequence)
     db.commit()
     return {"exams": payload, "scope": scope, "snapshot_sequence": snapshot_sequence,
@@ -2605,6 +2622,7 @@ def list_sync_mark_snapshot(
 ):
     """Return marks restricted by student, class, subject and verification scope."""
     device = _sync_active_device(db, user, device_id)
+    snapshot_start_sequence = _sync_snapshot_sequence(db)
     query = db.query(models.Mark).join(
         models.Student, models.Student.id == models.Mark.student_id
     )
@@ -2650,7 +2668,9 @@ def list_sync_mark_snapshot(
          "exam_id": row.exam_id, "score": row.score, "verified": row.verified}
         for row in rows
     ]
-    snapshot_sequence = db.query(func.max(models.SyncChange.id)).scalar() or 0
+    snapshot_sequence = _sync_snapshot_sequence(db)
+    if snapshot_sequence != snapshot_start_sequence:
+        raise HTTPException(409, "School records changed while this snapshot page was being prepared. Retry the download.")
     device.last_issued_sequence = max(device.last_issued_sequence, snapshot_sequence)
     db.commit()
     return {"marks": payload, "scope": scope, "snapshot_sequence": snapshot_sequence,
@@ -2669,6 +2689,7 @@ def list_sync_fee_snapshot(
 ):
     """Return fee records only for linked children or authorised finance staff."""
     device = _sync_active_device(db, user, device_id)
+    snapshot_start_sequence = _sync_snapshot_sequence(db)
     is_parent = user.role == "parent"
     if user.role == "admin":
         scope = "school"
@@ -2736,7 +2757,9 @@ def list_sync_fee_snapshot(
          "day_amount": row.day_amount}
         for row in class_fees
     ]
-    snapshot_sequence = db.query(func.max(models.SyncChange.id)).scalar() or 0
+    snapshot_sequence = _sync_snapshot_sequence(db)
+    if snapshot_sequence != snapshot_start_sequence:
+        raise HTTPException(409, "School records changed while this snapshot page was being prepared. Retry the download.")
     device.last_issued_sequence = max(device.last_issued_sequence, snapshot_sequence)
     db.commit()
     return {
