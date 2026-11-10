@@ -2398,6 +2398,8 @@ def _sync_change_visible_to_user(row, user):
                 return "view" in permissions.get("My Classes", set())
             if entity == "TimetableEntry":
                 return "view" in permissions.get("Timetable", set())
+        if entity in {"FeeCharge", "FeePayment", "ClassFee"}:
+            return "view" in permissions.get("Fees & Finance", set())
         return entity in {"Student", "SchoolClass"} and "view" in permissions.get("Students", set())
     section_by_entity = {
         "Student":"Students","SchoolClass":"Students","StaffMember":"Staff",
