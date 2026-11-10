@@ -1626,7 +1626,7 @@ def test_teacher_offline_marks_are_automatically_applied_and_idempotent():
         assert mine.json()["proposals"][0]["status"] == "applied"
         assert "payload" not in mine.json()["proposals"][0]
         assert client.get("/api/sync/teacher-mark-proposals/mine", headers={"Authorization": f"Bearer {create_access_token(create_admin())}"}).status_code == 403
-        assert client.get("/api/sync/teacher-mark-proposals", headers=th).status_code == 404
+        assert client.get("/api/sync/teacher-mark-proposals", headers=th).status_code == 405
         assert client.post("/api/sync/teacher-mark-proposals/1/apply", headers=th).status_code == 404
         with SessionLocal() as check:
             marks = check.query(models.Mark).filter_by(student_id=student_id, exam_id=exam_id, subject_id=subject_id).all()
