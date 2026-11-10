@@ -233,6 +233,7 @@ jobs:
             grep -q 'Get-FileHash' scripts/install-schoolbridge.ps1
             grep -q 'SHA256SUMS.txt' docs/USB_INSTALLATION.md
             test -s docs/USB_INSTALLATION.md
+            test -s docs/SCHOOL_DATA_ISOLATION.md
             grep -q 'proxy_pass http://backend:8001' frontend/nginx.conf
             grep -q 'SCHOOLBRIDGE_LICENSE_PUBLIC_KEY' scripts/install-schoolbridge.ps1
             python3 - \<<'PY'
@@ -287,7 +288,7 @@ jobs:
             cp /tmp/schoolbridge-images.tar "$pkg/schoolbridge-images.tar"
             cp /tmp/schoolbridge-usb/docker-compose.yml "$pkg/docker-compose.yml"
             cp scripts/install-schoolbridge.ps1 scripts/check-school-host.ps1 scripts/prepare-school-host.ps1 "$pkg/"
-            cp docs/USB_INSTALLATION.md docs/WINDOWS_RUNTIME_PREPARATION.md docs/SCHOOL_READINESS_AND_INSTALLATION.md "$pkg/docs/"
+            cp docs/USB_INSTALLATION.md docs/WINDOWS_RUNTIME_PREPARATION.md docs/SCHOOL_READINESS_AND_INSTALLATION.md docs/SCHOOL_DATA_ISOLATION.md "$pkg/docs/"
             cat > "$pkg/.env.example" \<<'EOF'
             SCHOOLBRIDGE_LICENSE_PUBLIC_KEY=
             SCHOOLBRIDGE_PORT=8080
@@ -325,6 +326,7 @@ jobs:
                     "SchoolBridge-USB/runtime/wsl.msi",
                     "SchoolBridge-USB/SHA256SUMS.txt",
                     "SchoolBridge-USB/docs/USB_INSTALLATION.md",
+                    "SchoolBridge-USB/docs/SCHOOL_DATA_ISOLATION.md",
                 }
                 missing = required - names
                 assert not missing, f"USB archive missing: {sorted(missing)}"
