@@ -2463,18 +2463,20 @@ def test_parent_change_feed_invalidates_previously_verified_marks_when_unverifie
         )
         db.add(exam)
         db.flush()
-        mark = models.Mark(
-            student_id=student.id, subject_id=subject.id, exam_id=exam.id,
-            score=85, verified=True,
-        )
-        db.add_all([
-            mark,
-            models.ParentStudentLink(user_id=parent.id, student_id=student.id),
-        ])
+        db.add(models.ParentStudentLink(user_id=parent.id, student_id=student.id))
         db.commit()
         parent_id = parent.id
-        mark_id = mark.id
         student_id = student.id
+
+        # Persist the parent link before the mark so the mark's insert hook
+        # records the correct historical parent visibility scope.
+        mark = models.Mark(
+            student_id=student_id, subject_id=subject.id, exam_id=exam.id,
+            score=85, verified=True,
+        )
+        db.add(mark)
+        db.commit()
+        mark_id = mark.id
 
     headers = {"Authorization": "Bearer " + create_access_token(
         SimpleNamespace(id=parent_id, role="parent")
