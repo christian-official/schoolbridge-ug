@@ -353,6 +353,57 @@ def test_fee_payments_cannot_exceed_charge_and_balance_updates():
     assert summary.json()["outstanding"] == 0.0
 
 
+def test_offline_finance_payment_is_idempotent_and_respects_balance():
+    reset_database()
+    admin = create_admin()
+    headers = {"Authorization": f"Bearer {create_access_token(admin)}"}
+    db = SessionLocal()
+    try:
+        student = models.Student(admission_number="OFFLINE-FEE-001", first_name="Amina", last_name="Learner")
+        db.add(student)
+        db.flush()
+        charge = models.FeeCharge(student_id=student.id, term="Term 1", year=2026, amount=100000)
+        db.add(charge)
+        db.commit()
+        charge_id = charge.id
+    finally:
+        db.close()
+
+    device_id = "00000000-0000-4000-8000-000000000811"
+    with TestClient(app) as client:
+        registered = client.post("/api/sync/devices", headers=headers,
+            json={"device_id": device_id, "device_name": "Offline finance device"})
+        assert registered.status_code == 200, registered.text
+        snapshot = client.get(f"/api/sync/fees?device_id={device_id}", headers=headers)
+        assert snapshot.status_code == 200, snapshot.text
+        body = {
+            "device_id": device_id, "idempotency_key": "offline-fee-payment-001",
+            "charge_id": charge_id, "amount": 60000,
+            "payment_date": "2026-11-10", "method": "Cash",
+            "reference": "OFFLINE-CASH-001", "base_sequence": snapshot.json()["snapshot_sequence"],
+        }
+        first = client.post("/api/sync/finance-payments", headers=headers, json=body)
+        assert first.status_code == 200, first.text
+        assert first.json()["status"] == "applied"
+        assert first.json()["receipt_number"].startswith("RCPT-")
+        duplicate = client.post("/api/sync/finance-payments", headers=headers, json=body)
+        assert duplicate.status_code == 200, duplicate.text
+        assert duplicate.json()["duplicate"] is True
+        assert duplicate.json()["payment_id"] == first.json()["payment_id"]
+        changed = client.post("/api/sync/finance-payments", headers=headers,
+            json={**body, "amount": 65000})
+        assert changed.status_code == 409
+        db = SessionLocal()
+        try:
+            payments = db.query(models.FeePayment).filter_by(charge_id=charge_id).all()
+            assert len(payments) == 1 and payments[0].amount == 60000
+            assert db.query(models.SyncChangeProposal).filter_by(
+                user_id=admin.id, entity_type="FinancePayment"
+            ).count() == 1
+        finally:
+            db.close()
+
+
 def test_fee_payment_amount_must_be_positive():
     reset_database()
     admin = create_admin()
