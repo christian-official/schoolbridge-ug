@@ -3610,45 +3610,8 @@ def list_announcements(db: Session = Depends(get_db), user=Depends(get_current_u
     return query.order_by(models.SchoolAnnouncement.created_at.desc(), models.SchoolAnnouncement.id.desc()).limit(100).all()
 
 @app.post("/api/teacher-assignments", tags=["Teacher Management"])
-def assign_teacher(
-    data: AssignmentCreate,
-    db: Session = Depends(get_db),
-    admin=Depends(require_admin),
-):
-    teacher = db.get(models.User, data.teacher_id)
-
-    if not teacher or teacher.role != "teacher":
-        raise HTTPException(404, "Teacher account not found.")
-
-    if not db.get(models.SchoolClass, data.class_id):
-        raise HTTPException(404, "Class not found.")
-
-    subject = db.get(models.Subject, data.subject_id)
-    if not subject:
-        raise HTTPException(404, "Subject not found.")
-
-    if not teacher.staff_id:
-        raise HTTPException(422, "This teacher login is not linked to a staff registration profile.")
-    staff_profile = db.get(models.StaffMember, teacher.staff_id)
-    registered_subjects = {
-        name.strip().casefold()
-        for name in (staff_profile.subjects or "").split(",")
-        if name.strip()
-    } if staff_profile else set()
-    if subject.name.strip().casefold() not in registered_subjects:
-        raise HTTPException(422, "This subject was not registered under the selected teacher. Update the teacher's registered subjects first.")
-
-    assignment = models.TeacherAssignment(**data.model_dump())
-    db.add(assignment)
-
-    try:
-        db.commit()
-        db.refresh(assignment)
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(409, "This assignment already exists.")
-
-    return {"message": "Teacher assigned successfully.", "id": assignment.id}
+def assign_teacher(data: AssignmentCreate, admin=Depends(require_admin)):
+    raise HTTPException(409, "Teachers now select their own class and subject assignments from My Profile.")
 
 
 @app.get("/api/class-teacher-assignments", tags=["Teacher Management"])
@@ -3666,55 +3629,13 @@ def list_class_teacher_assignments(db: Session = Depends(get_db), admin=Depends(
 
 
 @app.post("/api/class-teacher-assignments", tags=["Teacher Management"])
-def assign_class_teacher(data: ClassTeacherAssignmentCreate, db: Session = Depends(get_db), admin=Depends(require_admin)):
-    teacher = db.get(models.User, data.teacher_id)
-    if not teacher or teacher.role != "teacher":
-        raise HTTPException(404, "Select a valid teacher login account.")
-    if not db.get(models.SchoolClass, data.class_id):
-        raise HTTPException(404, "Class not found.")
-    existing = db.query(models.ClassTeacherAssignment).filter_by(class_id=data.class_id).first()
-    if existing:
-        previous_teacher_id = existing.teacher_id
-        existing.teacher_id = data.teacher_id
-        assignment = existing
-        if previous_teacher_id != data.teacher_id:
-            previous_teacher = db.get(models.User, previous_teacher_id)
-            remaining = db.query(models.ClassTeacherAssignment.id).filter(
-                models.ClassTeacherAssignment.teacher_id == previous_teacher_id,
-                models.ClassTeacherAssignment.id != existing.id,
-            ).first()
-            if previous_teacher and not remaining:
-                previous_permissions = user_permissions(previous_teacher)
-                previous_permissions.pop("Attendance", None)
-                previous_teacher.permissions_json = json.dumps({key: sorted(value) for key, value in previous_permissions.items()})
-    else:
-        assignment = models.ClassTeacherAssignment(**data.model_dump())
-        db.add(assignment)
-    permissions = user_permissions(teacher)
-    permissions["Attendance"] = {"view", "add", "edit"}
-    teacher.permissions_json = json.dumps({key: sorted(value) for key, value in permissions.items()})
-    write_audit(db, admin, "class_teacher_assigned", "class", data.class_id, f"Teacher account {teacher.username}")
-    db.commit()
-    db.refresh(assignment)
-    return {"id": assignment.id, "message": "Class teacher assigned successfully."}
+def assign_class_teacher(data: ClassTeacherAssignmentCreate, admin=Depends(require_admin)):
+    raise HTTPException(409, "Teachers now declare their own class-teacher responsibilities from My Profile.")
 
 
 @app.delete("/api/class-teacher-assignments/{assignment_id}", tags=["Teacher Management"])
-def remove_class_teacher(assignment_id: int, db: Session = Depends(get_db), admin=Depends(require_admin)):
-    assignment = db.get(models.ClassTeacherAssignment, assignment_id)
-    if not assignment:
-        raise HTTPException(404, "Class teacher assignment not found.")
-    teacher = db.get(models.User, assignment.teacher_id)
-    class_id = assignment.class_id
-    write_audit(db, admin, "class_teacher_removed", "class", class_id, f"Assignment {assignment.id}")
-    db.delete(assignment)
-    db.flush()
-    if teacher and not db.query(models.ClassTeacherAssignment.id).filter_by(teacher_id=teacher.id).first():
-        permissions = user_permissions(teacher)
-        permissions.pop("Attendance", None)
-        teacher.permissions_json = json.dumps({key: sorted(value) for key, value in permissions.items()})
-    db.commit()
-    return {"message": "Class teacher assignment removed."}
+def remove_class_teacher(assignment_id: int, admin=Depends(require_admin)):
+    raise HTTPException(409, "Class-teacher responsibilities are managed by staff from My Profile.")
 
 
 @app.get("/api/teacher/my-class-teacher-assignments", tags=["Teacher Workspace"])
