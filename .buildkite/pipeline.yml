@@ -1,8 +1,6 @@
 steps:
   - label: ":school: SchoolBridge full CI"
     key: "schoolbridge-ci"
-    agents:
-      queue: "linux-small"
     timeout_in_minutes: 45
     env:
       PYTHONPATH: "backend"
