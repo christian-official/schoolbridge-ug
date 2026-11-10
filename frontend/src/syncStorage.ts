@@ -49,7 +49,7 @@ async function deriveOfflineDraftKey(passphrase: string, salt: Uint8Array): Prom
   )
 }
 
-export async function saveEncryptedOfflineDraft(userId: number, deviceId: string, passphrase: string, value: unknown) {
+export async function saveEncryptedOfflineDraft(userId: number, deviceId: string, passphrase: string, value: unknown, replaceExisting = false) {
   if (!passphrase || passphrase.length < 10) throw new Error('Use a passphrase of at least 10 characters.')
   if (!crypto?.subtle || typeof indexedDB === 'undefined') throw new Error('This browser does not support protected offline storage.')
   const salt = crypto.getRandomValues(new Uint8Array(16))
@@ -65,7 +65,7 @@ export async function saveEncryptedOfflineDraft(userId: number, deviceId: string
       const existing = store.get('teacher-mark-draft')
       let alreadySaved = false
       existing.onsuccess = () => {
-        if (existing.result) { alreadySaved = true; transaction.abort(); return }
+        if (existing.result && !replaceExisting) { alreadySaved = true; transaction.abort(); return }
         store.put({ salt: Array.from(salt), iv: Array.from(iv), ciphertext: Array.from(ciphertext), updatedAt: Date.now() } satisfies EncryptedDraftRecord, 'teacher-mark-draft')
       }
       transaction.oncomplete = () => resolve()

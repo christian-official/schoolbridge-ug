@@ -1483,6 +1483,7 @@ function TeacherWorkspace({token,active,userId}:{token:string;active:string;user
   const [resultError,setResultError]=useState('')
   const [resultSaving,setResultSaving]=useState(false)
   const [resultSubmissionComplete,setResultSubmissionComplete]=useState(false)
+  const lastOfflineScoreContext=useRef('')
   const [offlinePassphrase,setOfflinePassphrase]=useState('')
   const [offlineDraftMessage,setOfflineDraftMessage]=useState('')
   const [offlineDraftBusy,setOfflineDraftBusy]=useState(false)
@@ -1584,9 +1585,10 @@ function TeacherWorkspace({token,active,userId}:{token:string;active:string;user
     return ()=>{cancelled=true}
   },[active,examId,selectedTeacherExam?.class_id,token])
   async function saveClassAttendance(){if(!classId||!students.length){setMessage('Choose a responsible class with active students.');return}setBusy(-1);setMessage('');try{const result=await api<{saved:number}>('attendance/register',token,{method:'PUT',body:JSON.stringify({class_id:Number(classId),attendance_date:attendanceDate,records:students.map(student=>({student_id:student.id,status:statuses[student.id]||'Present'}))})});setMessage(result.saved+' student attendance records saved for '+attendanceDate+'.')}catch(e){setMessage(e instanceof Error?e.message:'Unable to save class attendance.')}finally{setBusy(null)}}
-  useEffect(()=>{if(!selectedSubjectId){setResultScores({});return}const next:Record<number,string>={};resultStudents.forEach(student=>{const mark=resultMarks.find(row=>row.student_id===student.id&&row.subject_id===Number(selectedSubjectId));if(mark)next[student.id]=String(mark.score)});setResultScores(next)},[selectedSubjectId,resultStudents,resultMarks])
+  useEffect(()=>{const context=String(examId)+':'+String(selectedSubjectId);const changed=lastOfflineScoreContext.current!==context;lastOfflineScoreContext.current=context;if(!selectedSubjectId){setResultScores({});return}setResultScores(current=>{const next:Record<number,string>=changed?{}:{...current};resultStudents.forEach(student=>{const mark=resultMarks.find(row=>row.student_id===student.id&&row.subject_id===Number(selectedSubjectId));if(mark)next[student.id]=String(mark.score);else if(next[student.id]===undefined)next[student.id]=''});return next})},[examId,selectedSubjectId,resultStudents,resultMarks])
   async function saveOfflineTeacherMarksDraft(){
     if(!selectedTeacherExam||!selectedSubjectId||!resultStudents.length){setOfflineDraftMessage('Choose an examination, assigned subject and class register first.');return}
+    if(!window.confirm('Save the current class scores as the encrypted offline draft? This replaces the previous saved draft on this browser, if one exists.'))return
     if(offlinePassphrase.trim().length<10){setOfflineDraftMessage('Use an offline passphrase of at least 10 characters. It is not stored by SchoolBridge.');return}
     const deviceId=localStorage.getItem('schoolbridge-sync-device-'+userId)
     if(!deviceId){setOfflineDraftMessage('Register this browser in Device Management before preparing an offline draft.');return}
@@ -1600,7 +1602,7 @@ function TeacherWorkspace({token,active,userId}:{token:string;active:string;user
         exam:selectedTeacherExam,subject_id:Number(selectedSubjectId),base_sequence:resultSnapshotSequence,
         students:resultStudents,scores:resultScores,records,
         base_mark_ids:Object.fromEntries(resultStudents.map(student=>[student.id,resultMarks.find(mark=>mark.student_id===student.id&&mark.subject_id===Number(selectedSubjectId))?.id??null])),
-      })
+      },true)
       setOfflineDraftMessage('Encrypted offline draft saved on this browser. It has not changed official results.')
     }catch(error){setOfflineDraftMessage(error instanceof Error?error.message:'Unable to save the encrypted offline draft.')}
     finally{setOfflineDraftBusy(false)}
@@ -1615,7 +1617,7 @@ function TeacherWorkspace({token,active,userId}:{token:string;active:string;user
       if(draft.version!==1||draft.device_id!==deviceId||!draft.exam||!Array.isArray(draft.students)||!Array.isArray(draft.records))throw new Error('The saved draft is not valid for this registered device.')
       setTeacherExams([draft.exam]);setExamId(String(draft.exam.id))
       setSelectedTeacherExamGroupKey([draft.exam.name||'Other',draft.exam.term,draft.exam.year].join('|'))
-      setActiveTeacherExamType('All exams');setSelectedSubjectId(String(draft.subject_id))
+      setActiveTeacherExamType('All exams');lastOfflineScoreContext.current=String(draft.exam.id)+':'+String(draft.subject_id);setSelectedSubjectId(String(draft.subject_id))
       setResultStudents(draft.students);setResultScores(draft.scores||{})
       setResultSnapshotSequence(draft.base_sequence);setResultSubmissionComplete(false)
       setOfflineDraftMessage('Encrypted draft unlocked. Check the class and scores before submitting it when online.')
@@ -1628,9 +1630,12 @@ function TeacherWorkspace({token,active,userId}:{token:string;active:string;user
     setOfflineDraftBusy(true);setOfflineDraftMessage('')
     try{
       const draft=await loadEncryptedOfflineDraft<any>(userId,deviceId,offlinePassphrase)
+      const currentDraftIsOpen=selectedTeacherExam?.id===draft.exam.id&&Number(selectedSubjectId)===draft.subject_id&&resultStudents.length>0
+      const currentRecords=currentDraftIsOpen?resultStudents.map(student=>({student_id:student.id,score:resultScores[student.id]===undefined||resultScores[student.id].trim()===''?0:Number(resultScores[student.id])})):draft.records
+      if(currentRecords.some(record=>!Number.isFinite(record.score)||record.score<0||record.score>100))throw new Error('Every score must be between 0 and 100.')
       const result=await api<{proposal_id:number;status:string;duplicate:boolean}>('sync/teacher-mark-proposals',token,{method:'POST',body:JSON.stringify({
         device_id:draft.device_id,idempotency_key:draft.idempotency_key,exam_id:draft.exam.id,
-        subject_id:draft.subject_id,base_sequence:draft.base_sequence,base_mark_ids:draft.base_mark_ids||{},records:draft.records,
+        subject_id:draft.subject_id,base_sequence:draft.base_sequence,base_mark_ids:draft.base_mark_ids||{},records:currentRecords,
       })})
       await deleteEncryptedOfflineDraft(userId,deviceId)
       setOfflineDraftMessage('Draft submitted as proposal #'+result.proposal_id+' ('+result.status+'). An administrator must review it; official marks have not been changed.')
