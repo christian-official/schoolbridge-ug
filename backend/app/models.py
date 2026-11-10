@@ -401,3 +401,4 @@ class SyncChange(Base):
     entity_id: Mapped[int] = mapped_column(Integer, nullable=False)
     operation: Mapped[str] = mapped_column(String(10), nullable=False)
     changed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    scope_json: Mapped[str] = mapped_column(Text, default="{}", server_default="{}", nullable=False)

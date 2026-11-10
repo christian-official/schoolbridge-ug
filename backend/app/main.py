@@ -1993,57 +1993,68 @@ def list_sync_devices(
     }
 
 
-@app.get("/api/sync/changes", tags=["Offline Synchronisation"])
-def list_sync_changes(
-    device_id: UUID,
-    cursor: int = 0,
-    limit: int = 200,
-    db: Session = Depends(get_db),
-    user=Depends(get_current_user),
-):
-    """Return ordered change metadata for an active administrator device."""
-    if user.role != "admin":
-        raise HTTPException(403, "Change-feed access is currently restricted to administrators.")
+def _sync_change_visible_to_user(row, user):
+    if user.role == "admin": return True
+    try: scope = json.loads(row.scope_json or "{}")
+    except (TypeError, ValueError): scope = {}
+    entity = row.entity_type.split(":", 1)[0]
+    parent_visible = user.id in scope.get("parent_user_ids", [])
+    teacher_visible = user.id in scope.get("teacher_user_ids", [])
+    permissions = user_permissions(user)
+    if user.role == "parent":
+        if not parent_visible: return False
+        if entity in {"Mark", "MarkScope"}: return scope.get("verified") is True
+        return entity in {"Student","SchoolClass","Attendance","Exam","Mark","MarkScope","FeeCharge","FeePayment","ClassFee","ParentStudentLink"}
+    if user.role == "teacher":
+        if teacher_visible:
+            return entity in {"Student","SchoolClass","Subject","TeacherAssignment","ClassTeacherAssignment","Attendance","Exam","Mark","MarkScope","TimetableEntry"}
+        return entity in {"Student","SchoolClass"} and "view" in permissions.get("Students", set())
+    section_by_entity = {
+        "Student":"Students","SchoolClass":"Students","StaffMember":"Staff",
+        "Attendance":"Attendance","StaffAttendance":"Staff Attendance",
+        "Exam":"Examinations","Mark":"Examinations","MarkScope":"Examinations",
+        "Subject":"Examinations","FeeCharge":"Fees & Finance","FeePayment":"Fees & Finance",
+        "ClassFee":"Fees & Finance","SalaryPayment":"Fees & Finance",
+        "OtherExpense":"Fees & Finance","TimetableEntry":"Timetable",
+    }
+    section = section_by_entity.get(entity)
+    if not section or "view" not in permissions.get(section, set()): return False
+    return entity != "OtherExpense" or bool(scope.get("finance_only"))
 
+
+@app.get("/api/sync/changes", tags=["Offline Synchronisation"])
+def list_sync_changes(device_id: UUID, cursor: int = 0, limit: int = 200,
+                      db: Session = Depends(get_db), user=Depends(get_current_user)):
+    """Return only changes within the authenticated account's historical record scope."""
     if cursor < 0 or limit < 1 or limit > 500:
         raise HTTPException(422, "Cursor must be non-negative and limit must be between 1 and 500.")
-
-    device = db.query(models.SyncDevice).filter_by(
-        user_id=user.id, device_id=str(device_id)
-    ).first()
+    device = db.query(models.SyncDevice).filter_by(user_id=user.id, device_id=str(device_id)).first()
     if device is None or device.revoked_at is not None:
         raise HTTPException(403, "An active registered device is required.")
     if cursor > device.last_issued_sequence:
         raise HTTPException(409, "A change-feed cursor cannot skip beyond changes already delivered to this device.")
-
-    rows = db.query(models.SyncChange).filter(
-        models.SyncChange.id > cursor
-    ).order_by(models.SyncChange.id.asc()).limit(limit + 1).all()
-    has_more = len(rows) > limit
-    rows = rows[:limit]
-    next_cursor = rows[-1].id if rows else cursor
-
-    # Only sequences actually returned to this device may be acknowledged.
-    # Keep the high-water mark monotonic across repeated or overlapping reads.
-    if rows and rows[-1].id > device.last_issued_sequence:
-        device.last_issued_sequence = rows[-1].id
+    visible, scan_cursor, has_more = [], cursor, False
+    while len(visible) <= limit:
+        batch = db.query(models.SyncChange).filter(models.SyncChange.id > scan_cursor).order_by(
+            models.SyncChange.id.asc()).limit(500).all()
+        if not batch: break
+        for row in batch:
+            scan_cursor = row.id
+            if _sync_change_visible_to_user(row, user):
+                visible.append(row)
+                if len(visible) > limit:
+                    has_more = True
+                    scan_cursor = visible[limit - 1].id
+                    visible = visible[:limit]
+                    break
+        if has_more or len(batch) < 500: break
+    next_cursor = scan_cursor
+    device.last_issued_sequence = max(device.last_issued_sequence, next_cursor)
     device.last_seen_at = datetime.utcnow()
     db.commit()
-
-    return {
-        "changes": [
-            {
-                "sequence": row.id,
-                "entity_type": row.entity_type,
-                "entity_id": row.entity_id,
-                "operation": row.operation,
-                "changed_at": row.changed_at,
-            }
-            for row in rows
-        ],
-        "next_cursor": next_cursor,
-        "has_more": has_more,
-    }
+    return {"changes":[{"sequence":row.id,"entity_type":row.entity_type,"entity_id":row.entity_id,
+        "operation":row.operation,"changed_at":row.changed_at} for row in visible],
+        "next_cursor":next_cursor,"has_more":has_more}
 
 
 @app.post("/api/sync/proposals", tags=["Offline Synchronisation"])

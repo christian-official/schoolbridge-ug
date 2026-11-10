@@ -1131,10 +1131,15 @@ def test_sync_change_feed_tracks_ordered_mutations_and_deletions():
         student_changes = [row for row in all_changes if row["entity_type"] == "Student" and row["entity_id"] == student_id]
         assert [row["operation"] for row in student_changes] == ["insert", "update", "delete"]
 
-        forbidden = client.get(
-            f"/api/sync/changes?device_id={device_id}", headers=teacher_headers,
+        teacher_device = "00000000-0000-4000-8000-000000000103"
+        client.post("/api/sync/devices", headers=teacher_headers, json={
+            "device_id": teacher_device, "device_name": "Teacher sync device",
+        })
+        own_feed = client.get(
+            f"/api/sync/changes?device_id={teacher_device}", headers=teacher_headers,
         )
-        assert forbidden.status_code == 403
+        assert own_feed.status_code == 200
+        assert all(item["entity_type"] != "Student" for item in own_feed.json()["changes"])
 
         revoked = client.delete(f"/api/sync/devices/{device_id}", headers=admin_headers)
         assert revoked.status_code == 200

@@ -150,3 +150,13 @@ def test_sync_change_proposals_migration(tmp_path):
     cols={c["name"] for c in inspector.get_columns("sync_change_proposals")}
     assert {"user_id","device_id","idempotency_key","entity_type","entity_id","operation","payload_json","base_sequence","status","conflict_sequence","submitted_at","resolved_at","resolution"}.issubset(cols)
     engine.dispose()
+
+
+
+def test_sync_change_journal_migrates_historical_scope_column(tmp_path):
+    url = f"sqlite:///{tmp_path / 'sync-change-scopes.sqlite3'}"
+    upgrade_database(url)
+    engine = create_engine(url)
+    columns = {item["name"] for item in inspect(engine).get_columns("sync_changes")}
+    assert "scope_json" in columns
+    engine.dispose()
