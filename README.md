@@ -1,8 +1,8 @@
 # SchoolBridge
 
-**Offline-first school management for primary and secondary schools.**
+**Local-first school management for primary and secondary schools.**
 
-SchoolBridge is being developed as a locally installed Windows application for schools. Its core workflows are designed to work without internet access. A school can run it on one computer or allow authorised staff to connect from phones and computers over the school's local Wi-Fi network.
+SchoolBridge is being developed for installation on each school's own computer. The local school database is the primary source of truth. Internet and Render are not dependencies for ordinary school operations. A school can operate on one computer without LAN; a local Wi-Fi/router or wired network is optional for connecting additional staff devices.
 
 ## Planned capabilities
 
@@ -15,29 +15,22 @@ SchoolBridge is being developed as a locally installed Windows application for s
 - Role-based access, audit logs and data backups
 - Data export and restore tools
 
-## Operating modes
+## Current development status
 
-1. **Single computer:** all core work is performed on one Windows computer.
-2. **School local network:** the school computer hosts the application; authorised phones and computers connect over local Wi-Fi without internet.
-3. **Larger school network:** multiple authorised users work concurrently through a central school server.
+Phase 5 — Database & Offline Architecture includes database-safety, local deployment, device registration, change-journal, checkpoint and role-scoped snapshot foundations. Teacher mark drafts and selected attendance workflows have offline foundations, and Device Management supports explicit encrypted read-only snapshots. These do not mean all modules are fully offline.
 
-Each school's installation and data must remain isolated. Internet access may be used for optional updates, but must not be required for ordinary school operations.
+The local Docker Compose stack runs PostgreSQL, backend, frontend and a backup scheduler. USB scripts now prepare and import prebuilt application images without downloading those images at the school. **The USB package still requires Docker Engine/Compose to be pre-installed, and the service worker currently caches the app shell only. Full offline record access/writes across all modules and clean-machine disconnected installation tests remain unfinished.** Do not call the USB package a finished turnkey offline installer yet.
 
-## Development status
-
-Phase 5 — Database & Offline Architecture includes verified database-safety, school-LAN deployment, device registration, change-journal, checkpoint and role-scoped snapshot foundations. Teacher mark drafts are encrypted locally and valid submissions are automatically applied after server-side permission, assignment, device, student, result-lock and conflict checks. Device Management supports an explicit, 24-hour AES-GCM encrypted snapshot of authorised students, classes, attendance, examinations, marks and fees; it is invalidated after detected permission or record changes on reconnect. Automatic offline writes are currently enabled only for validated teacher-mark and class-attendance batches. Other entity types remain disabled until their own permission, relationship, validation and conflict rules are implemented. PostgreSQL LAN installs run a dedicated daily verified backup service; SQLite single-host installs can run the same scheduler through Windows Task Scheduler.
-
-Before a school visit, use the [school-readiness and first installation guide](docs/SCHOOL_READINESS_AND_INSTALLATION.md). Follow the [local-network installation guide](docs/LOCAL_NETWORK_INSTALLATION.md) for host setup and [the architecture notes](docs/architecture.md) for the current design direction.
+See [USB installation status and instructions](docs/USB_INSTALLATION.md), [school readiness](docs/SCHOOL_READINESS_AND_INSTALLATION.md), and [architecture notes](docs/architecture.md).
 
 ## Development
 
-The backend uses Python, FastAPI and SQLAlchemy. SQLite is intended for a single-host installation; PostgreSQL is used for multi-user school networks. The production Windows installer and the remaining permission-aware offline record synchronisation work are separate milestones.
+Backend: Python, FastAPI and SQLAlchemy. Single-host SQLite and multi-user local PostgreSQL are supported deployment paths. The local Compose stack uses PostgreSQL. Render services are preview/development only, not school production dependencies.
 
-## Important principles
+## Principles
 
-- Offline-first; no cloud account required for daily school operations.
-- Secure access with least-privilege roles.
-- Reliable backup, restore and data export.
-- Clear audit history for important changes.
-- Simple workflows suitable for school staff.
+- Local database is the school's primary source of truth.
+- No cloud account or internet required for ordinary local operations.
+- A LAN is optional for multi-device access, not installation.
+- Least-privilege roles, audit history, reliable backup and restore.
 - Never use real student data in development or testing.
