@@ -18,6 +18,7 @@ services:
       - schoolbridge-internal
 
   backend:
+    image: schoolbridge/backend:local
     build:
       context: ./backend
     restart: unless-stopped
@@ -64,6 +65,7 @@ services:
       - schoolbridge-internal
 
   frontend:
+    image: schoolbridge/frontend:local
     build:
       context: ./frontend
     restart: unless-stopped
