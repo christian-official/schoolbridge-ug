@@ -10,18 +10,13 @@ When installed locally, the frontend, API and database run together. The service
 
 ## 1. Prepare the USB package
 
-On a preparation computer with Docker Engine/Desktop, Compose v2, PowerShell and internet for the initial build, place the official installers at these exact paths:
-
-- `runtime/Docker Desktop Installer.exe`
-- `runtime/wsl.msi`
-
-Then run from the repository root:
+On a preparation computer with Docker Engine/Desktop, Compose v2, PowerShell and internet for the initial build, run from the repository root:
 
 ```powershell
 .\scripts\prepare-usb.ps1
 ```
 
-The script builds the frontend and backend images, pulls PostgreSQL on the preparation computer, exports all three images, copies the runtime installers and guides, and creates `SHA256SUMS.txt`. It starts with a clean output folder so stale files cannot make an incomplete package appear valid. Copy the complete `dist\SchoolBridge-USB` folder to an exFAT or NTFS USB drive.
+The script downloads the official Docker and WSL runtime installers if they are not already present, verifies their Microsoft/Docker signatures, builds the frontend and backend images, pulls PostgreSQL on the preparation computer, exports all three images, copies the runtime installers and guides, and creates `SHA256SUMS.txt`. It starts with a clean output folder so stale files cannot make an incomplete package appear valid. Copy the complete `dist\SchoolBridge-USB` folder to an exFAT or NTFS USB drive.
 
 Never put the owner's private signing key or passphrase on the USB. Only the public verification key belongs in the school's local `.env`.
 
