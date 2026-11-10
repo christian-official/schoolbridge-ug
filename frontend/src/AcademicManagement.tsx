@@ -9,7 +9,7 @@ type Exam = { id: number; name: string; exam_type: string; term: string; year: n
 type Mark = { id: number; student_id: number; subject_id: number; exam_id: number; score: number; verified: boolean }
 type GradeBand = { id?: number; grade: string; min_score: number; max_score: number; remark: string }
 type SchoolProfile = { name?: string; address?: string | null; phone?: string | null; email?: string | null; motto?: string | null; school_type?: string; a_level_combinations?: string | null; o_level_optional_subjects?: string | null; a_level_subsidiary_subjects?: string | null; report_logo?: string | null; report_template?: string | null }
-type ReportTemplateConfig = { title?: string; footer?: string }
+type ReportTemplateConfig = { title?: string; footer?: string; layout?: 'classic' | 'modern' | 'detailed'; uploaded?: boolean }
 type Page<T> = { items: T[]; total: number; pages?: number }
 
 const EXAM_TYPES = ['Beginning of Term', 'Mid-Term', 'End of Term', 'Mock', 'Promotional', 'Other'] as const
@@ -167,7 +167,7 @@ export default function AcademicManagement({ token, classes, canVerify = false, 
       setGradingBands(gradeRows)
       setSchoolProfile(profile || {})
       setReportLogo(profile?.report_logo || '')
-      if (profile?.report_template) { try { const config = JSON.parse(profile.report_template); setReportTemplateConfig(config); setReportTitle(config.title || 'STUDENT PROGRESS REPORT'); setReportFooter(config.footer || 'SchoolBridge · Official student progress report · Keep this report for your records'); localStorage.setItem('schoolbridge-report-template', profile.report_template) } catch { /* Keep the local editable defaults if an older template cannot be parsed. */ } }
+      if (profile?.report_template) { try { const config = JSON.parse(profile.report_template); setReportTemplateConfig(config); if (config.layout) setReportTemplate(config.layout); setReportTitle(config.title || 'STUDENT PROGRESS REPORT'); setReportFooter(config.footer || 'SchoolBridge · Official student progress report · Keep this report for your records'); localStorage.setItem('schoolbridge-report-template', profile.report_template) } catch { /* Keep the local editable defaults if an older template cannot be parsed. */ } }
       setDraftBands(gradeRows.map(({ grade, min_score, max_score, remark }) => ({ grade, min_score, max_score, remark })))
       if (selectedExamId && examRows.some(exam => String(exam.id) === selectedExamId)) {
         setSelectedExamId(selectedExamId)
@@ -445,11 +445,25 @@ export default function AcademicManagement({ token, classes, canVerify = false, 
     if (file.size > 100 * 1024) { setError('Report template JSON must be 100 KB or smaller.'); return }
     try {
       const parsed = JSON.parse(await file.text())
-      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) || (parsed.title !== undefined && typeof parsed.title !== 'string') || (parsed.footer !== undefined && typeof parsed.footer !== 'string')) throw new Error('Use a JSON template with optional title and footer text fields.')
-      const next = { title: parsed.title || reportTitle, footer: parsed.footer || reportFooter }
-      await persistReportBranding(reportLogo, next); setReportTemplateConfig(next); setReportTitle(next.title); setReportFooter(next.footer); setMessage('Custom report template imported and saved to the school database.')
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) || (parsed.title !== undefined && typeof parsed.title !== 'string') || (parsed.footer !== undefined && typeof parsed.footer !== 'string') || (parsed.layout !== undefined && !['classic','modern','detailed'].includes(parsed.layout))) throw new Error('Use a JSON template with optional title, footer and layout (classic, modern or detailed).')
+      const next: ReportTemplateConfig = { title: parsed.title || reportTitle, footer: parsed.footer || reportFooter, layout: parsed.layout || reportTemplate, uploaded: true }
+      await persistReportBranding(reportLogo, next); setReportTemplateConfig(next); setReportTemplate(next.layout || 'modern'); setReportTitle(next.title || reportTitle); setReportFooter(next.footer || reportFooter); setMessage('Custom report template imported and locked as the school report design.')
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to read this report template.') }
   }
+  async function deleteReportTemplate() {
+    if (!reportTemplateConfig.uploaded || !window.confirm('Delete the uploaded school report template and restore the built-in designs?')) return
+    setSaving(true); setError('')
+    try {
+      await persistReportBranding(reportLogo, {})
+      setReportTemplateConfig({})
+      setReportTemplate('modern')
+      setReportTitle('STUDENT PROGRESS REPORT')
+      setReportFooter('SchoolBridge · Official student progress report · Keep this report for your records')
+      setMessage('Uploaded report template deleted. Built-in designs are available again.')
+    } catch (e) { setError(e instanceof Error ? e.message : 'Unable to delete the report template.') }
+    finally { setSaving(false) }
+  }
+
   function printAcademicSection(target: 'results' | 'report' | 'class-reports') {
     const cleanup = () => { delete document.body.dataset.schoolbridgePrint }
     document.body.dataset.schoolbridgePrint = target
@@ -713,11 +727,11 @@ export default function AcademicManagement({ token, classes, canVerify = false, 
       <section className="panel academic-report-print">
         <div className="panel-heading report-screen-controls"><div><h2>Report cards</h2><p>Select a design, preview an individual student's report, or print reports for the entire class in one batch.</p></div><button type="button" className="secondary-button" disabled={!classReportData.length} onClick={() => printAcademicSection('class-reports')}><Printer size={15}/> Print whole class ({classReportData.length})</button></div>
         <div className="report-template-toolbar report-screen-controls">
-          <label>Report template<select value={reportTemplate} onChange={e => setReportTemplate(e.target.value as 'classic' | 'modern' | 'detailed')}><option value="modern">Modern professional</option><option value="classic">Classic school report</option><option value="detailed">Detailed academic report</option></select></label>
+          {reportTemplateConfig.uploaded ? <div className="report-template-locked"><strong>School report design locked</strong><span>{reportTemplateConfig.layout || reportTemplate} · Uploaded template</span></div> : <label>Report template<select value={reportTemplate} onChange={e => setReportTemplate(e.target.value as 'classic' | 'modern' | 'detailed')}><option value="modern">Modern professional</option><option value="classic">Classic school report</option><option value="detailed">Detailed academic report</option></select></label>}
           <label className="academic-exam-select report-student-picker">Preview student<select value={historyStudentId} onChange={e => setHistoryStudentId(e.target.value)}><option value="">Choose a student</option>{students.map(student => <option key={student.id} value={student.id}>{studentName(student)} · {student.admission_number}</option>)}</select></label>
           <button type="button" className="primary-button" disabled={!historyStudentId} onClick={() => printAcademicSection('report')}><Printer size={15}/> Print selected report</button>
         </div>
-        <div className="report-customisation-panel report-screen-controls"><div><strong>Upload a report template</strong><p>Import a JSON template with editable report heading and footer fields.</p><input type="file" accept=".json,application/json" onChange={e => void uploadReportTemplate(e.target.files?.[0])}/></div><label>Editable report heading<input value={reportTitle} maxLength={100} onChange={e => setReportTitle(e.target.value)}/></label><label>Editable report footer<input value={reportFooter} maxLength={180} onChange={e => setReportFooter(e.target.value)}/></label><button type="button" className="primary-button" onClick={saveReportTemplateEdits}>Save report design</button></div>
+        <div className="report-customisation-panel report-screen-controls"><div><strong>Upload a report template</strong><p>Import a JSON template with editable report heading and footer fields.</p><input type="file" accept=".json,application/json" onChange={e => void uploadReportTemplate(e.target.files?.[0])}/></div><label>Editable report heading<input value={reportTitle} maxLength={100} onChange={e => setReportTitle(e.target.value)}/></label><label>Editable report footer<input value={reportFooter} maxLength={180} onChange={e => setReportFooter(e.target.value)}/></label><button type="button" className="primary-button" onClick={saveReportTemplateEdits}>Save report design</button>{reportTemplateConfig.uploaded && <button type="button" className="secondary-button" disabled={saving} onClick={()=>void deleteReportTemplate()}>Delete uploaded template</button>}</div>
         {historyError && <div className="form-error" role="alert">{historyError}</div>}
         {historyStudent && reportCardMarkup(historyStudent, selectedReportRows)}
         {!historyStudent && <div className="subject-marks-empty"><BookOpen size={25}/><strong>Choose a student to preview a report</strong><span>Use Print whole class to produce every student's report in one print job.</span></div>}
