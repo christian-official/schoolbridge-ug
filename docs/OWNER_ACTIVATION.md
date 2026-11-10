@@ -34,3 +34,22 @@ The license is bound to one installation ID. Activation attempts are rate-limite
 ## Existing schools
 
 The database migration automatically marks an installation with existing users or school records as already initialized. Existing schools are not sent through first-time activation or locked out by this gate.
+
+
+## Authorise an exceptional identity correction
+
+A school administrator cannot change the registered school name, type, country or day/boarding structure after setup. If a legitimate legal or structural change is required, the owner must issue a separate signed correction license:
+
+```bash
+python backend/tools/schoolbridge_owner_license.py sign-license \
+  --private-key /secure/schoolbridge-owner.key \
+  --installation-id "INSTALLATION-ID-FROM-SCHOOLBRIDGE" \
+  --license-id "SCHOOL-REFERENCE-CORRECTION-002" \
+  --action school_identity_correction \
+  --school-name "New Registered School Name" \
+  --school-type Combined \
+  --country Uganda \
+  --school-structure Both
+```
+
+An authenticated school administrator pastes that signed license into the protected identity-correction control. The server verifies the owner signature, applies only the identity embedded in the signed license, records the previous and new identity, and rejects reuse of the same license.

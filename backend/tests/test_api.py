@@ -2021,7 +2021,7 @@ def test_offline_snapshot_pages_reject_records_changed_during_download(monkeypat
 
 
 
-def _signed_test_license(installation_id, private_key):
+def _signed_test_license(installation_id, private_key, extra_claims=None):
     import base64
     import json
     from datetime import datetime, timezone
@@ -2031,6 +2031,8 @@ def _signed_test_license(installation_id, private_key):
         "license_id": "test-license-001",
         "issued_at": int(datetime.now(timezone.utc).timestamp()),
     }
+    if extra_claims:
+        claims.update(extra_claims)
     payload = json.dumps(claims, sort_keys=True, separators=(",", ":")).encode()
     signature = private_key.sign(payload)
     encode = lambda value: base64.urlsafe_b64encode(value).decode().rstrip("=")
@@ -2168,3 +2170,48 @@ def test_partial_legacy_admin_environment_is_ignored_before_first_setup(monkeypa
     main_module.bootstrap_initial_admin()
     with SessionLocal() as db:
         assert db.query(models.User).count() == 0
+
+
+
+def test_owner_signed_identity_correction_is_audited_and_one_time(monkeypatch):
+    import base64
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    reset_new_installation()
+    private_key = Ed25519PrivateKey.generate()
+    public_key = private_key.public_key().public_bytes(
+        serialization.Encoding.Raw, serialization.PublicFormat.Raw
+    )
+    monkeypatch.setenv("SCHOOLBRIDGE_LICENSE_PUBLIC_KEY", base64.b64encode(public_key).decode())
+    with TestClient(app) as client:
+        installation_id = client.get("/api/setup/status").json()["installation_id"]
+        activation = _signed_test_license(installation_id, private_key)
+        assert client.post("/api/setup/activate", json={"license": activation}).status_code == 200
+        setup = client.post("/api/setup/complete", json={
+            "school_name": "Original School", "school_type": "Secondary",
+            "country": "Uganda", "school_structure": "Day",
+            "admin_username": "identity-admin", "admin_email": "identity@example.invalid",
+            "admin_password": "LongTestPassword123!",
+        })
+        assert setup.status_code == 200
+        login = client.post("/api/auth/login", data={
+            "username": "identity-admin", "password": "LongTestPassword123!",
+        })
+        headers = {"Authorization": "Bearer " + login.json()["access_token"]}
+        correction = _signed_test_license(installation_id, private_key, {
+            "action": "school_identity_correction",
+            "school_identity": {
+                "school_name": "Corrected School Name", "school_type": "Combined",
+                "country": "Uganda", "school_structure": "Both",
+            },
+        })
+        applied = client.post("/api/setup/identity-correction", headers=headers, json={"license": correction})
+        assert applied.status_code == 200, applied.text
+        replay = client.post("/api/setup/identity-correction", headers=headers, json={"license": correction})
+        assert replay.status_code == 409
+        with SessionLocal() as db:
+            profile = db.get(models.SchoolProfile, 1)
+            assert profile.name == "Corrected School Name"
+            assert db.query(models.SchoolIdentityCorrection).count() == 1
+            assert db.query(models.AuditLog).filter_by(action="school_identity_corrected").count() == 1

@@ -30,6 +30,17 @@ def upgrade() -> None:
             sa.Column("setup_completed_at", sa.DateTime(), nullable=True),
             sa.Column("original_identity_json", sa.Text(), nullable=True),
         )
+    if "school_identity_corrections" not in inspect(bind).get_table_names():
+        op.create_table(
+            "school_identity_corrections",
+            sa.Column("id", sa.Integer(), primary_key=True),
+            sa.Column("license_hash", sa.String(64), nullable=False, unique=True),
+            sa.Column("license_id", sa.String(100), nullable=False),
+            sa.Column("actor_id", sa.Integer(), sa.ForeignKey("users.id"), nullable=True),
+            sa.Column("old_identity_json", sa.Text(), nullable=False),
+            sa.Column("new_identity_json", sa.Text(), nullable=False),
+            sa.Column("corrected_at", sa.DateTime(), nullable=False, server_default=sa.func.current_timestamp()),
+        )
     tables = set(inspect(bind).get_table_names())
     has_existing_use = False
     if "users" in tables:
@@ -59,6 +70,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.drop_table("school_identity_corrections")
     op.drop_table("school_setup_state")
     with op.batch_alter_table("school_profile") as batch:
         columns = {c["name"] for c in inspect(op.get_bind()).get_columns("school_profile")}

@@ -418,3 +418,16 @@ class SchoolSetupState(Base):
     activation_locked_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     setup_completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     original_identity_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class SchoolIdentityCorrection(Base):
+    """One-time owner-authorised change to a protected school identity."""
+    __tablename__ = "school_identity_corrections"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    license_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    license_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    actor_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    old_identity_json: Mapped[str] = mapped_column(Text, nullable=False)
+    new_identity_json: Mapped[str] = mapped_column(Text, nullable=False)
+    corrected_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)

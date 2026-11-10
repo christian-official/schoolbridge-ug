@@ -32,6 +32,11 @@ def main() -> None:
     sign.add_argument("--installation-id", required=True)
     sign.add_argument("--license-id", required=True)
     sign.add_argument("--expires-at", type=int)
+    sign.add_argument("--action", choices=["activate", "school_identity_correction"], default="activate")
+    sign.add_argument("--school-name")
+    sign.add_argument("--school-type", choices=["Primary", "Secondary", "Combined"])
+    sign.add_argument("--country")
+    sign.add_argument("--school-structure", choices=["Day", "Boarding", "Both"])
     args = parser.parse_args()
 
     if args.command == "generate-keypair":
@@ -54,7 +59,17 @@ def main() -> None:
         "installation_id": args.installation_id,
         "license_id": args.license_id,
         "issued_at": int(datetime.now(timezone.utc).timestamp()),
+        "action": args.action,
     }
+    if args.action == "school_identity_correction":
+        if not all([args.school_name, args.school_type, args.country, args.school_structure]):
+            parser.error("Identity correction licenses require --school-name, --school-type, --country and --school-structure.")
+        claims["school_identity"] = {
+            "school_name": args.school_name,
+            "school_type": args.school_type,
+            "country": args.country,
+            "school_structure": args.school_structure,
+        }
     if args.expires_at:
         claims["expires_at"] = args.expires_at
     payload = json.dumps(claims, sort_keys=True, separators=(",", ":")).encode("utf-8")

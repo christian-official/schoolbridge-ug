@@ -1967,6 +1967,72 @@ def get_or_create_setup_state(db: Session):
     return state
 
 
+
+class SchoolIdentityCorrectionRequest(BaseModel):
+    license: str = Field(min_length=20, max_length=4096)
+
+
+@app.post("/api/setup/identity-correction", tags=["First-time Setup"])
+def apply_school_identity_correction(
+    data: SchoolIdentityCorrectionRequest,
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+):
+    state = db.get(models.SchoolSetupState, 1)
+    if not state or not state.setup_completed_at or not state.original_identity_json:
+        raise HTTPException(409, "There is no protected school identity to correct.")
+    try:
+        claims = verify_activation_license(data.license)
+    except (ValueError, RuntimeError):
+        raise HTTPException(403, "The owner correction license is invalid or cannot be verified.")
+    if claims.get("installation_id") != state.installation_id or claims.get("action") != "school_identity_correction":
+        raise HTTPException(403, "This license does not authorise a school identity correction for this installation.")
+    fingerprint = license_fingerprint(data.license)
+    if db.query(models.SchoolIdentityCorrection.id).filter_by(license_hash=fingerprint).first():
+        raise HTTPException(409, "This owner correction license has already been used.")
+    identity = claims.get("school_identity")
+    if not isinstance(identity, dict):
+        raise HTTPException(422, "The signed correction license does not contain a school identity.")
+    school_name = str(identity.get("school_name") or "").strip()
+    school_type = identity.get("school_type")
+    country = str(identity.get("country") or "").strip()
+    school_structure = identity.get("school_structure")
+    if not school_name or len(school_name) > 160 or school_type not in {"Primary", "Secondary", "Combined"} or not country or len(country) > 80 or school_structure not in {"Day", "Boarding", "Both"}:
+        raise HTTPException(422, "The signed school identity details are incomplete or invalid.")
+    profile = db.get(models.SchoolProfile, 1)
+    if not profile:
+        raise HTTPException(404, "School profile not found.")
+    old_identity = {
+        "school_name": profile.name, "school_type": profile.school_type,
+        "country": profile.country, "school_structure": profile.school_structure,
+    }
+    new_identity = {
+        "school_name": school_name, "school_type": school_type,
+        "country": country, "school_structure": school_structure,
+        "installation_id": state.installation_id,
+    }
+    profile.name = school_name
+    profile.school_type = school_type
+    profile.country = country
+    profile.school_structure = school_structure
+    state.original_identity_json = json.dumps(new_identity, sort_keys=True)
+    db.add(models.SchoolIdentityCorrection(
+        license_hash=fingerprint,
+        license_id=str(claims["license_id"]),
+        actor_id=admin.id,
+        old_identity_json=json.dumps(old_identity, sort_keys=True),
+        new_identity_json=json.dumps(new_identity, sort_keys=True),
+    ))
+    write_audit(db, admin, "school_identity_corrected", "school_profile", profile.id,
+                "Owner-signed identity correction applied; license " + str(claims["license_id"]))
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "This owner correction license has already been used.")
+    return {"message": "Owner-authorised school identity correction applied.", "school": new_identity}
+
+
 @app.get("/api/setup/status", tags=["First-time Setup"])
 def school_setup_status(db: Session = Depends(get_db)):
     state = get_or_create_setup_state(db)
