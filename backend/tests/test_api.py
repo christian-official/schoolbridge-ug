@@ -1352,15 +1352,23 @@ def test_sync_change_feed_bounds_hidden_history_scans_without_skipping_visible_e
         db.add(student)
         db.flush()
         db.add(models.ParentStudentLink(user_id=parent.id, student_id=student.id))
-        db.add_all([
+        db.flush()
+        # Isolate the 501 feed events from setup hooks so the first 500 rows
+        # are deliberately invisible and the final row is parent-visible.
+        db.query(models.SyncChange).delete()
+        hidden_changes = [
             models.SyncChange(
                 entity_type="Student", entity_id=10000 + index, operation="update",
                 scope_json=json.dumps({"parent_user_ids": []}),
             )
             for index in range(500)
-        ])
+        ]
+        db.add_all(hidden_changes)
+        db.flush()
+        hidden_cursor = hidden_changes[-1].id
+        student_id = student.id
         db.add(models.SyncChange(
-            entity_type="Student", entity_id=student.id, operation="update",
+            entity_type="Student", entity_id=student_id, operation="update",
             scope_json=json.dumps({"parent_user_ids": [parent.id]}),
         ))
         db.commit()
@@ -1381,7 +1389,7 @@ def test_sync_change_feed_bounds_hidden_history_scans_without_skipping_visible_e
         )
         assert first.status_code == 200, first.text
         assert first.json()["changes"] == []
-        assert first.json()["next_cursor"] == 500
+        assert first.json()["next_cursor"] == hidden_cursor
         assert first.json()["has_more"] is True
         second = client.get(
             f"/api/sync/changes?device_id={device_id}&cursor={first.json()['next_cursor']}&limit=20",
@@ -1389,7 +1397,7 @@ def test_sync_change_feed_bounds_hidden_history_scans_without_skipping_visible_e
         )
         assert second.status_code == 200, second.text
         assert len(second.json()["changes"]) == 1
-        assert second.json()["changes"][0]["entity_id"] == student.id
+        assert second.json()["changes"][0]["entity_id"] == student_id
         assert second.json()["has_more"] is False
 
 def test_sync_change_feed_rejects_invalid_cursor_and_limit():
