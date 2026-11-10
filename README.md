@@ -21,7 +21,7 @@ Phase 5 — Database & Offline Architecture includes database-safety, local depl
 
 The local Docker Compose stack runs PostgreSQL, backend, frontend and a backup scheduler. USB scripts now prepare and import prebuilt application images without downloading those images at the school. **The USB package still requires Docker Engine/Compose to be pre-installed, and the service worker currently caches the app shell only. Full offline record access/writes across all modules and clean-machine disconnected installation tests remain unfinished.** Do not call the USB package a finished turnkey offline installer yet.
 
-See [USB installation status and instructions](docs/USB_INSTALLATION.md), [school readiness](docs/SCHOOL_READINESS_AND_INSTALLATION.md), and [architecture notes](docs/architecture.md).
+See [USB installation status and instructions](docs/USB_INSTALLATION.md), [Windows runtime preparation](docs/WINDOWS_RUNTIME_PREPARATION.md), [school readiness](docs/SCHOOL_READINESS_AND_INSTALLATION.md), and [architecture notes](docs/architecture.md).
 
 ## Development
 
