@@ -37,13 +37,26 @@ if (-not $wslReady) {
     if ($wslProcess.ExitCode -notin @(0, 3010, 1641)) { throw "WSL installation failed with Windows Installer exit code $($wslProcess.ExitCode)." }
     if ($wslProcess.ExitCode -in @(3010, 1641)) { $restartNeeded = $true }
 }
-$dockerExe = Join-Path $env:ProgramFiles "Docker\Docker\Docker Desktop.exe"
-if (-not (Test-Path $dockerExe)) {
+
+# Docker Desktop defaults to a per-user installation; also support an all-users install.
+$dockerCandidates = @(
+    (Join-Path $env:LOCALAPPDATA "Programs\DockerDesktop\Docker Desktop.exe"),
+    (Join-Path $env:ProgramFiles "Docker\Docker\Docker Desktop.exe")
+)
+$dockerExe = $dockerCandidates | Where-Object { Test-Path $_ -PathType Leaf } | Select-Object -First 1
+if (-not $dockerExe) {
     Write-Host "Starting the official Docker Desktop installer."
     Write-Host "Complete its interactive setup and accept its licence terms as the authorised computer operator."
     $dockerProcess = Start-Process -FilePath $DockerInstaller -Wait -PassThru
     if ($dockerProcess.ExitCode -ne 0) { throw "Docker Desktop installer exited with code $($dockerProcess.ExitCode). Complete setup, then rerun this script." }
+    $dockerExe = $dockerCandidates | Where-Object { Test-Path $_ -PathType Leaf } | Select-Object -First 1
 }
-if (Test-Path $dockerExe) { Write-Host "Starting Docker Desktop..."; Start-Process -FilePath $dockerExe }
+if ($dockerExe) {
+    Write-Host "Starting Docker Desktop..."
+    Start-Process -FilePath $dockerExe
+}
+else {
+    Write-Warning "Docker Desktop was not found in the standard per-user or all-users install locations. Complete setup, sign in to the installing Windows account, then rerun this script."
+}
 if ($restartNeeded) { Write-Warning "Restart Windows, open Docker Desktop, wait for its engine, then run check-school-host.ps1." }
 else { Write-Host "Runtime preparation finished. Wait for Docker Desktop, then run check-school-host.ps1." }
