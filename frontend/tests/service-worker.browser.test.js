@@ -183,6 +183,13 @@ test('real Chromium completes the first-install owner activation and school setu
     await page.getByLabel('School phone').fill('+256700000000')
     await page.getByLabel('School email').fill('office@example.invalid')
     await page.getByLabel('School motto').fill('Learning together')
+    await page.getByLabel('School logo (PNG, JPEG or WebP)').setInputFiles({
+      name: 'school-logo.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from('test-logo'),
+    })
+    await page.waitForFunction(() => document.querySelector('.first-setup-logo-preview')?.getAttribute('src')?.startsWith('data:image/png;base64,'))
+    await page.getByLabel('House names (one per line)').fill('Lions\\nEagles')
     await page.getByLabel('Administrator username *').fill('first-admin')
     await page.getByLabel('Administrator email *').fill('admin@example.invalid')
     await page.getByLabel('Private password *').fill('LongTestPassword123!')
@@ -197,6 +204,8 @@ test('real Chromium completes the first-install owner activation and school setu
     assert.equal(setupPayload.admin_email, 'admin@example.invalid')
     assert.equal(setupPayload.admin_password, 'LongTestPassword123!')
     assert.equal(setupPayload.activation_license, 'signed-owner-license-token')
+    assert.ok(setupPayload.report_logo.startsWith('data:image/png;base64,'))
+    assert.equal(setupPayload.house_names, 'Lions\\nEagles')
     assert.equal(await page.getByLabel('Password').count(), 1)
   } finally {
     if (browser) await browser.close()

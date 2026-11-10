@@ -2092,12 +2092,18 @@ def test_first_install_requires_activation_and_creates_admin_atomically(monkeypa
             "country": "Uganda",
             "school_structure": "Both",
             "address": "Kampala",
+            "report_logo": "data:image/png;base64,bG9nbw==",
+            "house_names": "Lions\\nEagles",
             "admin_username": "first-admin",
             "admin_email": "admin@example.invalid",
             "admin_password": "LongTestPassword123!",
         })
         assert completed.status_code == 200, completed.text
         assert completed.json()["school"]["school_type"] == "Combined"
+        with SessionLocal() as db:
+            profile = db.get(models.SchoolProfile, 1)
+            assert profile.report_logo == "data:image/png;base64,bG9nbw=="
+            assert profile.house_names == "Lions\\nEagles"
 
         login = client.post(
             "/api/auth/login",

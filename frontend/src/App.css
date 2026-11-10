@@ -2384,3 +2384,5 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .owner-correction-panel p{margin:0;color:#64748b;font-size:12px;line-height:1.5}
 .owner-correction-panel textarea{width:100%;border:1px solid #d5deea;border-radius:9px;padding:10px;font:inherit;resize:vertical;background:#fff}
 .owner-correction-panel .secondary-button{justify-self:start}
+
+.first-setup-logo-preview{display:block;width:96px;height:96px;object-fit:contain;padding:8px;border:1px solid #e2e8f0;border-radius:12px;background:#fff}

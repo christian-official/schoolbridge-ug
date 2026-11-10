@@ -612,9 +612,32 @@ function FirstTimeSetupWizard({status,onStatusChange}:{status:FirstSetupStatus;o
   const [error,setError]=useState('')
   const [school,setSchool]=useState({
     school_name:'', school_type:'Secondary', country:'', school_structure:'Day',
-    address:'', phone:'', email:'', motto:'',
+    address:'', phone:'', email:'', motto:'', report_logo:'', house_names:'',
     admin_username:'', admin_email:'', admin_password:'',
   })
+  function handleSchoolLogo(event:React.ChangeEvent<HTMLInputElement>) {
+    const file=event.target.files?.[0]
+    if(!file)return
+    if(!['image/png','image/jpeg','image/webp'].includes(file.type)){
+      setError('Choose a PNG, JPEG or WebP school logo.')
+      event.target.value=''
+      return
+    }
+    if(file.size>1_400_000){
+      setError('The school logo must be smaller than 1.4 MB.')
+      event.target.value=''
+      return
+    }
+    const reader=new FileReader()
+    reader.onload=()=>{
+      if(typeof reader.result==='string'){
+        setSchool(current=>({...current,report_logo:reader.result as string}))
+        setError('')
+      }
+    }
+    reader.onerror=()=>setError('The school logo could not be read. Try another image.')
+    reader.readAsDataURL(file)
+  }
   async function activate(event:React.FormEvent<HTMLFormElement>) {
     event.preventDefault();setBusy(true);setError('')
     try {
@@ -683,6 +706,11 @@ function FirstTimeSetupWizard({status,onStatusChange}:{status:FirstSetupStatus;o
               <label>School email<input type="email" value={school.email} onChange={e=>setSchool({...school,email:e.target.value})}/></label>
             </div>
             <label>School motto<input value={school.motto} onChange={e=>setSchool({...school,motto:e.target.value})}/></label>
+          </div>
+          <div className="first-setup-section"><h3>School branding</h3>
+            <label>School logo (PNG, JPEG or WebP)<input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleSchoolLogo}/></label>
+            {school.report_logo&&<img className="first-setup-logo-preview" src={school.report_logo} alt="School logo preview"/>}
+            <label>House names (one per line)<textarea rows={3} value={school.house_names} onChange={e=>setSchool({...school,house_names:e.target.value})} placeholder="Enter house names, one per line"/></label>
           </div>
           <div className="first-setup-section"><h3>First administrator</h3>
             <label>Administrator username *<input required minLength={3} maxLength={80} autoComplete="username" value={school.admin_username} onChange={e=>setSchool({...school,admin_username:e.target.value})}/></label>

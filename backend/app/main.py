@@ -1953,6 +1953,8 @@ class FirstSchoolSetupRequest(BaseModel):
     phone: str | None = Field(default=None, max_length=40)
     email: str | None = Field(default=None, max_length=150)
     motto: str | None = Field(default=None, max_length=200)
+    report_logo: str | None = Field(default=None, max_length=2_000_000)
+    house_names: str | None = Field(default=None, max_length=5000)
     admin_username: str = Field(min_length=3, max_length=80, pattern=r"^[A-Za-z0-9_.-]+$")
     admin_email: str = Field(min_length=5, max_length=150)
     admin_password: str = Field(min_length=12, max_length=128)
@@ -2094,10 +2096,13 @@ def complete_first_school_setup(data: FirstSchoolSetupRequest, db: Session = Dep
         or_(models.User.username == data.admin_username, models.User.email == data.admin_email)
     ).first():
         raise HTTPException(409, "The administrator username or email is already in use.")
+    if data.report_logo and not re.fullmatch(r"data:image/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+", data.report_logo):
+        raise HTTPException(422, "School logo must be a PNG, JPEG or WebP image uploaded through the setup form.")
     profile = models.SchoolProfile(
         id=1, name=data.school_name.strip(), school_type=data.school_type,
         country=data.country.strip(), school_structure=data.school_structure,
         address=data.address, phone=data.phone, email=data.email, motto=data.motto,
+        report_logo=data.report_logo, house_names=data.house_names,
     )
     admin = models.User(
         username=data.admin_username.strip(), email=data.admin_email.strip().lower(),
