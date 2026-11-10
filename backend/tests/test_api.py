@@ -2036,7 +2036,7 @@ def _signed_test_license(installation_id, private_key, extra_claims=None):
     payload = json.dumps(claims, sort_keys=True, separators=(",", ":")).encode()
     signature = private_key.sign(payload)
     encode = lambda value: base64.urlsafe_b64encode(value).decode().rstrip("=")
-    return encode(payload) + "." + encode(signature)
+    return "CHRISTIAN:" + encode(payload) + "." + encode(signature)
 
 
 def test_first_install_requires_activation_and_creates_admin_atomically(monkeypatch):
