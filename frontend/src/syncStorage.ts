@@ -1,10 +1,10 @@
 export async function clearLocalSyncData(userId: number, deviceId: string) {
   if (typeof indexedDB !== 'undefined') {
-    await new Promise<void>(resolve => {
+    await new Promise<void>((resolve, reject) => {
       const deletion = indexedDB.deleteDatabase('schoolbridge-offline-' + userId + '-' + deviceId)
       deletion.onsuccess = () => resolve()
-      deletion.onerror = () => resolve()
-      deletion.onblocked = () => resolve()
+      deletion.onerror = () => reject(new Error('Unable to clear this device’s offline data.'))
+      deletion.onblocked = () => reject(new Error('Close other SchoolBridge tabs to finish clearing this device’s offline data.'))
     })
   }
   const prefix = 'schoolbridge-offline-' + userId + '-' + deviceId + '-'
@@ -30,7 +30,10 @@ function openOfflineDatabase(userId: number, deviceId: string): Promise<IDBDatab
       if (!opening.result.objectStoreNames.contains('drafts')) opening.result.createObjectStore('drafts')
       if (!opening.result.objectStoreNames.contains('snapshots')) opening.result.createObjectStore('snapshots')
     }
-    opening.onsuccess = () => resolve(opening.result)
+    opening.onsuccess = () => {
+      opening.result.onversionchange = () => opening.result.close()
+      resolve(opening.result)
+    }
     opening.onerror = () => reject(new Error('Unable to open encrypted offline storage.'))
   })
 }
