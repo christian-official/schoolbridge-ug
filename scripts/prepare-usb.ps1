@@ -29,8 +29,12 @@ try {
     $RuntimeSource = Join-Path $RepoRoot "runtime"
     if (Test-Path $RuntimeSource) {
         Copy-Item $RuntimeSource (Join-Path $PackageDir "runtime") -Recurse -Force
-    } else {
-        Write-Warning "No runtime folder found. Add the official WSL and Docker Desktop offline installers under runtime before preparing the final school USB."
+    }
+    if (-not (Test-Path (Join-Path $RuntimeSource "Docker Desktop Installer.exe"))) {
+        Write-Warning "Docker Desktop installer is missing. Add the official installer under runtime before calling this a complete offline Windows USB."
+    }
+    if (-not (Test-Path (Join-Path $RuntimeSource "wsl.msi"))) {
+        Write-Warning "Offline WSL MSI is missing. Some school computers may already have a suitable WSL version; otherwise add the official WSL MSI under runtime."
     }
     @'
 # Add the owner's Base64 public verification key before starting SchoolBridge.
