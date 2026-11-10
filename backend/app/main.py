@@ -5337,7 +5337,8 @@ def submit_offline_teacher_marks(data: OfflineTeacherMarkBatch, db: Session = De
         return {
             "proposal_id": old.id, "status": old.status, "duplicate": True,
             "applied": old.status == "applied", "saved": len(data.records) if old.status == "applied" else 0,
-        }    assignment = db.query(models.TeacherAssignment.id).filter_by(
+        }
+    assignment = db.query(models.TeacherAssignment.id).filter_by(
         teacher_id=teacher.id, class_id=exam.class_id, subject_id=subject.id
     ).first()
     if not assignment:
