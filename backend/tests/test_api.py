@@ -2491,7 +2491,7 @@ def test_parent_change_feed_invalidates_previously_verified_marks_when_unverifie
         assert initial.status_code == 200, initial.text
         assert any(
             item["entity_type"].startswith("MarkScope")
-            and item["entity_id"] == mark_id
+            and item["entity_id"] == student_id
             and item["operation"] == "insert"
             for item in initial.json()["changes"]
         )
