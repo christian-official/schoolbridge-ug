@@ -1198,6 +1198,32 @@ def test_sync_change_feed_filters_parent_and_teacher_history_scopes():
         parent_mark_events = [item for item in parent_feed.json()["changes"] if item["entity_type"].startswith("Mark")]
         assert len(parent_mark_events) == 2
 
+        # Moving a student must invalidate the old class scope as well as the
+        # linked parent's view, even though the row now belongs to another class.
+        with SessionLocal() as db:
+            db.get(models.Student, student_id).class_id = other_id
+            db.commit()
+        teacher_moved = client.get(
+            f"/api/sync/changes?device_id={teacher_device}&cursor={teacher_feed.json()['next_cursor']}",
+            headers=teacher_headers,
+        )
+        parent_moved = client.get(
+            f"/api/sync/changes?device_id={parent_device}&cursor={parent_feed.json()['next_cursor']}",
+            headers=parent_headers,
+        )
+        assert teacher_moved.status_code == 200, teacher_moved.text
+        assert parent_moved.status_code == 200, parent_moved.text
+        assert any(
+            item["entity_type"] == "Student" and item["entity_id"] == student_id
+            and item["operation"] == "update"
+            for item in teacher_moved.json()["changes"]
+        )
+        assert any(
+            item["entity_type"] == "Student" and item["entity_id"] == student_id
+            and item["operation"] == "update"
+            for item in parent_moved.json()["changes"]
+        )
+
         # Removing a relationship must still deliver an invalidation to the
         # account that was authorised immediately before the removal.
         with SessionLocal() as db:
@@ -1213,11 +1239,11 @@ def test_sync_change_feed_filters_parent_and_teacher_history_scopes():
             db.commit()
 
         teacher_removed = client.get(
-            f"/api/sync/changes?device_id={teacher_device}&cursor={teacher_feed.json()['next_cursor']}",
+            f"/api/sync/changes?device_id={teacher_device}&cursor={teacher_moved.json()['next_cursor']}",
             headers=teacher_headers,
         )
         parent_removed = client.get(
-            f"/api/sync/changes?device_id={parent_device}&cursor={parent_feed.json()['next_cursor']}",
+            f"/api/sync/changes?device_id={parent_device}&cursor={parent_moved.json()['next_cursor']}",
             headers=parent_headers,
         )
         assert teacher_removed.status_code == 200, teacher_removed.text
