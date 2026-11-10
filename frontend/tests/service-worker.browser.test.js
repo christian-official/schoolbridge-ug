@@ -185,18 +185,30 @@ test('real Chromium completes the first-install owner activation and school setu
     assert.ok(schoolSetupLayout.document <= schoolSetupLayout.viewport, `school setup page must fit mobile viewport: ${JSON.stringify(schoolSetupLayout)}`)
     await page.setViewportSize({ width: 1280, height: 900 })
 
-    // A refresh intentionally clears the signed license from page memory.
-    // The server remembers activation; the owner license is pasted again
-    // before the first administrator is created.
+    // Non-secret school identity fields survive a refresh in this browser tab.
+    // The activation code and administrator credentials must be entered again.
+    await page.getByLabel('Official school name *').fill('River Valley School')
+    await page.getByLabel('Country *').fill('Uganda')
+    await page.getByLabel('Administrator username *').fill('first-admin')
+    await page.getByLabel('Administrator email *').fill('admin@example.invalid')
+    await page.getByLabel('Private password *').fill('LongTestPassword123!')
     await page.reload({ waitUntil: 'networkidle' })
     await page.getByRole('heading', { name: 'Set up your school' }).waitFor()
     assert.equal(await page.getByLabel('Confirm CHRISTIAN Owner Key activation code').inputValue(), '')
+    assert.equal(await page.getByLabel('Official school name *').inputValue(), 'River Valley School')
+    assert.equal(await page.getByLabel('Country *').inputValue(), 'Uganda')
+    assert.equal(await page.getByLabel('Administrator username *').inputValue(), '')
+    assert.equal(await page.getByLabel('Administrator email *').inputValue(), '')
+    assert.equal(await page.getByLabel('Private password *').inputValue(), '')
+    const setupDraft = await page.evaluate(() => Object.values(sessionStorage).join(' '))
+    assert.ok(!setupDraft.includes('signed-owner-license-token'))
+    assert.ok(!setupDraft.includes('LongTestPassword123!'))
     await page.getByLabel('Confirm CHRISTIAN Owner Key activation code').fill('signed-owner-license-token')
-
-    await page.getByLabel('Official school name *').fill('River Valley School')
+    await page.getByLabel('Administrator username *').fill('first-admin')
+    await page.getByLabel('Administrator email *').fill('admin@example.invalid')
+    await page.getByLabel('Private password *').fill('LongTestPassword123!')
     await page.getByLabel('School type *').selectOption('Combined')
     await page.getByLabel('School structure *').selectOption('Both')
-    await page.getByLabel('Country *').fill('Uganda')
     await page.getByLabel('Physical address').fill('Kampala')
     await page.getByLabel('School phone').fill('+256700000000')
     await page.getByLabel('School email').fill('office@example.invalid')
