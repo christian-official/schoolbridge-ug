@@ -20,6 +20,7 @@ from .database import DATABASE_URL, Base, engine, get_db, SessionLocal, create_s
 from .migrations import upgrade_database
 from . import models
 from .sync_tracking import register_sync_tracking
+from .school_setup import verify_activation_license, license_fingerprint
 
 from dotenv import load_dotenv
 import jwt
@@ -205,7 +206,7 @@ upgrade_database(DATABASE_URL)
 
 def seed_demo_data_if_empty():
     """Populate a fresh preview database with clearly labelled demo records."""
-    if os.getenv("SCHOOLBRIDGE_SEED_DEMO_DATA", "true").lower() not in {"1", "true", "yes"}:
+    if os.getenv("SCHOOLBRIDGE_SEED_DEMO_DATA", "false").lower() not in {"1", "true", "yes"}:
         return
     db = SessionLocal()
     try:
@@ -1824,7 +1825,7 @@ def delete_timetable_entry(
 @app.middleware("http")
 async def protect_school_data(request: Request, call_next):
     path = request.url.path
-    public_paths = {"/api/health", "/api/auth/login"}
+    public_paths = {"/api/health", "/api/auth/login", "/api/setup/status", "/api/setup/activate", "/api/setup/complete"}
 
     # Browser CORS preflight requests must reach CORSMiddleware without auth.
     if request.method == "OPTIONS":
@@ -1834,6 +1835,14 @@ async def protect_school_data(request: Request, call_next):
         return await call_next(request)
 
     from starlette.responses import JSONResponse
+
+    setup_db = SessionLocal()
+    try:
+        setup_state = setup_db.get(models.SchoolSetupState, 1)
+        if not setup_state or not setup_state.setup_completed_at:
+            return JSONResponse({"detail": "Complete SchoolBridge first-time setup before accessing school records."}, status_code=403)
+    finally:
+        setup_db.close()
 
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
@@ -1918,11 +1927,111 @@ async def protect_school_data(request: Request, call_next):
         db.close()
 
 
+
+class SchoolActivationRequest(BaseModel):
+    license: str = Field(min_length=20, max_length=4096)
+
+
+class FirstSchoolSetupRequest(BaseModel):
+    school_name: str = Field(min_length=2, max_length=160)
+    school_type: str = Field(pattern="^(Primary|Secondary|Combined)$")
+    country: str = Field(min_length=2, max_length=80)
+    school_structure: str = Field(pattern="^(Day|Boarding|Both)$")
+    address: str | None = Field(default=None, max_length=255)
+    phone: str | None = Field(default=None, max_length=40)
+    email: str | None = Field(default=None, max_length=150)
+    motto: str | None = Field(default=None, max_length=200)
+    admin_username: str = Field(min_length=3, max_length=80, pattern=r"^[A-Za-z0-9_.-]+$")
+    admin_email: str = Field(min_length=5, max_length=150)
+    admin_password: str = Field(min_length=12, max_length=128)
+
+
+def get_or_create_setup_state(db: Session):
+    state = db.get(models.SchoolSetupState, 1)
+    if state is None:
+        state = models.SchoolSetupState(id=1, installation_id=str(uuid4()))
+        db.add(state)
+        db.commit()
+        db.refresh(state)
+    return state
+
+
+@app.get("/api/setup/status", tags=["First-time Setup"])
+def school_setup_status(db: Session = Depends(get_db)):
+    state = get_or_create_setup_state(db)
+    return {
+        "installation_id": state.installation_id,
+        "activated": bool(state.activated_at),
+        "setup_completed": bool(state.setup_completed_at),
+        "requires_activation": not bool(state.activated_at),
+        "requires_setup": not bool(state.setup_completed_at),
+    }
+
+
+@app.post("/api/setup/activate", tags=["First-time Setup"])
+def activate_school_installation(data: SchoolActivationRequest, db: Session = Depends(get_db)):
+    state = get_or_create_setup_state(db)
+    if state.activated_at:
+        raise HTTPException(409, "This SchoolBridge installation has already been activated.")
+    try:
+        claims = verify_activation_license(data.license)
+    except (ValueError, RuntimeError):
+        raise HTTPException(403, "The activation license is invalid or cannot be verified.")
+    if claims.get("installation_id") != state.installation_id or claims.get("product") != "SchoolBridge":
+        raise HTTPException(403, "This activation license was not issued for this installation.")
+    state.activated_at = datetime.utcnow()
+    state.activation_license_hash = license_fingerprint(data.license)
+    db.commit()
+    return {"message": "SchoolBridge installation activated.", "activated": True}
+
+
+@app.post("/api/setup/complete", tags=["First-time Setup"])
+def complete_first_school_setup(data: FirstSchoolSetupRequest, db: Session = Depends(get_db)):
+    state = get_or_create_setup_state(db)
+    if not state.activated_at:
+        raise HTTPException(403, "Activate this installation before completing school setup.")
+    if state.setup_completed_at or db.query(models.User).count():
+        raise HTTPException(409, "First-time setup has already been completed.")
+    if db.get(models.SchoolProfile, 1):
+        raise HTTPException(409, "A school profile already exists. Contact the SchoolBridge owner for assistance.")
+    if db.query(models.User).filter(
+        or_(models.User.username == data.admin_username, models.User.email == data.admin_email)
+    ).first():
+        raise HTTPException(409, "The administrator username or email is already in use.")
+    profile = models.SchoolProfile(
+        id=1, name=data.school_name.strip(), school_type=data.school_type,
+        country=data.country.strip(), school_structure=data.school_structure,
+        address=data.address, phone=data.phone, email=data.email, motto=data.motto,
+    )
+    admin = models.User(
+        username=data.admin_username.strip(), email=data.admin_email.strip().lower(),
+        hashed_password=password_hash.hash(data.admin_password), role="admin", is_active=True,
+    )
+    identity = {
+        "school_name": profile.name, "school_type": profile.school_type,
+        "country": profile.country, "school_structure": profile.school_structure,
+        "installation_id": state.installation_id,
+    }
+    db.add(profile)
+    db.add(admin)
+    state.original_identity_json = json.dumps(identity, sort_keys=True)
+    state.setup_completed_at = datetime.utcnow()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "School setup could not be completed because an account already exists.")
+    return {"message": "School setup completed. You can now sign in with the administrator account.", "school": identity}
+
+
 @app.post("/api/auth/login", tags=["Authentication"])
 def login(
     data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
+    state = db.get(models.SchoolSetupState, 1)
+    if not state or not state.setup_completed_at:
+        raise HTTPException(403, "SchoolBridge first-time setup must be completed before signing in.")
     login_name = data.username.strip()
     user = db.query(models.User).filter(
         models.User.username == login_name
@@ -4764,7 +4873,9 @@ class SchoolProfileUpdate(BaseModel):
     phone: str | None = Field(default=None, max_length=40)
     email: str | None = Field(default=None, max_length=150)
     motto: str | None = Field(default=None, max_length=200)
-    school_type: str = Field(default="Secondary", pattern="^(Primary|Secondary)$")
+    school_type: str = Field(default="Secondary", pattern="^(Primary|Secondary|Combined)$")
+    country: str | None = Field(default=None, max_length=80)
+    school_structure: str | None = Field(default=None, pattern="^(Day|Boarding|Both)$")
     a_level_combinations: str | None = None
     o_level_optional_subjects: str | None = None
     a_level_subsidiary_subjects: str | None = None
@@ -4790,7 +4901,22 @@ def save_school_profile(data: SchoolProfileUpdate, db: Session = Depends(get_db)
     if profile is None:
         profile = models.SchoolProfile(id=1)
         db.add(profile)
-    for key, value in data.model_dump(exclude_unset=True).items():
+    updates = data.model_dump(exclude_unset=True)
+    state = db.get(models.SchoolSetupState, 1)
+    if state and state.setup_completed_at and state.original_identity_json:
+        current_identity = {
+            "name": profile.name, "school_type": profile.school_type,
+            "country": profile.country, "school_structure": profile.school_structure,
+        }
+        requested_identity = {
+            "name": updates.get("name", profile.name),
+            "school_type": updates.get("school_type", profile.school_type),
+            "country": updates.get("country", profile.country),
+            "school_structure": updates.get("school_structure", profile.school_structure),
+        }
+        if requested_identity != current_identity:
+            raise HTTPException(403, "Official school identity is protected after first-time setup. Contact the SchoolBridge owner for an authorised, audited correction.")
+    for key, value in updates.items():
         setattr(profile, key, value)
     db.flush()
     write_audit(db, admin, "school_profile_updated", "school_profile", profile.id, "School profile and report branding updated.")

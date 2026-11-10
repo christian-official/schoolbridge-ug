@@ -20,6 +20,27 @@ from app import models
 def reset_database():
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
+    with SessionLocal() as db:
+        db.add(models.SchoolSetupState(
+            id=1,
+            installation_id="test-existing-installation",
+            activated_at=datetime.utcnow(),
+            setup_completed_at=datetime.utcnow(),
+            original_identity_json=json.dumps({
+                "school_name": "Test School",
+                "school_type": "Secondary",
+                "country": None,
+                "school_structure": None,
+            }),
+        ))
+        db.commit()
+
+
+def reset_new_installation():
+    reset_database()
+    with SessionLocal() as db:
+        db.query(models.SchoolSetupState).delete()
+        db.commit()
 
 
 def create_admin():
@@ -1997,3 +2018,95 @@ def test_offline_snapshot_pages_reject_records_changed_during_download(monkeypat
             )
             assert response.status_code == 409, (endpoint, response.text)
             assert "changed while this snapshot page" in response.json()["detail"]
+
+
+
+def _signed_test_license(installation_id, private_key):
+    import base64
+    import json
+    from datetime import datetime, timezone
+    claims = {
+        "product": "SchoolBridge",
+        "installation_id": installation_id,
+        "license_id": "test-license-001",
+        "issued_at": int(datetime.now(timezone.utc).timestamp()),
+    }
+    payload = json.dumps(claims, sort_keys=True, separators=(",", ":")).encode()
+    signature = private_key.sign(payload)
+    encode = lambda value: base64.urlsafe_b64encode(value).decode().rstrip("=")
+    return encode(payload) + "." + encode(signature)
+
+
+def test_first_install_requires_activation_and_creates_admin_atomically(monkeypatch):
+    import base64
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    reset_new_installation()
+    private_key = Ed25519PrivateKey.generate()
+    public_key = private_key.public_key().public_bytes(
+        serialization.Encoding.Raw, serialization.PublicFormat.Raw
+    )
+    monkeypatch.setenv("SCHOOLBRIDGE_LICENSE_PUBLIC_KEY", base64.b64encode(public_key).decode())
+
+    with TestClient(app) as client:
+        status = client.get("/api/setup/status")
+        assert status.status_code == 200
+        installation_id = status.json()["installation_id"]
+        assert status.json()["requires_activation"] is True
+
+        blocked_login = client.post(
+            "/api/auth/login",
+            data={"username": "first-admin", "password": "LongTestPassword123!"},
+        )
+        assert blocked_login.status_code == 403
+
+        license_token = _signed_test_license(installation_id, private_key)
+        activated = client.post("/api/setup/activate", json={"license": license_token})
+        assert activated.status_code == 200, activated.text
+        assert client.post("/api/setup/activate", json={"license": license_token}).status_code == 409
+
+        completed = client.post("/api/setup/complete", json={
+            "school_name": "River Valley School",
+            "school_type": "Combined",
+            "country": "Uganda",
+            "school_structure": "Both",
+            "address": "Kampala",
+            "admin_username": "first-admin",
+            "admin_email": "admin@example.invalid",
+            "admin_password": "LongTestPassword123!",
+        })
+        assert completed.status_code == 200, completed.text
+        assert completed.json()["school"]["school_type"] == "Combined"
+
+        login = client.post(
+            "/api/auth/login",
+            data={"username": "first-admin", "password": "LongTestPassword123!"},
+        )
+        assert login.status_code == 200, login.text
+        headers = {"Authorization": "Bearer " + login.json()["access_token"]}
+        changed_identity = client.put(
+            "/api/settings/school-profile",
+            headers=headers,
+            json={"name": "Changed School Name", "school_type": "Primary"},
+        )
+        assert changed_identity.status_code == 403
+        assert "identity is protected" in changed_identity.json()["detail"]
+
+
+def test_invalid_activation_license_is_rejected(monkeypatch):
+    reset_new_installation()
+    monkeypatch.delenv("SCHOOLBRIDGE_LICENSE_PUBLIC_KEY", raising=False)
+    with TestClient(app) as client:
+        client.get("/api/setup/status")
+        response = client.post("/api/setup/activate", json={"license": "not-a-real-signed-license"})
+    assert response.status_code == 403
+
+
+def test_demo_data_is_disabled_by_default(monkeypatch):
+    reset_new_installation()
+    monkeypatch.delenv("SCHOOLBRIDGE_SEED_DEMO_DATA", raising=False)
+    main_module.seed_demo_data_if_empty()
+    with SessionLocal() as db:
+        assert db.query(models.Student).count() == 0
+        assert db.query(models.SchoolProfile).count() == 0

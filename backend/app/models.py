@@ -252,6 +252,8 @@ class SchoolProfile(Base):
     email: Mapped[str | None] = mapped_column(String(150), nullable=True)
     motto: Mapped[str | None] = mapped_column(String(200), nullable=True)
     school_type: Mapped[str] = mapped_column(String(20), default="Secondary")
+    country: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    school_structure: Mapped[str | None] = mapped_column(String(20), nullable=True)
     a_level_combinations: Mapped[str | None] = mapped_column(Text, nullable=True)
     o_level_optional_subjects: Mapped[str | None] = mapped_column(Text, nullable=True)
     a_level_subsidiary_subjects: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -402,3 +404,15 @@ class SyncChange(Base):
     operation: Mapped[str] = mapped_column(String(10), nullable=False)
     changed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False, index=True)
     scope_json: Mapped[str] = mapped_column(Text, default="{}", server_default="{}", nullable=False)
+
+
+class SchoolSetupState(Base):
+    """Persistent installation activation and first-time setup state."""
+    __tablename__ = "school_setup_state"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    installation_id: Mapped[str] = mapped_column(String(36), unique=True, nullable=False)
+    activated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    activation_license_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    setup_completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    original_identity_json: Mapped[str | None] = mapped_column(Text, nullable=True)
