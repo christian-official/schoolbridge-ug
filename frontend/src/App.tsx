@@ -15,6 +15,7 @@ import Phase4Workspace from './Phase4Workspace'
 import ParentLiaisonWorkspace from './ParentLiaison'
 import SyncDevices from './SyncDevices'
 import VisitorRegister from './VisitorRegister'
+import StudentPromotion from './StudentPromotion'
 import { clearLocalSyncData, saveEncryptedOfflineDraft, loadEncryptedOfflineDraft, deleteEncryptedOfflineDraft, loadEncryptedOfflineSnapshot } from './syncStorage'
 import './App.css'
 import './DashboardRedesign.css'
@@ -1403,6 +1404,7 @@ function App() {
               <div className="panel-heading student-workspace-heading"><div><h2>Students</h2><p>{studentTotal.toLocaleString()} registered students · Select a class to view its student list.</p></div>{(user.role === 'admin' || (user.permissions?.['Students'] || []).includes('add')) && <button type="button" className="primary-button add-student-button" onClick={() => { setShowStudentForm(v => !v); setStudentError(''); setStudentSuccess('') }}><UserPlus size={16} /> {showStudentForm ? 'Close registration' : 'Register student'}</button>}</div>
               {studentSuccess && <div className="success-notice">{studentSuccess}</div>}
               {studentError && <div className="form-error">{studentError}</div>}
+              {user.role === 'admin' && <StudentPromotion token={token} classes={classes} onComplete={() => { void loadSchoolData(token); void loadStudentPage(1, search) }} />}
               {showStudentForm && (user.role === 'admin' || (user.permissions?.['Students'] || []).includes('add')) && (
                 <form className="student-form registration-form" onSubmit={registerStudent}>
                   <div className="form-heading">
