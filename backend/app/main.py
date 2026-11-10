@@ -1133,6 +1133,8 @@ def update_mark(mark_id: int, data: MarkUpdate, db: Session = Depends(get_db)):
         raise HTTPException(404, "Mark record not found.")
     exam = db.get(models.Exam, item.exam_id)
     student = db.get(models.Student, item.student_id)
+    if exam and exam.closed:
+        raise HTTPException(409, "This examination is closed. Reopen it before changing marks.")
     if exam and exam.class_id is not None and student and student.class_id != exam.class_id:
         raise HTTPException(409, "This mark no longer matches the examination class.")
     item.score = data.score
@@ -1147,6 +1149,9 @@ def verify_mark(mark_id: int, verified: bool, db: Session = Depends(get_db), adm
     item = db.get(models.Mark, mark_id)
     if not item:
         raise HTTPException(404, "Mark record not found.")
+    exam = db.get(models.Exam, item.exam_id)
+    if exam and exam.closed:
+        raise HTTPException(409, "This examination is closed. Reopen it before changing verification.")
     item.verified = verified
     write_audit(
         db, admin, "mark_verified" if verified else "mark_unlocked",
@@ -1169,6 +1174,8 @@ def verify_subject_marks_batch(
     subject = db.get(models.Subject, subject_id)
     if not exam or not subject:
         raise HTTPException(404, "Examination or subject not found.")
+    if exam.closed:
+        raise HTTPException(409, "This examination is closed. Reopen it before changing verification.")
     query = db.query(models.Mark).filter(
         models.Mark.exam_id == exam_id,
         models.Mark.subject_id == subject_id,
@@ -3967,6 +3974,8 @@ def save_teacher_marks_bulk(data: BulkMarkCreate, db: Session = Depends(get_db),
     subject = db.get(models.Subject, data.subject_id)
     if not exam or not subject or exam.class_id is None:
         raise HTTPException(404, "Class examination or subject not found.")
+    if exam.closed:
+        raise HTTPException(409, "This examination is closed. Reopen it before changing marks.")
     assigned = db.query(models.TeacherAssignment).filter_by(
         teacher_id=teacher.id, class_id=exam.class_id, subject_id=subject.id
     ).first()
@@ -4034,6 +4043,8 @@ def save_teacher_mark(data: MarkCreate, db: Session = Depends(get_db),
     exam = db.get(models.Exam, data.exam_id)
     if not student or not subject or not exam:
         raise HTTPException(404, "Student, subject or examination not found.")
+    if exam.closed:
+        raise HTTPException(409, "This examination is closed. Reopen it before changing marks.")
     if exam.class_id is None or student.class_id != exam.class_id:
         raise HTTPException(422, "The student does not belong to this class examination.")
     assignment = db.query(models.TeacherAssignment).filter_by(
