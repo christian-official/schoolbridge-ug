@@ -150,3 +150,27 @@ jobs:
           marker=$(dc exec -T database psql -U schoolbridge -d schoolbridge -tAc "SELECT marker FROM usb_ci_persistence_check WHERE id=1" | tr -d '[:space:]')
           if [ "$marker" != "survives-restart" ]; then dc logs; exit 1; fi
           curl --fail --silent http://127.0.0.1:18080/api/health >/dev/null
+
+
+  windows-installer-script-validation:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse all Windows PowerShell installer scripts
+        shell: pwsh
+        run: |
+          $files = @(
+            "scripts/prepare-usb.ps1",
+            "scripts/install-schoolbridge.ps1",
+            "scripts/check-school-host.ps1"
+          )
+          foreach ($file in $files) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file), [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) {
+              $errors | ForEach-Object { Write-Error $_.Message }
+              throw "PowerShell syntax validation failed for $file"
+            }
+            Write-Host "PowerShell syntax OK: $file"
+          }
