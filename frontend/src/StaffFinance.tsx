@@ -199,18 +199,19 @@ export default function StaffFinance({token,active,classes=[],refreshKey=0,initi
     if(offlineFinancePassphrase.length<12){setOfflineFinanceStatus('Enter a passphrase of at least 12 characters.');return}
     setOfflineFinanceBusy(true);setOfflineFinanceStatus('')
     try{
-      const account=await request<{id:number}>('auth/me',token)
-      const deviceId=localStorage.getItem('schoolbridge-sync-device-'+account.id)||''
-      if(!deviceId)throw new Error('Register this browser under Device synchronisation before saving offline payments.')
-      const metaRaw=localStorage.getItem('schoolbridge-offline-snapshot-meta-'+account.id+'-'+deviceId)
+      const loginIndex=JSON.parse(localStorage.getItem('schoolbridge-offline-login-index')||'null') as {userId:number;deviceId:string}|null
+      if(!loginIndex||!Number.isInteger(loginIndex.userId)||!loginIndex.deviceId)throw new Error('Download a current encrypted offline snapshot while connected before preparing offline payments.')
+      const userId=loginIndex.userId,deviceId=loginIndex.deviceId
+      if(localStorage.getItem('schoolbridge-sync-device-'+userId)!==deviceId)throw new Error('The registered device identity has changed. Revalidate this browser online.')
+      const metaRaw=localStorage.getItem('schoolbridge-offline-snapshot-meta-'+userId+'-'+deviceId)
       if(!metaRaw)throw new Error('Download a current encrypted offline snapshot before preparing payments.')
       const meta=JSON.parse(metaRaw) as {sequence:number}
       if(!Number.isInteger(meta.sequence)||meta.sequence<0)throw new Error('The offline snapshot sequence is invalid. Download it again.')
       const charge=selectedStudentCharges.find(item=>item.id===Number(payment.charge_id))
       if(!charge)throw new Error('The selected fee charge is unavailable.')
       const item:OfflineFinancePayment={idempotency_key:crypto.randomUUID(),charge_id:charge.id,amount:Number(payment.amount),method:payment.method,reference:payment.reference||null,payment_date:new Date().toISOString().slice(0,10),base_sequence:meta.sequence,student_name:[selectedPaymentStudent.first_name,selectedPaymentStudent.middle_name,selectedPaymentStudent.last_name].filter(Boolean).join(' '),admission_number:selectedPaymentStudent.admission_number,term:charge.term,year:charge.year}
-      const existing=await loadEncryptedFinanceQueue<OfflineFinancePayment[]>(account.id,deviceId,offlineFinancePassphrase).catch(()=>[])
-      const next=[...existing,item];await saveEncryptedFinanceQueue(account.id,deviceId,offlineFinancePassphrase,next)
+      const existing=await loadEncryptedFinanceQueue<OfflineFinancePayment[]>(userId,deviceId,offlineFinancePassphrase)
+      const next=[...existing,item];await saveEncryptedFinanceQueue(userId,deviceId,offlineFinancePassphrase,next)
       setOfflineFinanceQueue(next);setOfflineFinanceStatus('Payment securely queued. It has NOT been recorded by the school yet.')
     }catch(error){setOfflineFinanceStatus(error instanceof Error?error.message:'Unable to save offline payment.')}
     finally{setOfflineFinanceBusy(false)}
@@ -219,12 +220,14 @@ export default function StaffFinance({token,active,classes=[],refreshKey=0,initi
     if(offlineFinancePassphrase.length<12){setOfflineFinanceStatus('Enter the passphrase used to protect the queue.');return}
     setOfflineFinanceBusy(true);setOfflineFinanceStatus('')
     try{
-      const account=await request<{id:number}>('auth/me',token);const deviceId=localStorage.getItem('schoolbridge-sync-device-'+account.id)||''
-      if(!deviceId)throw new Error('This browser has no registered sync device.')
-      const queue=await loadEncryptedFinanceQueue<OfflineFinancePayment[]>(account.id,deviceId,offlineFinancePassphrase)
+      const loginIndex=JSON.parse(localStorage.getItem('schoolbridge-offline-login-index')||'null') as {userId:number;deviceId:string}|null
+      if(!loginIndex||!Number.isInteger(loginIndex.userId)||!loginIndex.deviceId)throw new Error('No registered offline snapshot is available on this browser.')
+      const userId=loginIndex.userId,deviceId=loginIndex.deviceId
+      if(localStorage.getItem('schoolbridge-sync-device-'+userId)!==deviceId)throw new Error('The registered device identity has changed. Revalidate this browser online.')
+      const queue=await loadEncryptedFinanceQueue<OfflineFinancePayment[]>(userId,deviceId,offlineFinancePassphrase)
       const remaining:OfflineFinancePayment[]=[];let applied=0,conflicts=0
       for(const item of queue){try{const result=await request<{status:string}>('sync/finance-payments',token,{method:'POST',body:JSON.stringify({device_id:deviceId,idempotency_key:item.idempotency_key,charge_id:item.charge_id,amount:item.amount,method:item.method,reference:item.reference,payment_date:item.payment_date,base_sequence:item.base_sequence})});if(result.status==='applied')applied++;else{conflicts++;remaining.push(item)}}catch(error){remaining.push(item);if(error instanceof Error&&error.message.includes('409'))conflicts++}}
-      await saveEncryptedFinanceQueue(account.id,deviceId,offlineFinancePassphrase,remaining);setOfflineFinanceQueue(remaining)
+      await saveEncryptedFinanceQueue(userId,deviceId,offlineFinancePassphrase,remaining);setOfflineFinanceQueue(remaining)
       setOfflineFinanceStatus(applied+' payment(s) synchronised; '+conflicts+' conflict(s) retained for review; '+remaining.length+' remain queued.')
       if(applied)await refreshFinance()
     }catch(error){setOfflineFinanceStatus(error instanceof Error?error.message:'Unable to synchronise offline payments.')}
