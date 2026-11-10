@@ -684,8 +684,8 @@ function FirstTimeSetupWizard({status,onStatusChange}:{status:FirstSetupStatus;o
         <p className="muted">This installation must be authorised by the SchoolBridge owner before school records or administrator accounts can be created.</p>
         <div className="installation-id-panel"><small>UNIQUE INSTALLATION ID</small><strong>{status.installation_id}</strong><button type="button" className="secondary-button" onClick={()=>void navigator.clipboard?.writeText(status.installation_id)}>Copy installation ID</button></div>
         <form onSubmit={activate}>
-          <label htmlFor="schoolbridge-license">Owner-signed activation license</label>
-          <textarea id="schoolbridge-license" value={license} onChange={e=>setLicense(e.target.value)} required rows={4} placeholder="Paste the signed installation license here"/>
+          <label htmlFor="schoolbridge-license">CHRISTIAN Owner Key activation code</label>
+          <textarea id="schoolbridge-license" value={license} onChange={e=>setLicense(e.target.value)} required rows={4} placeholder="Paste the CHRISTIAN activation code here"/>
           {error&&<p className="error" role="alert">{error}</p>}
           <button className="primary-button login-button" disabled={busy||license.trim().length<20}>{busy?'Verifying license...':'Activate installation'}</button>
         </form>
@@ -694,9 +694,9 @@ function FirstTimeSetupWizard({status,onStatusChange}:{status:FirstSetupStatus;o
         <p className="muted">Enter the school's official details and create its first administrator account. The original school identity will be protected after setup.</p>
         <form onSubmit={completeSetup}>
           <div className="first-setup-section"><h3>Owner authorisation</h3>
-            <label htmlFor="schoolbridge-license-confirm">Confirm owner-signed activation license</label>
-            <textarea id="schoolbridge-license-confirm" value={license} onChange={e=>setLicense(e.target.value)} required rows={3} placeholder="Paste the same owner license used to activate this installation"/>
-            <p className="form-hint">The same owner license is required to create the first administrator. It is held only in this page until setup is complete.</p>
+            <label htmlFor="schoolbridge-license-confirm">Confirm CHRISTIAN Owner Key activation code</label>
+            <textarea id="schoolbridge-license-confirm" value={license} onChange={e=>setLicense(e.target.value)} required rows={3} placeholder="Paste the same CHRISTIAN activation code used to activate this installation"/>
+            <p className="form-hint">The same CHRISTIAN activation code is required to create the first administrator. Your private owner key is never entered or stored on this school setup page.</p>
           </div>
           <div className="first-setup-section"><h3>School identity</h3>
             <label>Official school name *<input required minLength={2} maxLength={160} value={school.school_name} onChange={e=>setSchool({...school,school_name:e.target.value})}/></label>
