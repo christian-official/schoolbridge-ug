@@ -20,17 +20,14 @@ Never put the owner's private signing key or passphrase on the USB. Only the pub
 
 ## 2. Install on one computer without LAN or internet
 
-1. Run `./check-school-host.ps1` from the USB package. If Docker/WSL is missing, follow [Windows runtime preparation](WINDOWS_RUNTIME_PREPARATION.md) using the installers staged in the USB `runtime` folder. This step may require administrator rights and a Windows restart.
-2. Copy the USB's `SchoolBridge-USB` folder to a local folder on the computer, such as `C:\SchoolBridge`. Do not run the database from the USB itself.
-3. Open PowerShell in that folder and run `./install-schoolbridge.ps1`.
-4. The script imports the saved images locally and creates a local `.env` with fresh random database and application secrets.
-5. Add the owner's Base64 public key to `SCHOOLBRIDGE_LICENSE_PUBLIC_KEY` in `.env`.
-6. Run the installer and choose START. Open `http://localhost:8080` on the same computer.
-7. Complete owner activation using the unique installation ID and signed `CHRISTIAN:` code from the trusted owner computer, then complete school setup.
-8. Restart the computer and confirm the database records persist.
+1. Run `./check-school-host.ps1` from the USB package. If Docker/WSL is missing, follow [Windows runtime preparation](WINDOWS_RUNTIME_PREPARATION.md) using the official installers staged in the USB `runtime` folder. Runtime installation may require administrator rights, licence acceptance and a Windows restart.
+2. Copy the USB's `SchoolBridge-USB` folder to a local folder on the computer, such as `C:\\SchoolBridge`. Do not run the database from the USB itself.
+3. Open PowerShell in that local folder and run `./install-schoolbridge.ps1`.
+4. The installer rechecks host readiness, creates a local `.env` with fresh random database/application secrets, asks for the owner's Base64 **public** verification key, validates it, imports the saved images, and asks you to type `START` before starting services. It does not need the owner's private key or passphrase.
+5. Open `http://localhost:8080` on the same computer. Complete owner activation using the unique installation ID and signed `CHRISTIAN:` code generated on the trusted owner computer, then complete the school's first-time setup.
+6. Restart the computer and confirm that the school records remain available. Complete a backup and restore test before handover.
 
-No router, LAN, Wi-Fi or internet is required for this intended single-computer mode once the runtime is installed.
-
+No router, LAN, Wi-Fi or internet is required for the intended single-computer mode once the supported local runtime is installed.
 ## 3. Optional multi-device access
 
 If teachers need other devices, connect them to a local Wi-Fi router, hotspot or wired network and open `http://HOST-IP:8080`. Internet is still not required. This optional local connection is not an installation prerequisite.
