@@ -7,10 +7,10 @@ steps:
     env:
       PYTHONPATH: "backend"
       SCHOOLBRIDGE_DATABASE_URL: "sqlite:///./schoolbridge_ci.db"
-      SCHOOLBRIDGE_SECRET_KEY: "ci-only-secret-key-not-for-production"
       SCHOOLBRIDGE_POSTGRES_INTEGRATION_URL: "postgresql+psycopg://schoolbridge:ci-postgres-password@127.0.0.1:5432/schoolbridge_restore_ci"
     command: |
       set -euo pipefail
+      export SCHOOLBRIDGE_SECRET_KEY="ci-only-secret-key-not-for-production"
 
       echo "=== Start isolated PostgreSQL for recovery tests ==="
       docker rm -f schoolbridge-ci-postgres >/dev/null 2>&1 || true
