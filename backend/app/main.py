@@ -1478,15 +1478,31 @@ def submit_offline_attendance_batch(data: OfflineAttendanceBatchCreate,
     device = _sync_active_device(db, user, data.device_id)
     if data.base_sequence > device.last_issued_sequence:
         raise HTTPException(409, "The attendance baseline has not been issued to this device.")
-    if not db.get(models.SchoolClass, data.class_id):
-        raise HTTPException(404, "Class not found.")
     student_ids = [entry.student_id for entry in data.records]
     if len(student_ids) != len(set(student_ids)):
         raise HTTPException(422, "A student can appear only once in an offline attendance register.")
+    baseline = {int(key): value for key, value in data.base_attendance_ids.items()}
+    payload = json.dumps({
+        "class_id": data.class_id, "attendance_date": data.attendance_date.isoformat(),
+        "base_attendance_ids": baseline, "records": [entry.model_dump() for entry in data.records],
+    }, sort_keys=True, separators=(",", ":"))
+    if len(payload.encode("utf-8")) > 32768:
+        raise HTTPException(413, "Offline attendance payload exceeds 32 KB.")
+    old = db.query(models.SyncChangeProposal).filter_by(user_id=user.id, idempotency_key=data.idempotency_key).first()
+    if old:
+        same = (old.device_id == str(data.device_id) and old.entity_type == "AttendanceBatch"
+                and old.entity_id == data.class_id and old.operation == "update"
+                and old.base_sequence == data.base_sequence and old.payload_json == payload)
+        if not same:
+            raise HTTPException(409, "Idempotency key already used for different attendance content.")
+        return {"proposal_id": old.id, "status": old.status, "duplicate": True,
+                "applied": old.status == "applied", "saved": len(data.records) if old.status == "applied" else 0}
+    if not db.get(models.SchoolClass, data.class_id):
+        raise HTTPException(404, "Class not found.")
     existing = db.query(models.Attendance).filter(
         models.Attendance.student_id.in_(student_ids),
         models.Attendance.attendance_date == data.attendance_date,
-    ).all()
+    ).with_for_update().all()
     existing_by_student = {row.student_id: row for row in existing}
     needs_add = any(student_id not in existing_by_student for student_id in student_ids)
     needs_edit = any(student_id in existing_by_student for student_id in student_ids)
@@ -1510,24 +1526,8 @@ def submit_offline_attendance_batch(data: OfflineAttendanceBatchCreate,
     ).all()
     if len(students) != len(student_ids):
         raise HTTPException(422, "Every submitted student must be active and belong to the selected class.")
-    baseline = {int(key): value for key, value in data.base_attendance_ids.items()}
     if set(baseline) != set(student_ids):
         raise HTTPException(422, "The attendance baseline must include every submitted student.")
-    payload = json.dumps({
-        "class_id": data.class_id, "attendance_date": data.attendance_date.isoformat(),
-        "base_attendance_ids": baseline, "records": [entry.model_dump() for entry in data.records],
-    }, sort_keys=True, separators=(",", ":"))
-    if len(payload.encode("utf-8")) > 32768:
-        raise HTTPException(413, "Offline attendance payload exceeds 32 KB.")
-    old = db.query(models.SyncChangeProposal).filter_by(user_id=user.id, idempotency_key=data.idempotency_key).first()
-    if old:
-        same = (old.device_id == str(data.device_id) and old.entity_type == "AttendanceBatch"
-                and old.entity_id == data.class_id and old.base_sequence == data.base_sequence
-                and old.payload_json == payload)
-        if not same:
-            raise HTTPException(409, "Idempotency key already used for different attendance content.")
-        return {"proposal_id": old.id, "status": old.status, "duplicate": True,
-                "applied": old.status == "applied", "saved": len(data.records) if old.status == "applied" else 0}
     conflict = any(
         baseline[student_id] != (existing_by_student[student_id].id if student_id in existing_by_student else None)
         for student_id in student_ids
@@ -1567,7 +1567,9 @@ def submit_offline_attendance_batch(data: OfflineAttendanceBatchCreate,
     except IntegrityError:
         db.rollback()
         old = db.query(models.SyncChangeProposal).filter_by(user_id=user.id, idempotency_key=data.idempotency_key).first()
-        if old and old.payload_json == payload and old.device_id == str(data.device_id):
+        if (old and old.payload_json == payload and old.device_id == str(data.device_id)
+                and old.entity_type == "AttendanceBatch" and old.entity_id == data.class_id
+                and old.operation == "update" and old.base_sequence == data.base_sequence):
             return {"proposal_id": old.id, "status": old.status, "duplicate": True,
                     "applied": old.status == "applied", "saved": len(data.records) if old.status == "applied" else 0}
         raise HTTPException(409, "Offline attendance submission collision; retry using the same request.")
@@ -2503,7 +2505,7 @@ def list_sync_change_proposals(device_id: UUID, after_id: int=Query(0,ge=0), lim
 def resolve_sync_change_proposal(proposal_id: int, data: SyncChangeProposalResolution, db: Session=Depends(get_db), user=Depends(get_current_user)):
     if user.role!="admin": raise HTTPException(403,"Proposal resolution is administrator-only.")
     _sync_active_device(db,user,data.device_id)
-    row=db.query(models.SyncChangeProposal).filter_by(id=proposal_id,user_id=user.id).first()
+    row=db.query(models.SyncChangeProposal).filter_by(id=proposal_id,user_id=user.id).with_for_update().first()
     if not row: raise HTTPException(404,"Offline proposal not found.")
     if row.status not in {"conflict","pending_review"}: raise HTTPException(409,"Proposal already resolved.")
     if data.decision=="discard":
@@ -5246,7 +5248,7 @@ def _offline_teacher_mark_conflict(db: Session, exam_id: int, subject_id: int, e
     for entry in entries:
         student_id = int(entry["student_id"] if isinstance(entry, dict) else entry.student_id)
         baseline_id = base_mark_ids.get(str(student_id), base_mark_ids.get(student_id))
-        current = db.query(models.Mark).filter_by(student_id=student_id, exam_id=exam_id, subject_id=subject_id).first()
+        current = db.query(models.Mark).filter_by(student_id=student_id, exam_id=exam_id, subject_id=subject_id).with_for_update().first()
         scope_change = db.query(func.max(models.SyncChange.id)).filter(
             models.SyncChange.entity_type == f"MarkScope:{exam_id}:{subject_id}",
             models.SyncChange.entity_id == student_id,
@@ -5316,25 +5318,6 @@ def submit_offline_teacher_marks(data: OfflineTeacherMarkBatch, db: Session = De
     subject = db.get(models.Subject, data.subject_id)
     if not exam or not subject or exam.class_id is None:
         raise HTTPException(404, "Class examination or subject not found.")
-    assignment = db.query(models.TeacherAssignment.id).filter_by(
-        teacher_id=teacher.id, class_id=exam.class_id, subject_id=subject.id
-    ).first()
-    if not assignment:
-        raise HTTPException(403, "You are not currently assigned to this subject and class.")
-    student_ids = [entry.student_id for entry in data.records]
-    students = db.query(models.Student).filter(
-        models.Student.id.in_(student_ids), models.Student.class_id == exam.class_id,
-        models.Student.status == "active"
-    ).all()
-    if len(students) != len(student_ids):
-        raise HTTPException(422, "Every submitted student must be active and belong to this examination's class.")
-    missing_permissions = _offline_teacher_mark_missing_permissions(teacher, data.records, data.base_mark_ids)
-    if missing_permissions:
-        raise HTTPException(
-            403,
-            "Your current My Results permissions do not allow this batch: "
-            + ", ".join(sorted(missing_permissions)) + " permission required.",
-        )
     payload = json.dumps({
         "class_id": exam.class_id, "exam_id": exam.id, "subject_id": subject.id,
         "records": [entry.model_dump() for entry in data.records],
@@ -5354,7 +5337,26 @@ def submit_offline_teacher_marks(data: OfflineTeacherMarkBatch, db: Session = De
         return {
             "proposal_id": old.id, "status": old.status, "duplicate": True,
             "applied": old.status == "applied", "saved": len(data.records) if old.status == "applied" else 0,
-        }
+        }    assignment = db.query(models.TeacherAssignment.id).filter_by(
+        teacher_id=teacher.id, class_id=exam.class_id, subject_id=subject.id
+    ).first()
+    if not assignment:
+        raise HTTPException(403, "You are not currently assigned to this subject and class.")
+    student_ids = [entry.student_id for entry in data.records]
+    students = db.query(models.Student).filter(
+        models.Student.id.in_(student_ids), models.Student.class_id == exam.class_id,
+        models.Student.status == "active"
+    ).all()
+    if len(students) != len(student_ids):
+        raise HTTPException(422, "Every submitted student must be active and belong to this examination's class.")
+    missing_permissions = _offline_teacher_mark_missing_permissions(teacher, data.records, data.base_mark_ids)
+    if missing_permissions:
+        raise HTTPException(
+            403,
+            "Your current My Results permissions do not allow this batch: "
+            + ", ".join(sorted(missing_permissions)) + " permission required.",
+        )
+
 
     locked = db.query(models.Mark.id).filter(
         models.Mark.exam_id == exam.id, models.Mark.subject_id == subject.id,
@@ -5413,7 +5415,9 @@ def submit_offline_teacher_marks(data: OfflineTeacherMarkBatch, db: Session = De
         old = db.query(models.SyncChangeProposal).filter_by(
             user_id=teacher.id, idempotency_key=data.idempotency_key
         ).first()
-        if old and old.payload_json == payload and old.device_id == str(data.device_id):
+        if (old and old.payload_json == payload and old.device_id == str(data.device_id)
+                and old.entity_type == "TeacherMarkBatch" and old.entity_id == exam.id
+                and old.operation == "update" and old.base_sequence == data.base_sequence):
             return {
                 "proposal_id": old.id, "status": old.status, "duplicate": True,
                 "applied": old.status == "applied", "saved": len(data.records) if old.status == "applied" else 0,

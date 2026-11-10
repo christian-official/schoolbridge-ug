@@ -294,11 +294,14 @@ jobs:
             if ($signature.SignerCertificate.Subject -notmatch $runtimeFile.Publisher) { throw "Unexpected signer: $($signature.SignerCertificate.Subject)" }
           }
           foreach ($file in $files) {
+            Write-Host "Checking PowerShell syntax: $file"
             $tokens = $null
             $errors = $null
             [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file), [ref]$tokens, [ref]$errors) | Out-Null
             if ($errors.Count -gt 0) {
-              $errors | ForEach-Object { Write-Error $_.Message }
+              foreach ($parseError in $errors) {
+                Write-Host ("{0}:{1}:{2}: {3} [{4}]" -f $file, $parseError.Extent.StartLineNumber, $parseError.Extent.StartColumnNumber, $parseError.Message, $parseError.Extent.Text)
+              }
               throw "PowerShell syntax validation failed for $file"
             }
             Write-Host "PowerShell syntax OK: $file"

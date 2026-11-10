@@ -71,9 +71,9 @@ try {
     if ($PackageCompose -match '(?m)^    build:') { throw "USB Compose package still contains source build contexts." }
 
     # Keep database traffic isolated while publishing only the frontend edge service.
-    if ($PackageCompose -notmatch '(?m)^  schoolbridge-internal:) { throw "USB Compose internal network is missing." }
-    if ($PackageCompose -notmatch '(?m)^    internal: true) { throw "USB Compose database network must be isolated." }
-    if ($PackageCompose -notmatch '(?m)^  schoolbridge-edge:) { throw "USB Compose frontend edge network is missing." }
+    if (-not $PackageCompose.Contains("schoolbridge-internal:")) { throw "USB Compose internal network is missing." }
+    if (-not $PackageCompose.Contains("internal: true")) { throw "USB Compose database network must be isolated." }
+    if (-not $PackageCompose.Contains("schoolbridge-edge:")) { throw "USB Compose frontend edge network is missing." }
     Set-Content (Join-Path $PackageDir "docker-compose.yml") $PackageCompose -Encoding UTF8
     Copy-Item (Join-Path $PSScriptRoot "install-schoolbridge.ps1") $PackageDir -Force
     Copy-Item (Join-Path $PSScriptRoot "check-school-host.ps1") $PackageDir -Force

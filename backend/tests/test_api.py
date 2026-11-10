@@ -2031,6 +2031,41 @@ def test_offline_attendance_batch_is_automatically_applied_and_idempotent():
             assert audit is not None
 
 
+def test_offline_attendance_retry_is_idempotent_after_add_permission_is_consumed():
+    reset_database()
+    teacher = create_teacher()
+    headers = {"Authorization": f"Bearer {create_access_token(teacher)}"}
+    device = "00000000-0000-4000-8000-000000000504"
+    with SessionLocal() as db:
+        db.get(models.User, teacher.id).permissions_json = json.dumps({"My Attendance": ["view", "add"]})
+        school_class = models.SchoolClass(name="Offline Register S4", section="A")
+        db.add(school_class); db.flush()
+        student = models.Student(admission_number="OFF-ATT-004", first_name="Mariam", last_name="Test", class_id=school_class.id, status="active")
+        db.add(student); db.flush()
+        db.add(models.ClassTeacherAssignment(teacher_id=teacher.id, class_id=school_class.id))
+        db.commit()
+        class_id, student_id = school_class.id, student.id
+    with TestClient(app) as client:
+        registered = client.post("/api/sync/devices", headers=headers, json={"device_id": device, "device_name": "Teacher attendance device"})
+        assert registered.status_code == 200, registered.text
+        baseline = client.get(f"/api/sync/attendance-baseline?device_id={device}&class_id={class_id}&attendance_date=2026-11-10", headers=headers)
+        assert baseline.status_code == 200, baseline.text
+        body = {
+            "device_id": device, "idempotency_key": "offline-attendance-add-only-0001",
+            "class_id": class_id, "attendance_date": "2026-11-10",
+            "base_sequence": baseline.json()["base_sequence"],
+            "base_attendance_ids": baseline.json()["base_attendance_ids"],
+            "records": [{"student_id": student_id, "status": "Present"}],
+        }
+        first = client.post("/api/sync/attendance-batches", headers=headers, json=body)
+        assert first.status_code == 200, first.text
+        assert first.json()["applied"] is True
+        retry = client.post("/api/sync/attendance-batches", headers=headers, json=body)
+        assert retry.status_code == 200, retry.text
+        assert retry.json()["duplicate"] is True
+        assert retry.json()["applied"] is True
+
+
 def test_offline_attendance_batch_detects_conflicts_without_overwriting():
     reset_database()
     admin = create_admin()
