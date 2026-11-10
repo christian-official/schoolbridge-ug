@@ -47,8 +47,7 @@ services:
       - schoolbridge-internal
 
   backup:
-    build:
-      context: ./backend
+    image: schoolbridge/backend:local
     restart: unless-stopped
     command: ["python", "backup_scheduler.py"]
     environment:
