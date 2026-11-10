@@ -9,7 +9,7 @@ jobs:
       - run: python3 -m venv .venv && .venv/bin/pip install -r backend/requirements-dev.txt
       - run:
           name: Core API and access tests
-          command: PYTHONPATH=backend SCHOOLBRIDGE_DATABASE_URL=sqlite:///./schoolbridge_ci.db SCHOOLBRIDGE_SECRET_KEY=ci-only-secret-key-not-for-production .venv/bin/python -m pytest -q backend/tests/test_api.py backend/tests/test_database_health.py -k "health_endpoint or school_records_require_authentication or admin_can_login_and_create_class or duplicate_class_and_stream or backup_download or admin_can_download_valid_sqlite_backup or restore_rejects_invalid_database_file or admin_can_stage_valid_restore"
+          command: PYTHONPATH=backend SCHOOLBRIDGE_DATABASE_URL=sqlite:///./schoolbridge_ci.db SCHOOLBRIDGE_SECRET_KEY=ci-only-secret-key-not-for-production .venv/bin/python -m pytest -q backend/tests/test_api.py backend/tests/test_database_health.py -k "health_endpoint or school_records_require_authentication or admin_can_login_and_create_class or duplicate_class_and_stream or backup_download or admin_can_download_valid_sqlite_backup or restore_rejects_invalid_database_file or admin_can_stage_valid_restore or dismiss_student_hides_record or parent_results_are_released or gatekeeper_loses_visitor_record"
 
   backend-api-academics:
     machine:
