@@ -108,12 +108,12 @@ jobs:
           test -s scripts/install-schoolbridge.ps1
           test -s scripts/prepare-school-host.ps1
           grep -q 'prepare-school-host.ps1' scripts/prepare-usb.ps1
-          grep -q 'prepare-school-host.ps1' scripts/prepare-usb.ps1
           grep -q 'Docker Desktop Installer.exe' scripts/prepare-usb.ps1
           grep -q 'wsl.msi' scripts/prepare-usb.ps1
           grep -q 'SHA256SUMS.txt' scripts/prepare-usb.ps1
           grep -q 'USB_INSTALLATION.md' scripts/prepare-usb.ps1
           grep -q 'prepare-school-host.ps1' scripts/install-schoolbridge.ps1
+          grep -q 'Get-FileHash' scripts/install-schoolbridge.ps1
           grep -q 'SHA256SUMS.txt' docs/USB_INSTALLATION.md
           test -s docs/USB_INSTALLATION.md
           grep -q 'proxy_pass http://backend:8001' frontend/nginx.conf
