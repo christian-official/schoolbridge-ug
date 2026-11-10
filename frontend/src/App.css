@@ -2414,3 +2414,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   body[data-schoolbridge-print="community"] .school-community-workspace .table-wrap { overflow:visible !important; }
   body[data-schoolbridge-print="community"] .school-community-workspace table { white-space:normal !important; }
 }
+
+.student-promotion-panel { margin:0 0 18px; }
+.promotion-order-list { list-style:none; margin:0; padding:0; display:grid; gap:7px; }
+.promotion-order-list li { display:flex; align-items:center; justify-content:space-between; gap:12px; border:1px solid var(--line); border-radius:8px; padding:9px 12px; background:#fff; }
+.promotion-order-list li > span:first-child { display:grid; gap:3px; color:#34445e; font-size:12px; }
+.promotion-order-list small { color:#8a651f; font-size:10px; }
