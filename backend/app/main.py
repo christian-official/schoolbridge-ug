@@ -1960,7 +1960,7 @@ async def protect_school_data(request: Request, call_next):
                 pass
             elif not section or action not in user_permissions(user).get(section, set()):
                 return JSONResponse({"detail": "Your teacher account is not permitted to perform this action."}, status_code=403)
-        elif path.startswith("/api/visitors/") and _is_gatekeeper(user):
+        elif (path == "/api/visitors" or path.startswith("/api/visitors/")) and _is_gatekeeper(user):
             # Gatekeeper visitor access is narrowly enforced by the visitor handlers.
             pass
         elif path.startswith("/api/parent/"):
