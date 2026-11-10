@@ -2755,8 +2755,11 @@ def _sync_active_device(db: Session, user, device_id: UUID):
 
 def _sync_linked_student_ids(db: Session, user):
     return {
-        row[0] for row in db.query(models.ParentStudentLink.student_id).filter_by(
-            user_id=user.id
+        row[0] for row in db.query(models.ParentStudentLink.student_id).join(
+            models.Student, models.Student.id == models.ParentStudentLink.student_id
+        ).filter(
+            models.ParentStudentLink.user_id == user.id,
+            models.Student.status == "active",
         ).all()
     }
 
