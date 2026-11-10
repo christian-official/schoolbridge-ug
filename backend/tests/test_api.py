@@ -1158,7 +1158,8 @@ def test_sync_change_feed_filters_parent_and_teacher_history_scopes():
         subject = models.Subject(name="Scope Biology", school_type="Secondary")
         parent = models.User(username="scope-parent", email="scope-parent@example.invalid",
             hashed_password=password_hash.hash("ParentPassword123!"), role="parent", is_active=True)
-        db.add_all([assigned_class, unrelated_class, subject, parent]); db.flush()
+        exam = models.Exam(name="Scope test", term="Term 1", year=2026, class_id=assigned_class.id)
+        db.add_all([assigned_class, unrelated_class, subject, parent, exam]); db.flush()
         assigned_student = models.Student(admission_number="SCOPE-001", first_name="A", last_name="Assigned", class_id=assigned_class.id)
         unrelated_student = models.Student(admission_number="SCOPE-002", first_name="B", last_name="Other", class_id=unrelated_class.id)
         db.add_all([assigned_student, unrelated_student]); db.flush()
@@ -1168,7 +1169,7 @@ def test_sync_change_feed_filters_parent_and_teacher_history_scopes():
         ])
         db.commit()
         class_id, other_id, subject_id = assigned_class.id, unrelated_class.id, subject.id
-        student_id, other_student_id, parent_id = assigned_student.id, unrelated_student.id, parent.id
+        student_id, other_student_id, parent_id, exam_id = assigned_student.id, unrelated_student.id, parent.id, exam.id
     admin_headers = {"Authorization": f"Bearer {create_access_token(admin)}"}
     teacher_headers = {"Authorization": f"Bearer {create_access_token(teacher)}"}
     parent_headers = {"Authorization": f"Bearer " + create_access_token(parent)}
@@ -1182,7 +1183,10 @@ def test_sync_change_feed_filters_parent_and_teacher_history_scopes():
             # The journal records historical relationships, including the parent link and teacher assignment.
             db.get(models.Student, student_id).last_name = "Changed"
             db.get(models.Student, other_student_id).last_name = "Unrelated changed"
-            db.add(models.Mark(student_id=student_id, subject_id=subject_id, exam_id=None, score=88, verified=False))
+            mark = models.Mark(student_id=student_id, subject_id=subject_id, exam_id=exam_id, score=88, verified=False)
+            db.add(mark)
+            db.commit()
+            mark.verified = True
             db.commit()
         teacher_feed = client.get(f"/api/sync/changes?device_id={teacher_device}", headers=teacher_headers)
         parent_feed = client.get(f"/api/sync/changes?device_id={parent_device}", headers=parent_headers)
@@ -1191,6 +1195,8 @@ def test_sync_change_feed_filters_parent_and_teacher_history_scopes():
         parent_ids = {item["entity_id"] for item in parent_feed.json()["changes"] if item["entity_type"] == "Student"}
         assert student_id in teacher_ids and other_student_id not in teacher_ids
         assert student_id in parent_ids and other_student_id not in parent_ids
+        parent_mark_events = [item for item in parent_feed.json()["changes"] if item["entity_type"].startswith("Mark")]
+        assert parent_mark_events
 
 
 def test_sync_change_feed_rejects_invalid_cursor_and_limit():
