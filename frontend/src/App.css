@@ -2453,3 +2453,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 @keyframes schoolbridge-notice-in { from { opacity:.55; transform:translateY(-3px); } to { opacity:1; transform:translateY(0); } }
 @keyframes schoolbridge-alert-pulse { 0%,100% { box-shadow:0 0 0 0 rgba(212,61,61,.08); } 50% { box-shadow:0 0 0 5px rgba(212,61,61,.12); } }
 @media (prefers-reduced-motion:reduce) { .success-notice,.form-error,.notice,.connection-disconnected { animation:none !important; } }
+
+/* Remove legacy arrow buttons from every scroll bar while preserving scrolling. */
+*::-webkit-scrollbar-button { display:none !important; width:0 !important; height:0 !important; }
