@@ -561,6 +561,21 @@ class AttendanceRegisterUpdate(BaseModel):
     attendance_date: date = Field(default_factory=date.today)
     records: list[AttendanceRegisterEntry] = Field(min_length=1, max_length=500)
 
+
+class OfflineAttendanceBatchEntry(BaseModel):
+    student_id: int
+    status: str = Field(pattern="^(Present|Absent|Late|Excused)$")
+
+
+class OfflineAttendanceBatchCreate(BaseModel):
+    device_id: UUID
+    idempotency_key: str = Field(min_length=8, max_length=100)
+    class_id: int
+    attendance_date: date
+    base_sequence: int = Field(ge=0)
+    base_attendance_ids: dict[int, int | None]
+    records: list[OfflineAttendanceBatchEntry] = Field(min_length=1, max_length=500)
+
 class StaffAttendanceEntry(BaseModel):
     staff_id: int
     status: str = Field(pattern="^(Present|Absent|Late|Excused)$")
@@ -1395,6 +1410,138 @@ def save_attendance_register(
     }
 
 
+
+
+@app.get("/api/sync/attendance-baseline", tags=["Offline Synchronisation"])
+def get_offline_attendance_baseline(
+    device_id: UUID, class_id: int, attendance_date: date,
+    db: Session = Depends(get_db), user=Depends(get_current_user),
+):
+    device = _sync_active_device(db, user, device_id)
+    if not db.get(models.SchoolClass, class_id):
+        raise HTTPException(404, "Class not found.")
+    require_class_attendance_access(db, user, class_id, "view")
+    permissions = user_permissions(user)
+    if user.role == "teacher":
+        if "view" not in permissions.get("My Attendance", set()) and "view" not in permissions.get("Attendance", set()):
+            raise HTTPException(403, "You do not have permission to view this attendance register.")
+    elif user.role != "admin" and "view" not in permissions.get("Attendance", set()):
+        raise HTTPException(403, "You do not have permission to view this attendance register.")
+    student_ids = [row[0] for row in db.query(models.Student.id).filter(
+        models.Student.class_id == class_id, models.Student.status == "active"
+    ).all()]
+    rows = db.query(models.Attendance).filter(
+        models.Attendance.student_id.in_(student_ids or [-1]),
+        models.Attendance.attendance_date == attendance_date,
+    ).all()
+    sequence = db.query(func.max(models.SyncChange.id)).scalar() or 0
+    device.last_issued_sequence = max(device.last_issued_sequence, sequence)
+    db.commit()
+    return {"class_id": class_id, "attendance_date": attendance_date,
+            "base_sequence": sequence,
+            "base_attendance_ids": {str(student_id): next((row.id for row in rows if row.student_id == student_id), None) for student_id in student_ids}}
+
+
+@app.post("/api/sync/attendance-batches", tags=["Offline Synchronisation"])
+def submit_offline_attendance_batch(data: OfflineAttendanceBatchCreate,
+                                    db: Session = Depends(get_db),
+                                    user=Depends(get_current_user)):
+    device = _sync_active_device(db, user, data.device_id)
+    if data.base_sequence > device.last_issued_sequence:
+        raise HTTPException(409, "The attendance baseline has not been issued to this device.")
+    if not db.get(models.SchoolClass, data.class_id):
+        raise HTTPException(404, "Class not found.")
+    student_ids = [entry.student_id for entry in data.records]
+    if len(student_ids) != len(set(student_ids)):
+        raise HTTPException(422, "A student can appear only once in an offline attendance register.")
+    existing = db.query(models.Attendance).filter(
+        models.Attendance.student_id.in_(student_ids),
+        models.Attendance.attendance_date == data.attendance_date,
+    ).all()
+    existing_by_student = {row.student_id: row for row in existing}
+    needs_add = any(student_id not in existing_by_student for student_id in student_ids)
+    needs_edit = any(student_id in existing_by_student for student_id in student_ids)
+    permissions = user_permissions(user)
+    if user.role == "admin":
+        pass
+    elif user.role == "teacher":
+        require_class_attendance_access(db, user, data.class_id, "add" if needs_add else "edit")
+        allowed = permissions.get("My Attendance", set()) | permissions.get("Attendance", set())
+        if (needs_add and "add" not in allowed) or (needs_edit and "edit" not in allowed):
+            raise HTTPException(403, "Your current attendance permissions do not allow this register.")
+    else:
+        if needs_add: require_class_attendance_access(db, user, data.class_id, "add")
+        if needs_edit: require_class_attendance_access(db, user, data.class_id, "edit")
+        allowed = permissions.get("Attendance", set())
+        if (needs_add and "add" not in allowed) or (needs_edit and "edit" not in allowed):
+            raise HTTPException(403, "Your current attendance permissions do not allow this register.")
+    students = db.query(models.Student).filter(
+        models.Student.id.in_(student_ids), models.Student.class_id == data.class_id,
+        models.Student.status == "active",
+    ).all()
+    if len(students) != len(student_ids):
+        raise HTTPException(422, "Every submitted student must be active and belong to the selected class.")
+    baseline = {int(key): value for key, value in data.base_attendance_ids.items()}
+    if set(baseline) != set(student_ids):
+        raise HTTPException(422, "The attendance baseline must include every submitted student.")
+    payload = json.dumps({
+        "class_id": data.class_id, "attendance_date": data.attendance_date.isoformat(),
+        "base_attendance_ids": baseline, "records": [entry.model_dump() for entry in data.records],
+    }, sort_keys=True, separators=(",", ":"))
+    if len(payload.encode("utf-8")) > 32768:
+        raise HTTPException(413, "Offline attendance payload exceeds 32 KB.")
+    old = db.query(models.SyncChangeProposal).filter_by(user_id=user.id, idempotency_key=data.idempotency_key).first()
+    if old:
+        same = (old.device_id == str(data.device_id) and old.entity_type == "AttendanceBatch"
+                and old.entity_id == data.class_id and old.base_sequence == data.base_sequence
+                and old.payload_json == payload)
+        if not same:
+            raise HTTPException(409, "Idempotency key already used for different attendance content.")
+        return {"proposal_id": old.id, "status": old.status, "duplicate": True,
+                "applied": old.status == "applied", "saved": len(data.records) if old.status == "applied" else 0}
+    conflict = any(
+        baseline[student_id] != (existing_by_student[student_id].id if student_id in existing_by_student else None)
+        for student_id in student_ids
+    )
+    if not conflict:
+        conflict = db.query(models.SyncChange.id).filter(
+            models.SyncChange.id > data.base_sequence,
+            models.SyncChange.entity_type == f"AttendanceScope:{data.attendance_date.isoformat()}",
+            models.SyncChange.entity_id.in_(student_ids),
+        ).first() is not None
+    row = models.SyncChangeProposal(
+        user_id=user.id, device_id=device.device_id, idempotency_key=data.idempotency_key,
+        entity_type="AttendanceBatch", entity_id=data.class_id, operation="update",
+        payload_json=payload, base_sequence=data.base_sequence,
+        status="conflict" if conflict else "applied",
+        resolution="system_conflict" if conflict else "system_auto_apply",
+        resolved_at=datetime.utcnow(),
+    )
+    db.add(row)
+    try:
+        db.flush()
+        if conflict:
+            write_audit(db, user, "offline_attendance_rejected", "sync_change_proposal", row.id,
+                        f"class={data.class_id}; date={data.attendance_date}; records={len(data.records)}; reason=baseline_conflict")
+            db.commit()
+            return {"proposal_id": row.id, "status": "conflict", "duplicate": False, "applied": False, "saved": 0}
+        for entry in data.records:
+            attendance = existing_by_student.get(entry.student_id)
+            if attendance:
+                attendance.status = entry.status
+            else:
+                db.add(models.Attendance(student_id=entry.student_id, attendance_date=data.attendance_date, status=entry.status))
+        write_audit(db, user, "offline_attendance_auto_applied", "sync_change_proposal", row.id,
+                    f"class={data.class_id}; date={data.attendance_date}; records={len(data.records)}")
+        db.commit()
+        return {"proposal_id": row.id, "status": "applied", "duplicate": False, "applied": True, "saved": len(data.records)}
+    except IntegrityError:
+        db.rollback()
+        old = db.query(models.SyncChangeProposal).filter_by(user_id=user.id, idempotency_key=data.idempotency_key).first()
+        if old and old.payload_json == payload and old.device_id == str(data.device_id):
+            return {"proposal_id": old.id, "status": old.status, "duplicate": True,
+                    "applied": old.status == "applied", "saved": len(data.records) if old.status == "applied" else 0}
+        raise HTTPException(409, "Offline attendance submission collision; retry using the same request.")
 
 
 @app.get("/api/staff-attendance/roster", tags=["Attendance"])
