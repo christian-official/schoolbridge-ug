@@ -10,14 +10,15 @@ jobs:
           name: Install backend test dependencies
           command: |
             python3 --version
-            python3 -m pip install --upgrade pip
-            python3 -m pip install -r backend/requirements-dev.txt
+            python3 -m venv .venv
+            .venv/bin/pip install --upgrade pip
+            .venv/bin/pip install -r backend/requirements-dev.txt
       - run:
           name: Compile backend
-          command: python3 -m compileall -q backend/app
+          command: .venv/bin/python -m compileall -q backend/app
       - run:
           name: Run backend API tests
-          command: PYTHONPATH=backend SCHOOLBRIDGE_DATABASE_URL=sqlite:///./schoolbridge_ci.db SCHOOLBRIDGE_SECRET_KEY=ci-only-secret-key-not-for-production python3 -m pytest -q backend/tests
+          command: PYTHONPATH=backend SCHOOLBRIDGE_DATABASE_URL=sqlite:///./schoolbridge_ci.db SCHOOLBRIDGE_SECRET_KEY=ci-only-secret-key-not-for-production .venv/bin/python -m pytest -q backend/tests
 
   postgres-recovery-integration:
     machine:
@@ -29,8 +30,9 @@ jobs:
           command: |
             sudo apt-get update
             sudo apt-get install -y postgresql-client
-            python3 -m pip install --upgrade pip
-            python3 -m pip install -r backend/requirements-dev.txt
+            python3 -m venv .venv
+            .venv/bin/pip install --upgrade pip
+            .venv/bin/pip install -r backend/requirements-dev.txt
       - run:
           name: Start PostgreSQL 16
           command: |
@@ -52,18 +54,17 @@ jobs:
             SCHOOLBRIDGE_DATABASE_URL=sqlite:///./schoolbridge_ci.db \
             SCHOOLBRIDGE_SECRET_KEY=ci-only-secret-key-not-for-production \
             SCHOOLBRIDGE_POSTGRES_INTEGRATION_URL=postgresql+psycopg://schoolbridge:ci-postgres-password@127.0.0.1:5432/schoolbridge_restore_ci \
-            python3 -m pytest -q backend/tests/test_postgres_restore_integration.py
+            .venv/bin/python -m pytest -q backend/tests/test_postgres_restore_integration.py
 
   frontend-build:
     machine:
       image: ubuntu-2404:current
-    working_directory: ~/project/frontend
     steps:
-      - checkout:
-          path: ~/project
+      - checkout
       - run:
           name: Install Node.js 22
           command: |
+            cd frontend
             source /opt/circleci/.nvm/nvm.sh
             nvm install 22
             nvm use 22
@@ -72,12 +73,14 @@ jobs:
       - run:
           name: Install frontend dependencies
           command: |
+            cd frontend
             source /opt/circleci/.nvm/nvm.sh
             nvm use 22
             npm ci
       - run:
           name: Lint, test and build frontend
           command: |
+            cd frontend
             source /opt/circleci/.nvm/nvm.sh
             nvm use 22
             npm run lint
@@ -87,6 +90,7 @@ jobs:
       - run:
           name: Run real-browser offline tests
           command: |
+            cd frontend
             source /opt/circleci/.nvm/nvm.sh
             nvm use 22
             npm install --no-save --no-package-lock playwright@1.56.1
