@@ -1328,7 +1328,7 @@ function App() {
           {(user.role === 'parent' ? parentMenu : user.role === 'admin' ? menu : isFinanceAccount(user) ? getStaffNavigation(user).filter(item => ['Overview','Fees & Finance','My Attendance','My Profile'].includes(item.label)) : getStaffNavigation(user)).map(item => {
             const Icon = item.icon
             return (
-              <button key={item.label} className={`nav-item ${active === item.label ? 'active' : ''}`} title="Hold for 5 seconds to add this page to your Overview shortcuts" onPointerDown={() => beginShortcutHold(item.label)} onPointerUp={cancelShortcutHold} onPointerLeave={cancelShortcutHold} onPointerCancel={cancelShortcutHold} onContextMenu={event => event.preventDefault()} onClick={() => { if (longPressTriggered.current) { longPressTriggered.current = false; return } if (active !== item.label) setActive(item.label); setMobileMenu(false) }}>
+              <button key={item.label} className={`nav-item ${active === item.label ? 'active' : ''}`} title="Hold for 5 seconds to add this page to your Overview shortcuts" onPointerDown={() => beginShortcutHold(item.label)} onPointerUp={cancelShortcutHold} onPointerLeave={cancelShortcutHold} onPointerCancel={cancelShortcutHold} onContextMenu={event => event.preventDefault()} onClick={() => { if (longPressTriggered.current) { longPressTriggered.current = false; return } if (user.staff_profile_complete===false && item.label!=='My Profile') { setActive('My Profile'); setDataError('Complete your staff profile, passport photo and teaching assignments before opening other workspaces.'); return } if (active !== item.label) setActive(item.label); setMobileMenu(false) }}>
                 <Icon size={19} /> <span>{item.label}</span>
                 {active === item.label && <span className="active-dot" />}
               </button>
@@ -1550,7 +1550,7 @@ function App() {
           {active === 'Examinations' && user.role !== 'parent' && <AcademicManagement token={token} classes={classes} userId={user.id} isTeacher={user.role === 'teacher'} canVerify={user.role === 'admin' || (user.permissions?.['Examinations'] || []).includes('approve')} />}
           {active === 'Attendance' && user.role !== 'parent' && user.role !== 'teacher' && <AttendanceHub token={token} userId={user.id} canViewStudents={user.role === 'admin' || (user.permissions?.['Attendance'] || []).includes('view')} canViewStaff={user.role === 'admin' || (user.permissions?.['Staff Attendance'] || []).includes('view')} canEditStudents={user.role === 'admin' || (user.permissions?.['Attendance'] || []).includes('edit')} permissions={user.permissions} isAdmin={user.role === 'admin'} roleLabel={user.role_label || ''} />}
           {active === 'Timetable' && user.role !== 'parent' && <OperationsManagement token={token} active={active} permissions={user.permissions} isAdmin={user.role === 'admin'} roleLabel={user.role_label || ''} />}
-          {active === 'My Profile' && user.role !== 'parent' && user.role !== 'admin' && <MyStaffProfile token={token} />}
+          {active === 'My Profile' && user.role !== 'parent' && user.role !== 'admin' && <MyStaffProfile token={token} onComplete={()=>void loadUser(token)} />}
           {active === 'Leadership & Duty' && user.role !== 'parent' && <LeadershipDuty token={token} />}
           <div className="settings-page-cache" style={{display:active==='Settings'?'':'none'}}>
           {settingsSection === 'home' && (
