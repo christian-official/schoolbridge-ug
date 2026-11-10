@@ -157,6 +157,17 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
     }
   }
 
+  async function discardTeacherMarkProposal(id:number) {
+    if (!window.confirm('Discard this offline submission? No marks will be applied. The teacher will need to prepare a fresh submission.')) return
+    setBusy(true);setError('');setMessage('')
+    try {
+      await request('sync/teacher-mark-proposals/'+id+'/discard',token,{method:'PATCH'})
+      setMessage('Offline marks proposal #'+id+' discarded. No official records were changed.')
+      await load()
+    } catch(err) { setError(err instanceof Error?err.message:'Unable to discard offline marks.') }
+    finally { setBusy(false) }
+  }
+
   async function approveTeacherMarkProposal(id:number) {
     if (!window.confirm('Approve and apply these offline marks to official examination records?')) return
     setBusy(true);setError('');setMessage('')
@@ -206,7 +217,7 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
             <td>Exam #{item.payload.exam_id} · Subject #{item.payload.subject_id}<small className="form-hint">Class #{item.payload.class_id}</small></td>
             <td><details className="sync-proposal-details"><summary>{item.payload.records.length} score entries</summary><pre className="sync-proposal-payload">{JSON.stringify(item.payload.records,null,2)}</pre></details></td>
             <td>{item.status}{item.conflict_sequence ? <small className="form-hint">Changed after sequence {item.conflict_sequence}</small> : null}</td>
-            <td><button className="primary-button" type="button" disabled={busy||item.status==='conflict'} onClick={()=>void approveTeacherMarkProposal(item.id)}>Approve & apply</button></td>
+            <td><div className="proposal-review-actions"><button className="primary-button" type="button" disabled={busy||item.status==='conflict'} onClick={()=>void approveTeacherMarkProposal(item.id)}>Approve & apply</button><button className="secondary-button" type="button" disabled={busy} onClick={()=>void discardTeacherMarkProposal(item.id)}>Discard</button></div></td>
           </tr>)}
         </tbody></table></div>}
       </>}

@@ -61,12 +61,16 @@ export async function saveEncryptedOfflineDraft(userId: number, deviceId: string
   try {
     await new Promise<void>((resolve, reject) => {
       const transaction = db.transaction('drafts', 'readwrite')
-      transaction.objectStore('drafts').put({
-        salt: Array.from(salt), iv: Array.from(iv), ciphertext: Array.from(ciphertext), updatedAt: Date.now(),
-      } satisfies EncryptedDraftRecord, 'teacher-mark-draft')
+      const store = transaction.objectStore('drafts')
+      const existing = store.get('teacher-mark-draft')
+      let alreadySaved = false
+      existing.onsuccess = () => {
+        if (existing.result) { alreadySaved = true; transaction.abort(); return }
+        store.put({ salt: Array.from(salt), iv: Array.from(iv), ciphertext: Array.from(ciphertext), updatedAt: Date.now() } satisfies EncryptedDraftRecord, 'teacher-mark-draft')
+      }
       transaction.oncomplete = () => resolve()
       transaction.onerror = () => reject(new Error('Unable to save the encrypted offline draft.'))
-      transaction.onabort = () => reject(new Error('Offline draft storage was interrupted.'))
+      transaction.onabort = () => reject(new Error(alreadySaved ? 'A protected offline draft is already saved. Submit or clear it before saving another subject.' : 'Offline draft storage was interrupted.'))
     })
   } finally { db.close() }
 }

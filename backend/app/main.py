@@ -4911,3 +4911,21 @@ def apply_offline_teacher_mark_proposal(proposal_id: int, db: Session = Depends(
                 f"exam={exam.id}; class={exam.class_id}; subject={subject.id}; records={saved}; teacher_id={teacher.id}")
     db.commit()
     return {"proposal_id": row.id, "status": row.status, "applied": True, "saved": saved}
+
+
+@app.patch("/api/sync/teacher-mark-proposals/{proposal_id}/discard", tags=["Offline Synchronisation"])
+def discard_offline_teacher_mark_proposal(proposal_id: int, db: Session = Depends(get_db), admin=Depends(get_current_user)):
+    if admin.role != "admin":
+        raise HTTPException(403, "Administrator review is required.")
+    row = db.query(models.SyncChangeProposal).filter_by(id=proposal_id, entity_type="TeacherMarkBatch").first()
+    if not row:
+        raise HTTPException(404, "Offline teacher marks proposal not found.")
+    if row.status not in {"pending_review", "conflict"}:
+        raise HTTPException(409, "This offline submission has already been resolved.")
+    row.status = "discarded"
+    row.resolution = "discard"
+    row.resolved_at = datetime.utcnow()
+    write_audit(db, admin, "offline_teacher_marks_discarded", "sync_change_proposal", row.id,
+                f"teacher_id={row.user_id}; exam={row.entity_id}; applied=false")
+    db.commit()
+    return {"proposal_id": row.id, "status": row.status, "applied": False}
