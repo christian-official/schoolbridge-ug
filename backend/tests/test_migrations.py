@@ -1,3 +1,4 @@
+import pytest
 from sqlalchemy import create_engine, inspect, insert, select
 
 from app.database import Base
@@ -5,11 +6,17 @@ from app.migrations import upgrade_database
 from app import models
 
 
-def test_fresh_database_is_created_and_versioned(tmp_path):
-    database_path = tmp_path / "fresh-school.sqlite3"
+@pytest.fixture(scope="module")
+def migrated_database(tmp_path_factory):
+    """Build the full fresh schema once for read-only migration assertions."""
+    database_path = tmp_path_factory.mktemp("migrated-database") / "school.sqlite3"
     database_url = f"sqlite:///{database_path}"
-
     upgrade_database(database_url)
+    return database_url
+
+
+def test_fresh_database_is_created_and_versioned(migrated_database):
+    database_url = migrated_database
 
     inspector = inspect(create_engine(database_url))
     tables = set(inspector.get_table_names())
@@ -96,11 +103,8 @@ def test_current_database_does_not_create_redundant_migration_backup(tmp_path):
     assert list(tmp_path.glob("current-school.sqlite3.pre_migration_*.bak")) == []
 
 
-def test_fresh_database_includes_user_scoped_sync_device_registry(tmp_path):
-    database_path = tmp_path / "sync-devices.sqlite3"
-    database_url = f"sqlite:///{database_path}"
-
-    upgrade_database(database_url)
+def test_fresh_database_includes_user_scoped_sync_device_registry(migrated_database):
+    database_url = migrated_database
 
     engine = create_engine(database_url)
     inspector = inspect(engine)
@@ -119,10 +123,8 @@ def test_fresh_database_includes_user_scoped_sync_device_registry(tmp_path):
 
 
 
-def test_fresh_database_includes_sync_change_journal(tmp_path):
-    database_path = tmp_path / "sync-changes.sqlite3"
-    database_url = f"sqlite:///{database_path}"
-    upgrade_database(database_url)
+def test_fresh_database_includes_sync_change_journal(migrated_database):
+    database_url = migrated_database
 
     engine = create_engine(database_url)
     inspector = inspect(engine)
@@ -133,10 +135,8 @@ def test_fresh_database_includes_sync_change_journal(tmp_path):
 
 
 
-def test_sync_device_checkpoint_column_is_migrated(tmp_path):
-    database_path = tmp_path / "sync-device-checkpoint.sqlite3"
-    database_url = f"sqlite:///{database_path}"
-    upgrade_database(database_url)
+def test_sync_device_checkpoint_column_is_migrated(migrated_database):
+    database_url = migrated_database
 
     engine = create_engine(database_url)
     columns = {column["name"] for column in inspect(engine).get_columns("sync_devices")}
@@ -144,9 +144,8 @@ def test_sync_device_checkpoint_column_is_migrated(tmp_path):
     engine.dispose()
 
 
-def test_sync_change_proposals_migration(tmp_path):
-    url=f"sqlite:///{tmp_path / 'sync-proposals.sqlite3'}"
-    upgrade_database(url)
+def test_sync_change_proposals_migration(migrated_database):
+    url = migrated_database
     engine=create_engine(url)
     inspector=inspect(engine)
     assert "sync_change_proposals" in inspector.get_table_names()
@@ -156,9 +155,8 @@ def test_sync_change_proposals_migration(tmp_path):
 
 
 
-def test_sync_change_journal_migrates_historical_scope_column(tmp_path):
-    url = f"sqlite:///{tmp_path / 'sync-change-scopes.sqlite3'}"
-    upgrade_database(url)
+def test_sync_change_journal_migrates_historical_scope_column(migrated_database):
+    url = migrated_database
     engine = create_engine(url)
     columns = {item["name"] for item in inspect(engine).get_columns("sync_changes")}
     assert "scope_json" in columns
