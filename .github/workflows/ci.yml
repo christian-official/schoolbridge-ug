@@ -88,16 +88,62 @@ jobs:
       POSTGRES_USER: schoolbridge
       POSTGRES_PASSWORD: ci-only-postgres-password
       SCHOOLBRIDGE_SECRET_KEY: ci-only-application-secret
-      SCHOOLBRIDGE_LICENSE_PUBLIC_KEY: ci-only-public-key
+      SCHOOLBRIDGE_LICENSE_PUBLIC_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      SCHOOLBRIDGE_PORT: "18080"
     steps:
       - uses: actions/checkout@v4
       - name: Validate local Compose deployment configuration
         run: docker compose config --quiet
-      - name: Verify USB package scripts and local proxy are present
+      - name: Build and export all images as the USB workflow does
+        run: |
+          docker pull postgres:16-alpine
+          docker compose build backend frontend
+          docker image inspect schoolbridge/backend:local schoolbridge/frontend:local postgres:16-alpine
+          docker save -o /tmp/schoolbridge-images.tar postgres:16-alpine schoolbridge/backend:local schoolbridge/frontend:local
+          docker image rm schoolbridge/backend:local schoolbridge/frontend:local
+          docker load -i /tmp/schoolbridge-images.tar
+      - name: Verify scripts and build a source-free USB Compose package
         run: |
           test -s scripts/prepare-usb.ps1
           test -s scripts/install-schoolbridge.ps1
           test -s docs/USB_INSTALLATION.md
           grep -q 'proxy_pass http://backend:8001' frontend/nginx.conf
-          grep -q 'schoolbridge/backend:local' docker-compose.yml
-          grep -q 'schoolbridge/frontend:local' docker-compose.yml
+          grep -q 'SCHOOLBRIDGE_LICENSE_PUBLIC_KEY' scripts/install-schoolbridge.ps1
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          source = Path("docker-compose.yml").read_text()
+          package = re.sub(r"(?m)^    build:\\r?\\n      context: \\.?/(backend|frontend)\\r?\\n", "", source)
+          assert "context: ./backend" not in package
+          assert "context: ./frontend" not in package
+          assert "image: schoolbridge/backend:local" in package
+          assert "image: schoolbridge/frontend:local" in package
+          assert "image: postgres:16-alpine" in package
+          Path("/tmp/schoolbridge-usb").mkdir(exist_ok=True)
+          Path("/tmp/schoolbridge-usb/docker-compose.yml").write_text(package)
+          Path("/tmp/schoolbridge-usb/.env").write_text(
+              "POSTGRES_DB=schoolbridge\\nPOSTGRES_USER=schoolbridge\\n"
+              "POSTGRES_PASSWORD=ci-only-postgres-password\\n"
+              "SCHOOLBRIDGE_SECRET_KEY=ci-only-application-secret\\n"
+              "SCHOOLBRIDGE_LICENSE_PUBLIC_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\\n"
+              "SCHOOLBRIDGE_PORT=18080\\nSCHOOLBRIDGE_BACKUP_INTERVAL_HOURS=24\\n"
+          )
+          PY
+          docker compose --env-file /tmp/schoolbridge-usb/.env -f /tmp/schoolbridge-usb/docker-compose.yml config --quiet
+      - name: Boot packaged application with no source folders present
+        run: |
+          compose="docker compose --env-file /tmp/schoolbridge-usb/.env -p schoolbridge-usb-ci -f /tmp/schoolbridge-usb/docker-compose.yml"
+          $compose up -d --no-build
+          success=0
+          for attempt in $(seq 1 90); do
+            if curl --fail --silent http://127.0.0.1:18080/api/health >/dev/null; then success=1; break; fi
+            sleep 2
+          done
+          if [ "$success" -ne 1 ]; then $compose logs; exit 1; fi
+          $compose restart backend
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:18080/api/health >/dev/null; then exit 0; fi
+            sleep 2
+          done
+          $compose logs
+          exit 1
