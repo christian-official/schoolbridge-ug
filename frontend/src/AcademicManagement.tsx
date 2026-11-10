@@ -168,6 +168,7 @@ export default function AcademicManagement({ token, classes, canVerify = false, 
       setSchoolProfile(profile || {})
       setReportLogo(profile?.report_logo || '')
       if (profile?.report_template) { try { const config = JSON.parse(profile.report_template); setReportTemplateConfig(config); if (config.layout) setReportTemplate(config.layout); setReportTitle(config.title || 'STUDENT PROGRESS REPORT'); setReportFooter(config.footer || 'SchoolBridge · Official student progress report · Keep this report for your records'); localStorage.setItem('schoolbridge-report-template', profile.report_template) } catch { /* Keep the local editable defaults if an older template cannot be parsed. */ } }
+      else { setReportTemplateConfig({}); setReportTemplate('modern'); localStorage.removeItem('schoolbridge-report-template') }
       setDraftBands(gradeRows.map(({ grade, min_score, max_score, remark }) => ({ grade, min_score, max_score, remark })))
       if (selectedExamId && examRows.some(exam => String(exam.id) === selectedExamId)) {
         setSelectedExamId(selectedExamId)
