@@ -67,7 +67,7 @@ The change-feed endpoint returns metadata only, paginated by sequence cursor, an
 
 ### Per-device synchronisation checkpoints
 
-Each registered device stores both the highest change-journal sequence returned to it and the highest sequence it has successfully processed. A device may advance its checkpoint only up to its own delivered high-water mark; it cannot acknowledge another device's unseen changes or move its checkpoint backwards. Checkpoints are scoped to the owning account and revoked devices cannot update them. This records progress only; it does not mean record contents have been downloaded or safely applied locally.
+Each registered device stores both the highest change-journal sequence returned to it and the highest sequence it has successfully processed. Any authenticated account role may acknowledge progress for its own active device; administrators, teachers and parents are not restricted by role. A device may advance its checkpoint only up to its own delivered high-water mark; it cannot acknowledge another device's unseen changes or move its checkpoint backwards. Checkpoints are scoped to the owning account and revoked devices cannot update them. This records progress only; it does not mean record contents have been downloaded or safely applied locally.
 
 
 ### Scoped student bootstrap snapshots
