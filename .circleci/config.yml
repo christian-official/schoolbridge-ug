@@ -78,10 +78,22 @@ jobs:
       - checkout
       - run:
           name: Install only database test dependencies
-          command: python -m pip install --disable-pip-version-check pytest "sqlalchemy>=2.0,<3.0" "cryptography>=42.0,<46.0"
+          command: python -m pip install --disable-pip-version-check pytest "sqlalchemy>=2.0,<3.0"
       - run:
-          name: Database and licensing tests
-          command: PYTHONPATH=backend SCHOOLBRIDGE_DATABASE_URL=sqlite:///./schoolbridge_ci.db SCHOOLBRIDGE_SECRET_KEY=ci-only-secret-key-not-for-production python -m pytest -q backend/tests/test_database.py backend/tests/test_owner_license_tool.py
+          name: SQLite database tests
+          command: PYTHONPATH=backend SCHOOLBRIDGE_DATABASE_URL=sqlite:///./schoolbridge_ci.db SCHOOLBRIDGE_SECRET_KEY=ci-only-secret-key-not-for-production python -m pytest -vv -s backend/tests/test_database.py
+
+  backend-support-owner-license:
+    docker:
+      - image: cimg/python:3.12
+    steps:
+      - checkout
+      - run:
+          name: Install only licensing test dependencies
+          command: python -m pip install --disable-pip-version-check pytest "cryptography>=42.0,<46.0"
+      - run:
+          name: Owner licensing CLI tests
+          command: PYTHONPATH=backend SCHOOLBRIDGE_DATABASE_URL=sqlite:///./schoolbridge_ci.db SCHOOLBRIDGE_SECRET_KEY=ci-only-secret-key-not-for-production python -m pytest -vv -s backend/tests/test_owner_license_tool.py
 
   backend-support-sqlite-backup:
     machine:
@@ -328,6 +340,7 @@ workflows:
       - backend-migration-schema
       - backend-migration-legacy
       - backend-support-database
+      - backend-support-owner-license
       - backend-support-sqlite-backup
       - backend-support-postgres-backup
       - postgres-recovery-integration
