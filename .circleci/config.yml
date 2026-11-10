@@ -233,7 +233,7 @@ jobs:
             test -s docs/USB_INSTALLATION.md
             grep -q 'proxy_pass http://backend:8001' frontend/nginx.conf
             grep -q 'SCHOOLBRIDGE_LICENSE_PUBLIC_KEY' scripts/install-schoolbridge.ps1
-            python3 - \<<'PY'
+            python3 - <<'PY'
             from pathlib import Path
             import re
             source = Path("docker-compose.yml").read_text()
@@ -285,7 +285,7 @@ jobs:
             cp /tmp/schoolbridge-usb/docker-compose.yml "$pkg/docker-compose.yml"
             cp scripts/install-schoolbridge.ps1 scripts/check-school-host.ps1 scripts/prepare-school-host.ps1 "$pkg/"
             cp docs/USB_INSTALLATION.md docs/WINDOWS_RUNTIME_PREPARATION.md docs/SCHOOL_READINESS_AND_INSTALLATION.md "$pkg/docs/"
-            cat > "$pkg/.env.example" \<<'EOF'
+            cat > "$pkg/.env.example" <<'EOF'
             SCHOOLBRIDGE_LICENSE_PUBLIC_KEY=
             SCHOOLBRIDGE_PORT=8080
             SCHOOLBRIDGE_BACKUP_RETENTION_DAYS=30
