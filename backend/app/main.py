@@ -4665,6 +4665,11 @@ def record_fee_payment(data: FeePaymentCreate, db: Session = Depends(get_db), ad
     item = models.FeePayment(**data.model_dump(), receipt_number="RCPT-" + str(date.today().year) + "-" + uuid4().hex[:8].upper())
     db.add(item)
     db.flush()
+    parent_ids = [row[0] for row in db.query(models.ParentStudentLink.user_id).filter_by(student_id=charge.student_id).all()]
+    db.add(models.SyncChange(
+        entity_type="FeePayment", entity_id=item.id, operation="create",
+        scope_json=json.dumps({"parent_user_ids": parent_ids}),
+    ))
     write_audit(db, admin, "payment_received", "fee_payment", item.id,
                 f"Receipt {item.receipt_number}; amount {item.amount}; charge {item.charge_id}")
     db.commit()
