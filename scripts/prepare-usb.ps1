@@ -72,11 +72,96 @@ try {
 
     # Keep the school deployment self-contained: containers must not need internet
     # access after installation. The host can still reach the published frontend port.
-    $networkDriverPattern = '(?m)^    driver: bridge\r?\n'
-    $networkDriverMatches = [regex]::Matches($PackageCompose, $networkDriverPattern)
-    if ($networkDriverMatches.Count -ne 1) { throw "Expected exactly one Compose bridge network definition." }
-    $PackageCompose = [regex]::Replace($PackageCompose, $networkDriverPattern, "    driver: bridge`r`n    internal: true`r`n")
-    if ($PackageCompose -notmatch '(?m)^    internal: true\r?$') { throw "USB Compose network is not isolated from external networks." }
+    if ($PackageCompose -notmatch '(?ms)^  schoolbridge-internal:\r?\n    driver: bridge\r?\n    internal: true\r?
+
+    Set-Content (Join-Path $PackageDir "docker-compose.yml") $PackageCompose -Encoding UTF8
+    Copy-Item (Join-Path $PSScriptRoot "install-schoolbridge.ps1") $PackageDir -Force
+    Copy-Item (Join-Path $PSScriptRoot "check-school-host.ps1") $PackageDir -Force
+    Copy-Item (Join-Path $PSScriptRoot "prepare-school-host.ps1") $PackageDir -Force
+    Copy-Item $RuntimeSource (Join-Path $PackageDir "runtime") -Recurse -Force
+
+    $GuideDir = Join-Path $PackageDir "docs"
+    New-Item -ItemType Directory -Force -Path $GuideDir | Out-Null
+    foreach ($guide in @("USB_INSTALLATION.md", "WINDOWS_RUNTIME_PREPARATION.md", "SCHOOL_READINESS_AND_INSTALLATION.md")) {
+        $source = Join-Path $RepoRoot ("docs/" + $guide)
+        if (-not (Test-Path $source -PathType Leaf)) { throw "Required installation guide is missing: $source" }
+        Copy-Item $source $GuideDir -Force
+    }
+
+    @'
+# Add the owner's Base64 public verification key before starting SchoolBridge.
+SCHOOLBRIDGE_LICENSE_PUBLIC_KEY=
+SCHOOLBRIDGE_PORT=8080
+SCHOOLBRIDGE_BACKUP_RETENTION_DAYS=30
+SCHOOLBRIDGE_BACKUP_INTERVAL_HOURS=24
+'@ | Set-Content (Join-Path $PackageDir ".env.example") -Encoding ASCII
+
+    # A manifest lets the receiving school verify that USB files were copied intact.
+    Get-ChildItem $PackageDir -File -Recurse |
+        Where-Object { $_.Name -ne "SHA256SUMS.txt" } |
+        ForEach-Object {
+            $hash = Get-FileHash $_.FullName -Algorithm SHA256
+            $relative = $_.FullName.Substring($PackageDir.Length).TrimStart([IO.Path]::DirectorySeparatorChar)
+            "$($hash.Hash)  $relative"
+        } | Set-Content (Join-Path $PackageDir "SHA256SUMS.txt") -Encoding ASCII
+
+    Write-Host "Complete offline USB package prepared at $PackageDir"
+    Write-Host "Verify SHA256SUMS.txt after copying the folder to the USB drive."
+}
+finally {
+    Pop-Location
+    foreach ($name in $composeBuildVariables) {
+        [Environment]::SetEnvironmentVariable($name, $previousComposeBuildEnvironment[$name], "Process")
+    }
+}
+) {
+        throw "USB Compose database network must remain isolated from external networks."
+    }
+    if ($PackageCompose -notmatch '(?ms)^  schoolbridge-edge:\r?\n    driver: bridge\r?
+
+    Set-Content (Join-Path $PackageDir "docker-compose.yml") $PackageCompose -Encoding UTF8
+    Copy-Item (Join-Path $PSScriptRoot "install-schoolbridge.ps1") $PackageDir -Force
+    Copy-Item (Join-Path $PSScriptRoot "check-school-host.ps1") $PackageDir -Force
+    Copy-Item (Join-Path $PSScriptRoot "prepare-school-host.ps1") $PackageDir -Force
+    Copy-Item $RuntimeSource (Join-Path $PackageDir "runtime") -Recurse -Force
+
+    $GuideDir = Join-Path $PackageDir "docs"
+    New-Item -ItemType Directory -Force -Path $GuideDir | Out-Null
+    foreach ($guide in @("USB_INSTALLATION.md", "WINDOWS_RUNTIME_PREPARATION.md", "SCHOOL_READINESS_AND_INSTALLATION.md")) {
+        $source = Join-Path $RepoRoot ("docs/" + $guide)
+        if (-not (Test-Path $source -PathType Leaf)) { throw "Required installation guide is missing: $source" }
+        Copy-Item $source $GuideDir -Force
+    }
+
+    @'
+# Add the owner's Base64 public verification key before starting SchoolBridge.
+SCHOOLBRIDGE_LICENSE_PUBLIC_KEY=
+SCHOOLBRIDGE_PORT=8080
+SCHOOLBRIDGE_BACKUP_RETENTION_DAYS=30
+SCHOOLBRIDGE_BACKUP_INTERVAL_HOURS=24
+'@ | Set-Content (Join-Path $PackageDir ".env.example") -Encoding ASCII
+
+    # A manifest lets the receiving school verify that USB files were copied intact.
+    Get-ChildItem $PackageDir -File -Recurse |
+        Where-Object { $_.Name -ne "SHA256SUMS.txt" } |
+        ForEach-Object {
+            $hash = Get-FileHash $_.FullName -Algorithm SHA256
+            $relative = $_.FullName.Substring($PackageDir.Length).TrimStart([IO.Path]::DirectorySeparatorChar)
+            "$($hash.Hash)  $relative"
+        } | Set-Content (Join-Path $PackageDir "SHA256SUMS.txt") -Encoding ASCII
+
+    Write-Host "Complete offline USB package prepared at $PackageDir"
+    Write-Host "Verify SHA256SUMS.txt after copying the folder to the USB drive."
+}
+finally {
+    Pop-Location
+    foreach ($name in $composeBuildVariables) {
+        [Environment]::SetEnvironmentVariable($name, $previousComposeBuildEnvironment[$name], "Process")
+    }
+}
+) {
+        throw "USB Compose must expose the frontend through its dedicated edge network."
+    }
 
     Set-Content (Join-Path $PackageDir "docker-compose.yml") $PackageCompose -Encoding UTF8
     Copy-Item (Join-Path $PSScriptRoot "install-schoolbridge.ps1") $PackageDir -Force
