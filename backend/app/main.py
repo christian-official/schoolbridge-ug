@@ -3137,6 +3137,8 @@ def create_teacher(
     staff = db.get(models.StaffMember, data.staff_id)
     if not staff or staff.status != "active":
         raise HTTPException(404, "Select an existing active staff member.")
+    if not staff.login_allowed:
+        raise HTTPException(403, "This staff member is not eligible for a SchoolBridge login account.")
     if db.query(models.User).filter(models.User.staff_id == staff.id).first():
         raise HTTPException(409, "This staff member already has a login account.")
     role_type = "teacher" if staff.category == "Teaching" else "staff"
@@ -4096,6 +4098,7 @@ class StaffCreate(BaseModel):
     salary_amount: int | None = Field(default=None, ge=0)
     salary_frequency: str = Field(default="Monthly", pattern="^(Monthly|Termly|Weekly|Daily)$")
     house: str | None = None
+    create_login: bool = True
 
 def write_audit(db: Session, actor, action: str, entity_type: str, entity_id: int, details: str = ""):
     db.add(models.AuditLog(
@@ -4489,8 +4492,6 @@ def create_staff(data: StaffCreate, db: Session = Depends(get_db), admin=Depends
         raise HTTPException(422, "Enter the staff member's department.")
     if data.category == "Teaching" and (not data.subjects or not data.subjects.strip()):
         raise HTTPException(422, "Enter at least one subject taught by this teacher.")
-    # Generate a fresh staff number and login ID; never reject a new employee
-    # merely because their contact email is already used by another account.
     staff_number = ""
     username = ""
     for _ in range(8):
@@ -4500,64 +4501,68 @@ def create_staff(data: StaffCreate, db: Session = Depends(get_db), admin=Depends
             staff_number, username = candidate, candidate_username
             break
     if not staff_number:
-        raise HTTPException(503, "A unique staff login could not be generated. Please try again.")
-    item = models.StaffMember(staff_number=staff_number, **data.model_dump())
-    # Create the staff profile and login together so registration is one step.
-    temporary_passcode = secrets.token_urlsafe(9)
-    account_role = "teacher" if data.category == "Teaching" else "staff"
-    requested_email = (data.email or "").strip().lower()
-    email_in_use = bool(requested_email and db.query(models.User.id).filter_by(email=requested_email).first())
-    account_email = f"{username}@accounts.schoolbridge.local" if email_in_use or not requested_email else requested_email
-    if account_role == "teacher":
-        default_permissions = {
-            "Overview": ["view"], "My Classes": ["view"],
-            "My Attendance": ["view"], "My Results": ["view", "add", "edit"],
-            "Announcements": ["view"],
-        }
-    else:
-        title = (data.position or "").strip().lower()
-        if "bursar" in title or "account" in title:
-            sections = ["Overview", "Fees & Finance"]
-        elif "secretary" in title or "admin" in title:
-            sections = ["Overview", "Students", "Staff", "Parent Access", "Announcements", "Reports"]
-        elif "head" in title or title == "dos" or "director of studies" in title:
-            sections = ["Overview", "Students", "Staff", "Examinations", "Attendance", "Timetable", "Leadership & Duty", "Announcements", "Reports"]
-        else:
-            sections = ["Overview"]
-        default_permissions = {section: ["view"] for section in sections}
-    item_user = models.User(
-        username=username,
-        email=account_email,
-        hashed_password=password_hash.hash(temporary_passcode),
-        role=account_role,
-        role_label=(data.position or ("Teacher" if account_role == "teacher" else "Staff"))[:80],
-        permissions_json=json.dumps(default_permissions),
+        raise HTTPException(503, "A unique staff number could not be generated. Please try again.")
+    item = models.StaffMember(
+        staff_number=staff_number,
+        login_allowed=data.create_login,
+        **data.model_dump(exclude={"create_login"}),
     )
+    item_user = None
+    temporary_passcode = None
+    if data.create_login:
+        temporary_passcode = secrets.token_urlsafe(9)
+        account_role = "teacher" if data.category == "Teaching" else "staff"
+        requested_email = (data.email or "").strip().lower()
+        email_in_use = bool(requested_email and db.query(models.User.id).filter_by(email=requested_email).first())
+        account_email = f"{username}@accounts.schoolbridge.local" if email_in_use or not requested_email else requested_email
+        if account_role == "teacher":
+            default_permissions = {
+                "Overview": ["view"], "My Classes": ["view"],
+                "My Attendance": ["view"], "My Results": ["view", "add", "edit"],
+                "Announcements": ["view"],
+            }
+        else:
+            title = (data.position or "").strip().lower()
+            if "bursar" in title or "account" in title:
+                sections = ["Overview", "Fees & Finance"]
+            elif "secretary" in title or "admin" in title:
+                sections = ["Overview", "Students", "Staff", "Parent Access", "Announcements", "Reports"]
+            elif "head" in title or title == "dos" or "director of studies" in title:
+                sections = ["Overview", "Students", "Staff", "Examinations", "Attendance", "Timetable", "Leadership & Duty", "Announcements", "Reports"]
+            elif "gate" in title or "security" in title:
+                sections = ["Overview", "Visitor Register"]
+            else:
+                sections = ["Overview"]
+            default_permissions = {section: ["view"] for section in sections}
+        item_user = models.User(
+            username=username,
+            email=account_email,
+            hashed_password=password_hash.hash(temporary_passcode),
+            role=account_role,
+            role_label=(data.position or ("Teacher" if account_role == "teacher" else "Staff"))[:80],
+            permissions_json=json.dumps(default_permissions),
+        )
     db.add(item)
     try:
         db.flush()
-        item_user.staff_id = item.id
-        db.add(item_user)
+        if item_user:
+            item_user.staff_id = item.id
+            db.add(item_user)
         db.commit()
         db.refresh(item)
     except IntegrityError:
         db.rollback()
         raise HTTPException(409, "The staff member was not saved because a unique staff number, username or login email conflicts with an existing account. The form is safe to retry; check whether this email is already assigned to another login.")
-    # Keep the original staff fields at the top level for existing API clients,
-    # while also returning the grouped staff/login objects used by the new UI.
     staff_data = {column.name: getattr(item, column.name) for column in item.__table__.columns}
-    return {
-        **staff_data,
-        "staff": staff_data,
-        "login": {
-            "username": item_user.username,
-            "email": item_user.email,
-            "temporary_passcode": temporary_passcode,
-            "role": item_user.role,
-            "role_label": item_user.role_label,
-        },
+    login_data = None if not item_user else {
+        "username": item_user.username, "email": item_user.email,
+        "temporary_passcode": temporary_passcode, "role": item_user.role,
+        "role_label": item_user.role_label,
     }
-
+    write_audit(db, admin, "staff_registered", "staff", item.id,
+                "login account created" if item_user else "staff profile created without login eligibility")
+    db.commit()
+    return {**staff_data, "staff": staff_data, "login": login_data}
 
 @app.get("/api/staff", tags=["Staff"])
 def list_staff(search: str = "", category: str | None = None, page: int = 1, page_size: int = 25, db: Session = Depends(get_db)):
@@ -5006,6 +5011,7 @@ class StaffUpdate(BaseModel):
     salary_amount: int | None = Field(default=None, ge=0)
     salary_frequency: str | None = Field(default=None, pattern="^(Monthly|Termly|Weekly|Daily)$")
     house: str | None = None
+    login_allowed: bool | None = None
     status: str | None = Field(default=None, pattern="^(active|archived|inactive)$")
 
 
