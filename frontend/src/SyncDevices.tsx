@@ -59,7 +59,8 @@ async function request<T>(path: string, token: string, options: RequestInit = {}
 
 export default function SyncDevices({ token, userId, isAdmin }: Props) {
   const [devices, setDevices] = useState<Device[]>([])
-  const [proposals, setProposals] = useState<Proposal[]>([])\n  const [teacherMarkProposals, setTeacherMarkProposals] = useState<TeacherMarkProposal[]>([])
+  const [proposals, setProposals] = useState<Proposal[]>([])
+  const [teacherMarkProposals, setTeacherMarkProposals] = useState<TeacherMarkProposal[]>([])
   const [deviceId, setDeviceId] = useState('')
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
