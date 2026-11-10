@@ -2626,6 +2626,9 @@ def test_teaching_staff_can_self_declare_classes_subjects_and_responsibilities()
     assert loaded.json()["class_teacher_class_ids"] == [class_id]
     assert loaded.json()["class_subjects"][0]["subject_ids"] == [subject_id]
     assert set(loaded.json()["special_roles"]) == {"House Patron", "Duty Teacher"}
+    with SessionLocal() as db:
+        teacher = db.get(models.User, teacher_id)
+        assert "Attendance" in json.loads(teacher.permissions_json or "{}")
 
 
 def test_non_teaching_staff_can_be_registered_without_a_login_account():
