@@ -596,6 +596,103 @@ function validateRequiredFields(event: React.FormEvent<HTMLDivElement>) {
   }
 }
 
+
+type FirstSetupStatus = {
+  loading: boolean
+  setup_completed: boolean
+  activated: boolean
+  installation_id: string
+  error: string
+}
+
+function FirstTimeSetupWizard({status,onStatusChange}:{status:FirstSetupStatus;onStatusChange:(next:FirstSetupStatus)=>void}) {
+  const [license,setLicense]=useState('')
+  const [busy,setBusy]=useState(false)
+  const [error,setError]=useState('')
+  const [school,setSchool]=useState({
+    school_name:'', school_type:'Secondary', country:'', school_structure:'Day',
+    address:'', phone:'', email:'', motto:'',
+    admin_username:'', admin_email:'', admin_password:'',
+  })
+  async function activate(event:React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();setBusy(true);setError('')
+    try {
+      const response=await fetch(`${API_BASE_URL}/api/setup/activate`,{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({license}),
+      })
+      const result=await response.json().catch(()=>({}))
+      if(!response.ok)throw new Error(result.detail||'Installation activation failed.')
+      onStatusChange({...status,activated:true,error:''})
+      setLicense('')
+    } catch(e) { setError(e instanceof Error?e.message:'Installation activation failed.') }
+    finally { setBusy(false) }
+  }
+  async function completeSetup(event:React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();setBusy(true);setError('')
+    try {
+      const response=await fetch(`${API_BASE_URL}/api/setup/complete`,{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(school),
+      })
+      const result=await response.json().catch(()=>({}))
+      if(!response.ok)throw new Error(result.detail||'School setup could not be completed.')
+      onStatusChange({...status,setup_completed:true,activated:true,error:''})
+      setSchool({...school,admin_password:''})
+    } catch(e) { setError(e instanceof Error?e.message:'School setup could not be completed.') }
+    finally { setBusy(false) }
+  }
+  return <main className="login-page first-setup-page">
+    <section className="login-card first-setup-card">
+      <div className="brand-mark"><GraduationCap size={30}/></div>
+      <div className="brand-name">School<span>Bridge</span></div>
+      <p className="login-subtitle">Secure first-time school installation</p>
+      <div className="first-setup-progress"><span className={status.activated?'complete':''}>1. Owner activation</span><span className={status.activated?'active':''}>2. School setup</span></div>
+      {!status.activated ? <>
+        <h1>Activate this installation</h1>
+        <p className="muted">This installation must be authorised by the SchoolBridge owner before school records or administrator accounts can be created.</p>
+        <div className="installation-id-panel"><small>UNIQUE INSTALLATION ID</small><strong>{status.installation_id}</strong><button type="button" className="secondary-button" onClick={()=>void navigator.clipboard?.writeText(status.installation_id)}>Copy installation ID</button></div>
+        <form onSubmit={activate}>
+          <label htmlFor="schoolbridge-license">Owner-signed activation license</label>
+          <textarea id="schoolbridge-license" value={license} onChange={e=>setLicense(e.target.value)} required rows={4} placeholder="Paste the signed installation license here"/>
+          {error&&<p className="error" role="alert">{error}</p>}
+          <button className="primary-button login-button" disabled={busy||license.trim().length<20}>{busy?'Verifying license...':'Activate installation'}</button>
+        </form>
+      </> : <>
+        <h1>Set up your school</h1>
+        <p className="muted">Enter the school's official details and create its first administrator account. The original school identity will be protected after setup.</p>
+        <form onSubmit={completeSetup}>
+          <div className="first-setup-section"><h3>School identity</h3>
+            <label>Official school name *<input required minLength={2} maxLength={160} value={school.school_name} onChange={e=>setSchool({...school,school_name:e.target.value})}/></label>
+            <div className="first-setup-grid">
+              <label>School type *<select value={school.school_type} onChange={e=>setSchool({...school,school_type:e.target.value})}><option>Primary</option><option>Secondary</option><option>Combined</option></select></label>
+              <label>School structure *<select value={school.school_structure} onChange={e=>setSchool({...school,school_structure:e.target.value})}><option>Day</option><option>Boarding</option><option>Both</option></select></label>
+            </div>
+            <label>Country *<input required value={school.country} onChange={e=>setSchool({...school,country:e.target.value})} placeholder="e.g. Uganda"/></label>
+          </div>
+          <div className="first-setup-section"><h3>Contact and location</h3>
+            <label>Physical address<input value={school.address} onChange={e=>setSchool({...school,address:e.target.value})}/></label>
+            <div className="first-setup-grid">
+              <label>School phone<input type="tel" value={school.phone} onChange={e=>setSchool({...school,phone:e.target.value})}/></label>
+              <label>School email<input type="email" value={school.email} onChange={e=>setSchool({...school,email:e.target.value})}/></label>
+            </div>
+            <label>School motto<input value={school.motto} onChange={e=>setSchool({...school,motto:e.target.value})}/></label>
+          </div>
+          <div className="first-setup-section"><h3>First administrator</h3>
+            <label>Administrator username *<input required minLength={3} maxLength={80} autoComplete="username" value={school.admin_username} onChange={e=>setSchool({...school,admin_username:e.target.value})}/></label>
+            <label>Administrator email *<input required type="email" autoComplete="email" value={school.admin_email} onChange={e=>setSchool({...school,admin_email:e.target.value})}/></label>
+            <label>Private password *<input required type="password" minLength={12} maxLength={128} autoComplete="new-password" value={school.admin_password} onChange={e=>setSchool({...school,admin_password:e.target.value})}/></label>
+            <p className="form-hint">Use at least 12 characters. SchoolBridge stores only a secure password hash.</p>
+          </div>
+          {error&&<p className="error" role="alert">{error}</p>}
+          <button className="primary-button login-button" disabled={busy}>{busy?'Saving school setup...':'Complete school setup'}</button>
+        </form>
+      </>}
+      <p className="login-foot"><ShieldCheck size={15}/> Existing school installations are protected from this first-time setup process.</p>
+    </section>
+  </main>
+}
+
 function App() {
   const [token, setToken] = useState(sessionStorage.getItem('sb_token') || '')
   const [user, setUser] = useState<User | null>(null)
@@ -608,6 +705,16 @@ function App() {
   const [overviewShortcuts, setOverviewShortcuts] = useState<string[]>([])
   const [serverConnection, setServerConnection] = useState<'checking' | 'connected' | 'disconnected'>('checking')
   const [syncDeviceRevoked, setSyncDeviceRevoked] = useState(false)
+  const [setupStatus,setSetupStatus] = useState<FirstSetupStatus>({loading:true,setup_completed:false,activated:false,installation_id:'',error:''})
+  useEffect(()=>{
+    let cancelled=false
+    fetch(`${API_BASE_URL}/api/setup/status`).then(async response=>{
+      const result=await response.json().catch(()=>({}))
+      if(!response.ok)throw new Error(result.detail||'Unable to check installation setup.')
+      if(!cancelled)setSetupStatus({loading:false,setup_completed:Boolean(result.setup_completed),activated:Boolean(result.activated),installation_id:result.installation_id||'',error:''})
+    }).catch(e=>{if(!cancelled)setSetupStatus({loading:false,setup_completed:false,activated:false,installation_id:'',error:e instanceof Error?e.message:'Unable to check installation setup.'})})
+    return ()=>{cancelled=true}
+  },[])
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressTriggered = useRef(false)
   useEffect(() => {
@@ -1029,6 +1136,9 @@ function App() {
   const [artsCombinations, sciencesCombinations] = (schoolConfig.a_level_combinations || '').split(/\r?\n/).reduce((groups: string[][], line: string) => { const match = line.match(/^(ARTS|SCIENCES)::(.*)$/i); if (match && match[2].trim()) groups[match[1].toUpperCase() === 'ARTS' ? 0 : 1].push(match[2].trim()); return groups }, [[], []])
 
   if (!token || !user) {
+    if(setupStatus.loading) return <main className="login-page"><section className="login-card"><div className="brand-name">School<span>Bridge</span></div><p className="muted">Checking school installation...</p></section></main>
+    if(setupStatus.error) return <main className="login-page"><section className="login-card"><div className="brand-name">School<span>Bridge</span></div><h1>Unable to check setup</h1><p className="error" role="alert">{setupStatus.error}</p><button className="primary-button login-button" onClick={()=>window.location.reload()}>Try again</button></section></main>
+    if(!setupStatus.setup_completed) return <FirstTimeSetupWizard status={setupStatus} onStatusChange={setSetupStatus}/>
     return (
       <main className="login-page">
         <section className="login-card">

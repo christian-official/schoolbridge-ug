@@ -2357,3 +2357,24 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .sync-proposal-details summary{cursor:pointer;color:#315f8c;font-size:12px;font-weight:700}
 .sync-proposal-payload{max-width:360px;max-height:220px;overflow:auto;margin:8px 0;padding:10px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;color:#334155;font-size:11px;white-space:pre-wrap;overflow-wrap:anywhere}
 @media(max-width:680px){.device-current-status{align-items:flex-start;flex-direction:column}.sync-proposal-payload{max-width:220px}}
+
+/* First-time owner activation and school setup wizard. */
+.first-setup-page{align-items:flex-start;overflow:auto;padding:28px 16px}
+.first-setup-card{width:min(100%,680px);max-width:680px;margin:auto}
+.first-setup-card h1{margin:18px 0 8px}
+.first-setup-card form{display:grid;gap:12px;text-align:left}
+.first-setup-card label{display:grid;gap:6px;font-size:13px;font-weight:650;color:#334155}
+.first-setup-card input,.first-setup-card select,.first-setup-card textarea{width:100%;min-width:0;border:1px solid #d5deea;border-radius:10px;padding:11px 12px;background:#fff;color:#172b43;font:inherit}
+.first-setup-card textarea{resize:vertical}
+.first-setup-progress{display:flex;gap:8px;margin:20px 0;padding-bottom:14px;border-bottom:1px solid #e5eaf1}
+.first-setup-progress span{flex:1;padding:9px;border-radius:9px;background:#f1f5f9;color:#64748b;font-size:12px;font-weight:700;text-align:center}
+.first-setup-progress span.complete,.first-setup-progress span.active{background:#eaf3fb;color:#245b8f}
+.installation-id-panel{display:grid;gap:8px;margin:18px 0;padding:14px;border:1px solid #d9e3ee;border-radius:12px;background:#f7fafc}
+.installation-id-panel small{color:#64748b;font-size:10px;font-weight:800;letter-spacing:.08em}
+.installation-id-panel strong{font-size:13px;overflow-wrap:anywhere;color:#1e3a56}
+.installation-id-panel .secondary-button{justify-self:start}
+.first-setup-section{display:grid;gap:11px;padding:16px 0;border-bottom:1px solid #e8edf3}
+.first-setup-section h3{margin:0;color:#243b53;font-size:15px}
+.first-setup-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.first-setup-card .login-button{width:100%;margin-top:8px}
+@media(max-width:560px){.first-setup-grid{grid-template-columns:1fr}.first-setup-page{padding:14px 10px}.first-setup-card{padding:22px 18px}}
