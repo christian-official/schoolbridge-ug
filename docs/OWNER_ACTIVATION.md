@@ -33,7 +33,7 @@ The license is bound to one installation ID. Activation attempts are rate-limite
 
 ## Existing schools
 
-The database migration automatically marks an installation with existing users or school records as already initialized. Existing schools are not sent through first-time activation or locked out by this gate.
+The database migration automatically marks an installation with existing users or school records as already initialized and gives each migrated installation its own identifier. Existing schools are not sent through first-time activation or locked out by this gate. The public key is optional for an already-initialised installation to start; configure it only if the owner later needs to issue an exceptional identity-correction license.
 
 
 ## Authorise an exceptional identity correction
