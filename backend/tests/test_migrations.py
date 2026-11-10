@@ -338,3 +338,22 @@ def test_partial_school_setup_state_table_gets_missing_activation_columns(tmp_pa
     assert attempts == 0
     assert installation_id == "existing-installation-id"
     assert revision == "0026_repair_school_setup_state"
+
+
+def test_fresh_database_includes_exam_release_and_visitor_register(migrated_database):
+    engine = create_engine(migrated_database)
+    inspector = inspect(engine)
+    assert "closed" in {column["name"] for column in inspector.get_columns("exams")}
+    assert "visitor_logs" in inspector.get_table_names()
+    assert {"visitor_name", "checked_in_at", "checked_out_at", "recorded_by"} <= {
+        column["name"] for column in inspector.get_columns("visitor_logs")
+    }
+    engine.dispose()
+
+
+def test_fresh_database_includes_staff_profile_controls(migrated_database):
+    engine = create_engine(migrated_database)
+    inspector = inspect(engine)
+    columns = {column["name"] for column in inspector.get_columns("staff_members")}
+    assert {"special_roles_json", "login_allowed"} <= columns
+    engine.dispose()
