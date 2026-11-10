@@ -2433,3 +2433,118 @@ def test_combined_school_supports_both_curricula_and_secondary_academic_levels()
         })
         assert primary_student.status_code == 200, primary_student.text
         assert primary_student.json()["academic_level"] is None
+
+
+def test_dismissing_student_hides_record_and_deactivates_last_parent_account():
+    reset_database()
+    admin = create_admin()
+    token = create_access_token(admin)
+    db = SessionLocal()
+    try:
+        student = models.Student(
+            admission_number="SB-DISMISS-001", first_name="Amina", last_name="Test",
+            gender="Female", guardian_name="Parent Test", guardian_phone="0700000000",
+            status="active",
+        )
+        parent = models.User(
+            username="dismissed-parent", email="dismissed-parent@example.invalid",
+            hashed_password=password_hash.hash("ParentPassword123!"), role="parent", is_active=True,
+        )
+        db.add_all([student, parent])
+        db.flush()
+        db.add(models.ParentStudentLink(user_id=parent.id, student_id=student.id))
+        db.commit()
+        student_id, parent_id = student.id, parent.id
+    finally:
+        db.close()
+
+    with TestClient(app) as client:
+        changed = client.patch(
+            f"/api/students/{student_id}/status?status=dismissed",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        visible = client.get("/api/students")
+
+    assert changed.status_code == 200
+    assert changed.json()["parent_accounts_deactivated"] == 1
+    assert all(row["id"] != student_id for row in visible.json())
+    with SessionLocal() as db:
+        assert db.get(models.User, parent_id).is_active is False
+
+
+def test_parent_results_are_released_only_after_exam_is_closed():
+    reset_database()
+    admin = create_admin()
+    admin_token = create_access_token(admin)
+    db = SessionLocal()
+    try:
+        student = models.Student(
+            admission_number="SB-RESULT-001", first_name="Brian", last_name="Test",
+            gender="Male", guardian_name="Parent Test", guardian_phone="0700000000",
+            status="active",
+        )
+        parent = models.User(
+            username="result-parent", email="result-parent@example.invalid",
+            hashed_password=password_hash.hash("ParentPassword123!"), role="parent", is_active=True,
+        )
+        subject = models.Subject(name="Mathematics", school_type="Secondary")
+        exam = models.Exam(name="End of Term", exam_type="End of Term", term="Term 1", year=2026)
+        db.add_all([student, parent, subject, exam])
+        db.flush()
+        db.add(models.ParentStudentLink(user_id=parent.id, student_id=student.id))
+        db.add(models.Mark(student_id=student.id, subject_id=subject.id, exam_id=exam.id, score=85, verified=True))
+        db.commit()
+        student_id, exam_id = student.id, exam.id
+        parent_token = create_access_token(SimpleNamespace(id=parent.id, role="parent"))
+    finally:
+        db.close()
+
+    with TestClient(app) as client:
+        headers = {"Authorization": f"Bearer {parent_token}"}
+        before = client.get(f"/api/parent/children/{student_id}/results", headers=headers)
+        closed = client.post(f"/api/exams/{exam_id}/close", headers={"Authorization": f"Bearer {admin_token}"})
+        after = client.get(f"/api/parent/children/{student_id}/results", headers=headers)
+
+    assert before.status_code == 200 and before.json() == []
+    assert closed.status_code == 200
+    assert after.status_code == 200 and len(after.json()) == 1
+    assert after.json()[0]["score"] == 85
+
+
+def test_gatekeeper_loses_visitor_record_after_checkout_and_admin_receives_it():
+    reset_database()
+    db = SessionLocal()
+    try:
+        gatekeeper = models.User(
+            username="test-gatekeeper", email="gatekeeper@example.invalid",
+            hashed_password=password_hash.hash("GatePassword123!"), role="staff",
+            role_label="Gatekeeper", is_active=True,
+        )
+        admin = models.User(
+            username="visitor-admin", email="visitor-admin@example.invalid",
+            hashed_password=password_hash.hash("AdminPassword123!"), role="admin", is_active=True,
+        )
+        db.add_all([gatekeeper, admin])
+        db.commit()
+        gatekeeper_token = create_access_token(SimpleNamespace(id=gatekeeper.id, role="staff"))
+        admin_token = create_access_token(SimpleNamespace(id=admin.id, role="admin"))
+    finally:
+        db.close()
+
+    with TestClient(app) as client:
+        headers = {"Authorization": f"Bearer {gatekeeper_token}"}
+        checkin = client.post("/api/visitors/check-in", json={
+            "visitor_name": "Visitor One", "person_to_see": "Head Teacher",
+            "purpose": "Meeting", "phone": "0700000000",
+        }, headers=headers)
+        visitor_id = checkin.json()["id"]
+        assert len(client.get("/api/visitors", headers=headers).json()) == 1
+        checkout = client.post(f"/api/visitors/{visitor_id}/check-out", headers=headers)
+        gate_view = client.get("/api/visitors", headers=headers)
+        admin_view = client.get("/api/visitors", headers={"Authorization": f"Bearer {admin_token}"})
+
+    assert checkin.status_code == 200
+    assert checkout.status_code == 200
+    assert gate_view.status_code == 200 and gate_view.json() == []
+    assert admin_view.status_code == 200 and len(admin_view.json()) == 1
+    assert admin_view.json()[0]["visitor_name"] == "Visitor One"
