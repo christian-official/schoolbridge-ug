@@ -6,6 +6,8 @@ $EnvFile = Join-Path $PackageDir ".env"
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { throw "Docker Engine is not installed. The current USB package does not bundle the runtime; install a compatible offline Docker runtime first." }
 docker compose version | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "Docker Compose v2 is required." }
+docker info *> $null
+if ($LASTEXITCODE -ne 0) { throw "Docker Engine is not running. Start the local Docker service before installing." }
 if (-not (Test-Path $ImageArchive)) { throw "Missing schoolbridge-images.tar. Recreate the USB package." }
 
 if (-not (Test-Path $EnvFile)) {
@@ -35,7 +37,18 @@ Write-Host "Importing SchoolBridge images from USB..."
 docker load -i $ImageArchive
 if ($LASTEXITCODE -ne 0) { throw "Image import failed." }
 
-Write-Host "Review .env and add SCHOOLBRIDGE_LICENSE_PUBLIC_KEY before first activation."
+$envLines = Get-Content $EnvFile
+$publicKeyLine = $envLines | Where-Object { $_ -match '^SCHOOLBRIDGE_LICENSE_PUBLIC_KEY=' } | Select-Object -First 1
+if (-not $publicKeyLine -or $publicKeyLine -eq 'SCHOOLBRIDGE_LICENSE_PUBLIC_KEY=') {
+    $publicKey = Read-Host "Paste the owner's Base64 public verification key (not the private key)"
+    if ([string]::IsNullOrWhiteSpace($publicKey)) { throw "The owner's public verification key is required before first activation." }
+    try { [void][Convert]::FromBase64String($publicKey) } catch { throw "The public verification key must be valid Base64." }
+    if ([Convert]::FromBase64String($publicKey).Length -ne 32) { throw "The Ed25519 public key must decode to exactly 32 bytes." }
+    $envLines = $envLines | ForEach-Object {
+        if ($_ -match '^SCHOOLBRIDGE_LICENSE_PUBLIC_KEY=') { "SCHOOLBRIDGE_LICENSE_PUBLIC_KEY=$publicKey" } else { $_ }
+    }
+    Set-Content $EnvFile $envLines -Encoding ASCII
+}
 $confirmation = Read-Host "Start the local SchoolBridge services now? Type START"
 if ($confirmation -cne "START") { Write-Host "Images imported. Start later with: docker compose up -d"; exit 0 }
 
