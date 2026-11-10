@@ -3012,9 +3012,8 @@ def acknowledge_sync_checkpoint(
     user=Depends(get_current_user),
 ):
     """Persist the highest change sequence successfully processed by this device."""
-    if user.role != "admin":
-        raise HTTPException(403, "Checkpoint access is currently restricted to administrators.")
-
+    # Checkpoints belong to the authenticated device owner, not an admin role.
+    # Any account may acknowledge only sequences delivered to its own active device.
     device = db.query(models.SyncDevice).filter_by(
         user_id=user.id, device_id=str(device_id)
     ).first()
