@@ -2396,3 +2396,21 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .profile-card-open { display:flex; align-items:center; gap:10px; min-width:0; flex:1; padding:0; border:0; background:transparent; color:inherit; text-align:left; cursor:pointer; }
 .profile-card-open:hover .profile-info strong { color:var(--blue); }
 .top-user-name,.top-avatar { display:none !important; }
+
+@media print {
+  body[data-schoolbridge-print="community"] * { visibility:hidden !important; }
+  body[data-schoolbridge-print="community"] .school-community-workspace,
+  body[data-schoolbridge-print="community"] .school-community-workspace * { visibility:visible !important; }
+  body[data-schoolbridge-print="community"] .school-community-workspace {
+    position:absolute !important; inset:0 !important; width:100% !important;
+    margin:0 !important; padding:10mm !important; border:0 !important;
+    box-shadow:none !important; background:#fff !important;
+  }
+  body[data-schoolbridge-print="community"] .school-community-workspace button,
+  body[data-schoolbridge-print="community"] .school-community-workspace input,
+  body[data-schoolbridge-print="community"] .school-community-workspace select,
+  body[data-schoolbridge-print="community"] .school-community-workspace .community-toolbar,
+  body[data-schoolbridge-print="community"] .school-community-workspace .community-tabs { display:none !important; }
+  body[data-schoolbridge-print="community"] .school-community-workspace .table-wrap { overflow:visible !important; }
+  body[data-schoolbridge-print="community"] .school-community-workspace table { white-space:normal !important; }
+}
