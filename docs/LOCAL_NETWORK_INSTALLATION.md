@@ -1,5 +1,7 @@
 # SchoolBridge local-network installation (preview foundation)
 
+Before visiting a school, use the [school-readiness and first installation guide](SCHOOL_READINESS_AND_INSTALLATION.md) to prepare the host computer, network, school information and owner verification.
+
 This setup runs SchoolBridge on one school computer/server. Staff devices on the
 same trusted school Wi-Fi or wired LAN open the application in a browser. The
 backend and PostgreSQL database stay on the host; client devices do not connect
