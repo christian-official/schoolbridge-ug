@@ -21,6 +21,13 @@ def write_private_key(path: Path, value: bytes) -> None:
         output.write(base64.b64encode(value))
 
 
+def write_public_key(path: Path, value: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
+    with os.fdopen(descriptor, "wb") as output:
+        output.write(base64.b64encode(value))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Create or sign SchoolBridge installation licenses offline.")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -40,13 +47,17 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.command == "generate-keypair":
+        private_path = Path(args.private_key)
+        public_path = Path(args.public_key)
+        if private_path.resolve() == public_path.resolve():
+            parser.error("--private-key and --public-key must be different files.")
+        if private_path.exists() or public_path.exists():
+            parser.error("Key output files must not already exist; refusing to overwrite an existing key.")
         key = Ed25519PrivateKey.generate()
         private = key.private_bytes(serialization.Encoding.Raw, serialization.PrivateFormat.Raw, serialization.NoEncryption())
         public = key.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
-        write_private_key(Path(args.private_key), private)
-        Path(args.public_key).parent.mkdir(parents=True, exist_ok=True)
-        Path(args.public_key).write_text(base64.b64encode(public).decode("ascii"), encoding="ascii")
-        os.chmod(args.public_key, 0o644)
+        write_private_key(private_path, private)
+        write_public_key(public_path, public)
         print("Private key created with owner-only permissions. Keep it offline and never upload it.")
         print("Configure SCHOOLBRIDGE_LICENSE_PUBLIC_KEY with this public key value:")
         print(base64.b64encode(public).decode("ascii"))
