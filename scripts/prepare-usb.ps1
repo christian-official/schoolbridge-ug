@@ -42,6 +42,16 @@ if ($LASTEXITCODE -ne 0) { throw "Docker Compose v2 is required." }
 docker info *> $null
 if ($LASTEXITCODE -ne 0) { throw "Docker Engine must be running on the preparation computer." }
 
+# Compose validates required runtime variables even for an image-only build.
+# Supply throwaway values so a clean preparation computer does not need a pre-existing
+# school .env file, and never reuse or bake a real school secret into the USB package.
+$composeBuildVariables = @("POSTGRES_PASSWORD", "SCHOOLBRIDGE_SECRET_KEY")
+$previousComposeBuildEnvironment = @{}
+foreach ($name in $composeBuildVariables) {
+    $previousComposeBuildEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, "Process")
+    [Environment]::SetEnvironmentVariable($name, [guid]::NewGuid().ToString("N") + [guid]::NewGuid().ToString("N"), "Process")
+}
+
 Push-Location $RepoRoot
 try {
     docker pull postgres:16-alpine
@@ -93,4 +103,9 @@ SCHOOLBRIDGE_BACKUP_INTERVAL_HOURS=24
     Write-Host "Complete offline USB package prepared at $PackageDir"
     Write-Host "Verify SHA256SUMS.txt after copying the folder to the USB drive."
 }
-finally { Pop-Location }
+finally {
+    Pop-Location
+    foreach ($name in $composeBuildVariables) {
+        [Environment]::SetEnvironmentVariable($name, $previousComposeBuildEnvironment[$name], "Process")
+    }
+}
