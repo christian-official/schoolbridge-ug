@@ -2462,7 +2462,4 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   body[data-schoolbridge-print="class-reports"] .class-reports-print-batch .report-card-sheet {
     break-inside:avoid !important; page-break-inside:avoid !important;
   }
-  body[data-schoolbridge-print="class-reports"] .class-reports-print-batch .report-card-sheet + .report-card-sheet {
-    break-before:page !important; page-break-before:always !important;
-  }
 }
