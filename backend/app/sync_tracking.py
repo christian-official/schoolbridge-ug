@@ -94,11 +94,21 @@ def register_sync_tracking() -> None:
                     changed_at=datetime.utcnow(),
                     scope_json=json.dumps(scope, sort_keys=True, separators=(",", ":"))))
             if isinstance(target, models.Mark):
+                # Parents may already have cached a verified mark. When an
+                # administrator revokes verification, publish a scoped delete
+                # invalidation so the parent's offline copy can remove it.
+                verified_history = sa_inspect(target).attrs.verified.history
+                was_verified = any(bool(value) for value in verified_history.deleted)
+                parent_scope = dict(scope)
+                parent_scope["verified"] = bool(target.verified or was_verified)
+                parent_operation = (
+                    "delete" if was_verified and not target.verified else operation
+                )
                 connection.execute(models.SyncChange.__table__.insert().values(
                     entity_type=f"MarkScope:{target.exam_id}:{target.subject_id}",
-                    entity_id=target.student_id, operation=operation,
+                    entity_id=target.student_id, operation=parent_operation,
                     changed_at=datetime.utcnow(),
-                    scope_json=json.dumps(scope, sort_keys=True, separators=(",", ":"))))
+                    scope_json=json.dumps(parent_scope, sort_keys=True, separators=(",", ":"))))
         return listener
     for model in _TRACKED_MODELS:
         event.listen(model, "after_insert", record("insert"))
