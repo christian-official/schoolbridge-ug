@@ -2439,3 +2439,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .staff-login-eligibility { display:flex !important; align-items:center; flex-wrap:wrap; gap:8px; padding:12px; border:1px solid #dce5f3; border-radius:8px; background:#f8faff; color:#34445e !important; }
 .staff-login-eligibility input { width:auto !important; accent-color:var(--blue); }
 .staff-login-eligibility small { flex-basis:100%; margin-left:24px; color:#8491a6; font-size:10px; font-weight:400; }
+
+.report-header-align-left .report-school-title { text-align:left !important; }
+.report-header-align-center .report-school-title { text-align:center !important; }
+.report-header-align-right .report-school-title { text-align:right !important; }
+.report-card-sheet { border-top:4px solid var(--report-accent, #315ee8); }
