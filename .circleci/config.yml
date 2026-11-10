@@ -307,7 +307,7 @@ jobs:
             cd /tmp
             zip -qr SchoolBridge-USB.zip SchoolBridge-USB
             unzip -t SchoolBridge-USB.zip
-            python3 - <<'PY'
+            python3 - \<<'PY'
             from pathlib import Path
             from zipfile import ZipFile
             import hashlib
