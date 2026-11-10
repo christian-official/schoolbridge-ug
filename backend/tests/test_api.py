@@ -1386,6 +1386,25 @@ def test_sync_device_checkpoint_is_monotonic_owned_and_bounded():
         assert revoked.status_code == 403
 
 
+def test_teacher_can_acknowledge_checkpoint_for_own_device():
+    reset_database()
+    teacher = create_teacher()
+    headers = {"Authorization": f"Bearer {create_access_token(teacher)}"}
+    device_id = "00000000-0000-4000-8000-000000000203"
+
+    with TestClient(app) as client:
+        registered = client.post("/api/sync/devices", headers=headers, json={
+            "device_id": device_id, "device_name": "Teacher checkpoint device",
+        })
+        assert registered.status_code == 200
+        acknowledged = client.post(
+            f"/api/sync/devices/{device_id}/checkpoint?sequence=0",
+            headers=headers,
+        )
+        assert acknowledged.status_code == 200
+        assert acknowledged.json()["last_sync_sequence"] == 0
+
+
 def test_sync_device_checkpoint_rejects_negative_sequence():
     reset_database()
     admin = create_admin()
