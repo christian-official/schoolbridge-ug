@@ -40,6 +40,23 @@ test('real Chromium verifies the offline service-worker boundary', async () => {
     // once so the worker can observe and cache the built JS/CSS requests.
     await page.reload({ waitUntil: 'networkidle' })
     assert.equal(await page.title(), 'SchoolBridge')
+
+    const manifestResponse = await page.request.get(`${baseUrl}/manifest.webmanifest`)
+    assert.equal(manifestResponse.ok(), true, 'the install manifest should be served')
+    const manifest = await manifestResponse.json()
+    assert.equal(manifest.display, 'standalone')
+    assert.ok(manifest.icons.some(icon => icon.sizes === '192x192'))
+
+    await page.setViewportSize({ width: 360, height: 800 })
+    const mobileLayout = await page.evaluate(() => ({
+      viewport: window.innerWidth,
+      document: document.documentElement.scrollWidth,
+      body: document.body.scrollWidth,
+    }))
+    assert.ok(mobileLayout.document <= mobileLayout.viewport, `mobile document must not overflow horizontally: ${JSON.stringify(mobileLayout)}`)
+    assert.ok(mobileLayout.body <= mobileLayout.viewport, `mobile body must not overflow horizontally: ${JSON.stringify(mobileLayout)}`)
+    await page.setViewportSize({ width: 1440, height: 900 })
+
     assert.equal(
       await page.evaluate(() => navigator.serviceWorker.controller !== null),
       true,
