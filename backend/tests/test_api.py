@@ -2474,6 +2474,7 @@ def test_parent_change_feed_invalidates_previously_verified_marks_when_unverifie
         db.commit()
         parent_id = parent.id
         mark_id = mark.id
+        student_id = student.id
 
     headers = {"Authorization": "Bearer " + create_access_token(
         SimpleNamespace(id=parent_id, role="parent")
@@ -2508,7 +2509,7 @@ def test_parent_change_feed_invalidates_previously_verified_marks_when_unverifie
         invalidations = [
             item for item in revoked.json()["changes"]
             if item["entity_type"].startswith("MarkScope")
-            and item["entity_id"] == mark_id
+            and item["entity_id"] == student_id
         ]
         assert len(invalidations) == 1
         assert invalidations[0]["operation"] == "delete"
