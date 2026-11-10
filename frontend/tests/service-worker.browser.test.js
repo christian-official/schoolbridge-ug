@@ -175,7 +175,7 @@ test('real Chromium completes the first-install owner activation and school setu
     const activationLayout = await page.evaluate(() => ({ viewport: innerWidth, document: document.documentElement.scrollWidth }))
     assert.ok(activationLayout.document <= activationLayout.viewport, `activation page must fit mobile viewport: ${JSON.stringify(activationLayout)}`)
     await page.setViewportSize({ width: 1280, height: 900 })
-    await page.getByLabel('Owner-signed activation license').fill('signed-owner-license-token')
+    await page.getByLabel('CHRISTIAN Owner Key activation code').fill('signed-owner-license-token')
     await page.getByRole('button', { name: 'Activate installation' }).click()
     await page.getByRole('heading', { name: 'Set up your school' }).waitFor()
     assert.deepEqual(activationPayload, { license: 'signed-owner-license-token' })
