@@ -5,7 +5,7 @@ import { saveEncryptedOfflineDraft, loadEncryptedOfflineDraft, deleteEncryptedOf
 type SchoolClass = { id: number; name?: string; section?: string }
 type Subject = { id: number; name: string; code?: string | null }
 type Student = { id: number; first_name: string; middle_name?: string | null; last_name: string; admission_number: string; class_id?: number | null; academic_level?: string | null; combination?: string | null; optional_subjects?: string | null; subsidiary_subjects?: string | null }
-type Exam = { id: number; name: string; exam_type: string; term: string; year: number; class_id: number | null }
+type Exam = { id: number; name: string; exam_type: string; term: string; year: number; class_id: number | null; closed?: boolean }
 type Mark = { id: number; student_id: number; subject_id: number; exam_id: number; score: number; verified: boolean }
 type GradeBand = { id?: number; grade: string; min_score: number; max_score: number; remark: string }
 type SchoolProfile = { name?: string; address?: string | null; phone?: string | null; email?: string | null; motto?: string | null; school_type?: string; a_level_combinations?: string | null; o_level_optional_subjects?: string | null; a_level_subsidiary_subjects?: string | null; report_logo?: string | null; report_template?: string | null }
@@ -366,6 +366,17 @@ export default function AcademicManagement({ token, classes, canVerify = false, 
 
   async function submitOfflineMarkDraft(){const deviceId=localStorage.getItem('schoolbridge-sync-device-'+userId)||'';if(!deviceId||offlinePassphrase.length<12){setOfflineMarkMessage('Register this device and enter the offline passphrase.');return}setOfflineMarkBusy(true);try{const draft=await loadEncryptedOfflineDraft<any>(userId,deviceId,offlinePassphrase);if(draft.version!==1||draft.userId!==userId||draft.deviceId!==deviceId||draft.expiresAt<=Date.now())throw new Error('This marks draft is expired or belongs to another account or device.');const result=await request<{proposal_id:number;status:string;applied:boolean;saved:number}>('sync/teacher-mark-proposals',token,{method:'POST',body:JSON.stringify({device_id:deviceId,idempotency_key:draft.idempotencyKey,exam_id:draft.examId,subject_id:draft.subjectId,base_sequence:draft.baseSequence,base_mark_ids:draft.baseMarkIds,records:draft.records})});if(result.applied){await deleteEncryptedOfflineDraft(userId,deviceId);setOfflineMarkMessage(result.saved+' marks synchronised as unverified results; normal verification still applies.');if(selectedExamId===String(draft.examId)){const next=await request<Mark[]>('marks?exam_id='+draft.examId,token);setMarks(next);setMarkDrafts(Object.fromEntries(next.map(mark=>[String(mark.student_id)+':'+String(mark.subject_id),String(Math.round(mark.score))])))}const history=await request<{proposals:typeof offlineMarkHistory}>('sync/teacher-mark-proposals/mine',token);setOfflineMarkHistory(history.proposals||[])}else{setOfflineMarkMessage('Submission #'+result.proposal_id+' was not applied because a conflict was detected. The encrypted draft is retained.');const history=await request<{proposals:typeof offlineMarkHistory}>('sync/teacher-mark-proposals/mine',token);setOfflineMarkHistory(history.proposals||[])}}catch(error){setOfflineMarkMessage(error instanceof Error?error.message:'Unable to submit offline marks. The encrypted draft remains saved.')}finally{setOfflineMarkBusy(false)}}
 
+  async function setExamClosed(closed: boolean) {
+    if (!selectedExam) return
+    setSaving(true); setError(''); setMessage('')
+    try {
+      const result = await request<{message:string}>(`exams/${selectedExam.id}/${closed ? 'close' : 'reopen'}`, token, { method: 'POST' })
+      setMessage(result.message)
+      await loadSetup()
+    } catch (e) { setError(e instanceof Error ? e.message : 'Unable to update examination release status.') }
+    finally { setSaving(false) }
+  }
+
   async function setSubjectVerification(subjectId: number, verified: boolean) {
     if (!selectedExam) { setError('Choose an examination first.'); return }
     const subject = subjects.find(row => row.id === subjectId)
@@ -546,7 +557,7 @@ export default function AcademicManagement({ token, classes, canVerify = false, 
 
     {selectedExam && <>
       <section className="panel">
-        <div className="panel-heading"><div><h2>{selectedExam.exam_type || selectedExam.name}</h2><p>{selectedClass?.name || 'Class'}{selectedClass?.section ? ' — ' + selectedClass.section : ''} · {selectedExam.term} {selectedExam.year}</p></div></div>
+        <div className="panel-heading"><div><h2>{selectedExam.exam_type || selectedExam.name}</h2><p>{selectedClass?.name || 'Class'}{selectedClass?.section ? ' — ' + selectedClass.section : ''} · {selectedExam.term} {selectedExam.year} · {selectedExam.closed ? 'Closed · results released to parents' : 'Open · results hidden from parents'}</p></div>{canVerify && <button type="button" className={selectedExam.closed ? 'secondary-button' : 'primary-button'} disabled={saving} onClick={() => void setExamClosed(!selectedExam.closed)}>{selectedExam.closed ? 'Reopen examination' : 'Close exam & release results'}</button>}</div>
         <div className="stats-grid finance-stats">
           <div className="stat-card"><span>Students in class</span><strong className="stat-value">{students.length}</strong></div>
           <div className="stat-card"><span>Marks recorded</span><strong className="stat-value">{marks.length}</strong></div>
