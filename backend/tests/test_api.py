@@ -2094,6 +2094,9 @@ def test_first_install_requires_activation_and_creates_admin_atomically(monkeypa
         )
         assert changed_identity.status_code == 403
         assert "identity is protected" in changed_identity.json()["detail"]
+        with SessionLocal() as db:
+            assert db.query(models.AuditLog).filter_by(action="installation_activated").count() == 1
+            assert db.query(models.AuditLog).filter_by(action="school_first_setup_completed").count() == 1
 
 
 def test_invalid_activation_license_is_rejected(monkeypatch):

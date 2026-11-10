@@ -2068,6 +2068,11 @@ def activate_school_installation(data: SchoolActivationRequest, db: Session = De
     state.activation_license_hash = license_fingerprint(data.license)
     state.activation_attempts = 0
     state.activation_locked_until = None
+    db.add(models.AuditLog(
+        actor_id=None, actor_username="SchoolBridge Owner",
+        action="installation_activated", entity_type="school_setup",
+        entity_id=state.id, details="Owner-signed activation license accepted.",
+    ))
     db.commit()
     return {"message": "SchoolBridge installation activated.", "activated": True}
 
@@ -2101,8 +2106,11 @@ def complete_first_school_setup(data: FirstSchoolSetupRequest, db: Session = Dep
     }
     db.add(profile)
     db.add(admin)
+    db.flush()
     state.original_identity_json = json.dumps(identity, sort_keys=True)
     state.setup_completed_at = datetime.utcnow()
+    write_audit(db, admin, "school_first_setup_completed", "school_profile", profile.id,
+                "Initial school identity and first administrator created.")
     try:
         db.commit()
     except IntegrityError:
