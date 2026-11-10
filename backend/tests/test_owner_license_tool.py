@@ -39,7 +39,8 @@ def test_owner_license_cli_generates_protected_key_and_signs_activation(tmp_path
         check=True, capture_output=True, text=True,
     )
     token = signed.stdout.strip().splitlines()[-1]
-    payload_part, signature_part = token.split(".", 1)
+    assert token.startswith("CHRISTIAN:")
+    payload_part, signature_part = token.removeprefix("CHRISTIAN:").split(".", 1)
 
     def decode(value):
         return base64.urlsafe_b64decode(value + "=" * (-len(value) % 4))
@@ -68,7 +69,8 @@ def test_owner_license_cli_generates_protected_key_and_signs_activation(tmp_path
         check=True, capture_output=True, text=True,
     )
     correction_token = correction.stdout.strip().splitlines()[-1]
-    correction_payload_part, correction_signature_part = correction_token.split(".", 1)
+    assert correction_token.startswith("CHRISTIAN:")
+    correction_payload_part, correction_signature_part = correction_token.removeprefix("CHRISTIAN:").split(".", 1)
     correction_payload = decode(correction_payload_part)
     Ed25519PublicKey.from_public_bytes(public_key_bytes).verify(
         decode(correction_signature_part), correction_payload
