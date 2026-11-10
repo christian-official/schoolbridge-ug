@@ -19,7 +19,10 @@ def verify_activation_license(token: str) -> dict:
         raise RuntimeError("SCHOOLBRIDGE_LICENSE_PUBLIC_KEY is not configured.")
     try:
         public_key = Ed25519PublicKey.from_public_bytes(base64.b64decode(encoded_key, validate=True))
-        payload_part, signature_part = token.split(".", 1)
+        format_prefix, signed_part = token.split(":", 1)
+        if format_prefix != "CHRISTIAN":
+            raise ValueError("Invalid activation license format.")
+        payload_part, signature_part = signed_part.split(".", 1)
         payload_bytes = _decode_b64url(payload_part)
         signature = _decode_b64url(signature_part)
         public_key.verify(signature, payload_bytes)
