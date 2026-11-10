@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react'
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 type AttendanceRecord = { id:number; attendance_date:string; status:string; notes?:string|null; check_in_at?:string|null; check_out_at?:string|null }
+type ClassOption = { id:number; name:string; section?:string }
+type SubjectOption = { id:number; name:string; school_type?:string }
+type TeachingOptions = { classes:ClassOption[]; subjects:SubjectOption[]; class_subjects:{class_id:number;subject_ids:number[]}[]; class_teacher_class_ids:number[]; special_roles:string[] }
 type Profile = {
   first_name: string; last_name: string; staff_number: string; position?: string | null; department?: string | null; subjects?: string | null; phone?: string | null;
   email?: string | null;
@@ -33,12 +36,24 @@ export default function MyStaffProfile({ token }: { token: string }) {
   const [attendanceMessage, setAttendanceMessage] = useState('')
   const [attendanceError, setAttendanceError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [teaching, setTeaching] = useState<TeachingOptions>({classes:[],subjects:[],class_subjects:[],class_teacher_class_ids:[],special_roles:[]})
+  const [classSubjects, setClassSubjects] = useState<Record<number,number[]>>({})
+  const [classTeacherIds, setClassTeacherIds] = useState<number[]>([])
+  const [specialRoles, setSpecialRoles] = useState<string[]>([])
+  const [assignmentsSaving, setAssignmentsSaving] = useState(false)
   async function load() {
     setLoading(true); setError('')
     try {
       const [data, attendanceData] = await Promise.all([request<Profile>('me/staff-profile', token), request<{records:AttendanceRecord[]}>('me/staff-attendance', token)])
       setProfile(data); setFirstName(data.first_name); setPhone(data.phone || ''); setEmail(data.email || ''); setPhotoData(data.photo_data||null)
       setAttendance(attendanceData.records || [])
+      if (data.category === 'Teaching') {
+        const assignments = await request<TeachingOptions>('me/teaching-assignments', token)
+        setTeaching(assignments)
+        setClassSubjects(Object.fromEntries(assignments.class_subjects.map(row=>[row.class_id,row.subject_ids])))
+        setClassTeacherIds(assignments.class_teacher_class_ids)
+        setSpecialRoles(assignments.special_roles)
+      }
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to load your profile.') }
     finally { setLoading(false) }
   }
@@ -60,6 +75,18 @@ export default function MyStaffProfile({ token }: { token: string }) {
       setProfile(result.profile); setMessage(result.message)
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to update your profile.') }
     finally { setSaving(false) }
+  }
+  async function saveTeachingAssignments() {
+    setAssignmentsSaving(true); setError(''); setMessage('')
+    try {
+      const result = await request<{message:string}>('me/teaching-assignments', token, { method:'PUT', body:JSON.stringify({
+        class_subjects:Object.entries(classSubjects).map(([classId,subjectIds])=>({class_id:Number(classId),subject_ids:subjectIds})).filter(row=>row.subject_ids.length>0),
+        class_teacher_class_ids:classTeacherIds,
+        special_roles:specialRoles,
+      })})
+      setMessage(result.message)
+    } catch(e) { setError(e instanceof Error ? e.message : 'Unable to save your teaching assignments.') }
+    finally { setAssignmentsSaving(false) }
   }
   async function savePassword(event: React.FormEvent) {
     event.preventDefault(); setSaving(true); setError(''); setMessage('')
@@ -92,6 +119,15 @@ export default function MyStaffProfile({ token }: { token: string }) {
           </div>
           <div className="form-actions"><button className="primary-button" disabled={saving||!photoData}>{saving?'Saving...':photoData?'Save profile changes':'Add a passport photo to complete the profile'}</button></div>
         </form>
+        {profile.category === 'Teaching' && <section className="student-form staff-assignment-onboarding">
+          <div className="form-heading"><div><h3>My teaching assignments and school responsibilities</h3><p>Select the classes and subjects you teach. You may also declare class teacher, house, club, sports or duty responsibilities. These declarations do not grant administrator or system permissions.</p></div></div>
+          <div className="staff-assignment-list">{teaching.classes.map(item=><div className="staff-assignment-class" key={item.id}>
+            <div className="staff-assignment-class-heading"><strong>{item.name}{item.section?' — '+item.section:''}</strong><label><input type="checkbox" checked={classTeacherIds.includes(item.id)} onChange={e=>setClassTeacherIds(current=>e.target.checked?[...current,item.id]:current.filter(id=>id!==item.id))}/> Class teacher</label></div>
+            <div className="staff-assignment-subjects">{teaching.subjects.map(subject=><label key={subject.id}><input type="checkbox" checked={(classSubjects[item.id]||[]).includes(subject.id)} onChange={e=>setClassSubjects(current=>({...current,[item.id]:e.target.checked?[...(current[item.id]||[]),subject.id]:(current[item.id]||[]).filter(id=>id!==subject.id)}))}/>{subject.name}</label>)}</div>
+          </div>)}</div>
+          <div className="staff-special-roles"><strong>Additional responsibilities</strong><div>{['House Patron','Club Patron','Sports Coach','Duty Teacher'].map(role=><label key={role}><input type="checkbox" checked={specialRoles.includes(role)} onChange={e=>setSpecialRoles(current=>e.target.checked?[...current,role]:current.filter(value=>value!==role))}/>{role}</label>)}</div></div>
+          <div className="form-actions"><button type="button" className="primary-button" disabled={assignmentsSaving} onClick={()=>void saveTeachingAssignments()}>{assignmentsSaving?'Saving assignments…':'Save my assignments'}</button></div>
+        </section>}
         <hr />
         <form className="student-form" onSubmit={savePassword}>
           <div className="form-heading"><div><h3>Change password</h3><p>Use at least 8 characters. Your current password is required.</p></div></div>
