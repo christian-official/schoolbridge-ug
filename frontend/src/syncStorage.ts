@@ -4,7 +4,8 @@ export async function clearLocalSyncData(userId: number, deviceId: string) {
       const deletion = indexedDB.deleteDatabase('schoolbridge-offline-' + userId + '-' + deviceId)
       deletion.onsuccess = () => resolve()
       deletion.onerror = () => reject(new Error('Unable to clear this device’s offline data.'))
-      deletion.onblocked = () => reject(new Error('Close other SchoolBridge tabs to finish clearing this device’s offline data.'))
+      // Existing SchoolBridge tabs close their database connection on versionchange.
+      // Keep waiting for onsuccess instead of rejecting while IndexedDB is still deleting.
     })
   }
   const prefix = 'schoolbridge-offline-' + userId + '-' + deviceId + '-'
