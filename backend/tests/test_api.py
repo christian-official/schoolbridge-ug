@@ -1331,6 +1331,67 @@ def test_sync_change_feed_filters_parent_and_teacher_history_scopes():
         )
 
 
+
+def test_sync_change_feed_bounds_hidden_history_scans_without_skipping_visible_events():
+    reset_database()
+    parent = models.User(
+        username="bounded-feed-parent",
+        email="bounded-feed-parent@example.invalid",
+        hashed_password=password_hash.hash("ParentPassword123!"),
+        role="parent",
+        is_active=True,
+    )
+    with SessionLocal() as db:
+        school_class = models.SchoolClass(name="Bounded feed S1", section="A")
+        db.add_all([parent, school_class])
+        db.flush()
+        student = models.Student(
+            admission_number="BOUNDED-FEED-001", first_name="Amina",
+            last_name="Learner", class_id=school_class.id,
+        )
+        db.add(student)
+        db.flush()
+        db.add(models.ParentStudentLink(user_id=parent.id, student_id=student.id))
+        db.add_all([
+            models.SyncChange(
+                entity_type="Student", entity_id=10000 + index, operation="update",
+                scope_json=json.dumps({"parent_user_ids": []}),
+            )
+            for index in range(500)
+        ])
+        db.add(models.SyncChange(
+            entity_type="Student", entity_id=student.id, operation="update",
+            scope_json=json.dumps({"parent_user_ids": [parent.id]}),
+        ))
+        db.commit()
+        parent_id = parent.id
+    headers = {"Authorization": "Bearer " + create_access_token(
+        SimpleNamespace(id=parent_id, role="parent")
+    )}
+    device_id = "00000000-0000-4000-8000-000000000915"
+    with TestClient(app) as client:
+        registered = client.post(
+            "/api/sync/devices", headers=headers,
+            json={"device_id": device_id, "device_name": "Bounded feed device"},
+        )
+        assert registered.status_code == 200, registered.text
+        first = client.get(
+            f"/api/sync/changes?device_id={device_id}&cursor=0&limit=20",
+            headers=headers,
+        )
+        assert first.status_code == 200, first.text
+        assert first.json()["changes"] == []
+        assert first.json()["next_cursor"] == 500
+        assert first.json()["has_more"] is True
+        second = client.get(
+            f"/api/sync/changes?device_id={device_id}&cursor={first.json()['next_cursor']}&limit=20",
+            headers=headers,
+        )
+        assert second.status_code == 200, second.text
+        assert len(second.json()["changes"]) == 1
+        assert second.json()["changes"][0]["entity_id"] == student.id
+        assert second.json()["has_more"] is False
+
 def test_sync_change_feed_rejects_invalid_cursor_and_limit():
     reset_database()
     admin = create_admin()

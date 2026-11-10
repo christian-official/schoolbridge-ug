@@ -2428,21 +2428,25 @@ def list_sync_changes(device_id: UUID, cursor: int = 0, limit: int = 200,
         raise HTTPException(403, "An active registered device is required.")
     if cursor > device.last_issued_sequence:
         raise HTTPException(409, "A change-feed cursor cannot skip beyond changes already delivered to this device.")
+    # Bound each poll to 500 journal rows, even when almost every event is
+    # hidden from this account. Otherwise a quiet parent/teacher feed can scan
+    # the entire school history in one request as the journal grows.
+    batch = db.query(models.SyncChange).filter(models.SyncChange.id > cursor).order_by(
+        models.SyncChange.id.asc()).limit(500).all()
     visible, scan_cursor, has_more = [], cursor, False
-    while len(visible) <= limit:
-        batch = db.query(models.SyncChange).filter(models.SyncChange.id > scan_cursor).order_by(
-            models.SyncChange.id.asc()).limit(500).all()
-        if not batch: break
-        for row in batch:
-            scan_cursor = row.id
-            if _sync_change_visible_to_user(row, user):
-                visible.append(row)
-                if len(visible) > limit:
-                    has_more = True
-                    scan_cursor = visible[limit - 1].id
-                    visible = visible[:limit]
-                    break
-        if has_more or len(batch) < 500: break
+    for row in batch:
+        scan_cursor = row.id
+        if _sync_change_visible_to_user(row, user):
+            visible.append(row)
+            if len(visible) > limit:
+                has_more = True
+                scan_cursor = visible[limit - 1].id
+                visible = visible[:limit]
+                break
+    if not has_more and batch:
+        has_more = db.query(models.SyncChange.id).filter(
+            models.SyncChange.id > scan_cursor
+        ).first() is not None
     next_cursor = scan_cursor
     device.last_issued_sequence = max(device.last_issued_sequence, next_cursor)
     device.last_seen_at = datetime.utcnow()
