@@ -148,7 +148,9 @@ jobs:
           import re
           source = Path("docker-compose.yml").read_text()
           package = re.sub(r"(?m)^    build:\r?\n      context: \.\/(backend|frontend)\r?\n", "", source)
-          package = package.replace("    driver: bridge\n", "    driver: bridge\n    internal: true\n")
+          assert "schoolbridge-internal:" in package
+          assert "    internal: true" in package
+          assert "schoolbridge-edge:" in package
           assert "context: ./backend" not in package
           assert "context: ./frontend" not in package
           assert "image: schoolbridge/backend:local" in package
