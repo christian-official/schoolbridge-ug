@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 
 type Visitor = {
   id: number
@@ -36,7 +36,7 @@ export default function VisitorRegister({ token, isAdmin = false }: { token: str
   }
   useEffect(() => { void load() }, [token])
 
-  async function checkIn(event: React.FormEvent) {
+  async function checkIn(event: FormEvent) {
     event.preventDefault(); setBusy(true); setError(''); setMessage('')
     try {
       await request('visitors/check-in', token, { method: 'POST', body: JSON.stringify(draft) })
