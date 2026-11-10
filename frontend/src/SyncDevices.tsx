@@ -178,11 +178,12 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
     return JSON.stringify({role:account.role,permissions:Object.fromEntries(Object.entries(account.permissions||{}).sort(([a],[b])=>a.localeCompare(b)))})
   }
 
-  async function collectSnapshotPages<T>(endpoint:string, field:string, id:string):Promise<T[]> {
+  async function collectSnapshotPages<T>(endpoint:string, field:string, id:string, sequences:number[]):Promise<T[]> {
     const records:T[]=[]
     let after=0
     for(let page=0;page<100;page++){
       const result=await request<any>('sync/'+endpoint+'?device_id='+encodeURIComponent(id)+'&after_id='+after+'&limit=200',token)
+      if(typeof result.snapshot_sequence==='number')sequences.push(result.snapshot_sequence)
       records.push(...(result[field] as T[]))
       if(records.length>15000)throw new Error('This record category exceeds the 15,000-record offline safety limit.')
       if(!result.has_more)return records
@@ -200,26 +201,27 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
       const permissions=account.permissions||{}
       const can=(section:string)=>account.role==='admin'||(permissions[section]||[]).includes('view')
       const parent=account.role==='parent', teacher=account.role==='teacher'
-      const before=await request<{sequence:number}>('sync/sequence?device_id='+encodeURIComponent(deviceId),token)
-      const snapshot:any={version:1,userId,deviceId,permissionFingerprint:permissionFingerprint(account),downloadedAt:Date.now(),expiresAt:Date.now()+24*60*60*1000,sequence:before.sequence,students:[],classes:[],attendance:[],exams:[],marks:[],charges:[],payments:[],class_fees:[]}
+      const sequences:number[]=[]
+      const snapshot:any={version:1,userId,deviceId,permissionFingerprint:permissionFingerprint(account),downloadedAt:Date.now(),expiresAt:Date.now()+24*60*60*1000,sequence:0,students:[],classes:[],attendance:[],exams:[],marks:[],charges:[],payments:[],class_fees:[]}
       const tasks:Promise<void>[]=[]
       if(parent||can('Students')||(teacher&&can('My Classes'))){
-        tasks.push(collectSnapshotPages<any>('students','students',deviceId).then(rows=>{snapshot.students=rows}))
-        tasks.push(collectSnapshotPages<any>('classes','classes',deviceId).then(rows=>{snapshot.classes=rows}))
+        tasks.push(collectSnapshotPages<any>('students','students',deviceId,sequences).then(rows=>{snapshot.students=rows}))
+        tasks.push(collectSnapshotPages<any>('classes','classes',deviceId,sequences).then(rows=>{snapshot.classes=rows}))
       }
       if(parent||can('Attendance')||(teacher&&(can('My Attendance')||can('Attendance')))){
-        tasks.push(collectSnapshotPages<any>('attendance','attendance',deviceId).then(rows=>{snapshot.attendance=rows}))
+        tasks.push(collectSnapshotPages<any>('attendance','attendance',deviceId,sequences).then(rows=>{snapshot.attendance=rows}))
       }
       if(parent||can('Examinations')||(teacher&&can('My Results'))){
-        tasks.push(collectSnapshotPages<any>('exams','exams',deviceId).then(rows=>{snapshot.exams=rows}))
+        tasks.push(collectSnapshotPages<any>('exams','exams',deviceId,sequences).then(rows=>{snapshot.exams=rows}))
         if(teacher&&can('My Results')||!teacher&&(parent||can('Examinations'))){
-          tasks.push(collectSnapshotPages<any>('marks','marks',deviceId).then(rows=>{snapshot.marks=rows}))
+          tasks.push(collectSnapshotPages<any>('marks','marks',deviceId,sequences).then(rows=>{snapshot.marks=rows}))
         }
       }
       if(parent||can('Fees & Finance')){
         let charge=0,payment=0,classFee=0
         for(let page=0;page<100;page++){
           const result=await request<any>('sync/fees?device_id='+encodeURIComponent(deviceId)+'&after_charge_id='+charge+'&after_payment_id='+payment+'&after_class_fee_id='+classFee+'&limit=200',token)
+          if(typeof result.snapshot_sequence==='number')sequences.push(result.snapshot_sequence)
           snapshot.charges.push(...result.charges);snapshot.payments.push(...result.payments);snapshot.class_fees.push(...result.class_fees)
           if(Object.values(result.has_more||{}).some(Boolean)){
             charge=result.next_after_charge_id;payment=result.next_after_payment_id;classFee=result.next_after_class_fee_id
@@ -229,11 +231,10 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
         }
       }
       await Promise.all(tasks)
-      const after=await request<{sequence:number}>('sync/sequence?device_id='+encodeURIComponent(deviceId),token)
-      if(after.sequence!==before.sequence)throw new Error('School records changed while the snapshot was being downloaded. Retry to obtain a consistent copy.')
+      if(!sequences.length||new Set(sequences).size!==1)throw new Error('School records changed while the snapshot was being downloaded. Retry to obtain a consistent copy.')
       const total=Object.keys(snapshot).filter(key=>Array.isArray(snapshot[key])).reduce((sum,key)=>sum+snapshot[key].length,0)
       if(total>20000)throw new Error('This account has more than 20,000 authorised records. Narrow the data scope before downloading.')
-      snapshot.sequence=after.sequence
+      snapshot.sequence=sequences[0]
       await saveEncryptedOfflineSnapshot(userId,deviceId,offlinePassphrase,snapshot)
       localStorage.setItem('schoolbridge-offline-snapshot-meta-'+userId+'-'+deviceId,JSON.stringify({fingerprint:snapshot.permissionFingerprint,sequence:snapshot.sequence}))
       setOfflineSnapshot(snapshot)
