@@ -88,7 +88,6 @@ const teacherMenu = [
   { label: 'My Results', icon: FileText },
   { label: 'Timetable', icon: CalendarDays },
   { label: 'Announcements', icon: FileText },
-  { label: 'My Profile', icon: Users },
 ]
 const parentMenu = [
   { label: 'My Children', icon: GraduationCap },
@@ -110,7 +109,6 @@ function getStaffNavigation(user:User) {
   const allItems = [...menu, ...teacherMenu.filter(item => !menu.some(base => base.label === item.label))]
   const visible = allItems.filter(item =>
     item.label === 'Overview' ||
-    item.label === 'My Profile' ||
     item.label === 'My Attendance' ||
     (item.label === 'Visitor Register' && /gatekeeper|security/.test((user.role_label || '').toLowerCase())) ||
     (user.permissions?.[item.label] || []).includes('view') ||
