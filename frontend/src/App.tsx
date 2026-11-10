@@ -1501,7 +1501,7 @@ function App() {
               </section>
             </div>
           )}
-          {active === 'Examinations' && user.role !== 'parent' && <AcademicManagement token={token} classes={classes} canVerify={user.role === 'admin' || (user.permissions?.['Examinations'] || []).includes('approve')} />}
+          {active === 'Examinations' && user.role !== 'parent' && <AcademicManagement token={token} classes={classes} userId={user.id} isTeacher={user.role === 'teacher'} canVerify={user.role === 'admin' || (user.permissions?.['Examinations'] || []).includes('approve')} />}
           {active === 'Attendance' && user.role !== 'parent' && user.role !== 'teacher' && <AttendanceHub token={token} userId={user.id} canViewStudents={user.role === 'admin' || (user.permissions?.['Attendance'] || []).includes('view')} canViewStaff={user.role === 'admin' || (user.permissions?.['Staff Attendance'] || []).includes('view')} canEditStudents={user.role === 'admin' || (user.permissions?.['Attendance'] || []).includes('edit')} permissions={user.permissions} isAdmin={user.role === 'admin'} roleLabel={user.role_label || ''} />}
           {active === 'Timetable' && user.role !== 'parent' && <OperationsManagement token={token} active={active} permissions={user.permissions} isAdmin={user.role === 'admin'} roleLabel={user.role_label || ''} />}
           {active === 'My Profile' && user.role !== 'parent' && user.role !== 'admin' && <MyStaffProfile token={token} />}
