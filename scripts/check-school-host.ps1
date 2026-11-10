@@ -3,7 +3,9 @@ $issues = New-Object System.Collections.Generic.List[string]
 $checks = New-Object System.Collections.Generic.List[object]
 
 function Add-Check([string]$Name, [bool]$Passed, [string]$Detail) {
-    $checks.Add([pscustomobject]@{ Check = $Name; Status = if ($Passed) { "PASS" } else { "BLOCKED" }; Detail = $Detail })
+    $status = "BLOCKED"
+    if ($Passed) { $status = "PASS" }
+    $checks.Add([pscustomobject]@{ Check = $Name; Status = $status; Detail = $Detail })
     if (-not $Passed) { $issues.Add($Name + ": " + $Detail) }
 }
 
@@ -13,8 +15,10 @@ if (-not $IsWindows -and $env:OS -ne "Windows_NT") {
 }
 $os = Get-CimInstance Win32_OperatingSystem
 $build = [int]$os.BuildNumber
-$osSupported = ($build -ge 19045)
-Add-Check "Windows version" $osSupported ("Build " + $build + "; Windows 10 22H2 build 19045 or newer is the baseline.")
+$isWin10 = ($os.Caption -match "Windows 10" -and $build -ge 19045)
+$isWin11 = ($os.Caption -match "Windows 11" -and $build -ge 22631)
+$osSupported = ($isWin10 -or $isWin11)
+Add-Check "Windows version" $osSupported ($os.Caption + " build " + $build + "; supported baseline is Windows 10 22H2 or Windows 11 23H2 or newer.")
 $is64 = [Environment]::Is64BitOperatingSystem
 Add-Check "64-bit Windows" $is64 "A 64-bit operating system is required for the current Linux-container package."
 $computer = Get-CimInstance Win32_ComputerSystem
