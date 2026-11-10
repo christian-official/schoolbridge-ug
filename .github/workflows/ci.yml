@@ -79,3 +79,25 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Run real-browser offline tests
         run: npm run test:offline:browser
+
+
+  local-deployment-package:
+    runs-on: ubuntu-24.04
+    env:
+      POSTGRES_DB: schoolbridge
+      POSTGRES_USER: schoolbridge
+      POSTGRES_PASSWORD: ci-only-postgres-password
+      SCHOOLBRIDGE_SECRET_KEY: ci-only-application-secret
+      SCHOOLBRIDGE_LICENSE_PUBLIC_KEY: ci-only-public-key
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate local Compose deployment configuration
+        run: docker compose config --quiet
+      - name: Verify USB package scripts and local proxy are present
+        run: |
+          test -s scripts/prepare-usb.ps1
+          test -s scripts/install-schoolbridge.ps1
+          test -s docs/USB_INSTALLATION.md
+          grep -q 'proxy_pass http://backend:8001' frontend/nginx.conf
+          grep -q 'schoolbridge/backend:local' docker-compose.yml
+          grep -q 'schoolbridge/frontend:local' docker-compose.yml
