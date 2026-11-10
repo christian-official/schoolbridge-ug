@@ -1589,7 +1589,7 @@ function TeacherWorkspace({token,active,userId}:{token:string;active:string;user
   async function saveOfflineTeacherMarksDraft(){
     if(!selectedTeacherExam||!selectedSubjectId||!resultStudents.length){setOfflineDraftMessage('Choose an examination, assigned subject and class register first.');return}
     if(!window.confirm('Save the current class scores as the encrypted offline draft? This replaces the previous saved draft on this browser, if one exists.'))return
-    if(offlinePassphrase.trim().length<10){setOfflineDraftMessage('Use an offline passphrase of at least 10 characters. It is not stored by SchoolBridge.');return}
+    if(offlinePassphrase.trim().length<12){setOfflineDraftMessage('Use a strong offline passphrase of at least 12 characters. It is not stored by SchoolBridge.');return}
     const deviceId=localStorage.getItem('schoolbridge-sync-device-'+userId)
     if(!deviceId){setOfflineDraftMessage('Register this browser in Device Management before preparing an offline draft.');return}
     if(resultSnapshotSequence===null){setOfflineDraftMessage('Connect while online and refresh your results snapshot before saving an offline draft.');return}
@@ -1610,7 +1610,7 @@ function TeacherWorkspace({token,active,userId}:{token:string;active:string;user
   async function unlockOfflineTeacherMarksDraft(){
     const deviceId=localStorage.getItem('schoolbridge-sync-device-'+userId)
     if(!deviceId){setOfflineDraftMessage('This browser has no registered device identity.');return}
-    if(offlinePassphrase.trim().length<10){setOfflineDraftMessage('Enter the passphrase used when saving this draft.');return}
+    if(offlinePassphrase.trim().length<10){setOfflineDraftMessage('Enter the 12-character-or-longer passphrase used when saving this draft.');return}
     setOfflineDraftBusy(true);setOfflineDraftMessage('')
     try{
       const draft=await loadEncryptedOfflineDraft<any>(userId,deviceId,offlinePassphrase)
@@ -1631,7 +1631,8 @@ function TeacherWorkspace({token,active,userId}:{token:string;active:string;user
     try{
       const draft=await loadEncryptedOfflineDraft<any>(userId,deviceId,offlinePassphrase)
       const currentDraftIsOpen=selectedTeacherExam?.id===draft.exam.id&&Number(selectedSubjectId)===draft.subject_id&&resultStudents.length>0
-      const currentRecords:{student_id:number;score:number}[]=currentDraftIsOpen?resultStudents.map(student=>({student_id:student.id,score:resultScores[student.id]===undefined||resultScores[student.id].trim()===''?0:Number(resultScores[student.id])})):draft.records
+      if(!currentDraftIsOpen)throw new Error('Unlock the saved draft and check its scores before submitting it.')
+      const currentRecords:{student_id:number;score:number}[]=resultStudents.map(student=>({student_id:student.id,score:resultScores[student.id]===undefined||resultScores[student.id].trim()===''?0:Number(resultScores[student.id])}))
       if(currentRecords.some(record=>!Number.isFinite(record.score)||record.score<0||record.score>100))throw new Error('Every score must be between 0 and 100.')
       const result=await api<{proposal_id:number;status:string;duplicate:boolean}>('sync/teacher-mark-proposals',token,{method:'POST',body:JSON.stringify({
         device_id:draft.device_id,idempotency_key:draft.idempotency_key,exam_id:draft.exam.id,
@@ -1639,6 +1640,7 @@ function TeacherWorkspace({token,active,userId}:{token:string;active:string;user
       })})
       await deleteEncryptedOfflineDraft(userId,deviceId)
       setOfflineDraftMessage('Draft submitted as proposal #'+result.proposal_id+' ('+result.status+'). An administrator must review it; official marks have not been changed.')
+      setOfflinePassphrase('')
     }catch(error){setOfflineDraftMessage(error instanceof Error?error.message:'Unable to submit the saved draft.')}
     finally{setOfflineDraftBusy(false)}
   }
@@ -1683,8 +1685,8 @@ function TeacherWorkspace({token,active,userId}:{token:string;active:string;user
       {resultError&&<div className="form-error" role="alert">{resultError}</div>}
       {resultMessage&&<div className="success-notice" role="status">{resultMessage}</div>}
       <section className="offline-mark-draft-tools">
-        <div><strong>Offline marks draft</strong><p className="form-hint">Save a protected copy on this browser while online. If the connection drops, unlock it with the same passphrase, then submit it for administrator review after reconnecting.</p></div>
-        <label>Offline passphrase<input type="password" minLength={10} autoComplete="off" value={offlinePassphrase} onChange={event=>setOfflinePassphrase(event.target.value)} placeholder="At least 10 characters"/></label>
+        <div><strong>Offline marks draft</strong><p className="form-hint">Prepare and save this class register while online. If the connection drops, unlock it with the same passphrase and continue editing. Save / update again before closing the browser, then unlock and submit for administrator review after reconnecting.</p></div>
+        <label>Offline passphrase<input type="password" minLength={10} autoComplete="off" value={offlinePassphrase} onChange={event=>setOfflinePassphrase(event.target.value)} placeholder="At least 12 characters"/></label>
         <div className="form-actions">
           <button type="button" className="secondary-button" disabled={offlineDraftBusy||resultSaving||!selectedTeacherExam||!selectedSubjectId} onClick={()=>void saveOfflineTeacherMarksDraft()}>{offlineDraftBusy?'Working...':'Save encrypted offline draft'}</button>
           <button type="button" className="secondary-button" disabled={offlineDraftBusy} onClick={()=>void unlockOfflineTeacherMarksDraft()}>Unlock saved draft</button>

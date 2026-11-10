@@ -50,7 +50,7 @@ async function deriveOfflineDraftKey(passphrase: string, salt: Uint8Array): Prom
 }
 
 export async function saveEncryptedOfflineDraft(userId: number, deviceId: string, passphrase: string, value: unknown, replaceExisting = false) {
-  if (!passphrase || passphrase.length < 10) throw new Error('Use a passphrase of at least 10 characters.')
+  if (!passphrase || passphrase.length < 12) throw new Error('Use a passphrase of at least 10 characters.')
   if (!crypto?.subtle || typeof indexedDB === 'undefined') throw new Error('This browser does not support protected offline storage.')
   const salt = crypto.getRandomValues(new Uint8Array(16))
   const iv = crypto.getRandomValues(new Uint8Array(12))
@@ -76,7 +76,7 @@ export async function saveEncryptedOfflineDraft(userId: number, deviceId: string
 }
 
 export async function loadEncryptedOfflineDraft<T>(userId: number, deviceId: string, passphrase: string): Promise<T> {
-  if (!passphrase || passphrase.length < 10) throw new Error('Enter the passphrase used to protect this draft.')
+  if (!passphrase || passphrase.length < 12) throw new Error('Enter the passphrase used to protect this draft.')
   if (!crypto?.subtle || typeof indexedDB === 'undefined') throw new Error('This browser does not support protected offline storage.')
   const db = await openOfflineDatabase(userId, deviceId)
   let record: EncryptedDraftRecord | undefined
