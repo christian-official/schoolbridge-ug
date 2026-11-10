@@ -85,7 +85,8 @@ def register_sync_tracking() -> None:
             common = {"entity_id": target.id, "operation": operation,
                       "changed_at": datetime.utcnow(),
                       "scope_json": json.dumps(scope, sort_keys=True, separators=(",", ":"))}
-            connection.execute(models.SyncChange.__table__.insert().values(entity_type=target.__class__.__name__, **common))
+            entity_type = "UserAccess" if isinstance(target, models.User) else target.__class__.__name__
+            connection.execute(models.SyncChange.__table__.insert().values(entity_type=entity_type, **common))
             if isinstance(target, models.Mark):
                 connection.execute(models.SyncChange.__table__.insert().values(
                     entity_type=f"MarkScope:{target.exam_id}:{target.subject_id}",

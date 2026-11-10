@@ -1196,7 +1196,7 @@ def test_sync_change_feed_filters_parent_and_teacher_history_scopes():
         assert student_id in teacher_ids and other_student_id not in teacher_ids
         assert student_id in parent_ids and other_student_id not in parent_ids
         parent_mark_events = [item for item in parent_feed.json()["changes"] if item["entity_type"].startswith("Mark")]
-        assert parent_mark_events
+        assert len(parent_mark_events) == 2
 
 
 def test_sync_change_feed_rejects_invalid_cursor_and_limit():
