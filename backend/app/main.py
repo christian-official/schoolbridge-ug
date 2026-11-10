@@ -666,6 +666,7 @@ class ExamOut(BaseModel):
     term: str
     year: int
     class_id: int | None = None
+    closed: bool = False
     model_config = ConfigDict(from_attributes=True)
 
 
