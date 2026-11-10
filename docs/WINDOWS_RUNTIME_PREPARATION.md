@@ -13,15 +13,9 @@ The USB preparation script copies this folder into the USB package. It does not 
 
 ## School computer readiness
 
-Run:
+Current Docker Desktop Windows requirements include a supported Windows 10/11 release, WSL 2.1.5 or later for the WSL backend, at least 8 GB RAM and hardware virtualization enabled. Check the current official documentation because requirements change.
 
-```powershell
-.\check-school-host.ps1
-```
-
-The checker reports the Windows build, 64-bit support, memory, CPU virtualization, WSL version, Docker CLI and running Docker Engine. Current Docker Desktop Windows requirements include a supported Windows 10/11 release, WSL 2.1.5 or later for the WSL backend, at least 8 GB RAM and hardware virtualization enabled. Check the current official documentation because requirements change.
-
-Run `./prepare-school-host.ps1` from an elevated PowerShell window on the school computer. It checks the supported Windows version, memory and hardware virtualisation; enables the WSL and Virtual Machine Platform Windows features; installs the staged WSL MSI when needed; and launches the official Docker Desktop installer. The Docker setup remains interactive so the authorised school operator can review and accept its licence terms. The script does not silently accept third-party terms or force a restart. If Windows requests a restart, restart and open Docker Desktop, wait for its engine, then run `./check-school-host.ps1` again.
+First run `./prepare-school-host.ps1` from an elevated PowerShell window on the school computer. It checks the supported Windows version, memory and hardware virtualisation; enables the WSL and Virtual Machine Platform Windows features; installs the staged WSL MSI when needed; and launches the official Docker Desktop installer. The Docker setup remains interactive so the authorised school operator can review and accept its licence terms. The script does not silently accept third-party terms or force a restart. If Windows requests a restart, restart and open Docker Desktop, wait for its engine, then run `./check-school-host.ps1` again.
 
 ## Important
 
