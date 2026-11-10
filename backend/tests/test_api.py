@@ -2587,3 +2587,42 @@ def test_annual_promotion_moves_students_and_graduates_final_class():
     with SessionLocal() as db:
         assert db.get(models.Student, learner_id).class_id == final_id
         assert db.get(models.Student, final_learner_id).status == "graduated"
+
+
+def test_teaching_staff_can_self_declare_classes_subjects_and_responsibilities():
+    reset_database()
+    db = SessionLocal()
+    try:
+        staff = models.StaffMember(
+            staff_number="ST-SELF-001", first_name="Jane", last_name="Teacher",
+            category="Teaching", position="Teacher", photo_data="data:image/png;base64,aGVsbG8=",
+        )
+        db.add(staff)
+        db.flush()
+        teacher = models.User(
+            username="self-assigned-teacher", email="self-assigned@example.invalid",
+            hashed_password=password_hash.hash("TeacherPassword123!"), role="teacher",
+            staff_id=staff.id, is_active=True,
+        )
+        school_class = models.SchoolClass(name="Senior 1", section="East")
+        subject = models.Subject(name="Biology", school_type="Secondary")
+        db.add_all([teacher, school_class, subject])
+        db.commit()
+        teacher_id, class_id, subject_id = teacher.id, school_class.id, subject.id
+        token = create_access_token(SimpleNamespace(id=teacher_id, role="teacher"))
+    finally:
+        db.close()
+
+    with TestClient(app) as client:
+        response = client.put("/api/me/teaching-assignments", json={
+            "class_subjects": [{"class_id": class_id, "subject_ids": [subject_id]}],
+            "class_teacher_class_ids": [class_id],
+            "special_roles": ["House Patron", "Duty Teacher"],
+        }, headers={"Authorization": f"Bearer {token}"})
+        loaded = client.get("/api/me/teaching-assignments", headers={"Authorization": f"Bearer {token}"})
+
+    assert response.status_code == 200
+    assert loaded.status_code == 200
+    assert loaded.json()["class_teacher_class_ids"] == [class_id]
+    assert loaded.json()["class_subjects"][0]["subject_ids"] == [subject_id]
+    assert set(loaded.json()["special_roles"]) == {"House Patron", "Duty Teacher"}
