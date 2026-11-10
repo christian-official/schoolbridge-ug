@@ -13,3 +13,89 @@ export async function clearLocalSyncData(userId: number, deviceId: string) {
     if (key?.startsWith(prefix)) localStorage.removeItem(key)
   }
 }
+
+
+type EncryptedDraftRecord = { salt: number[]; iv: number[]; ciphertext: number[]; updatedAt: number }
+
+function offlineDatabaseName(userId: number, deviceId: string) {
+  return 'schoolbridge-offline-' + userId + '-' + deviceId
+}
+
+function openOfflineDatabase(userId: number, deviceId: string): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const opening = indexedDB.open(offlineDatabaseName(userId, deviceId), 1)
+    opening.onupgradeneeded = () => {
+      if (!opening.result.objectStoreNames.contains('drafts')) opening.result.createObjectStore('drafts')
+    }
+    opening.onsuccess = () => resolve(opening.result)
+    opening.onerror = () => reject(new Error('Unable to open encrypted offline storage.'))
+  })
+}
+
+async function deriveOfflineDraftKey(passphrase: string, salt: Uint8Array): Promise<CryptoKey> {
+  const material = await crypto.subtle.importKey('raw', new TextEncoder().encode(passphrase), 'PBKDF2', false, ['deriveKey'])
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations: 310000, hash: 'SHA-256' },
+    material,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt'],
+  )
+}
+
+export async function saveEncryptedOfflineDraft(userId: number, deviceId: string, passphrase: string, value: unknown) {
+  if (!passphrase || passphrase.length < 10) throw new Error('Use a passphrase of at least 10 characters.')
+  if (!crypto?.subtle || typeof indexedDB === 'undefined') throw new Error('This browser does not support protected offline storage.')
+  const salt = crypto.getRandomValues(new Uint8Array(16))
+  const iv = crypto.getRandomValues(new Uint8Array(12))
+  const key = await deriveOfflineDraftKey(passphrase, salt)
+  const plaintext = new TextEncoder().encode(JSON.stringify(value))
+  const ciphertext = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plaintext))
+  const db = await openOfflineDatabase(userId, deviceId)
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const transaction = db.transaction('drafts', 'readwrite')
+      transaction.objectStore('drafts').put({
+        salt: Array.from(salt), iv: Array.from(iv), ciphertext: Array.from(ciphertext), updatedAt: Date.now(),
+      } satisfies EncryptedDraftRecord, 'teacher-mark-draft')
+      transaction.oncomplete = () => resolve()
+      transaction.onerror = () => reject(new Error('Unable to save the encrypted offline draft.'))
+      transaction.onabort = () => reject(new Error('Offline draft storage was interrupted.'))
+    })
+  } finally { db.close() }
+}
+
+export async function loadEncryptedOfflineDraft<T>(userId: number, deviceId: string, passphrase: string): Promise<T> {
+  if (!passphrase || passphrase.length < 10) throw new Error('Enter the passphrase used to protect this draft.')
+  if (!crypto?.subtle || typeof indexedDB === 'undefined') throw new Error('This browser does not support protected offline storage.')
+  const db = await openOfflineDatabase(userId, deviceId)
+  let record: EncryptedDraftRecord | undefined
+  try {
+    record = await new Promise((resolve, reject) => {
+      const request = db.transaction('drafts', 'readonly').objectStore('drafts').get('teacher-mark-draft')
+      request.onsuccess = () => resolve(request.result as EncryptedDraftRecord | undefined)
+      request.onerror = () => reject(new Error('Unable to read the encrypted offline draft.'))
+    })
+  } finally { db.close() }
+  if (!record) throw new Error('No encrypted teacher marks draft is saved on this browser.')
+  try {
+    const salt = new Uint8Array(record.salt), iv = new Uint8Array(record.iv), ciphertext = new Uint8Array(record.ciphertext)
+    const key = await deriveOfflineDraftKey(passphrase, salt)
+    const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext)
+    return JSON.parse(new TextDecoder().decode(plaintext)) as T
+  } catch {
+    throw new Error('Unable to unlock the draft. Check the passphrase and try again.')
+  }
+}
+
+export async function deleteEncryptedOfflineDraft(userId: number, deviceId: string) {
+  const db = await openOfflineDatabase(userId, deviceId)
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const transaction = db.transaction('drafts', 'readwrite')
+      transaction.objectStore('drafts').delete('teacher-mark-draft')
+      transaction.oncomplete = () => resolve()
+      transaction.onerror = () => reject(new Error('Unable to clear the submitted offline draft.'))
+    })
+  } finally { db.close() }
+}

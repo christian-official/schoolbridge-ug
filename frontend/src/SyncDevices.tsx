@@ -27,7 +27,7 @@ type Proposal = {
   resolution: string | null
 }
 
-type Props = { token: string; userId: number; isAdmin: boolean }
+type TeacherMarkProposal = { id:number; teacher_id:number; teacher_username:string; payload:{exam_id:number;subject_id:number;class_id:number;records:{student_id:number;score:number}[]}; status:string; conflict_sequence:number|null; submitted_at:string }\ntype Props = { token: string; userId: number; isAdmin: boolean }
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
 
 function deviceStorageKey(userId: number) {
@@ -58,7 +58,7 @@ async function request<T>(path: string, token: string, options: RequestInit = {}
 
 export default function SyncDevices({ token, userId, isAdmin }: Props) {
   const [devices, setDevices] = useState<Device[]>([])
-  const [proposals, setProposals] = useState<Proposal[]>([])
+  const [proposals, setProposals] = useState<Proposal[]>([])\n  const [teacherMarkProposals, setTeacherMarkProposals] = useState<TeacherMarkProposal[]>([])
   const [deviceId, setDeviceId] = useState('')
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -73,6 +73,12 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
       setDeviceId(storedId)
       const result = await request<{ devices: Device[] }>('sync/devices', token)
       setDevices(result.devices)
+      if (isAdmin) {
+        const teacherQueue = await request<{proposals:TeacherMarkProposal[]}>('sync/teacher-mark-proposals', token)
+        setTeacherMarkProposals(teacherQueue.proposals)
+      } else {
+        setTeacherMarkProposals([])
+      }
       const revokedCurrent = result.devices.some(device => device.device_id === storedId && !device.active)
       if (storedId && revokedCurrent) await clearLocalSyncData(userId, storedId)
       const activeCurrent = result.devices.some(device => device.device_id === storedId && device.active)
@@ -149,6 +155,17 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
     }
   }
 
+  async function approveTeacherMarkProposal(id:number) {
+    if (!window.confirm('Approve and apply these offline marks to official examination records?')) return
+    setBusy(true);setError('');setMessage('')
+    try {
+      const result=await request<{saved:number}>('sync/teacher-mark-proposals/'+id+'/apply',token,{method:'POST'})
+      setMessage('Offline marks proposal #'+id+' approved. '+result.saved+' mark records were applied and remain unverified for academic verification.')
+      await load()
+    } catch(err) { setError(err instanceof Error?err.message:'Unable to approve offline marks.') }
+    finally { setBusy(false) }
+  }
+
   const currentDevice = devices.find(device => device.device_id === deviceId)
   const currentRevoked = Boolean(currentDevice && !currentDevice.active)
 
@@ -175,6 +192,19 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
             <td>{proposal.status}{proposal.conflict_sequence ? <small className="form-hint">Conflict at sequence {proposal.conflict_sequence}</small> : null}</td>
             <td>{proposal.submitted_at ? new Date(proposal.submitted_at + (proposal.submitted_at.endsWith('Z') ? '' : 'Z')).toLocaleString() : '—'}</td>
             <td>{['pending_review', 'conflict'].includes(proposal.status) ? <div className="proposal-review-actions"><button className="secondary-button" type="button" disabled={busy} onClick={() => void resolveProposal(proposal.id, 'rebase')}>Rebase</button><button className="secondary-button" type="button" disabled={busy} onClick={() => void resolveProposal(proposal.id, 'discard')}>Discard</button></div> : proposal.resolution || 'Reviewed'}</td>
+          </tr>)}
+        </tbody></table></div>}
+      </>}
+      {isAdmin && <>
+        <h3>Teacher offline marks awaiting review</h3>
+        <p className="form-hint">Review the teacher, examination, subject and submitted scores. Approval rechecks the teacher's current assignment and mark conflicts; applied scores remain unverified.</p>
+        {teacherMarkProposals.filter(item=>['pending_review','conflict'].includes(item.status)).length===0 ? <p className="empty-state">No teacher offline marks are awaiting review.</p> : <div className="table-wrap"><table><thead><tr><th>Teacher</th><th>Exam / subject</th><th>Records</th><th>Status</th><th>Action</th></tr></thead><tbody>
+          {teacherMarkProposals.filter(item=>['pending_review','conflict'].includes(item.status)).map(item=><tr key={item.id}>
+            <td>{item.teacher_username}<small className="form-hint">Proposal #{item.id}</small></td>
+            <td>Exam #{item.payload.exam_id} · Subject #{item.payload.subject_id}<small className="form-hint">Class #{item.payload.class_id}</small></td>
+            <td><details className="sync-proposal-details"><summary>{item.payload.records.length} score entries</summary><pre className="sync-proposal-payload">{JSON.stringify(item.payload.records,null,2)}</pre></details></td>
+            <td>{item.status}{item.conflict_sequence ? <small className="form-hint">Changed after sequence {item.conflict_sequence}</small> : null}</td>
+            <td><button className="primary-button" type="button" disabled={busy||item.status==='conflict'} onClick={()=>void approveTeacherMarkProposal(item.id)}>Approve & apply</button></td>
           </tr>)}
         </tbody></table></div>}
       </>}
