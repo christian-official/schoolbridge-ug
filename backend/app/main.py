@@ -4596,7 +4596,7 @@ def submit_offline_finance_payment(data: OfflineFinancePaymentCreate, db: Sessio
         if not same:
             raise HTTPException(409, "Idempotency key already used for different payment content.")
         return {"proposal_id": old.id, "status": old.status, "duplicate": True,
-                "applied": old.status == "applied", "payment_id": json.loads(old.resolution or "{}").get("payment_id")}
+                "applied": old.status == "applied", "payment_id": (json.loads(old.resolution).get("payment_id") if old.resolution and old.resolution.startswith("{") else None)}
     charge = db.query(models.FeeCharge).filter_by(id=data.charge_id).with_for_update().first()
     if not charge:
         raise HTTPException(404, "Fee charge not found.")
@@ -4648,7 +4648,7 @@ def submit_offline_finance_payment(data: OfflineFinancePaymentCreate, db: Sessio
         old = db.query(models.SyncChangeProposal).filter_by(user_id=user.id, idempotency_key=data.idempotency_key).first()
         if old and old.device_id == str(data.device_id) and old.payload_json == payload:
             return {"proposal_id": old.id, "status": old.status, "duplicate": True,
-                    "applied": old.status == "applied", "payment_id": json.loads(old.resolution or "{}").get("payment_id")}
+                    "applied": old.status == "applied", "payment_id": (json.loads(old.resolution).get("payment_id") if old.resolution and old.resolution.startswith("{") else None)}
         raise HTTPException(409, "Offline payment key collision; retry with the same request.")
 
 
