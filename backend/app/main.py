@@ -1721,7 +1721,7 @@ async def protect_school_data(request: Request, call_next):
             # Self-service profile, password and personal dashboard endpoints
             # are scoped to the authenticated account.
             pass
-        elif path == "/api/sync/devices" or path.startswith("/api/sync/devices/") or path in {"/api/sync/changes", "/api/sync/students", "/api/sync/classes", "/api/sync/attendance", "/api/sync/exams", "/api/sync/marks", "/api/sync/fees", "/api/sync/proposals"}:
+        elif path == "/api/sync/devices" or path.startswith("/api/sync/devices/") or path in {"/api/sync/changes", "/api/sync/students", "/api/sync/classes", "/api/sync/attendance", "/api/sync/exams", "/api/sync/marks", "/api/sync/fees", "/api/sync/proposals"} or path.startswith("/api/sync/teacher-mark-proposals"):
             # Sync routes enforce account, device and record scope in each handler.
             pass
         elif path.startswith("/api/teacher/"):
@@ -2420,7 +2420,7 @@ def list_sync_mark_snapshot(
     user=Depends(get_current_user),
 ):
     """Return marks restricted by student, class, subject and verification scope."""
-    _sync_active_device(db, user, device_id)
+    device = _sync_active_device(db, user, device_id)
     query = db.query(models.Mark).join(
         models.Student, models.Student.id == models.Mark.student_id
     )
@@ -2466,8 +2466,10 @@ def list_sync_mark_snapshot(
          "exam_id": row.exam_id, "score": row.score, "verified": row.verified}
         for row in rows
     ]
+    snapshot_sequence = db.query(func.max(models.SyncChange.id)).scalar() or 0
+    device.last_issued_sequence = max(device.last_issued_sequence, snapshot_sequence)
     db.commit()
-    return {"marks": payload, "scope": scope,
+    return {"marks": payload, "scope": scope, "snapshot_sequence": snapshot_sequence,
             "next_after_id": next_after_id, "has_more": has_more}
 
 
@@ -4673,3 +4675,231 @@ def adjust_fee_charge(charge_id: int, data: FeeChargeUpdate, db: Session = Depen
                 f"Previous UGX {previous}; new UGX {data.amount}; reason: {data.reason}")
     db.commit()
     return {"message": "Fee charge adjusted and recorded in the audit log.", "charge_id": charge.id, "amount": charge.amount, "paid": paid, "balance": charge.amount-paid}
+
+
+class OfflineTeacherMarkEntry(BaseModel):
+    student_id: int = Field(ge=1)
+    score: float = Field(ge=0, le=100)
+
+
+class OfflineTeacherMarkBatch(BaseModel):
+    device_id: UUID
+    idempotency_key: str = Field(min_length=16, max_length=100)
+    exam_id: int = Field(ge=1)
+    subject_id: int = Field(ge=1)
+    base_sequence: int = Field(ge=0)
+    records: list[OfflineTeacherMarkEntry] = Field(min_length=1, max_length=500)
+
+
+@app.post("/api/sync/teacher-mark-proposals", tags=["Offline Synchronisation"])
+def submit_offline_teacher_marks(data: OfflineTeacherMarkBatch, db: Session = Depends(get_db), teacher=Depends(get_current_user)):
+    """Queue offline teacher marks for review; never writes official marks."""
+    if teacher.role != "teacher":
+        raise HTTPException(403, "Teacher account required.")
+    permissions = user_permissions(teacher).get("My Results", set())
+    if not ({"add", "edit"} & permissions):
+        raise HTTPException(403, "You do not have permission to submit examination results.")
+    device = _sync_active_device(db, teacher, data.device_id)
+    if data.base_sequence > device.last_issued_sequence:
+        raise HTTPException(409, "The proposal baseline has not been issued to this device.")
+    if len({entry.student_id for entry in data.records}) != len(data.records):
+        raise HTTPException(422, "Each student may appear only once in an offline submission.")
+    exam = db.get(models.Exam, data.exam_id)
+    subject = db.get(models.Subject, data.subject_id)
+    if not exam or not subject or exam.class_id is None:
+        raise HTTPException(404, "Class examination or subject not found.")
+    assignment = db.query(models.TeacherAssignment).filter_by(
+        teacher_id=teacher.id, class_id=exam.class_id, subject_id=subject.id
+    ).first()
+    if not assignment:
+        raise HTTPException(403, "You are not currently assigned to this subject and class.")
+    student_ids = [entry.student_id for entry in data.records]
+    students = db.query(models.Student).filter(
+        models.Student.id.in_(student_ids), models.Student.class_id == exam.class_id,
+        models.Student.status == "active"
+    ).all()
+    if len(students) != len(student_ids):
+        raise HTTPException(422, "Every submitted student must be active and belong to this examination's class.")
+    locked = db.query(models.Mark.id).filter(
+        models.Mark.exam_id == exam.id, models.Mark.subject_id == subject.id,
+        models.Mark.verified.is_(True)
+    ).first()
+    if locked:
+        raise HTTPException(409, "These results are verified and locked. Ask an administrator to unlock them before preparing changes.")
+    payload = json.dumps({
+        "class_id": exam.class_id, "exam_id": exam.id, "subject_id": subject.id,
+        "records": [entry.model_dump() for entry in data.records],
+    }, sort_keys=True, separators=(",", ":"))
+    if len(payload.encode("utf-8")) > 32768:
+        raise HTTPException(413, "Offline marks payload exceeds 32 KB.")
+    old = db.query(models.SyncChangeProposal).filter_by(
+        user_id=teacher.id, idempotency_key=data.idempotency_key
+    ).first()
+    if old:
+        same = (old.device_id == str(data.device_id) and old.entity_type == "TeacherMarkBatch"
+                and old.entity_id == exam.id and old.operation == "update"
+                and old.base_sequence == data.base_sequence and old.payload_json == payload)
+        if not same:
+            raise HTTPException(409, "Idempotency key already used for different content.")
+        return {"proposal_id": old.id, "status": old.status, "duplicate": True, "applied": False}
+    changed_ids = [row[0] for row in db.query(models.SyncChange.entity_id).filter(
+        models.SyncChange.entity_type == "Mark", models.SyncChange.id > data.base_sequence
+    ).all()]
+    changed_students = set()
+    if changed_ids:
+        changed_students = {
+            row[0] for row in db.query(models.Mark.student_id).filter(
+                models.Mark.id.in_(changed_ids), models.Mark.exam_id == exam.id,
+                models.Mark.subject_id == subject.id
+            ).all()
+        }
+    conflict = bool(changed_students & set(student_ids))
+    conflict_sequence = db.query(func.max(models.SyncChange.id)).filter(
+        models.SyncChange.entity_type == "Mark", models.SyncChange.id > data.base_sequence
+    ).scalar() if conflict else None
+    row = models.SyncChangeProposal(
+        user_id=teacher.id, device_id=device.device_id, idempotency_key=data.idempotency_key,
+        entity_type="TeacherMarkBatch", entity_id=exam.id, operation="update",
+        payload_json=payload, base_sequence=data.base_sequence,
+        status="conflict" if conflict else "pending_review", conflict_sequence=conflict_sequence,
+    )
+    db.add(row)
+    write_audit(db, teacher, "offline_teacher_marks_submitted", "sync_change_proposal", 0,
+                f"exam={exam.id}; class={exam.class_id}; subject={subject.id}; records={len(data.records)}; status={row.status}")
+    try:
+        db.commit()
+        db.refresh(row)
+    except IntegrityError:
+        db.rollback()
+        old = db.query(models.SyncChangeProposal).filter_by(
+            user_id=teacher.id, idempotency_key=data.idempotency_key
+        ).first()
+        if old and old.payload_json == payload and old.device_id == str(data.device_id):
+            return {"proposal_id": old.id, "status": old.status, "duplicate": True, "applied": False}
+        raise HTTPException(409, "Offline submission key collision; retry using the same request.")
+    return {"proposal_id": row.id, "status": row.status, "duplicate": False, "applied": False}
+
+
+@app.get("/api/sync/teacher-mark-proposals", tags=["Offline Synchronisation"])
+def list_offline_teacher_mark_proposals(
+    status: str | None = Query(None, pattern="^(pending_review|conflict|applied|discarded|rejected)$"),
+    db: Session = Depends(get_db), admin=Depends(get_current_user)
+):
+    if admin.role != "admin":
+        raise HTTPException(403, "Administrator review is required.")
+    query = db.query(models.SyncChangeProposal).filter(
+        models.SyncChangeProposal.entity_type == "TeacherMarkBatch"
+    )
+    if status:
+        query = query.filter(models.SyncChangeProposal.status == status)
+    rows = query.order_by(models.SyncChangeProposal.submitted_at.asc()).limit(300).all()
+    proposals = []
+    for row in rows:
+        owner = db.get(models.User, row.user_id)
+        proposals.append({
+            "id": row.id, "teacher_id": row.user_id,
+            "teacher_username": owner.username if owner else "Unavailable account",
+            "device_id": row.device_id, "payload": json.loads(row.payload_json),
+            "base_sequence": row.base_sequence, "status": row.status,
+            "conflict_sequence": row.conflict_sequence, "submitted_at": row.submitted_at,
+        })
+    return {"proposals": proposals}
+
+
+@app.post("/api/sync/teacher-mark-proposals/{proposal_id}/apply", tags=["Offline Synchronisation"])
+def apply_offline_teacher_mark_proposal(proposal_id: int, db: Session = Depends(get_db), admin=Depends(get_current_user)):
+    if admin.role != "admin":
+        raise HTTPException(403, "Administrator approval is required.")
+    row = db.query(models.SyncChangeProposal).filter_by(
+        id=proposal_id, entity_type="TeacherMarkBatch"
+    ).first()
+    if not row:
+        raise HTTPException(404, "Offline teacher marks proposal not found.")
+    if row.status not in {"pending_review", "conflict"}:
+        raise HTTPException(409, "This offline submission has already been resolved.")
+    payload = json.loads(row.payload_json)
+    teacher = db.get(models.User, row.user_id)
+    exam = db.get(models.Exam, payload["exam_id"])
+    subject = db.get(models.Subject, payload["subject_id"])
+    if not teacher or not teacher.is_active or teacher.role != "teacher" or not exam or not subject or exam.class_id != payload["class_id"]:
+        row.status = "rejected"
+        row.resolution = "reject_invalid_context"
+        row.resolved_at = datetime.utcnow()
+        write_audit(db, admin, "offline_teacher_marks_rejected", "sync_change_proposal", row.id,
+                    "Teacher account, examination or class context is no longer valid.")
+        db.commit()
+        raise HTTPException(409, "The teacher or examination context is no longer valid; proposal rejected.")
+    assignment = db.query(models.TeacherAssignment.id).filter_by(
+        teacher_id=teacher.id, class_id=exam.class_id, subject_id=subject.id
+    ).first()
+    if not assignment:
+        row.status = "rejected"
+        row.resolution = "reject_assignment_changed"
+        row.resolved_at = datetime.utcnow()
+        write_audit(db, admin, "offline_teacher_marks_rejected", "sync_change_proposal", row.id,
+                    "Teacher assignment was no longer active at approval time.")
+        db.commit()
+        raise HTTPException(409, "Teacher assignment has changed. Proposal rejected; no marks were applied.")
+    entries = payload.get("records", [])
+    student_ids = [int(entry["student_id"]) for entry in entries]
+    if not entries or len(student_ids) != len(set(student_ids)) or len(entries) > 500:
+        raise HTTPException(422, "Stored submission failed integrity validation.")
+    students = db.query(models.Student).filter(
+        models.Student.id.in_(student_ids), models.Student.class_id == exam.class_id,
+        models.Student.status == "active"
+    ).all()
+    if len(students) != len(student_ids) or any(
+        not isinstance(entry.get("score"), (int, float)) or isinstance(entry.get("score"), bool)
+        or entry["score"] < 0 or entry["score"] > 100 for entry in entries
+    ):
+        row.status = "rejected"
+        row.resolution = "reject_validation"
+        row.resolved_at = datetime.utcnow()
+        write_audit(db, admin, "offline_teacher_marks_rejected", "sync_change_proposal", row.id,
+                    "Student eligibility or score validation failed.")
+        db.commit()
+        raise HTTPException(422, "Student eligibility or score validation failed; no marks were applied.")
+    locked = db.query(models.Mark.id).filter(
+        models.Mark.exam_id == exam.id, models.Mark.subject_id == subject.id,
+        models.Mark.verified.is_(True)
+    ).first()
+    if locked:
+        raise HTTPException(409, "Results have been verified and locked. Unlock them before approving this submission.")
+    latest_changes = db.query(models.SyncChange).filter(
+        models.SyncChange.entity_type == "Mark", models.SyncChange.id > row.base_sequence
+    ).all()
+    changed_ids = [change.entity_id for change in latest_changes]
+    changed_students = set()
+    if changed_ids:
+        changed_students = {
+            item[0] for item in db.query(models.Mark.student_id).filter(
+                models.Mark.id.in_(changed_ids), models.Mark.exam_id == exam.id,
+                models.Mark.subject_id == subject.id
+            ).all()
+        }
+    if changed_students & set(student_ids):
+        row.status = "conflict"
+        row.conflict_sequence = max(change.id for change in latest_changes)
+        db.commit()
+        raise HTTPException(409, "One or more marks changed after the offline snapshot. Review the conflict before retrying.")
+    saved = 0
+    for entry in entries:
+        mark = db.query(models.Mark).filter_by(
+            student_id=entry["student_id"], subject_id=subject.id, exam_id=exam.id
+        ).first()
+        if mark and mark.verified:
+            raise HTTPException(409, "A mark became verified before approval; no submission was applied.")
+        if mark:
+            mark.score = float(entry["score"])
+            mark.verified = False
+        else:
+            db.add(models.Mark(student_id=entry["student_id"], subject_id=subject.id,
+                               exam_id=exam.id, score=float(entry["score"]), verified=False))
+        saved += 1
+    row.status = "applied"
+    row.resolution = "approved_apply"
+    row.resolved_at = datetime.utcnow()
+    write_audit(db, admin, "offline_teacher_marks_applied", "sync_change_proposal", row.id,
+                f"exam={exam.id}; class={exam.class_id}; subject={subject.id}; records={saved}; teacher_id={teacher.id}")
+    db.commit()
+    return {"proposal_id": row.id, "status": row.status, "applied": True, "saved": saved}
