@@ -2645,3 +2645,16 @@ def test_non_teaching_staff_can_be_registered_without_a_login_account():
     assert response.json()["login_allowed"] is False
     with SessionLocal() as db:
         assert db.query(models.User).filter_by(staff_id=response.json()["id"]).first() is None
+
+
+def test_administrators_cannot_assign_teacher_classes_or_subjects():
+    reset_database()
+    admin = create_admin()
+    headers = {"Authorization": f"Bearer {create_access_token(admin)}"}
+    with TestClient(app) as client:
+        subject_assignment = client.post("/api/teacher-assignments", headers=headers,
+                                         json={"teacher_id": 999, "class_id": 999, "subject_id": 999})
+        class_teacher_assignment = client.post("/api/class-teacher-assignments", headers=headers,
+                                                json={"teacher_id": 999, "class_id": 999})
+    assert subject_assignment.status_code == 409
+    assert class_teacher_assignment.status_code == 409
