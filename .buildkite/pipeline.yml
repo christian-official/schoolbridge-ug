@@ -22,22 +22,27 @@ steps:
 
       for attempt in $(seq 1 60); do
         if docker exec schoolbridge-ci-postgres pg_isready -U schoolbridge -d schoolbridge_restore_ci >/dev/null 2>&1; then
+          echo "PostgreSQL is ready"
           break
-        fi
-        if [ "$attempt" -eq 60 ]; then
-          docker logs schoolbridge-ci-postgres
-          exit 1
         fi
         sleep 2
       done
 
+      if ! docker exec schoolbridge-ci-postgres pg_isready -U schoolbridge -d schoolbridge_restore_ci >/dev/null 2>&1; then
+        docker logs schoolbridge-ci-postgres
+        exit 1
+      fi
+
+      echo "=== Create isolated Python environment ==="
+      python3 -m venv .venv
+      .venv/bin/python -m pip install --upgrade pip
+      .venv/bin/python -m pip install -r backend/requirements-dev.txt
+
       echo "=== Backend test suite ==="
-      python3 -m pip install --upgrade pip
-      python3 -m pip install -r backend/requirements-dev.txt
-      python3 -m pytest -q backend/tests
+      .venv/bin/python -m pytest -q backend/tests
 
       echo "=== PostgreSQL backup and restore integration ==="
-      python3 -m pytest -q backend/tests/test_postgres_restore_integration.py
+      .venv/bin/python -m pytest -q backend/tests/test_postgres_restore_integration.py
 
       echo "=== Frontend lint, offline tests and production build ==="
       cd frontend
