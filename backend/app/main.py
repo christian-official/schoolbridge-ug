@@ -920,11 +920,10 @@ def create_student(data: StudentCreate, db: Session = Depends(get_db), admin=Dep
     return item
 
 @app.get("/api/students", response_model=list[StudentOut], tags=["Students"])
-def list_students(include_inactive: bool = False, db: Session = Depends(get_db)):
-    query = db.query(models.Student)
-    if not include_inactive:
-        query = query.filter(models.Student.status == "active")
-    return query.order_by(models.Student.last_name, models.Student.first_name).all()
+def list_students(db: Session = Depends(get_db)):
+    return db.query(models.Student).filter(
+        models.Student.status == "active"
+    ).order_by(models.Student.last_name, models.Student.first_name).all()
 
 
 def get_current_user(
