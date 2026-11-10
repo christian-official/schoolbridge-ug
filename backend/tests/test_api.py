@@ -1351,26 +1351,8 @@ def test_sync_change_feed_bounds_hidden_history_scans_without_skipping_visible_e
         )
         db.add(student)
         db.flush()
-        db.add(models.ParentStudentLink(user_id=parent.id, student_id=student.id))
-        db.flush()
-        # Isolate the 501 feed events from setup hooks so the first 500 rows
-        # are deliberately invisible and the final row is parent-visible.
-        db.query(models.SyncChange).delete()
-        hidden_changes = [
-            models.SyncChange(
-                entity_type="Student", entity_id=10000 + index, operation="update",
-                scope_json=json.dumps({"parent_user_ids": []}),
-            )
-            for index in range(500)
-        ]
-        db.add_all(hidden_changes)
-        db.flush()
-        hidden_cursor = hidden_changes[-1].id
         student_id = student.id
-        db.add(models.SyncChange(
-            entity_type="Student", entity_id=student_id, operation="update",
-            scope_json=json.dumps({"parent_user_ids": [parent.id]}),
-        ))
+        db.add(models.ParentStudentLink(user_id=parent.id, student_id=student_id))
         db.commit()
         parent_id = parent.id
     headers = {"Authorization": "Bearer " + create_access_token(
@@ -1383,8 +1365,29 @@ def test_sync_change_feed_bounds_hidden_history_scans_without_skipping_visible_e
             json={"device_id": device_id, "device_name": "Bounded feed device"},
         )
         assert registered.status_code == 200, registered.text
-        first = client.get(
+        initial = client.get(
             f"/api/sync/changes?device_id={device_id}&cursor=0&limit=20",
+            headers=headers,
+        )
+        assert initial.status_code == 200, initial.text
+        with SessionLocal() as db:
+            hidden_changes = [
+                models.SyncChange(
+                    entity_type="Student", entity_id=10000 + index, operation="update",
+                    scope_json=json.dumps({"parent_user_ids": []}),
+                )
+                for index in range(500)
+            ]
+            db.add_all(hidden_changes)
+            db.flush()
+            hidden_cursor = hidden_changes[-1].id
+            db.add(models.SyncChange(
+                entity_type="Student", entity_id=student_id, operation="update",
+                scope_json=json.dumps({"parent_user_ids": [parent_id]}),
+            ))
+            db.commit()
+        first = client.get(
+            f"/api/sync/changes?device_id={device_id}&cursor={initial.json()['next_cursor']}&limit=20",
             headers=headers,
         )
         assert first.status_code == 200, first.text
