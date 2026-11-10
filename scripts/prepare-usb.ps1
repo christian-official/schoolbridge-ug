@@ -6,6 +6,8 @@ $ComposeFile = Join-Path $RepoRoot "docker-compose.yml"
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { throw "Docker is required on the preparation computer." }
 docker compose version | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "Docker Compose v2 is required." }
+docker info *> $null
+if ($LASTEXITCODE -ne 0) { throw "Docker Engine must be running on the preparation computer." }
 
 Push-Location $RepoRoot
 try {
@@ -20,6 +22,7 @@ try {
 
     $PackageCompose = Get-Content $ComposeFile -Raw
     $PackageCompose = [regex]::Replace($PackageCompose, '(?m)^    build:\r?\n      context: \./(backend|frontend)\r?\n', '')
+    if ($PackageCompose -match '(?m)^    build:') { throw "USB Compose package still contains source build contexts." }
     Set-Content (Join-Path $PackageDir "docker-compose.yml") $PackageCompose -Encoding UTF8
     Copy-Item (Join-Path $PSScriptRoot "install-schoolbridge.ps1") $PackageDir -Force
     @'
