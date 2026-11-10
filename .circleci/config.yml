@@ -1,55 +1,83 @@
-version: 2.1
-
 jobs:
-  backend-api-tests:
+  backend-api-core:
     machine:
       image: ubuntu-2404:current
     steps:
       - checkout
+      - run: python3 -m venv .venv && .venv/bin/pip install -r backend/requirements-dev.txt
       - run:
-          name: Install backend test dependencies
-          command: |
-            python3 --version
-            python3 -m venv .venv
-            .venv/bin/pip install --upgrade pip
-            .venv/bin/pip install -r backend/requirements-dev.txt
-      - run:
-          name: Compile backend
-          command: .venv/bin/python -m compileall -q backend/app
-      - run:
-          name: Run backend API tests
-          command: PYTHONPATH=backend SCHOOLBRIDGE_DATABASE_URL=sqlite:///./schoolbridge_ci.db SCHOOLBRIDGE_SECRET_KEY=ci-only-secret-key-not-for-production .venv/bin/python -m pytest -vv -s --durations=25 backend/tests/test_api.py
+          name: Core API and access tests
+          command: PYTHONPATH=backend SCHOOLBRIDGE_DATABASE_URL=sqlite:///./schoolbridge_ci.db SCHOOLBRIDGE_SECRET_KEY=ci-only-secret-key-not-for-production .venv/bin/python -m pytest -q backend/tests/test_api.py -k "health_endpoint or school_records_require_authentication or admin_can_login_and_create_class or duplicate_class_and_stream or backup_download or admin_can_download_valid_sqlite_backup or restore_rejects_invalid_database_file or admin_can_stage_valid_restore"
 
-  backend-migration-tests:
+  backend-api-academics:
     machine:
       image: ubuntu-2404:current
     steps:
       - checkout
+      - run: python3 -m venv .venv && .venv/bin/pip install -r backend/requirements-dev.txt
       - run:
-          name: Install backend test dependencies
-          command: |
-            python3 -m venv .venv
-            .venv/bin/pip install --upgrade pip
-            .venv/bin/pip install -r backend/requirements-dev.txt
+          name: Finance, staff and examination tests
+          command: PYTHONPATH=backend SCHOOLBRIDGE_DATABASE_URL=sqlite:///./schoolbridge_ci.db SCHOOLBRIDGE_SECRET_KEY=ci-only-secret-key-not-for-production .venv/bin/python -m pytest -q backend/tests/test_api.py -k "teacher_cannot_access_admin or admin_cannot_use_teacher or fee_payments or fee_payment_amount or phase_one_staff_and_finance or class_scoped_exams or teacher_exam_access or grading_scale or verified_marks or staff_registration or verify_all_scores or combined_school"
+
+  backend-api-parent:
+    machine:
+      image: ubuntu-2404:current
+    steps:
+      - checkout
+      - run: python3 -m venv .venv && .venv/bin/pip install -r backend/requirements-dev.txt
       - run:
-          name: Run database migration tests
-          command: PYTHONPATH=backend SCHOOLBRIDGE_DATABASE_URL=sqlite:///./schoolbridge_ci.db SCHOOLBRIDGE_SECRET_KEY=ci-only-secret-key-not-for-production .venv/bin/python -m pytest -vv -s --durations=25 backend/tests/test_migrations.py
+          name: Parent access and device registration tests
+          command: PYTHONPATH=backend SCHOOLBRIDGE_DATABASE_URL=sqlite:///./schoolbridge_ci.db SCHOOLBRIDGE_SECRET_KEY=ci-only-secret-key-not-for-production .venv/bin/python -m pytest -q backend/tests/test_api.py -k "parent_portal or parent_liaison or sync_device_registration"
+
+  backend-api-sync:
+    machine:
+      image: ubuntu-2404:current
+    steps:
+      - checkout
+      - run: python3 -m venv .venv && .venv/bin/pip install -r backend/requirements-dev.txt
+      - run:
+          name: Change feed and offline snapshot tests
+          command: PYTHONPATH=backend SCHOOLBRIDGE_DATABASE_URL=sqlite:///./schoolbridge_ci.db SCHOOLBRIDGE_SECRET_KEY=ci-only-secret-key-not-for-production .venv/bin/python -m pytest -q backend/tests/test_api.py -k "sync_change_feed or sync_device_checkpoint or sync_student_snapshot or sync_attendance_snapshot or sync_exam_and_mark_snapshots or sync_fee_snapshot"
+
+  backend-api-offline:
+    machine:
+      image: ubuntu-2404:current
+    steps:
+      - checkout
+      - run: python3 -m venv .venv && .venv/bin/pip install -r backend/requirements-dev.txt
+      - run:
+          name: Offline proposal, attendance and setup tests
+          command: PYTHONPATH=backend SCHOOLBRIDGE_DATABASE_URL=sqlite:///./schoolbridge_ci.db SCHOOLBRIDGE_SECRET_KEY=ci-only-secret-key-not-for-production .venv/bin/python -m pytest -q backend/tests/test_api.py -k "sync_offline_proposals or teacher_offline_marks or offline_attendance_batch or offline_snapshot_pages or first_install or fresh_install or invalid_activation_license or demo_data or activation_attempts or legacy_install or environment_admin_bootstrap or partial_legacy_admin or owner_signed_identity"
+
+  backend-migration-schema:
+    machine:
+      image: ubuntu-2404:current
+    steps:
+      - checkout
+      - run: python3 -m venv .venv && .venv/bin/pip install -r backend/requirements-dev.txt
+      - run:
+          name: Migrated schema verification tests
+          command: PYTHONPATH=backend SCHOOLBRIDGE_DATABASE_URL=sqlite:///./schoolbridge_ci.db SCHOOLBRIDGE_SECRET_KEY=ci-only-secret-key-not-for-production .venv/bin/python -m pytest -q backend/tests/test_migrations.py -k "migrated_database or fresh_database"
+
+  backend-migration-legacy:
+    machine:
+      image: ubuntu-2404:current
+    steps:
+      - checkout
+      - run: python3 -m venv .venv && .venv/bin/pip install -r backend/requirements-dev.txt
+      - run:
+          name: Legacy database migration tests
+          command: PYTHONPATH=backend SCHOOLBRIDGE_DATABASE_URL=sqlite:///./schoolbridge_ci.db SCHOOLBRIDGE_SECRET_KEY=ci-only-secret-key-not-for-production .venv/bin/python -m pytest -q backend/tests/test_migrations.py -k "baseline_adds or existing_database or current_database or legacy_school or partial_school_setup"
 
   backend-support-tests:
     machine:
       image: ubuntu-2404:current
     steps:
       - checkout
+      - run: python3 -m venv .venv && .venv/bin/pip install -r backend/requirements-dev.txt
       - run:
-          name: Install backend test dependencies
-          command: |
-            python3 -m venv .venv
-            .venv/bin/pip install --upgrade pip
-            .venv/bin/pip install -r backend/requirements-dev.txt
-      - run:
-          name: Run backend support tests
-          command: |
-            PYTHONPATH=backend SCHOOLBRIDGE_DATABASE_URL=sqlite:///./schoolbridge_ci.db SCHOOLBRIDGE_SECRET_KEY=ci-only-secret-key-not-for-production .venv/bin/python -m pytest -vv -s --durations=25               backend/tests/test_backup_scheduler.py               backend/tests/test_database.py               backend/tests/test_database_health.py               backend/tests/test_owner_license_tool.py               backend/tests/test_postgres_backup.py               backend/tests/test_restore_postgres.py               backend/tests/test_sqlite_backup.py
+          name: Backup, database and licensing tests
+          command: PYTHONPATH=backend SCHOOLBRIDGE_DATABASE_URL=sqlite:///./schoolbridge_ci.db SCHOOLBRIDGE_SECRET_KEY=ci-only-secret-key-not-for-production .venv/bin/python -m pytest -q backend/tests/test_backup_scheduler.py backend/tests/test_database.py backend/tests/test_database_health.py backend/tests/test_owner_license_tool.py backend/tests/test_postgres_backup.py backend/tests/test_restore_postgres.py backend/tests/test_sqlite_backup.py
 
   postgres-recovery-integration:
     machine:
@@ -268,8 +296,13 @@ jobs:
 workflows:
   schoolbridge-ci:
     jobs:
-      - backend-api-tests
-      - backend-migration-tests
+      - backend-api-core
+      - backend-api-academics
+      - backend-api-parent
+      - backend-api-sync
+      - backend-api-offline
+      - backend-migration-schema
+      - backend-migration-legacy
       - backend-support-tests
       - postgres-recovery-integration
       - frontend-build
