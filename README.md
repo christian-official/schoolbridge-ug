@@ -25,13 +25,13 @@ Each school's installation and data must remain isolated. Internet access may be
 
 ## Development status
 
-Phase 5 — Database & Offline Architecture has implemented its database-safety, school-LAN deployment, backup, device-registration, change-journal, checkpoint, role-scoped snapshot and audited offline-proposal foundations. Final validation and deployment verification remain. This is not a complete offline records or synchronisation implementation: API data is not cached for offline use, and submitted offline proposals are not automatically applied to live records.
+Phase 5 — Database & Offline Architecture includes verified database-safety, school-LAN deployment, device registration, change-journal, checkpoint and role-scoped snapshot foundations. Teacher mark drafts are encrypted locally and valid submissions are automatically applied after server-side permission, assignment, device, student, result-lock and conflict checks. Other school-record caching and generic offline writes remain disabled until their entity-specific permission and relationship invalidation rules are implemented and tested. PostgreSQL LAN installs run a dedicated daily verified backup service; SQLite single-host installs can run the same scheduler through Windows Task Scheduler.
 
 See [the local-network installation guide](docs/LOCAL_NETWORK_INSTALLATION.md) for setup and [the architecture notes](docs/architecture.md) for the current design direction.
 
 ## Development
 
-The backend uses Python, FastAPI and SQLAlchemy. SQLite is intended for a single-host installation; PostgreSQL is used for multi-user school networks. The production Windows installer and safe offline data synchronisation will be added in later milestones.
+The backend uses Python, FastAPI and SQLAlchemy. SQLite is intended for a single-host installation; PostgreSQL is used for multi-user school networks. The production Windows installer and the remaining permission-aware offline record synchronisation work are separate milestones.
 
 ## Important principles
 

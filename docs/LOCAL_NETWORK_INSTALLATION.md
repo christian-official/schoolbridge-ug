@@ -132,3 +132,10 @@ PostgreSQL backups.
 The SQLite migration snapshots and file restore protections apply only to
 single-host SQLite installations. Multi-device network deployments use the
 PostgreSQL backup command above.
+
+
+## Automated backups
+
+The Docker Compose deployment runs a separate backup service that creates a verified PostgreSQL backup immediately and repeats every 24 hours. Archives are stored in the persistent schoolbridge-backups volume and retained for 30 days by default. Set SCHOOLBRIDGE_BACKUP_INTERVAL_HOURS and SCHOOLBRIDGE_BACKUP_RETENTION_DAYS in the deployment environment to change the schedule and retention period.
+
+For a single-computer SQLite installation, configure Windows Task Scheduler to run python backup_scheduler.py --once daily from the backend directory. Keep the backup directory on a separate protected drive where possible, and periodically test restoring a backup before relying on it.
