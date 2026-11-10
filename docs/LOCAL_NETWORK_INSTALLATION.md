@@ -70,9 +70,12 @@ internet. The database port is not published by this Compose configuration.
      --license-id "SCHOOL-REFERENCE-001"
    ```
 
-10. Paste the signed license into SchoolBridge. Complete the school identity,
-    contact and structure details, then create the first administrator account
-    in the browser. No administrator password is preconfigured by the installer.
+10. Paste the signed license into SchoolBridge to activate the installation.
+11. The same license must also be confirmed in the setup form before the first
+    administrator can be created. Complete the school identity, contact and
+    structure details, then create the first administrator account in the
+    browser. Keep the page open until setup finishes; after a refresh, paste the
+    same license again. No administrator password is preconfigured by the installer.
 
 The Compose setup disables demo-data seeding and uses PostgreSQL with a
 persistent database volume. It does not use SQLite over a network share.

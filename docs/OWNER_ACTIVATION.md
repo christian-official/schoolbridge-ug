@@ -27,9 +27,9 @@ python backend/tools/schoolbridge_owner_license.py sign-license \
   --license-id "SCHOOL-REFERENCE-001"
 ```
 
-Optionally add `--expires-at` with a Unix timestamp. Give the resulting signed license string to the school installer to paste into SchoolBridge.
+Optionally add `--expires-at` with a Unix timestamp. Give the resulting signed license string to the school installer. The same license is required twice in the first-time wizard: first to activate the installation, then again to authorise creation of the first administrator. The wizard keeps it only in page memory; if the page is refreshed before setup is complete, paste the same license again.
 
-The license is bound to one installation ID. Activation attempts are rate-limited, successful activation is one-time, and the database stores only a SHA-256 fingerprint of the license. The original license and private signing key are not stored.
+The license is bound to one installation ID. Activation attempts are rate-limited, successful activation is one-time, and the database stores only a SHA-256 fingerprint of the license. The first administrator cannot be claimed using activation status alone: setup completion must present the exact same owner-signed license. The original license and private signing key are not stored.
 
 ## Existing schools
 
