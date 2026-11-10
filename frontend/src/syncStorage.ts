@@ -279,3 +279,53 @@ export async function deleteEncryptedOfflineAttendanceDraft(userId:number,device
     })
   }finally{db.close()}
 }
+
+
+type EncryptedFinanceQueueRecord = { version: 2; salt: number[]; iv: number[]; ciphertext: number[]; updatedAt: number }
+
+export async function saveEncryptedFinanceQueue(userId:number,deviceId:string,passphrase:string,value:unknown) {
+  if(!passphrase||passphrase.length<12)throw new Error('Use a passphrase of at least 12 characters.')
+  if(!crypto?.subtle||typeof indexedDB==='undefined')throw new Error('Protected offline storage is unavailable.')
+  const salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12)),updatedAt=Date.now()
+  const key=await deriveOfflineDraftKey(passphrase,salt)
+  const plaintext=new TextEncoder().encode(JSON.stringify(value))
+  const additionalData=new TextEncoder().encode('schoolbridge-offline-finance-queue-v2:'+updatedAt)
+  const ciphertext=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv:asArrayBuffer(iv),additionalData:asArrayBuffer(additionalData)},key,asArrayBuffer(plaintext)))
+  const db=await openOfflineDatabase(userId,deviceId)
+  try{await new Promise<void>((resolve,reject)=>{
+    const tx=db.transaction('drafts','readwrite')
+    tx.objectStore('drafts').put({version:2,salt:Array.from(salt),iv:Array.from(iv),ciphertext:Array.from(ciphertext),updatedAt} satisfies EncryptedFinanceQueueRecord,'offline-finance-payment-queue')
+    tx.oncomplete=()=>resolve();tx.onerror=()=>reject(new Error('Unable to save encrypted finance payments.'))
+  })}finally{db.close()}
+}
+
+export async function loadEncryptedFinanceQueue<T>(userId:number,deviceId:string,passphrase:string):Promise<T> {
+  if(!passphrase||passphrase.length<12)throw new Error('Enter the passphrase used to protect finance payments.')
+  if(!crypto?.subtle||typeof indexedDB==='undefined')throw new Error('Protected offline storage is unavailable.')
+  const db=await openOfflineDatabase(userId,deviceId)
+  let record:EncryptedFinanceQueueRecord|undefined
+  try{record=await new Promise((resolve,reject)=>{
+    const req=db.transaction('drafts','readonly').objectStore('drafts').get('offline-finance-payment-queue')
+    req.onsuccess=()=>resolve(req.result as EncryptedFinanceQueueRecord|undefined);req.onerror=()=>reject(new Error('Unable to read encrypted finance payments.'))
+  })}finally{db.close()}
+  if(!record) return [] as T
+  const age=Date.now()-record.updatedAt
+  if(record.version!==2||!Number.isFinite(record.updatedAt)||age<0||age>=OFFLINE_DRAFT_TTL_MS){
+    await deleteEncryptedFinanceQueue(userId,deviceId)
+    throw new Error('The offline finance queue has expired. Reconnect and prepare fresh payments.')
+  }
+  try{
+    const key=await deriveOfflineDraftKey(passphrase,new Uint8Array(record.salt))
+    const additionalData=new TextEncoder().encode('schoolbridge-offline-finance-queue-v2:'+record.updatedAt)
+    const plaintext=await crypto.subtle.decrypt({name:'AES-GCM',iv:asArrayBuffer(new Uint8Array(record.iv)),additionalData:asArrayBuffer(additionalData)},key,asArrayBuffer(new Uint8Array(record.ciphertext)))
+    return JSON.parse(new TextDecoder().decode(plaintext)) as T
+  }catch{throw new Error('Unable to unlock finance payments. Check the passphrase and try again.')}
+}
+
+export async function deleteEncryptedFinanceQueue(userId:number,deviceId:string) {
+  const db=await openOfflineDatabase(userId,deviceId)
+  try{await new Promise<void>((resolve,reject)=>{
+    const tx=db.transaction('drafts','readwrite');tx.objectStore('drafts').delete('offline-finance-payment-queue')
+    tx.oncomplete=()=>resolve();tx.onerror=()=>reject(new Error('Unable to clear offline finance payments.'))
+  })}finally{db.close()}
+}
