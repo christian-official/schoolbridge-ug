@@ -179,7 +179,7 @@ test('real Chromium completes the first-install owner activation and school setu
     await page.getByRole('button', { name: 'Activate installation' }).click()
     await page.getByRole('heading', { name: 'Set up your school' }).waitFor()
     assert.deepEqual(activationPayload, { license: 'signed-owner-license-token' })
-    assert.equal(await page.getByLabel('Confirm owner-signed activation license').inputValue(), 'signed-owner-license-token')
+    assert.equal(await page.getByLabel('Confirm CHRISTIAN Owner Key activation code').inputValue(), 'signed-owner-license-token')
     await page.setViewportSize({ width: 360, height: 800 })
     const schoolSetupLayout = await page.evaluate(() => ({ viewport: innerWidth, document: document.documentElement.scrollWidth }))
     assert.ok(schoolSetupLayout.document <= schoolSetupLayout.viewport, `school setup page must fit mobile viewport: ${JSON.stringify(schoolSetupLayout)}`)
@@ -190,8 +190,8 @@ test('real Chromium completes the first-install owner activation and school setu
     // before the first administrator is created.
     await page.reload({ waitUntil: 'networkidle' })
     await page.getByRole('heading', { name: 'Set up your school' }).waitFor()
-    assert.equal(await page.getByLabel('Confirm owner-signed activation license').inputValue(), '')
-    await page.getByLabel('Confirm owner-signed activation license').fill('signed-owner-license-token')
+    assert.equal(await page.getByLabel('Confirm CHRISTIAN Owner Key activation code').inputValue(), '')
+    await page.getByLabel('Confirm CHRISTIAN Owner Key activation code').fill('signed-owner-license-token')
 
     await page.getByLabel('Official school name *').fill('River Valley School')
     await page.getByLabel('School type *').selectOption('Combined')
