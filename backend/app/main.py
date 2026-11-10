@@ -2325,9 +2325,12 @@ def confirm_password_reset(data: PasswordResetConfirm, db: Session = Depends(get
 
 
 @app.get("/api/auth/me", tags=["Authentication"])
-def current_account(user=Depends(get_current_user)):
+def current_account(user=Depends(get_current_user), db: Session = Depends(get_db)):
+    staff_profile = db.get(models.StaffMember, user.staff_id) if user.staff_id else None
+    profile_complete = bool(staff_profile and staff_profile.first_name.strip() and staff_profile.last_name.strip() and staff_profile.photo_data)
     return {
         "id": user.id,
+        "staff_profile_complete": profile_complete if user.role in {"teacher", "staff"} else True,
         "username": user.username,
         "email": user.email,
         "role": user.role,
