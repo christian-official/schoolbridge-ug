@@ -84,7 +84,7 @@ def main() -> None:
     if args.expires_at:
         claims["expires_at"] = args.expires_at
     payload = json.dumps(claims, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    print(encode(payload) + "." + encode(key.sign(payload)))
+    print("CHRISTIAN:" + encode(payload) + "." + encode(key.sign(payload)))
 
 
 if __name__ == "__main__":
