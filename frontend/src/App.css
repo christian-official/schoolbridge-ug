@@ -2392,3 +2392,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .first-setup-confirmation p{margin:0;color:#64748b;font-size:12px;line-height:1.5}
 .first-setup-confirmation label{display:flex;align-items:flex-start;gap:9px;font-size:12px;line-height:1.5}
 .first-setup-confirmation input{width:auto;min-width:16px;margin:2px 0 0}
+
+.profile-card-open { display:flex; align-items:center; gap:10px; min-width:0; flex:1; padding:0; border:0; background:transparent; color:inherit; text-align:left; cursor:pointer; }
+.profile-card-open:hover .profile-info strong { color:var(--blue); }
+.top-user-name,.top-avatar { display:none !important; }
