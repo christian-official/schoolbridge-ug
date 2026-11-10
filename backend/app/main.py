@@ -4634,7 +4634,7 @@ def submit_offline_finance_payment(data: OfflineFinancePaymentCreate, db: Sessio
             receipt_number="RCPT-" + str(date.today().year) + "-" + uuid4().hex[:8].upper())
         db.add(payment)
         db.flush()
-        proposal.resolution = json.dumps({"payment_id": payment.id, "receipt_number": payment.receipt_number})
+        proposal.conflict_sequence = payment.id
         parent_ids = [row[0] for row in db.query(models.ParentStudentLink.user_id).filter_by(student_id=charge.student_id).all()]
         db.add(models.SyncChange(entity_type="FeePayment", entity_id=payment.id, operation="create",
             scope_json=json.dumps({"parent_user_ids": parent_ids})))
