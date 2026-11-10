@@ -2123,6 +2123,17 @@ def test_first_install_requires_activation_and_creates_admin_atomically(monkeypa
             assert db.query(models.AuditLog).filter_by(action="school_first_setup_completed").count() == 1
 
 
+def test_fresh_install_blocks_school_records_until_setup_is_complete():
+    reset_new_installation()
+    with TestClient(app) as client:
+        students = client.get("/api/students")
+        profile = client.get("/api/settings/school-profile")
+        assert students.status_code == 403
+        assert profile.status_code == 403
+        assert "first-time setup" in students.json()["detail"].lower()
+        assert "first-time setup" in profile.json()["detail"].lower()
+
+
 def test_invalid_activation_license_is_rejected(monkeypatch):
     reset_new_installation()
     monkeypatch.delenv("SCHOOLBRIDGE_LICENSE_PUBLIC_KEY", raising=False)
