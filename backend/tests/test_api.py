@@ -1697,7 +1697,7 @@ def test_sync_exam_and_mark_snapshots_filter_teacher_subjects_and_parent_verific
         child = models.Student(admission_number="EX-SYNC-1", first_name="A", last_name="One", class_id=school_class.id)
         other = models.Student(admission_number="EX-SYNC-2", first_name="B", last_name="Two", class_id=other_class.id)
         parent = models.User(username="exam-parent", email="exam-parent@example.invalid", hashed_password=password_hash.hash("ParentPassword123!"), role="parent", is_active=True)
-        exam = models.Exam(name="Mid Term", term="Term 1", year=2026, class_id=school_class.id)
+        exam = models.Exam(name="Mid Term", term="Term 1", year=2026, class_id=school_class.id, closed=True)
         other_exam = models.Exam(name="Mid Term Other Class", term="Term 1", year=2026, class_id=other_class.id)
         db.add_all([child, other, parent, exam, other_exam])
         db.flush()
