@@ -18,7 +18,9 @@ try {
     docker save -o (Join-Path $PackageDir "schoolbridge-images.tar") postgres:16-alpine schoolbridge/backend:local schoolbridge/frontend:local
     if ($LASTEXITCODE -ne 0) { throw "Could not export container images." }
 
-    Copy-Item $ComposeFile (Join-Path $PackageDir "docker-compose.yml") -Force
+    $PackageCompose = Get-Content $ComposeFile -Raw
+    $PackageCompose = [regex]::Replace($PackageCompose, '(?m)^    build:\r?\n      context: \./(backend|frontend)\r?\n', '')
+    Set-Content (Join-Path $PackageDir "docker-compose.yml") $PackageCompose -Encoding UTF8
     Copy-Item (Join-Path $PSScriptRoot "install-schoolbridge.ps1") $PackageDir -Force
     @'
 # Add the owner's Base64 public verification key before starting SchoolBridge.
