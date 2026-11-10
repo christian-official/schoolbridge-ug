@@ -131,7 +131,14 @@ function getStaffNavigation(user:User) {
   })
 }
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
+const configuredApiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
+// Keep the deployed static site connected to its dedicated API even if a Render
+// build is triggered without the VITE_API_BASE_URL build-time variable.
+const API_BASE_URL = configuredApiBaseUrl || (
+  typeof window !== 'undefined' && window.location.hostname === 'schoolbridge-ug-1.onrender.com'
+    ? 'https://schoolbridge-ug.onrender.com'
+    : ''
+)
 
 async function api<T>(path: string, token: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_BASE_URL}/api/${path}`, {
