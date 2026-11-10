@@ -14,6 +14,7 @@ import OperationsManagement from './OperationsManagement'
 import Phase4Workspace from './Phase4Workspace'
 import ParentLiaisonWorkspace from './ParentLiaison'
 import SyncDevices from './SyncDevices'
+import VisitorRegister from './VisitorRegister'
 import { clearLocalSyncData, saveEncryptedOfflineDraft, loadEncryptedOfflineDraft, deleteEncryptedOfflineDraft, loadEncryptedOfflineSnapshot } from './syncStorage'
 import './App.css'
 import './DashboardRedesign.css'
@@ -76,6 +77,7 @@ const menu = [
   { label: 'Announcements', icon: FileText },
   { label: 'Parent Liaison', icon: MessageSquareText },
   { label: 'School Community', icon: Users },
+  { label: 'Visitor Register', icon: ShieldCheck },
 ]
 const teacherMenu = [
   { label: 'My Classes', icon: BookOpen },
@@ -108,6 +110,7 @@ function getStaffNavigation(user:User) {
     item.label === 'Overview' ||
     item.label === 'My Profile' ||
     item.label === 'My Attendance' ||
+    (item.label === 'Visitor Register' && /gatekeeper|security/.test((user.role_label || '').toLowerCase())) ||
     (user.permissions?.[item.label] || []).includes('view') ||
     (item.label === 'Attendance' && (user.permissions?.['Staff Attendance'] || []).includes('view'))
   )
@@ -124,7 +127,9 @@ function getStaffNavigation(user:User) {
         ? ['Overview','Fees & Finance','My Attendance','My Profile']
         : /academic|director of studies|\bdos\b|deputy|headteacher|examination/.test(role)
           ? ['Overview','Timetable','Staff','Examinations','Attendance','Students','Reports','Announcements','My Attendance','My Profile']
-          : ['Overview','Staff','Attendance','Timetable','Leadership & Duty','Announcements','Reports','My Attendance','My Profile']
+          : /gatekeeper|security/.test(role)
+      ? ['Overview','Visitor Register','My Attendance','My Profile']
+      : ['Overview','Staff','Attendance','Timetable','Leadership & Duty','Announcements','Reports','My Attendance','My Profile']
   return visible.sort((a,b) => {
     const ai=priority.indexOf(a.label), bi=priority.indexOf(b.label)
     return (ai<0?999:ai)-(bi<0?999:bi)
@@ -1330,8 +1335,10 @@ function App() {
         <div className="sidebar-bottom">
           {user.role === 'admin' && <button className="nav-item" onClick={() => { if (active !== 'Settings') setActive('Settings') }}><Settings size={19} /> Settings</button>}
           <div className="profile-card">
-            <div className="avatar">{user.username.slice(0, 1).toUpperCase()}</div>
-            <div className="profile-info"><strong>{user.username}</strong><small>{user.role}</small></div>
+            <button type="button" className="profile-card-open" onClick={() => { if (user.role !== 'admin' && user.role !== 'parent') setActive('My Profile') }} aria-label="Open my profile">
+              <div className="avatar">{user.username.slice(0, 1).toUpperCase()}</div>
+              <div className="profile-info"><strong>{user.username}</strong><small>{user.role}</small></div>
+            </button>
             <button className="logout-button" title="Sign out" onClick={logout}><LogOut size={18} /></button>
           </div>
         </div>
@@ -1353,8 +1360,7 @@ function App() {
               {isRefreshing ? <LoaderCircle className="spin" size={15} /> : <RefreshCw size={15} />}
               {isRefreshing ? 'Refreshing...' : 'Refresh'}
             </button>
-            <span className="top-user-name">{user.username}</span>
-            <div className="top-avatar">{user.username.slice(0, 1).toUpperCase()}</div>
+
           </div>
         </header>
 
@@ -1379,6 +1385,7 @@ function App() {
 
           {active === 'Parent Liaison' && <ParentLiaisonWorkspace token={token} role={user.role} />}
           {active === 'School Community' && <SchoolCommunityWorkspace token={token} />}
+          {active === 'Visitor Register' && <VisitorRegister token={token} isAdmin={user.role === 'admin'} />}
           {active === 'Device Management' && <SyncDevices token={token} userId={user.id} isAdmin={user.role === 'admin'} />}
           {active === 'Overview' && user.role === 'admin' && <AdministratorDashboard token={token} username={user.username} onNavigate={setActive} summary={dashboardSummary} financeSummary={financeDashboard} availableSections={['Students','Staff','Fees & Finance','Examinations','Attendance','Timetable','Leadership & Duty','Parent Access','Parent Liaison','Announcements','Reports']}/>} 
 
