@@ -1,8 +1,9 @@
-"""Owner-only offline Ed25519 license utility. Keep private keys outside the repository."""
+"""CHRISTIAN Owner Key utility. Keep the encrypted private key outside the repository."""
 import argparse
 import base64
 import json
 import os
+from getpass import getpass
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -14,11 +15,11 @@ def encode(value: bytes) -> str:
     return base64.urlsafe_b64encode(value).decode("ascii").rstrip("=")
 
 
-def write_private_key(path: Path, value: bytes) -> None:
+def write_private_key(path: Path, value: bytes, passphrase: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(descriptor, "wb") as output:
-        output.write(base64.b64encode(value))
+        output.write(value)
 
 
 def write_public_key(path: Path, value: bytes) -> None:
@@ -53,18 +54,23 @@ def main() -> None:
             parser.error("--private-key and --public-key must be different files.")
         if private_path.exists() or public_path.exists():
             parser.error("Key output files must not already exist; refusing to overwrite an existing key.")
+        passphrase = getpass("Create a strong private-key passphrase: ")
+        if len(passphrase) < 14:
+            parser.error("The private-key passphrase must be at least 14 characters.")
+        if passphrase != getpass("Confirm private-key passphrase: "):
+            parser.error("Passphrases do not match.")
         key = Ed25519PrivateKey.generate()
-        private = key.private_bytes(serialization.Encoding.Raw, serialization.PrivateFormat.Raw, serialization.NoEncryption())
+        private = key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.BestAvailableEncryption(passphrase.encode("utf-8")))
         public = key.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
-        write_private_key(private_path, private)
+        write_private_key(private_path, private, passphrase)
         write_public_key(public_path, public)
         print("Private key created with owner-only permissions. Keep it offline and never upload it.")
         print("Configure SCHOOLBRIDGE_LICENSE_PUBLIC_KEY with this public key value:")
         print(base64.b64encode(public).decode("ascii"))
         return
 
-    private_bytes = base64.b64decode(Path(args.private_key).read_bytes(), validate=True)
-    key = Ed25519PrivateKey.from_private_bytes(private_bytes)
+    passphrase = getpass("Private-key passphrase: ")
+    key = serialization.load_pem_private_key(Path(args.private_key).read_bytes(), password=passphrase.encode("utf-8"))
     claims = {
         "product": "SchoolBridge",
         "installation_id": args.installation_id,
