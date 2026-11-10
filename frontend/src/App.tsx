@@ -1942,7 +1942,7 @@ function SchoolCommunityWorkspace({token}:{token:string}) {
 
 function SchoolProfileSettings({token,onSaved}:{token:string;onSaved:()=>void}) {
   const [profileTab,setProfileTab]=useState<'identity'|'contact'|'houses'|'branding'>('identity')
-  const [form,setForm]=useState({name:'',address:'',phone:'',email:'',motto:'',school_type:'Secondary',country:'',school_structure:'Day',a_level_combinations:'',o_level_optional_subjects:'',a_level_subsidiary_subjects:'',report_logo:'',house_names:''})
+  const [form,setForm]=useState({name:'',address:'',phone:'',email:'',motto:'',school_type:'Secondary',country:'',school_structure:'',a_level_combinations:'',o_level_optional_subjects:'',a_level_subsidiary_subjects:'',report_logo:'',house_names:''})
   const [identityLocked,setIdentityLocked]=useState(false)
   const [message,setMessage]=useState('')
   const [error,setError]=useState('')
@@ -1960,7 +1960,7 @@ function SchoolProfileSettings({token,onSaved}:{token:string;onSaved:()=>void}) 
       setForm({
         name:p.name||'',address:p.address||'',phone:p.phone||'',email:p.email||'',house_names:p.house_names||'',
         motto:p.motto||'',school_type:p.school_type||'Secondary',
-        country:p.country||'',school_structure:p.school_structure||'Day',
+        country:p.country||'',school_structure:p.school_structure||'',
         a_level_combinations:p.a_level_combinations||'',
         o_level_optional_subjects:p.o_level_optional_subjects||'',
         a_level_subsidiary_subjects:p.a_level_subsidiary_subjects||'',report_logo:p.report_logo||''
@@ -2003,7 +2003,7 @@ function SchoolProfileSettings({token,onSaved}:{token:string;onSaved:()=>void}) 
           <label className="field-span-full">Official school name *<input required disabled={identityLocked} maxLength={160} autoComplete="organization" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} placeholder="Enter the registered school name"/></label>
           <label>School type *<select required disabled={identityLocked} value={form.school_type} onChange={e=>setForm({...form,school_type:e.target.value})}><option value="Primary">Primary</option><option value="Secondary">Secondary</option><option value="Combined">Combined</option></select><small className="field-hint">This controls the class options and academic levels used during student registration.</small></label>
           <label>Country *<input required disabled={identityLocked} maxLength={80} value={form.country} onChange={e=>setForm({...form,country:e.target.value})} placeholder="Country"/></label>
-          <label>School structure *<select disabled={identityLocked} value={form.school_structure} onChange={e=>setForm({...form,school_structure:e.target.value})}><option>Day</option><option>Boarding</option><option>Both</option></select></label>
+          <label>School structure<select disabled={identityLocked} value={form.school_structure} onChange={e=>setForm({...form,school_structure:e.target.value})}><option value="">Not specified</option><option>Day</option><option>Boarding</option><option>Both</option></select></label>
           <label>School motto<input maxLength={200} value={form.motto} onChange={e=>setForm({...form,motto:e.target.value})} placeholder="Enter the school motto (optional)"/></label>
         </div>
       </div>

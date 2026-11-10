@@ -4912,6 +4912,9 @@ def save_school_profile(data: SchoolProfileUpdate, db: Session = Depends(get_db)
         profile = models.SchoolProfile(id=1)
         db.add(profile)
     updates = data.model_dump(exclude_unset=True)
+    for optional_identity_field in ("country", "school_structure"):
+        if optional_identity_field in updates and not updates[optional_identity_field]:
+            updates[optional_identity_field] = None
     state = db.get(models.SchoolSetupState, 1)
     if state and state.setup_completed_at and state.original_identity_json:
         original = json.loads(state.original_identity_json)
