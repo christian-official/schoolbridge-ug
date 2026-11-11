@@ -4606,8 +4606,14 @@ def submit_offline_finance_payment(data: OfflineFinancePaymentCreate, db: Sessio
                 and old.base_sequence == data.base_sequence and old.payload_json == payload)
         if not same:
             raise HTTPException(409, "Idempotency key already used for different payment content.")
-        return {"proposal_id": old.id, "status": old.status, "duplicate": True,
-                "applied": old.status == "applied", "payment_id": old.conflict_sequence}
+        return {
+            "proposal_id": old.id,
+            "status": old.status,
+            "duplicate": True,
+            "applied": old.status == "applied",
+            "payment_id": old.conflict_sequence if old.status == "applied" else None,
+            "conflict_sequence": old.conflict_sequence if old.status == "conflict" else None,
+        }
     charge = db.query(models.FeeCharge).filter_by(id=data.charge_id).with_for_update().first()
     if not charge:
         raise HTTPException(404, "Fee charge not found.")

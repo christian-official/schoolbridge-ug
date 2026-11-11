@@ -404,6 +404,79 @@ def test_offline_finance_payment_is_idempotent_and_respects_balance():
             db.close()
 
 
+def test_offline_finance_conflict_retry_does_not_return_sequence_as_payment_id():
+    reset_database()
+    admin = create_admin()
+    headers = {"Authorization": f"Bearer {create_access_token(admin)}"}
+    db = SessionLocal()
+    try:
+        student = models.Student(
+            admission_number="OFFLINE-FEE-CONFLICT-001",
+            first_name="Amina", last_name="Learner",
+        )
+        db.add(student)
+        db.flush()
+        charge = models.FeeCharge(
+            student_id=student.id, term="Term 1", year=2026, amount=100000,
+        )
+        db.add(charge)
+        db.commit()
+        charge_id = charge.id
+    finally:
+        db.close()
+
+    device_id = "00000000-0000-4000-8000-000000000812"
+    with TestClient(app) as client:
+        registered = client.post(
+            "/api/sync/devices", headers=headers,
+            json={"device_id": device_id, "device_name": "Offline conflict device"},
+        )
+        assert registered.status_code == 200, registered.text
+        snapshot = client.get(f"/api/sync/fees?device_id={device_id}", headers=headers)
+        assert snapshot.status_code == 200, snapshot.text
+        base_sequence = snapshot.json()["snapshot_sequence"]
+
+        db = SessionLocal()
+        try:
+            charge = db.get(models.FeeCharge, charge_id)
+            charge.amount = 120000
+            db.commit()
+        finally:
+            db.close()
+
+        body = {
+            "device_id": device_id,
+            "idempotency_key": "offline-fee-conflict-001",
+            "charge_id": charge_id,
+            "amount": 60000,
+            "payment_date": "2026-11-11",
+            "method": "Cash",
+            "reference": "OFFLINE-CONFLICT-001",
+            "base_sequence": base_sequence,
+        }
+        first = client.post("/api/sync/finance-payments", headers=headers, json=body)
+        assert first.status_code == 200, first.text
+        assert first.json()["status"] == "conflict"
+        assert first.json()["applied"] is False
+        assert first.json()["payment_id"] is None
+        conflict_sequence = first.json()["conflict_sequence"]
+        assert conflict_sequence is not None
+
+        retry = client.post("/api/sync/finance-payments", headers=headers, json=body)
+        assert retry.status_code == 200, retry.text
+        assert retry.json()["duplicate"] is True
+        assert retry.json()["status"] == "conflict"
+        assert retry.json()["applied"] is False
+        assert retry.json()["payment_id"] is None
+        assert retry.json()["conflict_sequence"] == conflict_sequence
+
+        db = SessionLocal()
+        try:
+            assert db.query(models.FeePayment).filter_by(charge_id=charge_id).count() == 0
+        finally:
+            db.close()
+
+
 def test_fee_payment_amount_must_be_positive():
     reset_database()
     admin = create_admin()
