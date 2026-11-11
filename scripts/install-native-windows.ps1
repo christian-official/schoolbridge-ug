@@ -1,5 +1,5 @@
-#requires -RunAsAdministrator
 param([string]$LicensePublicKey)
+#requires -RunAsAdministrator
 $ErrorActionPreference="Stop"
 $os=Get-CimInstance Win32_OperatingSystem
 $build=[int]$os.BuildNumber
