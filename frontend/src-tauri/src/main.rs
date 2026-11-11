@@ -240,7 +240,7 @@ fn start_backend() -> Result<ManagedBackend, String> {
         .env("SCHOOLBRIDGE_STATIC_DIR", &static_dir)
         // Restrict cross-origin access to the packaged Tauri WebView and the
         // loopback Vite origin used by desktop development.
-        .env("SCHOOLBRIDGE_CORS_ORIGINS", "http://tauri.localhost,http://localhost:5173")
+        .env("SCHOOLBRIDGE_CORS_ORIGINS", "http://tauri.localhost,http://localhost:5173,http://127.0.0.1:5173")
         .stdout(Stdio::from(log))
         .stderr(Stdio::from(error_log))
         .spawn()
