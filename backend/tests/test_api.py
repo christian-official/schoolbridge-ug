@@ -3049,3 +3049,20 @@ def test_sync_change_feed_rejects_invalid_and_undelivered_cursors():
         assert client.get(f"/api/sync/changes?device_id={device}&cursor=-1", headers=headers).status_code == 422
         assert client.get(f"/api/sync/changes?device_id={device}&limit=501", headers=headers).status_code == 422
         assert client.get(f"/api/sync/changes?device_id={device}&cursor=1", headers=headers).status_code == 409
+
+
+def test_sync_change_feed_cannot_be_read_through_another_users_device():
+    reset_database()
+    admin = create_admin()
+    teacher = create_teacher()
+    admin_headers = {"Authorization": f"Bearer {create_access_token(admin)}"}
+    teacher_headers = {"Authorization": f"Bearer {create_access_token(teacher)}"}
+    device = "00000000-0000-4000-8000-000000000502"
+    with TestClient(app) as client:
+        registered = client.post(
+            "/api/sync/devices", headers=admin_headers,
+            json={"device_id": device, "device_name": "Owner isolation"},
+        )
+        assert registered.status_code == 200
+        denied = client.get(f"/api/sync/changes?device_id={device}", headers=teacher_headers)
+        assert denied.status_code == 403
