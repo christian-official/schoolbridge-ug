@@ -10,7 +10,9 @@
     "preview": "vite preview",
     "test:offline": "node --test tests/service-worker.test.js",
     "test:pwa": "node --test tests/pwa.test.js",
-    "test:offline:browser": "node --test tests/service-worker.browser.test.js"
+    "test:offline:browser": "node --test tests/service-worker.browser.test.js",
+    "build:legacy-client": "vite build --target firefox115 --outDir dist-legacy",
+    "preview:legacy": "vite preview --outDir dist-legacy"
   },
   "dependencies": {
     "lucide-react": "^1.70.0",

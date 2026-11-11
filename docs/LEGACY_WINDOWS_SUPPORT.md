@@ -134,7 +134,7 @@ The repository uses Vite 8. Its documented default production browser target inc
 A review of the current frontend manifest and CI workflow found these concrete validation gaps:
 
 - The frontend currently uses React 19.3, Vite 8.3 and TypeScript 7. The project does not currently declare a dedicated legacy-browser build target in its Vite configuration.
-- The frontend CI job runs the offline browser suite in Playwright Chromium only. It does not run Firefox, and it does not run Firefox ESR 115.
+- The frontend now has a separate `build:legacy-client` output targeting Firefox 115, without changing the modern production bundle. CI boots that dedicated output in Playwright Firefox for a legacy-client API smoke test. The CI browser is the Playwright-pinned Firefox build, not Mozilla Firefox ESR 115; the Windows 8/8.1 ESR 115 machine acceptance remains outstanding.
 - Therefore, the Firefox 114 Vite default target is only a build/transpilation baseline. It is not evidence that SchoolBridge's React application, browser APIs, service worker, IndexedDB, Web Crypto, file uploads or printing work on Firefox ESR 115 on Windows 8/8.1.
 - Do not lower the global build target or replace current browser dependencies just to obtain a nominal legacy-browser build. First add a separate compatibility build/test lane and identify unsupported APIs. Any polyfill must be narrowly scoped, maintained and covered by tests.
 
