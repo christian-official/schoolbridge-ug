@@ -36,9 +36,17 @@ const isTauriDesktop = typeof window !== 'undefined' && (
   window.location.hostname === 'tauri.localhost' ||
   window.location.protocol === 'tauri:'
 )
+function isPrivateLanAddress(hostname: string): boolean {
+  const octets = hostname.split('.').map(part => /^\\d{1,3}$/.test(part) ? Number(part) : -1)
+  if (octets.length !== 4 || octets.some(part => part < 0 || part > 255)) return false
+  const [first, second] = octets
+  return first === 10 || (first === 172 && second >= 16 && second <= 31) || (first === 192 && second === 168)
+}
+const isSchoolBridgeLanClient = typeof window !== 'undefined' &&
+  window.location.protocol === 'https:' && isPrivateLanAddress(window.location.hostname)
 const API_BASE_URL = isTauriDesktop
   ? 'http://127.0.0.1:8080'
-  : (import.meta.env.VITE_API_BASE_URL || '')
+  : (isSchoolBridgeLanClient ? '' : (import.meta.env.VITE_API_BASE_URL || ''))
 
 function deviceStorageKey(userId: number) {
   return 'schoolbridge-sync-device-' + userId
