@@ -860,6 +860,51 @@ mod tests {
             "backend startup attempts must never overlap");
     }
 
+    #[cfg(windows)]
+    #[test]
+    fn managed_backend_shutdown_terminates_and_reaps_backend_and_lan_children() {
+        use std::process::{Command, Stdio};
+        use windows_sys::Win32::{
+            Foundation::CloseHandle,
+            System::Threading::{GetExitCodeProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION},
+        };
+
+        let spawn_listener = || {
+            Command::new("cmd.exe")
+                .args(["/C", "ping -n 30 127.0.0.1 >NUL"])
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn()
+                .expect("start lifecycle test listener")
+        };
+
+        let backend = spawn_listener();
+        let backend_pid = backend.id();
+        let job = super::JobGuard::attach(backend_pid).expect("attach backend child to job");
+        let lan = spawn_listener();
+        let lan_pid = lan.id();
+        job.attach_additional(lan_pid).expect("attach LAN child to same job");
+
+        super::ManagedBackend {
+            children: vec![backend, lan],
+            lan: None,
+            _job: job,
+        }.stop();
+
+        for pid in [backend_pid, lan_pid] {
+            unsafe {
+                let process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
+                assert!(!process.is_null(), "could not inspect stopped child {pid}");
+                let mut exit_code = 0_u32;
+                let inspected = GetExitCodeProcess(process, &mut exit_code);
+                CloseHandle(process);
+                assert_ne!(inspected, 0, "could not read child {pid} exit status");
+                assert_ne!(exit_code, 259, "child {pid} remained active after desktop shutdown");
+            }
+        }
+    }
+
     #[test]
     fn backend_health_failures_require_three_consecutive_checks() {
         let mut failures = 0;
