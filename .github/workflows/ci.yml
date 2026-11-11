@@ -10,9 +10,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: schoolbridge-ci-${{ github.ref }}
+  # Isolate each run so separate pushes/manual runs can execute concurrently.
+  group: schoolbridge-ci-${{ github.ref }}-${{ github.run_id }}
   cancel-in-progress: false
-  queue: max
 
 jobs:
   backend-tests:
