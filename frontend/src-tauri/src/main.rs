@@ -532,7 +532,7 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::is_healthy_response;
+    use super::{is_healthy_response, Ipv4Addr};
 
     #[test]
     fn lan_listener_is_disabled_by_default() {
