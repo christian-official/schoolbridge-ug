@@ -698,6 +698,7 @@ class SubjectOut(SubjectCreate):
 
 class StudentOut(StudentCreate):
     id: int
+    status: str = "active"
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -4255,9 +4256,15 @@ def upgrade_class_stream_uniqueness():
 upgrade_class_stream_uniqueness()
 
 @app.get("/api/students/search", tags=["Students"])
-def search_students(page: int = 1, page_size: int = 25, search: str = "", class_id: int | None = None, db: Session = Depends(get_db)):
+def search_students(page: int = 1, page_size: int = 25, search: str = "", class_id: int | None = None, status: str = "active", db: Session = Depends(get_db), user=Depends(get_current_user)):
+    if status not in {"active", "dismissed", "transferred", "inactive", "all"}:
+        raise HTTPException(422, "Choose a valid student status.")
+    if status != "active" and user.role != "admin" and "view" not in user_permissions(user).get("Students", set()):
+        raise HTTPException(403, "You do not have permission to view student history.")
     page_size = min(max(page_size, 1), 100)
-    query = db.query(models.Student).filter(models.Student.status == "active")
+    query = db.query(models.Student)
+    if status != "all":
+        query = query.filter(models.Student.status == status)
     if search.strip():
         term = "%" + search.strip() + "%"
         query = query.filter(or_(models.Student.admission_number.ilike(term), models.Student.first_name.ilike(term), models.Student.middle_name.ilike(term), models.Student.last_name.ilike(term)))
