@@ -32,6 +32,9 @@ jobs:
       - name: Compile standalone Tauri desktop shell
         working-directory: frontend
         run: npm run desktop:build
+      - name: Test desktop backend lifecycle health validation
+        working-directory: frontend
+        run: cargo test --manifest-path src-tauri/Cargo.toml
       - name: Publish standalone desktop executable
         uses: actions/upload-artifact@v4
         with:
