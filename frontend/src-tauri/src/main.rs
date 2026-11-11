@@ -809,6 +809,10 @@ mod tests {
             .expect("start long-running lifecycle test child");
         let pid = child.id();
         let job = super::JobGuard::attach(pid).expect("attach child to job");
+        // Retain a process handle before shutdown; reopening by PID after exit
+        // is unreliable because Windows may already have discarded PID lookup.
+        let process = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) };
+        assert!(!process.is_null(), "could not open child process before shutdown");
         super::ManagedBackend {
             children: vec![child],
             lan: None,
@@ -816,8 +820,6 @@ mod tests {
         }.stop();
 
         unsafe {
-            let process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
-            assert!(!process.is_null(), "could not inspect stopped child process");
             let mut exit_code = 0_u32;
             let inspected = GetExitCodeProcess(process, &mut exit_code);
             CloseHandle(process);
