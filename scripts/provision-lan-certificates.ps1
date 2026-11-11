@@ -13,8 +13,10 @@ if (-not (Test-Path $EnvFile -PathType Leaf)) { throw "Installed SchoolBridge .e
 $null = New-Item -ItemType Directory -Force -Path $SecretDir
 # The CA and server private keys are readable only by the installing operator and SYSTEM.
 $identity = [Security.Principal.WindowsIdentity]::GetCurrent().Name
-& icacls.exe $SecretDir /inheritance:r /grant:r "$($identity):(OI)(CI)F" "SYSTEM:(OI)(CI)F" | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "Could not restrict permissions on the LAN certificate directory." }
+& icacls.exe $SecretDir /reset /T /C | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "Could not reset existing LAN certificate directory permissions." }
+& icacls.exe $SecretDir /inheritance:r /grant:r "$($identity):(OI)(CI)F" "SYSTEM:(OI)(CI)F" /T /C | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "Could not restrict permissions on the LAN certificate directory and its existing files." }
 $export = Join-Path ([Environment]::GetFolderPath("Desktop")) "SchoolBridge-LAN-Root-CA.pem"
 & $Python $Provisioner --bind-ip $BindAddress --secret-dir $SecretDir --env-file $EnvFile --export-ca $export
 if ($LASTEXITCODE -ne 0) { throw "LAN certificate provisioning failed. LAN remains disabled." }

@@ -2,11 +2,9 @@ import importlib.util
 import ipaddress
 import tempfile
 import unittest
-from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from cryptography import x509
-from cryptography.hazmat.primitives import serialization
 from cryptography.x509.oid import ExtendedKeyUsageOID
 
 MODULE_PATH = Path(__file__).parents[2] / "scripts" / "provision-lan-certificates.py"
