@@ -23,8 +23,9 @@ The backend log is written to
 `%LOCALAPPDATA%\SchoolBridge\logs\backend.log`.
 
 The manager refuses to attach to an unrelated process already listening on the
-configured port. It never binds the backend to a LAN interface; local-network
-access is a separate, explicitly secured project task.
+configured loopback port. The loopback backend remains bound only to
+`127.0.0.1`; optional school-network access uses the separate HTTPS LAN listener
+described below.
 
 This lifecycle foundation does not by itself package the runtime, configure
 frontend API routing, or establish Windows 8/8.1 compatibility. Those remain
