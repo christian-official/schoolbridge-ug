@@ -563,8 +563,8 @@ mod tests {
         let config = super::configured_lan(&env_file, &install).unwrap().unwrap();
         assert_eq!(config.bind_ip, "192.168.1.20".parse().unwrap());
         assert_eq!(config.port, 8443);
-        assert_eq!(config.cert_file, cert);
-        assert_eq!(config.key_file, key);
+        assert_eq!(config.cert_file, cert.canonicalize().unwrap());
+        assert_eq!(config.key_file, key.canonicalize().unwrap());
         let _ = std::fs::remove_dir_all(dir);
     }
 
