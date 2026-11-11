@@ -1323,6 +1323,8 @@ function App() {
   }
 
   function logout() {
+    const activeToken = token
+    if (activeToken) void api('auth/logout', activeToken, { method: 'POST' }).catch(() => {})
     sessionStorage.removeItem('sb_token')
     setToken('')
     setUser(null)

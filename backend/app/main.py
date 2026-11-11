@@ -63,6 +63,14 @@ TOKEN_HOURS = 8
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 
+def token_version_matches(payload, user) -> bool:
+    """Reject tokens issued before the account's most recent session revocation."""
+    try:
+        return int(payload.get("ver", 0)) == int(getattr(user, "token_version", 0) or 0)
+    except (TypeError, ValueError):
+        return False
+
+
 def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
@@ -75,6 +83,8 @@ def get_current_user(
     user = db.get(models.User, user_id)
     if not user or not user.is_active:
         raise HTTPException(401, "Account is unavailable.")
+    if not token_version_matches(payload, user):
+        raise HTTPException(401, "Invalid or expired login token.")
     return user
 
 
@@ -1423,6 +1433,7 @@ def create_access_token(user):
     payload = {
         "sub": str(user.id),
         "role": user.role,
+        "ver": int(getattr(user, "token_version", 0) or 0),
         "exp": expires,
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
@@ -1934,6 +1945,10 @@ async def protect_school_data(request: Request, call_next):
             return JSONResponse(
                 {"detail": "Account is unavailable."}, status_code=401
             )
+        if not token_version_matches(payload, user):
+            return JSONResponse(
+                {"detail": "Invalid or expired login token."}, status_code=401
+            )
 
         if user.must_change_password and path not in {"/api/auth/me", "/api/me/password"}:
             return JSONResponse({"detail": "Password change required. Set a new password before continuing."}, status_code=403)
@@ -2313,12 +2328,20 @@ def confirm_password_reset(data: PasswordResetConfirm, db: Session = Depends(get
     if password_hash.verify(data.new_password, user.hashed_password):
         raise HTTPException(400, "Choose a password different from your current password.")
     user.hashed_password = password_hash.hash(data.new_password)
+    user.token_version = (user.token_version or 0) + 1
     user.reset_code_hash = None
     user.reset_expires_at = None
     user.reset_attempts = 0
     user.must_change_password = False
     db.commit()
     return {"message": "Password reset successfully. You can now sign in with your new password."}
+
+
+@app.post("/api/auth/logout", tags=["Authentication"])
+def logout(user=Depends(get_current_user), db: Session = Depends(get_db)):
+    user.token_version = (user.token_version or 0) + 1
+    db.commit()
+    return {"message": "Signed out successfully."}
 
 
 @app.get("/api/auth/me", tags=["Authentication"])
@@ -5034,6 +5057,7 @@ def update_my_password(data: MyPasswordUpdate, user=Depends(get_current_user), d
     if password_hash.verify(data.new_password, user.hashed_password):
         raise HTTPException(400, "Choose a password different from your current password.")
     user.hashed_password = password_hash.hash(data.new_password)
+    user.token_version = (user.token_version or 0) + 1
     user.must_change_password = False
     user.reset_code_hash = None
     user.reset_expires_at = None

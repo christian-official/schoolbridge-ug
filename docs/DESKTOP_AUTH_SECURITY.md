@@ -1,0 +1,3 @@
+# Desktop authentication session revocation
+
+Access tokens now carry a per-account session version checked against the database on every protected request. Signing out, changing a password, or recovering a password increments that version and invalidates previously issued tokens. Existing installations receive the field through migration 0027 with a zero default. The desktop clears its local session immediately and attempts server-side revocation; an offline computer cannot notify the server until it reconnects. This does not claim local credential encryption or Windows Credential Manager integration.

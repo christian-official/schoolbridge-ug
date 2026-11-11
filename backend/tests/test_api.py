@@ -133,6 +133,36 @@ def test_admin_can_login_and_create_class():
     assert created.json()["section"] == "East"
 
 
+def test_logout_revokes_existing_access_tokens():
+    reset_database()
+    admin = create_admin()
+    token = create_access_token(admin)
+    headers = {"Authorization": f"Bearer {token}"}
+    with TestClient(app) as client:
+        before = client.get("/api/auth/me", headers=headers)
+        signed_out = client.post("/api/auth/logout", headers=headers)
+        after = client.get("/api/auth/me", headers=headers)
+    assert before.status_code == 200
+    assert signed_out.status_code == 200
+    assert after.status_code == 401
+
+
+def test_password_change_revokes_old_access_token():
+    reset_database()
+    create_admin()
+    with TestClient(app) as client:
+        login = client.post("/api/auth/login", data={"username": "test-admin", "password": "TestPassword123!"})
+        token = login.json()["access_token"]
+        headers = {"Authorization": f"Bearer {token}"}
+        changed = client.put("/api/me/password", json={
+            "current_password": "TestPassword123!",
+            "new_password": "NewTestPassword456!",
+        }, headers=headers)
+        old_session = client.get("/api/auth/me", headers=headers)
+    assert changed.status_code == 200
+    assert old_session.status_code == 401
+
+
 def test_duplicate_class_and_stream_is_rejected():
     reset_database()
     admin = create_admin()

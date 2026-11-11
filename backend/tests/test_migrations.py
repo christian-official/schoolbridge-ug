@@ -338,3 +338,12 @@ def test_partial_school_setup_state_table_gets_missing_activation_columns(tmp_pa
     assert attempts == 0
     assert installation_id == "existing-installation-id"
     assert revision == "0026_repair_school_setup_state"
+
+
+def test_user_session_version_column_is_migrated(migrated_database):
+    engine = create_engine(migrated_database)
+    columns = {item["name"]: item for item in inspect(engine).get_columns("users")}
+    engine.dispose()
+    assert "token_version" in columns
+    assert columns["token_version"]["nullable"] is False
+    assert columns["token_version"]["default"] in {"0", "'0'"}
