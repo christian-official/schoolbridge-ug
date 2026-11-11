@@ -72,6 +72,25 @@ fn clear_auth_token() -> Result<(), String> {
 
 const DEFAULT_BACKEND_PORT: u16 = 8080;
 const BACKEND_START_TIMEOUT: Duration = Duration::from_secs(90);
+const HEALTH_FAILURE_LIMIT: u8 = 3;
+
+fn health_check_failed(consecutive_failures: &mut u8) -> bool {
+    *consecutive_failures = consecutive_failures.saturating_add(1);
+    *consecutive_failures >= HEALTH_FAILURE_LIMIT
+}
+
+fn health_check_succeeded(consecutive_failures: &mut u8) {
+    *consecutive_failures = 0;
+}
+
+fn mark_restart_attempted(restart_attempted: &mut bool) -> bool {
+    if *restart_attempted {
+        false
+    } else {
+        *restart_attempted = true;
+        true
+    }
+}
 
 #[cfg(windows)]
 struct JobGuard(windows_sys::Win32::Foundation::HANDLE);
@@ -602,15 +621,12 @@ fn supervise_backend(app_handle: tauri::AppHandle) {
                         if let Some(reason) = backend.failure_reason() {
                             Some(reason)
                         } else if backend_is_healthy(DEFAULT_BACKEND_PORT) {
-                            consecutive_health_failures = 0;
+                            health_check_succeeded(&mut consecutive_health_failures);
                             None
+                        } else if health_check_failed(&mut consecutive_health_failures) {
+                            Some("The SchoolBridge backend stopped responding to health checks.".into())
                         } else {
-                            consecutive_health_failures = consecutive_health_failures.saturating_add(1);
-                            if consecutive_health_failures >= 3 {
-                                Some("The SchoolBridge backend stopped responding to health checks.".into())
-                            } else {
-                                None
-                            }
+                            None
                         }
                     }
                     None => Some("The SchoolBridge backend process group is unavailable.".into()),
@@ -631,7 +647,7 @@ fn supervise_backend(app_handle: tauri::AppHandle) {
                 break;
             }
 
-            if restart_attempted {
+            if !mark_restart_attempted(&mut restart_attempted) {
                 show_startup_error(&format!(
                     "{reason}\n\nSchoolBridge tried one automatic recovery, but the backend failed again. Close and reopen the desktop app. Diagnostic logs are under %LOCALAPPDATA%\\SchoolBridge\\logs."
                 ));
@@ -649,6 +665,10 @@ fn supervise_backend(app_handle: tauri::AppHandle) {
                         break;
                     }
                     *backend = Some(restarted);
+                    // A successful restart starts a fresh health-monitoring
+                    // window; stale failures from the previous process must
+                    // not make the first transient probe fail the new backend.
+                    health_check_succeeded(&mut consecutive_health_failures);
                 }
                 Err(error) => {
                     show_startup_error(&format!(
@@ -717,6 +737,26 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::{is_healthy_response, Ipv4Addr};
+
+    #[test]
+    fn backend_health_failures_require_three_consecutive_checks() {
+        let mut failures = 0;
+        assert!(!super::health_check_failed(&mut failures));
+        assert!(!super::health_check_failed(&mut failures));
+        assert_eq!(failures, 2);
+        assert!(super::health_check_failed(&mut failures));
+        super::health_check_succeeded(&mut failures);
+        assert_eq!(failures, 0);
+        assert!(!super::health_check_failed(&mut failures));
+    }
+
+    #[test]
+    fn backend_recovery_is_limited_to_one_restart_attempt() {
+        let mut attempted = false;
+        assert!(super::mark_restart_attempted(&mut attempted));
+        assert!(attempted);
+        assert!(!super::mark_restart_attempted(&mut attempted));
+    }
 
     #[test]
     fn lan_listener_is_disabled_by_default() {
