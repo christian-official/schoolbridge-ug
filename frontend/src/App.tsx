@@ -1171,9 +1171,18 @@ function App() {
   }
 
   async function dismissStudent(id:number) {
-    if (!window.confirm('Dismiss this student? Their academic and financial history will be retained.')) return
+    const reason = window.prompt('Enter the reason for dismissing this student:')
+    if (reason === null) return
+    if (reason.trim().length < 3) {
+      setProfileMessage('Enter a dismissal reason of at least 3 characters.')
+      return
+    }
+    if (!window.confirm('Confirm dismissal? The student will leave active lists, linked parent access will be reviewed, and all historical records will be retained.')) return
     try {
-      await api('students/' + id + '/status?status=dismissed', token, { method: 'PATCH' })
+      await api('students/' + id + '/dismiss', token, {
+        method: 'POST',
+        body: JSON.stringify({ reason: reason.trim(), effective_date: new Date().toISOString().slice(0, 10) }),
+      })
       setStudentProfile((current:any) => current ? {...current, student:{...current.student,status:'dismissed'}} : current)
       setProfileMessage('Student dismissed. Historical records have been retained.')
       await loadStudentPage(studentPage, search)
@@ -1193,7 +1202,7 @@ function App() {
         nationality:student.nationality||null,phone:student.phone||null,address:student.address||null,
         guardian_name:student.guardian_name||null,guardian_relationship:student.guardian_relationship||null,
         guardian_phone:student.guardian_phone||null,guardian2_name:student.guardian2_name||null,guardian2_relationship:student.guardian2_relationship||null,guardian2_phone:student.guardian2_phone||null,study_mode:student.study_mode||'Day',house:student.house||null,previous_school:student.previous_school||null,
-        admission_date:student.admission_date||null,class_id:student.class_id,status:student.status,photo_data:student.photo_data||null
+        admission_date:student.admission_date||null,class_id:student.class_id,photo_data:student.photo_data||null
       })})
       setStudentProfile({...studentProfile,student:updated.student})
       setProfileMessage('Student profile saved. Existing fee and academic records were retained.')
@@ -1673,7 +1682,7 @@ function App() {
                     <label>Parent / guardian<input value={studentProfile.student.guardian_name||''} onChange={e=>setStudentProfile({...studentProfile,student:{...studentProfile.student,guardian_name:e.target.value}})}/></label>
                     <label>Guardian phone<input value={studentProfile.student.guardian_phone||''} onChange={e=>setStudentProfile({...studentProfile,student:{...studentProfile.student,guardian_phone:e.target.value}})}/></label>
                     <label>Second guardian name<input value={studentProfile.student.guardian2_name||''} onChange={e=>setStudentProfile({...studentProfile,student:{...studentProfile.student,guardian2_name:e.target.value}})}/></label><label>Second guardian relationship<input value={studentProfile.student.guardian2_relationship||''} onChange={e=>setStudentProfile({...studentProfile,student:{...studentProfile.student,guardian2_relationship:e.target.value}})}/></label><label>Second guardian phone<input value={studentProfile.student.guardian2_phone||''} onChange={e=>setStudentProfile({...studentProfile,student:{...studentProfile.student,guardian2_phone:e.target.value}})}/></label>
-                    <label>Student status<select value={studentProfile.student.status||'active'} onChange={e=>setStudentProfile({...studentProfile,student:{...studentProfile.student,status:e.target.value}})}><option value="active">Active</option><option value="transferred">Transferred</option><option value="dismissed">Dismissed</option><option value="inactive">Inactive</option></select></label>
+                    <div><small>Student status</small><strong>{studentProfile.student.status||'active'}</strong><p className="field-hint">Use the formal dismissal action to dismiss a student.</p></div>
                   </div>
                   <div className="form-actions"><button className="primary-button" disabled={profileSaving||!studentProfile.student.photo_data}>{profileSaving?'Saving...':studentProfile.student.photo_data?'Save student profile':'Add a passport photo to complete the profile'}</button></div>
                 </form></details>
