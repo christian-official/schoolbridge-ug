@@ -3,6 +3,8 @@ import argparse
 import logging
 import os
 import re
+import shutil
+import subprocess
 import tempfile
 import time
 from datetime import datetime, timedelta, timezone
@@ -31,6 +33,31 @@ def prune_sqlite_backups(directory, retention_days=30, now=None):
     return removed
 
 
+def secure_backup_file(path):
+    """Restrict backup access on POSIX and Windows before publishing the archive."""
+    path = Path(path)
+    if os.name != "nt":
+        os.chmod(path, 0o600)
+        return
+
+    icacls = shutil.which("icacls.exe") or shutil.which("icacls")
+    whoami = shutil.which("whoami.exe") or shutil.which("whoami")
+    if not icacls or not whoami:
+        raise RuntimeError("Windows backup ACL tools are unavailable; refusing to publish an unsecured backup.")
+
+    identity = subprocess.run([whoami, "/user", "/fo", "csv", "/nh"], check=True, capture_output=True, text=True)
+    match = re.search(r"(S-1-(?:[0-9]+-)+[0-9]+)", identity.stdout)
+    if not match:
+        raise RuntimeError("Could not determine the current Windows account SID for backup permissions.")
+
+    # Well-known SIDs avoid locale-dependent account names.
+    secured = subprocess.run([
+        icacls, str(path), "/inheritance:r", "/grant:r",
+        f"*{match.group(1)}:(F)", "*S-1-5-18:(F)", "*S-1-5-32-544:(F)",
+    ], capture_output=True, text=True)
+    if secured.returncode != 0:
+        raise RuntimeError("Could not apply restrictive Windows backup permissions: " + (secured.stderr.strip() or secured.stdout.strip()))
+
 def create_scheduled_backup(database_url=None, backup_directory=None, retention_days=None, now=None):
     from app.database import create_sqlite_backup
     from backup_postgres import create_postgres_backup
@@ -58,7 +85,7 @@ def create_scheduled_backup(database_url=None, backup_directory=None, retention_
     temporary = Path(temporary_name)
     try:
         create_sqlite_backup(str(source), str(temporary))
-        os.chmod(temporary, 0o600)
+        secure_backup_file(temporary)
         os.replace(temporary, destination)
     except Exception:
         temporary.unlink(missing_ok=True)

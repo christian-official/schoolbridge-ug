@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from pathlib import Path
+import os
 import sqlite3
 
 from backup_scheduler import create_scheduled_backup, prune_sqlite_backups
@@ -19,7 +20,17 @@ def test_sqlite_scheduled_backup_is_verified_and_private(tmp_path):
     )
     archive = Path(result["path"])
     assert archive.exists() and archive.stat().st_size > 0
-    assert archive.stat().st_mode & 0o777 == 0o600
+    if os.name == "nt":
+        import shutil
+        import subprocess
+        icacls = shutil.which("icacls.exe") or shutil.which("icacls")
+        assert icacls
+        permissions = subprocess.run([icacls, str(archive)], check=True, capture_output=True, text=True).stdout
+        assert "S-1-5-18" in permissions
+        assert "S-1-5-32-544" in permissions
+        assert "S-1-1-0" not in permissions
+    else:
+        assert archive.stat().st_mode & 0o777 == 0o600
     check = sqlite3.connect(archive)
     try:
         assert check.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
