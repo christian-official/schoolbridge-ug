@@ -132,9 +132,17 @@ function getStaffNavigation(user:User) {
 }
 
 const configuredApiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
+// Tauri's Windows WebView uses the tauri.localhost origin. The desktop app
+// always talks to its own loopback backend, never to a hosted school server.
+const isTauriDesktop = typeof window !== 'undefined' && (
+  '__TAURI_INTERNALS__' in window ||
+  window.location.hostname === 'tauri.localhost' ||
+  window.location.protocol === 'tauri:'
+)
+const desktopApiBaseUrl = isTauriDesktop ? 'http://127.0.0.1:8080' : ''
 // Keep the deployed static site connected to its dedicated API even if a Render
 // build is triggered without the VITE_API_BASE_URL build-time variable.
-const API_BASE_URL = configuredApiBaseUrl || (
+const API_BASE_URL = desktopApiBaseUrl || configuredApiBaseUrl || (
   typeof window !== 'undefined' && window.location.hostname === 'schoolbridge-ug-1.onrender.com'
     ? 'https://schoolbridge-ug.onrender.com'
     : ''

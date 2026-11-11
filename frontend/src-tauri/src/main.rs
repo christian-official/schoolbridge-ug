@@ -143,8 +143,10 @@ fn configured_port(env_file: &Path) -> Result<u16, String> {
             .map_err(|_| "SCHOOLBRIDGE_PORT must be a valid TCP port.".to_string())?;
     }
 
-    if port < 1024 {
-        return Err("SCHOOLBRIDGE_PORT must be between 1024 and 65535.".into());
+    if port != DEFAULT_BACKEND_PORT {
+        return Err(format!(
+            "The desktop frontend connects to the local backend on port {DEFAULT_BACKEND_PORT}; set SCHOOLBRIDGE_PORT={DEFAULT_BACKEND_PORT} in .env."
+        ));
     }
     Ok(port)
 }
@@ -236,6 +238,9 @@ fn start_backend() -> Result<ManagedBackend, String> {
         .current_dir(&root)
         .env("PYTHONPATH", &backend_dir)
         .env("SCHOOLBRIDGE_STATIC_DIR", &static_dir)
+        // Restrict cross-origin access to the packaged Tauri WebView and the
+        // loopback Vite origin used by desktop development.
+        .env("SCHOOLBRIDGE_CORS_ORIGINS", "http://tauri.localhost,http://localhost:5173")
         .stdout(Stdio::from(log))
         .stderr(Stdio::from(error_log))
         .spawn()
