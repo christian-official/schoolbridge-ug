@@ -16,6 +16,8 @@ $null=New-Item -ItemType Directory -Force -Path (Join-Path $PackageDir "backend"
 $null=New-Item -ItemType Directory -Force -Path (Join-Path $PackageDir "wheelhouse")
 Copy-Item (Join-Path $BackendDir "app") (Join-Path $PackageDir "backend/app") -Recurse
 Copy-Item (Join-Path $BackendDir "requirements.txt") (Join-Path $PackageDir "backend/requirements.txt")
+Copy-Item (Join-Path $BackendDir "alembic.ini") (Join-Path $PackageDir "backend/alembic.ini")
+Copy-Item (Join-Path $BackendDir "migrations") (Join-Path $PackageDir "backend/migrations") -Recurse
 Copy-Item (Join-Path $FrontendDir "dist") (Join-Path $PackageDir "backend/app/static") -Recurse
 Copy-Item $PythonEmbedZip (Join-Path $PackageDir "python-3.12-embed-amd64.zip")
 Copy-Item $GetPipScript (Join-Path $PackageDir "get-pip.py")

@@ -12,7 +12,7 @@ $PackageDir=$PSScriptRoot
 $Target=Join-Path $env:ProgramData "SchoolBridge"
 $Manifest=Join-Path $PackageDir "SHA256SUMS.txt"
 $PythonZip=Join-Path $PackageDir "python-3.12-embed-amd64.zip"
-foreach($required in @($Manifest,$PythonZip,(Join-Path $PackageDir "get-pip.py"),(Join-Path $PackageDir "wheelhouse"),(Join-Path $PackageDir "backend/app/main.py"))){if(-not(Test-Path $required)){throw "Incomplete package; missing $required"}}
+foreach($required in @($Manifest,$PythonZip,(Join-Path $PackageDir "get-pip.py"),(Join-Path $PackageDir "wheelhouse"),(Join-Path $PackageDir "backend/app/main.py"),(Join-Path $PackageDir "backend/alembic.ini"),(Join-Path $PackageDir "backend/migrations/versions"))){if(-not(Test-Path $required)){throw "Incomplete package; missing $required"}}
 $root=[IO.Path]::GetFullPath($PackageDir).TrimEnd([IO.Path]::DirectorySeparatorChar)+[IO.Path]::DirectorySeparatorChar
 foreach($entry in Get-Content $Manifest){
  if([string]::IsNullOrWhiteSpace($entry)){continue}
