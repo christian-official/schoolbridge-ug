@@ -24,8 +24,7 @@ foreach($entry in Get-Content $Manifest){
  if((Get-FileHash $path -Algorithm SHA256).Hash -ne $entry.Substring(0,64)){throw "Package checksum mismatch: $relative"}
 }
 if(Test-Path $Target){
- if(Test-Path (Join-Path $Target "data/schoolbridge.db")){throw "Existing SchoolBridge database found; installer will not overwrite it."}
- Remove-Item $Target -Recurse -Force
+ throw "Existing SchoolBridge installation directory found at $Target. The installer will not replace or delete it. Back up the school data and use a separately tested upgrade procedure."
 }
 $null=New-Item -ItemType Directory -Force -Path $Target
 Get-ChildItem $PackageDir -Force | Where-Object {$_.Name -ne "SHA256SUMS.txt"} | ForEach-Object {Copy-Item $_.FullName $Target -Recurse -Force}

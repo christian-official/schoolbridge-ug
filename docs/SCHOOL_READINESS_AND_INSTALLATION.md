@@ -2,25 +2,32 @@
 
 ## Agreed architecture
 
-SchoolBridge is local-first. Each school has its own local database, and its frontend/backend run on the school's computer. Render is only a preview/development service. Internet is not required for installation, login or ordinary local school operations.
+SchoolBridge is local-first. Each school has its own local database, and its frontend/backend run on the school's computer. Render is a preview/development service only. Internet is not required for ordinary local operations.
 
-A school can install and operate on one standalone computer with no internet, router, Wi-Fi or LAN. A local network is optional and is required only if additional devices must connect to the host. Internet may later support optional updates, remote parent access, external notifications or off-site backups; it must not be a dependency for core local operations.
+A school can operate on one standalone computer with no internet, router, Wi-Fi or LAN. A local network is optional and is needed only if additional devices must connect to the host. The database remains on the host computer's local disk; client devices never connect directly to the database.
 
-**Honest release status:** the repository contains a local PostgreSQL/Compose stack and USB packaging scripts. The preparation script stages the official Docker Desktop and WSL installers, verifies their signatures, builds and exports the application/database images, and generates a SHA-256 manifest. The school installation workflow uses these staged files without downloading the application images. A clean-machine installation with internet disconnected has not yet passed acceptance testing. The service worker caches the application shell only; complete offline record access and offline writes across all modules are not implemented.
+## Honest release status
 
-## 1. Prepare the computer
+Two Windows installation paths exist and must not be confused:
 
-Current project preflight baseline: supported 64-bit Windows 10 22H2 or Windows 11 23H2 or later, at least 8 GB RAM, hardware virtualization enabled, WSL 2.1.5 or later, and a compatible Docker Desktop installation. These are project baselines, not a substitute for checking current vendor requirements and licensing.
+1. **Docker-free native Windows package:** bundles CPython 3.12, the application, frontend and offline dependency wheels; uses local SQLite. CI run [#934](https://github.com/christian-official/schoolbridge-ug/actions/runs/42998487404) passed all seven jobs, including installation and boot on a Windows Server 2022 runner. This verifies the automated package path, but does not replace acceptance on a clean physical Windows 10 22H2 or Windows 11 23H2+ computer.
+2. **Docker/WSL2 USB package:** uses Docker Desktop, WSL2 and PostgreSQL. It is a separate route and still needs its own clean-machine acceptance.
 
-On the online preparation computer, run `scripts/prepare-usb.ps1` as described in [USB installation](USB_INSTALLATION.md). It creates the complete package under `dist/SchoolBridge-USB`. Copy that entire folder to a USB drive and verify its SHA-256 manifest after copying.
+The native package currently supports a single-computer loopback host only. LAN hosting, automatic upgrades, unattended service recovery and installer signing are not included. The service worker caches the application shell only; offline record access and writes across every module are not implemented.
 
-At the school, run `prepare-school-host.ps1` from an elevated PowerShell window. Complete Docker Desktop's interactive setup and licence acceptance, restart if requested, start Docker Desktop and wait for its engine. Run `check-school-host.ps1` and resolve all blockers before proceeding.
+## 1. Choose and prepare the host
+
+For the Docker-free route, use a 64-bit Windows 10 22H2 or Windows 11 23H2-or-newer computer. The installer bundles Python and backend dependencies; Docker, WSL2, Node.js and a preinstalled Python are not required on the school computer.
+
+Download the `SchoolBridge-Native-Windows` artifact from a successful [SchoolBridge CI workflow run](https://github.com/christian-official/schoolbridge-ug/actions/workflows/ci.yml). Open the run, scroll to **Artifacts**, and download the native Windows package. The artifact is temporary and must be retained securely by the release owner.
+
+For the separate Docker/WSL2 route, follow [USB installation](USB_INSTALLATION.md) and [Windows runtime preparation](WINDOWS_RUNTIME_PREPARATION.md). That route has additional Docker Desktop, WSL2, virtualization and licensing requirements.
 
 ## 2. Information to collect from the school
 
 Confirm with an authorised school representative:
 
-**Required by the current setup form**
+**Required by the first-school setup**
 - Official school name.
 - School type: Primary, Secondary or Combined.
 - School structure: Day, Boarding or Both.
@@ -35,7 +42,20 @@ Confirm with an authorised school representative:
 
 Do not put real student data in development/test environments or send it through chat. Test imports with synthetic data first.
 
-## 3. Owner verification
+## 3. Install the native package
+
+1. Copy the complete extracted package to a local folder on the school computer; do not run it from the USB drive.
+2. Open an elevated PowerShell window in that package folder.
+3. Run `./install-native-windows.ps1`.
+4. When prompted, enter the owner's **Base64 Ed25519 public verification key**. This is public material; never enter or copy the private signing key or its passphrase.
+5. After installation, start **SchoolBridge** from the Windows Start Menu shortcut.
+6. Open the local address shown by the launcher (default: `http://127.0.0.1:8080`).
+
+The installer stores the application under `%ProgramData%\SchoolBridge` and the SQLite database under `%ProgramData%\SchoolBridge\data`. The native host binds to loopback; other computers cannot connect to it.
+
+The installer deliberately refuses to replace an existing installation directory. Do not delete or overwrite an existing installation to perform an upgrade; a tested in-place upgrade procedure is not yet available.
+
+## 4. Owner verification and first-school setup
 
 Owner verification is performed by the software owner on a trusted computer using the local SchoolBridge owner-license utility. The school browser displays a unique installation ID and accepts the signed activation code. The private signing key and passphrase never go to the school host, GitHub, Render or school staff.
 
@@ -44,22 +64,14 @@ Owner verification is performed by the software owner on a trusted computer usin
 3. Configure only the Base64 public key in the school's local `.env` as `SCHOOLBRIDGE_LICENSE_PUBLIC_KEY`.
 4. At the school, copy the unique installation ID from the first-time setup page.
 5. On the trusted owner computer, sign that exact ID. The resulting activation code begins `CHRISTIAN:`.
-6. Paste the code into the school's activation page and re-enter it during setup if prompted.
+6. Paste the code into the school's activation page and complete the school's first-time setup, including creation of its first administrator.
 
-Never share the private key or passphrase.
+The first school administrator is separate from the software owner's signing authority. Never share the private key or passphrase.
 
-## 4. Install from USB
+## 5. Backups and handover
 
-Follow [USB preparation and first installation](USB_INSTALLATION.md). The installer verifies the package manifest, checks host readiness, creates local secrets, validates the owner's public verification key, imports the prebuilt images and starts the services after explicit operator confirmation. Copy the package to the school's local disk before running the database; do not run the database from the USB itself.
+Before handover, verify owner activation, school setup, administrator login, student/staff record creation, database persistence after restart, a successful backup and a tested restore. Test the required workflows with internet disconnected. Use synthetic data until the school has accepted the installation.
 
-The intended single-computer workflow needs no LAN or internet once the supported local runtime is ready and all package files are present.
+For the native package, stop SchoolBridge before making a manual copy of the `data` directory and retain the complete backup on a separate, protected drive. The database uses SQLite WAL mode; copying only the main database file while the application is running may omit committed WAL data. Prefer the application's verified backup function where available.
 
-## 5. Optional local network
-
-Only if teachers need to connect from additional devices, provide a local router, hotspot or wired network. The host runs the services and database; client devices use a browser and never connect directly to PostgreSQL. Internet is not required for this local connection.
-
-## 6. First setup and handover
-
-Owner-activate the installation, verify the school's identity, enter contact/structure details and create the first school administrator. This administrator account is separate from the software owner's signing authority.
-
-Before handover, verify login, database persistence after restart, a successful backup and a tested restore. Test required modules with internet disconnected. Do not declare production readiness until clean-machine USB/runtime and offline module acceptance tests pass.
+Do not declare production readiness until clean-machine Windows 10/11 installation and the required school workflow, restart, backup and restore acceptance tests pass.
