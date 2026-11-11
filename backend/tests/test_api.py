@@ -3033,3 +3033,19 @@ def test_teacher_assignment_transfer_invalidates_both_previous_and_new_teacher_s
         scope = json.loads(change.scope_json)
         assert scope["teacher_user_ids"] == sorted([previous_id, incoming_id])
 
+
+
+def test_sync_change_feed_rejects_invalid_and_undelivered_cursors():
+    reset_database()
+    admin = create_admin()
+    headers = {"Authorization": f"Bearer {create_access_token(admin)}"}
+    device = "00000000-0000-4000-8000-000000000501"
+    with TestClient(app) as client:
+        registered = client.post(
+            "/api/sync/devices", headers=headers,
+            json={"device_id": device, "device_name": "Cursor validation"},
+        )
+        assert registered.status_code == 200
+        assert client.get(f"/api/sync/changes?device_id={device}&cursor=-1", headers=headers).status_code == 422
+        assert client.get(f"/api/sync/changes?device_id={device}&limit=501", headers=headers).status_code == 422
+        assert client.get(f"/api/sync/changes?device_id={device}&cursor=1", headers=headers).status_code == 409
