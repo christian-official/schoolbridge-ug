@@ -10,6 +10,7 @@ if(-not($isWin10 -or $isWin11 -or $isCiServer)){throw "Native host requires Wind
 if(-not [Environment]::Is64BitOperatingSystem){throw "The native Python runtime requires 64-bit Windows."}
 $PackageDir=$PSScriptRoot
 $Target=Join-Path $env:ProgramData "SchoolBridge"
+$InstallStage=Join-Path $env:ProgramData ("SchoolBridge.installing-"+[guid]::NewGuid().ToString("N"))
 $Manifest=Join-Path $PackageDir "SHA256SUMS.txt"
 $PythonZip=Join-Path $PackageDir "python-3.12-embed-amd64.zip"
 foreach($required in @($Manifest,$PythonZip,(Join-Path $PackageDir "get-pip.py"),(Join-Path $PackageDir "wheelhouse"),(Join-Path $PackageDir "backend/app/main.py"),(Join-Path $PackageDir "backend/alembic.ini"),(Join-Path $PackageDir "backend/migrations/versions"))){if(-not(Test-Path $required)){throw "Incomplete package; missing $required"}}
@@ -26,43 +27,49 @@ foreach($entry in Get-Content $Manifest){
 if(Test-Path $Target){
  throw "Existing SchoolBridge installation directory found at $Target. The installer will not replace or delete it. Back up the school data and use a separately tested upgrade procedure."
 }
-$null=New-Item -ItemType Directory -Force -Path $Target
-Get-ChildItem $PackageDir -Force | Where-Object {$_.Name -ne "SHA256SUMS.txt"} | ForEach-Object {Copy-Item $_.FullName $Target -Recurse -Force}
-$runtime=Join-Path $Target "runtime"
-$null=New-Item -ItemType Directory -Force -Path $runtime
-Expand-Archive -LiteralPath (Join-Path $Target "python-3.12-embed-amd64.zip") -DestinationPath $runtime -Force
-$python=Join-Path $runtime "python.exe"
-$pth=Join-Path $runtime "python312._pth"
-if(-not(Test-Path $python) -or -not(Test-Path $pth)){throw "Archive is not the expected CPython 3.12 x64 embeddable distribution."}
-$pthLines=@(Get-Content $pth | Where-Object {$_ -notmatch '^\s*#?\s*import site\s*$'})
-$pthLines += "Lib\site-packages"
-$pthLines += "..\backend"
-$pthLines += "import site"
-Set-Content $pth $pthLines -Encoding ASCII
-& $python (Join-Path $Target "get-pip.py") --no-index --find-links (Join-Path $Target "wheelhouse")
-if($LASTEXITCODE -ne 0){throw "Offline pip bootstrap failed."}
-& $python -m pip install --no-index --find-links (Join-Path $Target "wheelhouse") --target (Join-Path $runtime "Lib/site-packages") -r (Join-Path $Target "backend/requirements.txt")
-if($LASTEXITCODE -ne 0){throw "Offline backend dependency installation failed."}
-$null=New-Item -ItemType Directory -Force -Path (Join-Path $Target "data")
-$secretBytes=New-Object byte[] 48
-$rng=[Security.Cryptography.RandomNumberGenerator]::Create()
-try{$rng.GetBytes($secretBytes)}finally{$rng.Dispose()}
-$secret=[Convert]::ToBase64String($secretBytes)
 $publicKey=$LicensePublicKey
 if([string]::IsNullOrWhiteSpace($publicKey)){$publicKey=Read-Host "Enter owner's Base64 Ed25519 public verification key"}
 try{$decoded=[Convert]::FromBase64String($publicKey)}catch{throw "Public key must be valid Base64."}
 if($decoded.Length -ne 32){throw "Ed25519 public key must decode to exactly 32 bytes."}
-@"
+$null=New-Item -ItemType Directory -Force -Path $InstallStage
+try {
+ Get-ChildItem $PackageDir -Force | Where-Object {$_.Name -ne "SHA256SUMS.txt"} | ForEach-Object {Copy-Item $_.FullName $InstallStage -Recurse -Force}
+ $runtime=Join-Path $InstallStage "runtime"
+ $null=New-Item -ItemType Directory -Force -Path $runtime
+ Expand-Archive -LiteralPath (Join-Path $InstallStage "python-3.12-embed-amd64.zip") -DestinationPath $runtime -Force
+ $python=Join-Path $runtime "python.exe"
+ $pth=Join-Path $runtime "python312._pth"
+ if(-not(Test-Path $python) -or -not(Test-Path $pth)){throw "Archive is not the expected CPython 3.12 x64 embeddable distribution."}
+ $pthLines=@(Get-Content $pth | Where-Object {$_ -notmatch '^\s*#?\s*import site\s*$'})
+ $pthLines += "Lib\site-packages"
+ $pthLines += "..\backend"
+ $pthLines += "import site"
+ Set-Content $pth $pthLines -Encoding ASCII
+ & $python (Join-Path $InstallStage "get-pip.py") --no-index --find-links (Join-Path $InstallStage "wheelhouse")
+ if($LASTEXITCODE -ne 0){throw "Offline pip bootstrap failed."}
+ & $python -m pip install --no-index --find-links (Join-Path $InstallStage "wheelhouse") --target (Join-Path $runtime "Lib/site-packages") -r (Join-Path $InstallStage "backend/requirements.txt")
+ if($LASTEXITCODE -ne 0){throw "Offline backend dependency installation failed."}
+ $null=New-Item -ItemType Directory -Force -Path (Join-Path $InstallStage "data")
+ $secretBytes=New-Object byte[] 48
+ $rng=[Security.Cryptography.RandomNumberGenerator]::Create()
+ try{$rng.GetBytes($secretBytes)}finally{$rng.Dispose()}
+ $secret=[Convert]::ToBase64String($secretBytes)
+ @"
 SCHOOLBRIDGE_SECRET_KEY=$secret
 SCHOOLBRIDGE_DATABASE_URL=sqlite:///./data/schoolbridge.db
 SCHOOLBRIDGE_LICENSE_PUBLIC_KEY=$publicKey
 SCHOOLBRIDGE_PORT=8080
-"@ | Set-Content (Join-Path $Target ".env") -Encoding ASCII
-$shortcutDir=Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs"
-$ws=New-Object -ComObject WScript.Shell
-$link=$ws.CreateShortcut((Join-Path $shortcutDir "SchoolBridge.lnk"))
-$link.TargetPath="powershell.exe"
-$link.Arguments='-NoProfile -ExecutionPolicy Bypass -File "'+(Join-Path $Target "run-native-windows.ps1")+'"'
-$link.WorkingDirectory=$Target
-$link.Save()
-Write-Host "SchoolBridge native files installed in $Target. Start from the Start Menu shortcut."
+"@ | Set-Content (Join-Path $InstallStage ".env") -Encoding ASCII
+ [IO.Directory]::Move($InstallStage,$Target)
+ $shortcutDir=Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs"
+ $ws=New-Object -ComObject WScript.Shell
+ $link=$ws.CreateShortcut((Join-Path $shortcutDir "SchoolBridge.lnk"))
+ $link.TargetPath="powershell.exe"
+ $link.Arguments='-NoProfile -ExecutionPolicy Bypass -File "'+(Join-Path $Target "run-native-windows.ps1")+'"'
+ $link.WorkingDirectory=$Target
+ $link.Save()
+ Write-Host "SchoolBridge native files installed in $Target. Start from the Start Menu shortcut."
+} catch {
+ if(Test-Path $InstallStage){Remove-Item $InstallStage -Recurse -Force -ErrorAction SilentlyContinue}
+ throw
+}
