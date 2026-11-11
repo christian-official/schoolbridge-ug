@@ -1,10 +1,12 @@
 from datetime import datetime, timezone
 from pathlib import Path
+import os
 from unittest.mock import Mock
 
 import pytest
 
 from backup_postgres import create_postgres_backup, prune_old_backups
+from backup_scheduler import secure_backup_file
 from restore_postgres import restore_postgres_backup
 
 
@@ -26,7 +28,18 @@ def test_postgres_backup_is_verified_before_being_published(tmp_path):
     backup = Path(result["path"])
     assert backup.exists()
     assert backup.read_bytes() == b"custom archive"
-    assert backup.stat().st_mode & 0o777 == 0o600
+    if os.name == "nt":
+        import shutil
+        import subprocess
+        icacls = shutil.which("icacls.exe") or shutil.which("icacls")
+        assert icacls
+        permissions = subprocess.run([icacls, str(backup)], check=True, capture_output=True, text=True).stdout
+        assert "Successfully processed 1 files" in permissions
+        assert "Failed processing 0 files" in permissions
+        assert "Everyone" not in permissions
+        assert "BUILTIN\\Users" not in permissions
+    else:
+        assert backup.stat().st_mode & 0o777 == 0o600
     assert calls[0][0] == "pg_dump"
     assert calls[1][:2] == ["pg_restore", "--list"]
     assert not list(tmp_path.glob("*.partial"))

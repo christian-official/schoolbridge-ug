@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import unquote
 
+from backup_scheduler import secure_backup_file
 from dotenv import load_dotenv
 from sqlalchemy.engine import make_url
 
@@ -93,7 +94,7 @@ def create_postgres_backup(database_url=None, backup_directory=None, retention_d
             ["pg_restore", "--list", str(temporary)],
             check=True, capture_output=True, text=True, env=env,
         )
-        os.chmod(temporary, 0o600)
+        secure_backup_file(temporary)
         os.replace(temporary, destination)
     except Exception:
         temporary.unlink(missing_ok=True)

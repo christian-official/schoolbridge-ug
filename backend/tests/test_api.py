@@ -274,12 +274,15 @@ def test_admin_can_stage_valid_restore_without_immediate_replacement(tmp_path):
             assert live_db.execute(
                 "SELECT username FROM users"
             ).fetchone()[0] == "test-admin"
-        with sqlite3.connect(pending_path) as staged_db:
+        staged_db = sqlite3.connect(pending_path)
+        try:
             assert staged_db.execute("SELECT COUNT(*) FROM users").fetchone()[0] == 2
             assert staged_db.execute(
                 "SELECT username FROM users WHERE username = ?",
                 ("backup-only-teacher",),
             ).fetchone() is not None
+        finally:
+            staged_db.close()
     finally:
         if os.path.exists(pending_path):
             os.unlink(pending_path)
