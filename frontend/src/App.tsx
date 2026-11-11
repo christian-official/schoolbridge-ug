@@ -966,6 +966,7 @@ function App() {
   const [financeDashboard, setFinanceDashboard] = useState<FinanceDashboardSummary>({ fees_expected: 0, fees_collected: 0, outstanding: 0 })
   const [studentPage, setStudentPage] = useState(1)
   const [studentClassFilter, setStudentClassFilter] = useState('')
+  const [studentArchive, setStudentArchive] = useState(false)
   const [classes, setClasses] = useState<RecordItem[]>([])
   const [dataError, setDataError] = useState('')
   const [search, setSearch] = useState('')
@@ -1213,14 +1214,14 @@ function App() {
 
   async function loadStudentPage(page = 1, query = search) {
     try {
-      const params = new URLSearchParams({ page: String(page), page_size: '5', search: query })
+      const params = new URLSearchParams({ page: String(page), page_size: '5', search: query, status: studentArchive ? 'dismissed' : 'active' })
       if (studentClassFilter) params.set('class_id', studentClassFilter)
       const result = await api<StudentPage>('students/search?' + params.toString(), token)
       setStudents(result.items); setStudentTotal(result.total); setStudentPage(result.page)
     } catch (error) { setDataError(error instanceof Error ? error.message : 'Unable to load student records.') }
   }
 
-  useEffect(() => { if (token && active === 'Students') void loadStudentPage(1, search) }, [search, studentClassFilter, active, token])
+  useEffect(() => { if (token && active === 'Students') void loadStudentPage(1, search) }, [search, studentClassFilter, studentArchive, active, token])
 
   useEffect(() => {
     if (!token || !studentForm.class_id) { setStudentForm(old => ({ ...old, fee_amount: '' })); return }
@@ -1616,8 +1617,8 @@ function App() {
                   {classes.map(item=><button type="button" role="tab" aria-selected={studentClassFilter===String(item.id)} className={studentClassFilter===String(item.id)?'student-class-tab active':'student-class-tab'} key={item.id} onClick={()=>{setStudentClassFilter(String(item.id));setStudentPage(1)}}>{item.name}{item.section? ` · ${item.section}`:''}</button>)}
                 </div>
               </section>
-              <div className="student-search-panel"><div className="search-box"><Search size={19}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder={studentClassFilter?'Search this class by student name or admission number...':'Search all students by name or admission number...'} aria-label="Search students by name or admission number"/></div><span>Search results update automatically</span></div>
-              <div className="student-list-heading"><div><h3>{studentClassFilter ? (classes.find(item=>String(item.id)===studentClassFilter)?.name||'Selected class') : 'All students'}{studentClassFilter && classes.find(item=>String(item.id)===studentClassFilter)?.section ? ` · ${classes.find(item=>String(item.id)===studentClassFilter)?.section}` : ''}</h3><p>{studentTotal.toLocaleString()} matching student records</p></div></div><StudentTable students={filteredStudents} classes={classes} onSelect={id => void openStudentProfile(id)} />
+              <div className="student-search-panel"><div className="search-box"><Search size={19}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder={studentClassFilter?'Search this class by student name or admission number...':'Search all students by name or admission number...'} aria-label="Search students by name or admission number"/></div><button type="button" className="secondary-button" onClick={()=>{setStudentArchive(value=>!value);setStudentPage(1);setStudentClassFilter('')}}>{studentArchive?'Back to active students':'View dismissed archive'}</button><span>{studentArchive?'Dismissed student history':'Search results update automatically'}</span></div>
+              <div className="student-list-heading"><div><h3>{studentArchive?'Dismissed student archive':studentClassFilter ? (classes.find(item=>String(item.id)===studentClassFilter)?.name||'Selected class') : 'All students'}{!studentArchive && studentClassFilter && classes.find(item=>String(item.id)===studentClassFilter)?.section ? ` · ${classes.find(item=>String(item.id)===studentClassFilter)?.section}` : ''}</h3><p>{studentTotal.toLocaleString()} matching student records</p></div></div><StudentTable students={filteredStudents} classes={classes} onSelect={id => void openStudentProfile(id)} />
               <div className="pagination-row"><span>Showing {students.length ? (studentPage - 1) * 25 + 1 : 0}–{Math.min(studentPage * 25, studentTotal)} of {studentTotal}</span><div><button className="secondary-button" disabled={studentPage <= 1} onClick={() => void loadStudentPage(studentPage - 1)}>Previous</button><button className="secondary-button" disabled={studentPage * 25 >= studentTotal} onClick={() => void loadStudentPage(studentPage + 1)}>Next</button></div></div>
             </section>
           )}
