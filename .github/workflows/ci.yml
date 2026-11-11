@@ -11,7 +11,8 @@ permissions:
 
 concurrency:
   group: schoolbridge-ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
+  queue: max
 
 jobs:
   backend-tests:
