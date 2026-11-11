@@ -15,13 +15,24 @@ SchoolBridge is being developed for installation on each school's own computer. 
 - Role-based access, audit logs and data backups
 - Data export and restore tools
 
+## Platform and installation status
+
+| Windows version | Native installation target | Current status |
+|---|---|---|
+| Windows 8.0 | Yes | Legacy installer engineering; runtime feasibility unresolved |
+| Windows 8.1 | Yes | Legacy installer engineering; runtime/dependency validation required |
+| Windows 10/11 | Yes | Existing Docker/WSL2 USB package; Docker-free installer is a separate workstream |
+| Newer supported Windows | Yes | Preserve compatibility and validate each release |
+
+The Windows 8.0 and 8.1 requirement means a locally installed application and database on that computer. Browser-only access to another computer does not satisfy it. No legacy Windows installer is certified or available yet. See [legacy Windows installation engineering](docs/LEGACY_WINDOWS_SUPPORT.md).
+
 ## Current development status
 
 Phase 5 — Database & Offline Architecture includes database-safety, local deployment, device registration, change-journal, checkpoint and role-scoped snapshot foundations. Teacher mark drafts and selected attendance workflows have offline foundations, and Device Management supports explicit encrypted read-only snapshots. These do not mean all modules are fully offline.
 
 The local Docker Compose stack runs PostgreSQL, backend, frontend and a backup scheduler. The USB preparation script stages the official Docker Desktop and Microsoft WSL installers, verifies their Authenticode signatures, builds the SchoolBridge/PostgreSQL images, exports them, and creates a SHA-256 integrity manifest. At the school, the packaged runtime installers are run interactively, then the prebuilt images are imported locally without downloading application images.
 
-**Release status:** the USB packaging and installation workflow is implemented but has not yet passed a clean Windows computer acceptance test with internet and LAN disconnected. Docker Desktop setup remains interactive and requires operator licence acceptance; compatible Windows hardware and virtualization are required. The service worker caches the app shell only. Full offline record access/writes across all modules remain unfinished. Do not call this a certified turnkey school installer or claim every module is fully offline until the acceptance gates pass.
+**Release status:** the existing Docker/WSL2 USB packaging and installation workflow is implemented but has not yet passed a clean Windows computer acceptance test with internet and LAN disconnected. Docker Desktop setup remains interactive and requires operator licence acceptance; compatible Windows hardware and virtualization are required. The service worker caches the app shell only. Full offline record access/writes across all modules remain unfinished. Do not call this a certified turnkey school installer or claim every module is fully offline until the acceptance gates pass.
 
 See [USB installation status and instructions](docs/USB_INSTALLATION.md), [Windows runtime preparation](docs/WINDOWS_RUNTIME_PREPARATION.md), [school readiness](docs/SCHOOL_READINESS_AND_INSTALLATION.md), and [architecture notes](docs/architecture.md).
 

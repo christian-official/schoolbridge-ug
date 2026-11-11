@@ -46,8 +46,12 @@ Docker Desktop terms must be reviewed and accepted by the authorised school/host
 - [Microsoft WSL releases](https://github.com/microsoft/WSL/releases)
 
 
-## Why Windows 8 is not supported
+## Windows 8 and 8.1: separate native installer workstream
 
-Windows 8 and 8.1 are outside the supported operating-system baseline for this deployment. The current package runs SchoolBridge in Linux containers through Docker Desktop and its WSL 2 backend. That runtime requires modern Windows virtualization and WSL 2 support; Windows 8 cannot provide the supported WSL 2/Docker Desktop environment required by this package. The installer therefore rejects older Windows versions instead of allowing a setup that cannot be reliably installed, secured or maintained.
+The existing Docker/WSL2 USB package described above is **not compatible with Windows 8 or Windows 8.1**. Its preflight intentionally rejects those operating systems. Do not try to bypass the check or install Docker/WSL2 versions that are no longer supported.
 
-This is a deployment-runtime limitation, not a limitation in the SchoolBridge web application itself. Supporting Windows 8 would require a separately engineered legacy deployment (for example, a compatible native Windows service/runtime and database arrangement), plus dedicated installation, security, update, backup and recovery testing. It must not be advertised as supported until those tests pass. The current project prioritises one reliable, repeatable Windows deployment rather than adding an unverified legacy path.
+The product requirement is now to provide a **native local installation on both Windows 8.0 and Windows 8.1**. This is a separate installer and runtime project tracked in [LEGACY_WINDOWS_SUPPORT.md](LEGACY_WINDOWS_SUPPORT.md). It must use a local database and locally running application; access through another computer's browser is not an acceptable substitute.
+
+The legacy installer is not yet available or certified. Windows 8.0 currently has no security-maintained CPython runtime documented for the existing backend; Windows 8.1 has a newer Python runtime option but still requires full dependency and real-machine validation. Do not install an EOL runtime, weaken cryptography, or describe either OS as supported before its acceptance tests pass.
+
+Keep using this document only for the existing Docker/WSL2 package's Windows 10/11 deployment path. The legacy work must not weaken or break that path.
