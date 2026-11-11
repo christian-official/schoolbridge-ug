@@ -1,6 +1,13 @@
 #requires -RunAsAdministrator
 param([string]$LicensePublicKey)
 $ErrorActionPreference="Stop"
+$os=Get-CimInstance Win32_OperatingSystem
+$build=[int]$os.BuildNumber
+$isWin10=($os.Caption -match "Windows 10" -and $build -ge 19045)
+$isWin11=($os.Caption -match "Windows 11" -and $build -ge 22631)
+$isCiServer=($os.Caption -match "Windows Server 2022" -and $build -ge 20348)
+if(-not($isWin10 -or $isWin11 -or $isCiServer)){throw "Native host requires Windows 10 22H2 or Windows 11 23H2 or newer. Windows 8/8.1 are not certified."}
+if(-not [Environment]::Is64BitOperatingSystem){throw "The native Python runtime requires 64-bit Windows."}
 $PackageDir=$PSScriptRoot
 $Target=Join-Path $env:ProgramData "SchoolBridge"
 $Manifest=Join-Path $PackageDir "SHA256SUMS.txt"
