@@ -570,10 +570,10 @@ fn start_backend() -> Result<ManagedBackend, String> {
         thread::sleep(Duration::from_millis(500));
     }
 
-    for child in &mut children {
+    for child in &mut children.0 {
         let _ = child.kill();
     }
-    for child in &mut children {
+    for child in &mut children.0 {
         let _ = child.wait();
     }
     Err(format!(
