@@ -413,7 +413,7 @@ fn start_backend() -> Result<ManagedBackend, String> {
     };
 
     let mut children = vec![child];
-    if let Some(config) = lan {
+    if let Some(config) = lan.clone() {
         let lan_log_path = log_dir.join("lan-backend.log");
         let lan_log = OpenOptions::new().create(true).append(true).open(&lan_log_path)
             .map_err(|error| format!("Could not open the LAN backend log: {error}"))?;
@@ -462,8 +462,15 @@ fn start_backend() -> Result<ManagedBackend, String> {
                 log_path.display()
             ));
         }
-        let lan_ready = if let Some(config) = &configured_lan(&env_file)? {
-            TcpStream::connect((config.bind_ip, config.port)).is_ok()
+        let lan_ready = if let Some(config) = &lan {
+            let process_alive = if children.len() > 1 {
+                children[1].try_wait()
+                    .map_err(|error| format!("Could not monitor the HTTPS LAN listener: {error}"))?
+                    .is_none()
+            } else {
+                false
+            };
+            process_alive && TcpStream::connect((config.bind_ip, config.port)).is_ok()
         } else {
             true
         };
@@ -513,6 +520,28 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::is_healthy_response;
+
+    #[test]
+    fn lan_listener_is_disabled_by_default() {
+        let dir = std::env::temp_dir().join(format!("schoolbridge-lan-disabled-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let env_file = dir.join(".env");
+        std::fs::write(&env_file, "SCHOOLBRIDGE_PORT=8080\\n").unwrap();
+        assert_eq!(super::configured_lan(&env_file).unwrap(), None);
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn lan_listener_rejects_public_and_loopback_addresses() {
+        let dir = std::env::temp_dir().join(format!("schoolbridge-lan-invalid-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let env_file = dir.join(".env");
+        std::fs::write(&env_file, "SCHOOLBRIDGE_LAN_ENABLED=true\\nSCHOOLBRIDGE_LAN_BIND_IP=8.8.8.8\\n").unwrap();
+        assert!(super::configured_lan(&env_file).unwrap_err().contains("private"));
+        std::fs::write(&env_file, "SCHOOLBRIDGE_LAN_ENABLED=true\\nSCHOOLBRIDGE_LAN_BIND_IP=127.0.0.1\\n").unwrap();
+        assert!(super::configured_lan(&env_file).unwrap_err().contains("private"));
+        let _ = std::fs::remove_dir_all(dir);
+    }
 
     #[test]
     fn creates_an_absolute_local_app_data_sqlite_url() {
