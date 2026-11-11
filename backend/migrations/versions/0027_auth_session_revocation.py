@@ -10,12 +10,21 @@ depends_on = None
 
 
 def upgrade() -> None:
-    columns = {column["name"] for column in inspect(op.get_bind()).get_columns("users")}
+    inspector = inspect(op.get_bind())
+    # Some supported legacy databases only contain setup metadata at this point.
+    # They must still advance through the migration chain; the users table is
+    # created by the later baseline migration when the full schema is applied.
+    if "users" not in inspector.get_table_names():
+        return
+    columns = {column["name"] for column in inspector.get_columns("users")}
     if "token_version" not in columns:
         op.add_column("users", sa.Column("token_version", sa.Integer(), nullable=False, server_default="0"))
 
 
 def downgrade() -> None:
-    columns = {column["name"] for column in inspect(op.get_bind()).get_columns("users")}
+    inspector = inspect(op.get_bind())
+    if "users" not in inspector.get_table_names():
+        return
+    columns = {column["name"] for column in inspector.get_columns("users")}
     if "token_version" in columns:
         op.drop_column("users", "token_version")

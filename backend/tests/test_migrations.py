@@ -337,7 +337,7 @@ def test_partial_school_setup_state_table_gets_missing_activation_columns(tmp_pa
     assert "activation_locked_until" in columns
     assert attempts == 0
     assert installation_id == "existing-installation-id"
-    assert revision == "0026_repair_school_setup_state"
+    assert revision == "0027_auth_session_revocation"
 
 
 def test_user_session_version_column_is_migrated(migrated_database):
