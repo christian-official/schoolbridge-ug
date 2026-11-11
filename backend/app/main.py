@@ -2410,6 +2410,8 @@ def _sync_change_visible_to_user(row, user):
     permissions = user_permissions(user)
     if user.role == "parent":
         if not parent_visible: return False
+        # Deliver the parent's own account changes so offline permissions can be revalidated.
+        if entity == "UserAccess": return True
         if entity in {"Mark", "MarkScope"}: return scope.get("verified") is True
         return entity in {"Student","SchoolClass","Attendance","Exam","Mark","MarkScope","FeeCharge","FeePayment","ClassFee","ParentStudentLink"}
     if user.role == "teacher":

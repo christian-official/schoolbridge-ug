@@ -45,7 +45,10 @@ def _scope_for_target(connection, target):
             students = connection.execute(select(models.Student.id).where(models.Student.class_id == class_id)).all()
             for item in students: add_student(item[0], class_id)
     if isinstance(target, models.User):
+        # Account changes must invalidate the account owner's offline view
+        # regardless of whether the account currently has a parent or teacher role.
         scope["teacher_user_ids"].add(int(target.id))
+        scope["parent_user_ids"].add(int(target.id))
     elif isinstance(target, models.Student):
         add_student(target.id, target.class_id)
         try:

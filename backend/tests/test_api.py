@@ -86,6 +86,13 @@ def test_optional_local_frontend_serving_supports_assets_and_spa_routes(tmp_path
         assert unknown_api.status_code == 403
         assert "SchoolBridge local app" not in unknown_api.text
 
+        outside = tmp_path.parent / (tmp_path.name + "-private.txt")
+        outside.write_text("must never be served")
+        (tmp_path / "private-link.txt").symlink_to(outside)
+        traversal = client.get("/private-link.txt")
+        assert traversal.status_code == 404
+        assert "must never be served" not in traversal.text
+
 
 def test_health_endpoint_is_public():
     reset_database()
@@ -2723,3 +2730,50 @@ def test_parent_change_feed_invalidates_previously_verified_marks_when_unverifie
         ]
         assert len(invalidations) == 1
         assert invalidations[0]["operation"] == "delete"
+
+
+def test_parent_change_feed_includes_own_account_access_invalidations():
+    reset_database()
+    parent = models.User(
+        username="parent-access-invalidation",
+        email="parent-access-invalidation@example.invalid",
+        hashed_password=password_hash.hash("ParentPassword123!"),
+        role="parent",
+        is_active=True,
+    )
+    with SessionLocal() as db:
+        db.add(parent)
+        db.commit()
+        parent_id = parent.id
+
+    headers = {"Authorization": "Bearer " + create_access_token(
+        SimpleNamespace(id=parent_id, role="parent")
+    )}
+    device_id = "00000000-0000-4000-8000-000000000925"
+    with TestClient(app) as client:
+        registered = client.post(
+            "/api/sync/devices", headers=headers,
+            json={"device_id": device_id, "device_name": "Parent account invalidation"},
+        )
+        assert registered.status_code == 200, registered.text
+        initial = client.get(
+            f"/api/sync/changes?device_id={device_id}", headers=headers,
+        )
+        assert initial.status_code == 200, initial.text
+
+        with SessionLocal() as db:
+            account = db.get(models.User, parent_id)
+            account.email = "parent-access-updated@example.invalid"
+            db.commit()
+
+        updated = client.get(
+            f"/api/sync/changes?device_id={device_id}&cursor={initial.json()['next_cursor']}",
+            headers=headers,
+        )
+        assert updated.status_code == 200, updated.text
+        own_access_events = [
+            item for item in updated.json()["changes"]
+            if item["entity_type"] == "UserAccess" and item["entity_id"] == parent_id
+        ]
+        assert len(own_access_events) == 1
+        assert own_access_events[0]["operation"] == "update"
