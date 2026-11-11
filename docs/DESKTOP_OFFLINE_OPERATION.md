@@ -19,7 +19,7 @@ If the local backend itself cannot be reached, a registered device may use its p
 - contains only records authorised for that account;
 - is read-only and cannot create or modify school records.
 
-After the local service becomes available again, SchoolBridge checks the account permissions and sync change journal. Changed records or permissions invalidate the snapshot and require a fresh download. Revoked devices must not continue using their saved copy.
+After the local service becomes available again, SchoolBridge checks device status, account permissions, and the sync change journal. A revoked device or changed records/permissions causes the saved copy to be cleared and requires fresh authorisation. A revocation issued while a device is offline cannot be enforced until that device reconnects; the encrypted snapshot may remain accessible to someone who knows its passphrase until its 24-hour expiry. This is an explicit limitation of offline access.
 
 ## Connectivity-dependent features and boundaries
 
