@@ -161,7 +161,7 @@ jobs:
             cat > "$RUNNER_TEMP/pg-tools/$tool" <<EOF
           #!/usr/bin/env bash
           set -euo pipefail
-          exec docker run --rm --network host -v /tmp:/tmp -e PGPASSWORD="${PGPASSWORD:-}" postgres:16 $tool "$@"
+          exec docker run --rm --network host -v /tmp:/tmp -e PGPASSWORD="\${PGPASSWORD:-}" postgres:16 $tool "\$@"
           EOF
             chmod +x "$RUNNER_TEMP/pg-tools/$tool"
           done
