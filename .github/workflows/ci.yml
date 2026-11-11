@@ -296,7 +296,10 @@ jobs:
             "scripts/prepare-usb.ps1",
             "scripts/install-schoolbridge.ps1",
             "scripts/check-school-host.ps1",
-            "scripts/prepare-school-host.ps1"
+            "scripts/prepare-school-host.ps1",
+            "scripts/prepare-native-windows.ps1",
+            "scripts/install-native-windows.ps1",
+            "scripts/run-native-windows.ps1"
           )
           $runtime = Join-Path $env:TEMP "schoolbridge-runtime-validation"
           New-Item -ItemType Directory -Force -Path $runtime | Out-Null
@@ -315,6 +318,19 @@ jobs:
             if ($signature.Status -ne "Valid") { throw "Invalid Authenticode signature: $($runtimeFile.Path) ($($signature.Status))" }
             if ($signature.SignerCertificate.Subject -notmatch $runtimeFile.Publisher) { throw "Unexpected signer: $($signature.SignerCertificate.Subject)" }
           }
+          foreach ($required in @(
+            "scripts/NATIVE_WINDOWS_INSTALLATION.md",
+            "backend/requirements.txt",
+            "frontend/package-lock.json"
+          )) {
+            if (-not (Test-Path $required -PathType Leaf)) { throw "Missing native Windows packaging input: $required" }
+          }
+          $builder = Get-Content "scripts/prepare-native-windows.ps1" -Raw
+          $installer = Get-Content "scripts/install-native-windows.ps1" -Raw
+          $launcher = Get-Content "scripts/run-native-windows.ps1" -Raw
+          if ($builder -notmatch "--platform win_amd64" -or $builder -notmatch "--only-binary") { throw "Native package must resolve binary Windows wheels." }
+          if ($installer -notmatch "--no-index" -or $installer -notmatch "SHA256SUMS.txt") { throw "Native installer must verify and install offline." }
+          if ($launcher -notmatch "--host 127\.0\.0\.1") { throw "Initial native host must remain loopback-only." }
           foreach ($file in $files) {
             Write-Host "Checking PowerShell syntax: $file"
             $tokens = $null
