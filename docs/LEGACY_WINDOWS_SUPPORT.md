@@ -33,7 +33,7 @@ Before selecting the runtime, record evidence for:
 - supported Python/runtime versions on Windows 8 and 8.1;
 - compatible builds/wheels for FastAPI, Pydantic, SQLAlchemy, Alembic, Uvicorn, password hashing and cryptography dependencies;
 - a reproducible, offline dependency bundle with hashes and no runtime internet requirement;
-- supported frontend browser features, including service worker, IndexedDB, Web Crypto, file uploads and printing;
+- supported features of the eventual embedded desktop rendering engine, including service worker, IndexedDB, Web Crypto, file uploads and printing;
 - code signing / installer behaviour and OS-level TLS limitations;
 - security patch status and the operational risk of running unsupported Windows.
 
@@ -77,7 +77,7 @@ These facts narrow the feasible deployment options and supersede any assumption 
 - Current Python documentation states Python 3.12 supports Windows 8.1 and newer; Python 3.11 also supports Windows 8.1 and newer. This does not include Windows 8.0.
 - Python 3.8 is end-of-life (2024-10-07) and receives no security updates. Therefore, the existing Python/FastAPI backend has no currently supported CPython runtime documented for a native Windows 8.0 host. Do not ship an EOL Python runtime to bridge that gap.
 - Windows 8.1 can technically run a currently security-maintained CPython 3.12 runtime, but that does not make the Windows 8.1 operating system secure or supported. A native host prototype still requires an explicit risk decision and real-machine validation.
-- Microsoft Edge 109 was the final Edge release for Windows 8/8.1 and is no longer maintained. Mozilla currently states Firefox ESR 115 is the final Firefox line for these systems and will receive security updates through March 2027, subject to re-evaluation. Browser security updates do not replace missing OS security updates, and the SchoolBridge frontend feature baseline still needs testing on that browser.
+- Microsoft Edge 109 was the final Edge release for Windows 8/8.1 and is no longer maintained. No external browser is accepted as the SchoolBridge desktop shell. The eventual desktop package must provide its own supported rendering/runtime layer (or a fully native UI) and prove compatibility on each target OS; an ordinary browser smoke test is not desktop acceptance.
 
 ## Confirmed product requirement: native installation on both legacy systems
 

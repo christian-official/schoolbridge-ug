@@ -194,12 +194,6 @@ jobs:
       - name: Run real-browser offline tests
         working-directory: frontend
         run: npm run test:offline:browser
-      - name: Install Playwright Firefox
-        working-directory: frontend
-        run: npx playwright install --with-deps firefox
-      - name: Run Firefox legacy-client compatibility smoke test
-        working-directory: frontend
-        run: node --test tests/legacy-browser.firefox.test.js
 
   local-deployment-package:
     name: deployment / compose-build-and-usb-validation
