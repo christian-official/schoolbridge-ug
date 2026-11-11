@@ -410,7 +410,8 @@ jobs:
             "scripts/prepare-school-host.ps1",
             "scripts/prepare-native-windows.ps1",
             "scripts/install-native-windows.ps1",
-            "scripts/run-native-windows.ps1"
+            "scripts/run-native-windows.ps1",
+            "scripts/configure-lan-firewall.ps1"
           )
           $runtime = Join-Path $env:TEMP "schoolbridge-runtime-validation"
           New-Item -ItemType Directory -Force -Path $runtime | Out-Null
@@ -439,9 +440,14 @@ jobs:
           $builder = Get-Content "scripts/prepare-native-windows.ps1" -Raw
           $installer = Get-Content "scripts/install-native-windows.ps1" -Raw
           $launcher = Get-Content "scripts/run-native-windows.ps1" -Raw
+          $lanFirewall = Get-Content "scripts/configure-lan-firewall.ps1" -Raw
           if ($builder -notmatch "--platform win_amd64" -or $builder -notmatch "--only-binary") { throw "Native package must resolve binary Windows wheels." }
           if ($installer -notmatch "--no-index" -or $installer -notmatch "SHA256SUMS.txt") { throw "Native installer must verify and install offline." }
           if ($launcher -notmatch "--host 127\.0\.0\.1") { throw "Initial native host must remain loopback-only." }
+          foreach ($requiredLanGuard in @("Profile = `"Private`"", "RemoteAddress = `"LocalSubnet`"", "LocalAddress = `$BindAddress", "Program = `$python", "EdgeTraversalPolicy = `"Block`"")) {
+            if ($lanFirewall -notlike "*$requiredLanGuard*") { throw "LAN firewall rule is missing required scope: $requiredLanGuard" }
+          }
+          if ($lanFirewall -match "RemoteAddress = `"Any`"" -or $lanFirewall -match "Profile = `"Any`"") { throw "LAN firewall rule must not allow all remote addresses or profiles." }
           foreach ($file in $files) {
             Write-Host "Checking PowerShell syntax: $file"
             $tokens = $null
