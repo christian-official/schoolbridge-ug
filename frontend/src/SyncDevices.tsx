@@ -41,6 +41,13 @@ function browserDeviceName() {
   return (browser + ' on ' + platform).slice(0, 100)
 }
 
+class ApiRequestError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message)
+    this.name = 'ApiRequestError'
+  }
+}
+
 async function request<T>(path: string, token: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(API_BASE_URL + '/api/' + path, {
     ...options,
@@ -52,7 +59,7 @@ async function request<T>(path: string, token: string, options: RequestInit = {}
     cache: 'no-store',
   })
   const result = await response.json().catch(() => ({}))
-  if (!response.ok) throw new Error(result.detail || 'Request failed: ' + response.status)
+  if (!response.ok) throw new ApiRequestError(result.detail || 'Request failed: ' + response.status, response.status)
   return result as T
 }
 
@@ -107,6 +114,27 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
         setProposals([])
       }
     } catch (err) {
+      if (err instanceof ApiRequestError && err.status === 401) {
+        // A known authentication failure is not a network outage. Do not leave
+        // an old encrypted workspace available for a later offline sign-in.
+        const storedId = localStorage.getItem(deviceStorageKey(userId)) || ''
+        try {
+          if (storedId) await clearLocalSyncData(userId, storedId)
+        } finally {
+          if (storedId) localStorage.removeItem('schoolbridge-offline-snapshot-meta-' + userId + '-' + storedId)
+          const loginIndexKey = 'schoolbridge-offline-login-index'
+          try {
+            const loginIndex = JSON.parse(localStorage.getItem(loginIndexKey) || 'null') as { userId?: number; deviceId?: string } | null
+            if (loginIndex?.userId === userId && (!storedId || loginIndex.deviceId === storedId)) {
+              localStorage.removeItem(loginIndexKey)
+            }
+          } catch {
+            localStorage.removeItem(loginIndexKey)
+          }
+          setOfflineSnapshot(null)
+          setOfflineStatus('Your account could not be authenticated. This device’s saved offline workspace was cleared; reconnect and sign in again.')
+        }
+      }
       setError(err instanceof Error ? err.message : 'Unable to load registered devices.')
     } finally {
       setLoading(false)
