@@ -547,17 +547,20 @@ mod tests {
     #[test]
     fn lan_listener_accepts_private_ip_only_with_existing_https_files() {
         let dir = std::env::temp_dir().join(format!("schoolbridge-lan-valid-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
-        let cert = dir.join("lan-cert.pem");
-        let key = dir.join("lan-key.pem");
-        let env_file = dir.join(".env");
+        let install = dir.join("install");
+        let cert_dir = dir.join("certs");
+        std::fs::create_dir_all(&install).unwrap();
+        std::fs::create_dir_all(&cert_dir).unwrap();
+        let cert = cert_dir.join("lan-cert.pem");
+        let key = cert_dir.join("lan-key.pem");
+        let env_file = install.join(".env");
         std::fs::write(&cert, "certificate placeholder").unwrap();
         std::fs::write(&key, "private key placeholder").unwrap();
         std::fs::write(&env_file, format!(
             "SCHOOLBRIDGE_LAN_ENABLED=true\nSCHOOLBRIDGE_LAN_BIND_IP=192.168.1.20\nSCHOOLBRIDGE_LAN_PORT=8443\nSCHOOLBRIDGE_LAN_CERT_FILE={}\nSCHOOLBRIDGE_LAN_KEY_FILE={}\n",
             cert.display(), key.display()
         )).unwrap();
-        let config = super::configured_lan(&env_file).unwrap().unwrap();
+        let config = super::configured_lan(&env_file, &install).unwrap().unwrap();
         assert_eq!(config.bind_ip, "192.168.1.20".parse().unwrap());
         assert_eq!(config.port, 8443);
         assert_eq!(config.cert_file, cert);
@@ -573,7 +576,7 @@ mod tests {
         std::fs::write(&env_file, "SCHOOLBRIDGE_LAN_ENABLED=true\nSCHOOLBRIDGE_LAN_BIND_IP=8.8.8.8\n").unwrap();
         assert!(super::configured_lan(&env_file, &dir).unwrap_err().contains("private"));
         std::fs::write(&env_file, "SCHOOLBRIDGE_LAN_ENABLED=true\nSCHOOLBRIDGE_LAN_BIND_IP=127.0.0.1\n").unwrap();
-        assert!(super::configured_lan(&env_file).unwrap_err().contains("private"));
+        assert!(super::configured_lan(&env_file, &dir).unwrap_err().contains("private"));
         let _ = std::fs::remove_dir_all(dir);
     }
 
