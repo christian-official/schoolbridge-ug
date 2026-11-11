@@ -12,6 +12,7 @@ from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Response,
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from starlette.background import BackgroundTask
+from starlette.convertors import Convertor, register_url_convertor
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
@@ -30,6 +31,20 @@ from pwdlib import PasswordHash
 from jwt.exceptions import InvalidTokenError
 from fastapi import Request
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+
+class FrontendPathConvertor(Convertor):
+    # Keep API and framework routes out of the SPA fallback.
+    regex = r"(?!(?:api|docs|redoc|openapi\.json)(?:/|$)).+"
+
+    def convert(self, value: str) -> str:
+        return value
+
+    def to_string(self, value: str) -> str:
+        return value
+
+
+register_url_convertor("frontend", FrontendPathConvertor())
+
 
 load_dotenv()
 password_hash = PasswordHash.recommended()
@@ -5484,11 +5499,9 @@ def list_my_offline_teacher_mark_proposals(
 
 
 
-@app.get("/{frontend_path:path}", include_in_schema=False)
+@app.get("/{frontend_path:frontend}", include_in_schema=False)
 def serve_schoolbridge_frontend(frontend_path: str):
     """Serve the bundled SPA for a single-origin, container-free installation."""
-    if frontend_path.startswith(("api/", "docs", "redoc", "openapi.json")):
-        raise HTTPException(404, "Not found.")
     static_dir = _schoolbridge_static_directory()
     candidate = (static_dir / frontend_path).resolve()
     try:

@@ -82,8 +82,9 @@ def test_optional_local_frontend_serving_supports_assets_and_spa_routes(tmp_path
         assert "SchoolBridge local app" in deep_link.text
 
         unknown_api = client.get("/api/not-a-real-endpoint")
-        assert unknown_api.status_code == 404
-        assert "Frontend bundle is not installed" not in unknown_api.text
+        # API paths remain under the existing authentication middleware.
+        assert unknown_api.status_code == 403
+        assert "SchoolBridge local app" not in unknown_api.text
 
 
 def test_health_endpoint_is_public():
