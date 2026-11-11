@@ -2843,6 +2843,69 @@ def test_timetable_reassignment_invalidates_previous_and_new_staff_class_subject
 
 
 
+def test_assignment_transfer_change_feed_reaches_teacher_with_results_only_permission():
+    reset_database()
+    permissions = json.dumps({"My Results": ["view"]})
+    with SessionLocal() as db:
+        previous = models.User(
+            username="results-only-previous", email="results-only-previous@example.invalid",
+            hashed_password=password_hash.hash("TeacherPassword123!"), role="teacher",
+            is_active=True, permissions_json=permissions,
+        )
+        incoming = models.User(
+            username="results-only-incoming", email="results-only-incoming@example.invalid",
+            hashed_password=password_hash.hash("TeacherPassword123!"), role="teacher",
+            is_active=True, permissions_json=permissions,
+        )
+        school_class = models.SchoolClass(name="Results Scope S3", section="A")
+        subject = models.Subject(name="Results Scope Chemistry", school_type="Secondary")
+        db.add_all([previous, incoming, school_class, subject])
+        db.flush()
+        assignment = models.TeacherAssignment(
+            teacher_id=previous.id, class_id=school_class.id, subject_id=subject.id,
+        )
+        db.add(assignment)
+        db.commit()
+        previous_id, incoming_id = previous.id, incoming.id
+        assignment_id, class_id, subject_id = assignment.id, school_class.id, subject.id
+
+    previous_headers = {"Authorization": "Bearer " + create_access_token(
+        SimpleNamespace(id=previous_id, role="teacher")
+    )}
+    incoming_headers = {"Authorization": "Bearer " + create_access_token(
+        SimpleNamespace(id=incoming_id, role="teacher")
+    )}
+    previous_device = "00000000-0000-4000-8000-000000000941"
+    incoming_device = "00000000-0000-4000-8000-000000000942"
+    with TestClient(app) as client:
+        for headers, device in ((previous_headers, previous_device), (incoming_headers, incoming_device)):
+            response = client.post("/api/sync/devices", headers=headers, json={
+                "device_id": device, "device_name": "Results-only teacher device",
+            })
+            assert response.status_code == 200, response.text
+
+        with SessionLocal() as db:
+            assignment = db.get(models.TeacherAssignment, assignment_id)
+            assignment.teacher_id = incoming_id
+            db.commit()
+
+        previous_feed = client.get(
+            f"/api/sync/changes?device_id={previous_device}", headers=previous_headers,
+        )
+        incoming_feed = client.get(
+            f"/api/sync/changes?device_id={incoming_device}", headers=incoming_headers,
+        )
+        assert previous_feed.status_code == 200, previous_feed.text
+        assert incoming_feed.status_code == 200, incoming_feed.text
+        for feed in (previous_feed.json(), incoming_feed.json()):
+            assert any(
+                item["entity_type"] == "TeacherAssignment"
+                and item["entity_id"] == assignment_id
+                for item in feed["changes"]
+            )
+
+
+
 def test_teacher_assignment_transfer_invalidates_both_previous_and_new_teacher_scopes():
     reset_database()
     with SessionLocal() as db:

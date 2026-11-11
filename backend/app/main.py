@@ -2425,7 +2425,14 @@ def _sync_change_visible_to_user(row, user):
             if entity == "Attendance":
                 return "view" in permissions.get("My Attendance", set()) or "view" in permissions.get("Attendance", set())
             if entity in {"TeacherAssignment", "ClassTeacherAssignment"}:
-                return "view" in permissions.get("My Classes", set())
+                # Assignment changes can invalidate several kinds of cached
+                # teacher data, not only the class list: marks, timetable and
+                # attendance are all scoped by these relationships.
+                affected_sections = (
+                    "My Classes", "My Results", "Timetable",
+                    "My Attendance", "Attendance",
+                )
+                return any("view" in permissions.get(section, set()) for section in affected_sections)
             if entity == "TimetableEntry":
                 return "view" in permissions.get("Timetable", set())
         if entity in {"FeeCharge", "FeePayment", "ClassFee"}:
