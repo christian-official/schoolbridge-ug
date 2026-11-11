@@ -3199,3 +3199,110 @@ def test_sync_proposal_rejects_base_sequence_not_issued_to_device():
             },
         )
         assert rejected.status_code == 409
+
+
+def test_student_dismissal_preserves_history_and_shared_parent_access():
+    reset_database()
+    admin = create_admin()
+    admin_headers = {"Authorization": f"Bearer {create_access_token(admin)}"}
+    db = SessionLocal()
+    try:
+        school_class = models.SchoolClass(name="Primary 5", section="Green")
+        db.add(school_class)
+        db.flush()
+        first = models.Student(admission_number="SB-DISMISS-001", first_name="Amina", last_name="Learner", class_id=school_class.id)
+        second = models.Student(admission_number="SB-DISMISS-002", first_name="Brian", last_name="Learner", class_id=school_class.id)
+        db.add_all([first, second])
+        db.flush()
+        db.add(models.Attendance(student_id=first.id, attendance_date=date(2026, 3, 1), status="Present"))
+        db.add(models.FeeCharge(student_id=first.id, term="Term 1", year=2026, amount=500))
+        db.commit()
+        first_id, second_id = first.id, second.id
+    finally:
+        db.close()
+
+    with TestClient(app) as client:
+        created = client.post("/api/parent-accounts", headers=admin_headers, json={
+            "username": "shared-parent", "email": "shared-parent@example.invalid",
+            "student_ids": [first_id, second_id],
+        })
+        assert created.status_code == 200, created.text
+        parent_id = created.json()["id"]
+        parent_login = client.post("/api/auth/login", data={
+            "username": "shared-parent", "password": created.json()["temporary_password"],
+        })
+        assert parent_login.status_code == 200
+        parent_token = parent_login.json()["access_token"]
+        parent_headers = {"Authorization": f"Bearer {parent_token}"}
+
+        dismissed = client.post(f"/api/students/{first_id}/dismiss", headers=admin_headers, json={
+            "reason": "Family relocation", "effective_date": "2026-03-02",
+        })
+        assert dismissed.status_code == 200, dismissed.text
+        assert dismissed.json()["deactivated_parent_ids"] == []
+
+        active_students = client.get("/api/students", headers=admin_headers)
+        assert active_students.status_code == 200
+        assert [row["id"] for row in active_students.json()] == [second_id]
+        archived_students = client.get("/api/students?status=dismissed", headers=admin_headers)
+        assert archived_students.status_code == 200
+        assert [row["id"] for row in archived_students.json()] == [first_id]
+
+        children = client.get("/api/parent/children", headers=parent_headers)
+        assert children.status_code == 200
+        assert [row["id"] for row in children.json()] == [second_id]
+        hidden_history = client.get(f"/api/parent/children/{first_id}/attendance", headers=parent_headers)
+        assert hidden_history.status_code == 404
+
+        with SessionLocal() as verify_db:
+            dismissed_student = verify_db.get(models.Student, first_id)
+            parent = verify_db.get(models.User, parent_id)
+            retained_link = verify_db.query(models.ParentStudentLink).filter_by(
+                user_id=parent_id, student_id=first_id
+            ).first()
+            assert dismissed_student.status == "dismissed"
+            assert retained_link is not None
+            assert parent.is_active is True
+
+        dismissed_second = client.post(f"/api/students/{second_id}/dismiss", headers=admin_headers, json={
+            "reason": "End of enrolment", "effective_date": "2026-03-03",
+        })
+        assert dismissed_second.status_code == 200, dismissed_second.text
+        assert dismissed_second.json()["deactivated_parent_ids"] == [parent_id]
+        revoked = client.get("/api/parent/children", headers=parent_headers)
+        assert revoked.status_code == 401
+
+        with SessionLocal() as verify_db:
+            parent = verify_db.get(models.User, parent_id)
+            assert parent.is_active is False
+            assert parent.token_version == 1
+            assert verify_db.query(models.ParentStudentLink).filter_by(user_id=parent_id).count() == 2
+            assert verify_db.query(models.Attendance).filter_by(student_id=first_id).count() == 1
+            assert verify_db.query(models.FeeCharge).filter_by(student_id=first_id).count() == 1
+
+
+def test_parent_account_removal_deactivates_without_deleting_links():
+    reset_database()
+    admin = create_admin()
+    admin_headers = {"Authorization": f"Bearer {create_access_token(admin)}"}
+    with SessionLocal() as db:
+        student = models.Student(admission_number="SB-PARENT-KEEP", first_name="Lina", last_name="Learner")
+        parent = models.User(username="parent-keep", email="parent-keep@example.invalid",
+                             hashed_password=password_hash.hash("ParentPassword123!"), role="parent")
+        db.add_all([student, parent])
+        db.flush()
+        db.add(models.ParentStudentLink(user_id=parent.id, student_id=student.id))
+        db.commit()
+        parent_id, student_id = parent.id, student.id
+
+    with TestClient(app) as client:
+        removed = client.delete(f"/api/parent-accounts/{parent_id}", headers=admin_headers)
+        assert removed.status_code == 200, removed.text
+        assert removed.json()["deactivated"] is True
+
+    with SessionLocal() as db:
+        parent = db.get(models.User, parent_id)
+        assert parent is not None and parent.is_active is False
+        assert db.query(models.ParentStudentLink).filter_by(
+            user_id=parent_id, student_id=student_id
+        ).count() == 1
