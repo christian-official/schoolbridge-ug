@@ -229,13 +229,11 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
     setOfflineBusy(true);setOfflineStatus('')
     try{
       const account=await request<{username:string;role:string;role_label?:string;permissions:Record<string,string[]>}>('auth/me',token)
-      const installation=await request<{installation_id:string;setup_completed:boolean;activated:boolean}>('setup/status',token)
-      if(!installation.setup_completed||!installation.activated||!installation.installation_id)throw new Error('Complete and activate this SchoolBridge installation before preparing offline records.')
       const permissions=account.permissions||{}
       const can=(section:string)=>account.role==='admin'||(permissions[section]||[]).includes('view')
       const parent=account.role==='parent', teacher=account.role==='teacher'
       const sequences:number[]=[]
-      const snapshot:any={version:1,userId,deviceId,username:account.username,installationId:installation.installation_id,role:account.role,role_label:account.role_label||account.role,permissions:account.permissions||{},permissionFingerprint:permissionFingerprint(account),downloadedAt:Date.now(),expiresAt:Date.now()+24*60*60*1000,sequence:0,students:[],classes:[],attendance:[],exams:[],marks:[],charges:[],payments:[],class_fees:[]}
+      const snapshot:any={version:1,userId,deviceId,username:account.username,role:account.role,role_label:account.role_label||account.role,permissions:account.permissions||{},permissionFingerprint:permissionFingerprint(account),downloadedAt:Date.now(),expiresAt:Date.now()+24*60*60*1000,sequence:0,students:[],classes:[],attendance:[],exams:[],marks:[],charges:[],payments:[],class_fees:[]}
       const tasks:Promise<void>[]=[]
       if(parent||can('Students')||(teacher&&can('My Classes'))){
         tasks.push(collectSnapshotPages<any>('students','students',deviceId,sequences).then(rows=>{snapshot.students=rows}))
@@ -271,8 +269,7 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
       await saveEncryptedOfflineSnapshot(userId,deviceId,offlinePassphrase,snapshot)
       localStorage.setItem('schoolbridge-offline-snapshot-meta-'+userId+'-'+deviceId,JSON.stringify({fingerprint:snapshot.permissionFingerprint,sequence:snapshot.sequence}))
       // Lookup metadata is not an authenticator; the account and records stay encrypted in IndexedDB.
-      // The installation ID prevents a cached snapshot from being mistaken for another school's data.
-      localStorage.setItem('schoolbridge-offline-login-index',JSON.stringify({userId,deviceId,username:account.username,installationId:installation.installation_id}))
+      localStorage.setItem('schoolbridge-offline-login-index',JSON.stringify({userId,deviceId,username:account.username}))
       setOfflineSnapshot(snapshot)
       setOfflineStatus('Authorised records were encrypted and saved on this browser. The copy expires in 24 hours and is cleared if changed permissions or records are detected after reconnecting.')
     }catch(error){setOfflineStatus(error instanceof Error?error.message:'Unable to create the encrypted offline snapshot.')}
@@ -286,8 +283,7 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
     setOfflineBusy(true);setOfflineStatus('')
     try{
       const snapshot=await loadEncryptedOfflineSnapshot<any>(userId,id,offlinePassphrase)
-      const installation=await request<{installation_id:string;setup_completed:boolean;activated:boolean}>('setup/status',token)
-      if(snapshot.version!==1||snapshot.userId!==userId||snapshot.deviceId!==id||snapshot.installationId!==installation.installation_id||!installation.setup_completed||!installation.activated)throw new Error('This offline snapshot belongs to a different account, device, or SchoolBridge installation.')
+      if(snapshot.version!==1||snapshot.userId!==userId||snapshot.deviceId!==id)throw new Error('This offline snapshot belongs to a different account or device.')
       if(!snapshot.expiresAt||snapshot.expiresAt<Date.now()){
         await deleteEncryptedOfflineSnapshot(userId,id)
         localStorage.removeItem('schoolbridge-offline-snapshot-meta-'+userId+'-'+id)

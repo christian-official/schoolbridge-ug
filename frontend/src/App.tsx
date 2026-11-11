@@ -1475,7 +1475,7 @@ function App() {
           <div className="top-actions">
             <span className={`connection-indicator connection-${serverConnection}`} role="status" aria-live="polite">
               {serverConnection === 'connected' ? <CheckCircle2 size={15}/> : serverConnection === 'disconnected' ? <WifiOff size={15}/> : <Wifi size={15}/>}
-              <span>{serverConnection === 'connected' ? 'School server connected' : serverConnection === 'disconnected' ? 'School server unavailable' : 'Checking connection'}</span>
+              <span>{serverConnection === 'connected' ? (isTauriDesktop ? 'Local SchoolBridge service ready' : 'School server connected') : serverConnection === 'disconnected' ? (isTauriDesktop ? 'Local SchoolBridge service unavailable' : 'School server unavailable') : (isTauriDesktop ? 'Checking local service' : 'Checking connection')}</span>
             </span>
             <button className="secondary-button refresh-button" type="button" onClick={() => setActive('Device Management')} aria-label="Manage registered devices">Devices</button>
             <button className="secondary-button refresh-button" type="button" onClick={() => void refreshWorkspace()} disabled={isRefreshing} aria-live="polite">
