@@ -32,7 +32,7 @@ Phase 5 — Database & Offline Architecture includes database-safety, local depl
 
 ### Docker-free native Windows package
 
-A native 64-bit Windows package is now built in GitHub Actions. CI run [#934](https://github.com/christian-official/schoolbridge-ug/actions/runs/42998487404) passed all seven jobs, including offline package installation, application boot, frontend serving and local SQLite health on a Windows Server 2022 runner. The package is intended for Windows 10 22H2 and Windows 11 23H2 or later.
+A native 64-bit Windows package is now built in GitHub Actions. CI run [#937](https://github.com/christian-official/schoolbridge-ug/actions/runs/43000294374) passed all seven jobs, including offline package installation, application boot, frontend serving and local SQLite health on a Windows Server 2022 runner. The package is intended for Windows 10 22H2 and Windows 11 23H2 or later.
 
 **Important acceptance limit:** Windows Server 2022 CI is not a substitute for installing and testing on a clean physical Windows 10/11 school computer. Do not call the native package fully accepted for school deployment until that test covers owner activation, first-school setup, login, real workflows, restart persistence, backup and restore.
 

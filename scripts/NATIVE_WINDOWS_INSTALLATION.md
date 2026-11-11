@@ -4,7 +4,7 @@ This package runs SchoolBridge directly on a 64-bit Windows computer using bundl
 
 ## Download the package
 
-The package is published as the `SchoolBridge-Native-Windows` artifact by the [SchoolBridge CI workflow](https://github.com/christian-official/schoolbridge-ug/actions/workflows/ci.yml). Open a successful run, scroll to **Artifacts**, and download that artifact. CI run [#935](https://github.com/christian-official/schoolbridge-ug/actions/runs/42999503936) is the latest verified package run. GitHub artifacts expire; keep an approved release copy in the project's controlled release storage.
+The package is published as the `SchoolBridge-Native-Windows` artifact by the [SchoolBridge CI workflow](https://github.com/christian-official/schoolbridge-ug/actions/workflows/ci.yml). Open successful run [#937](https://github.com/christian-official/schoolbridge-ug/actions/runs/43000294374), scroll to **Artifacts**, and download `SchoolBridge-Native-Windows`. This run passed all seven CI jobs. GitHub artifacts expire; keep an approved release copy in the project's controlled release storage.
 
 The package is built and smoke-tested on a Windows Server 2022 runner. A clean physical Windows 10/11 acceptance test is still required before school deployment.
 
