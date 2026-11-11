@@ -756,6 +756,68 @@ fn main() {
 mod tests {
     use super::{is_healthy_response, Ipv4Addr};
 
+    #[cfg(windows)]
+    #[test]
+    fn managed_backend_detects_a_real_child_process_exit() {
+        use std::{process::Command, thread, time::{Duration, Instant}};
+
+        let child = Command::new("cmd.exe")
+            .args(["/C", "exit /b 17"])
+            .spawn()
+            .expect("start lifecycle test child");
+        let job = super::JobGuard::attach(child.id()).expect("attach child to job");
+        let mut backend = super::ManagedBackend {
+            children: vec![child],
+            lan: None,
+            _job: job,
+        };
+
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            if let Some(reason) = backend.failure_reason() {
+                assert!(reason.contains("stopped unexpectedly"), "{reason}");
+                break;
+            }
+            assert!(Instant::now() < deadline, "child process did not exit in time");
+            thread::sleep(Duration::from_millis(20));
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn managed_backend_shutdown_terminates_and_reaps_a_real_child() {
+        use std::process::{Command, Stdio};
+        use windows_sys::Win32::{
+            Foundation::CloseHandle,
+            System::Threading::{GetExitCodeProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION},
+        };
+
+        let child = Command::new("cmd.exe")
+            .args(["/C", "ping -n 30 127.0.0.1 >NUL"])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("start long-running lifecycle test child");
+        let pid = child.id();
+        let job = super::JobGuard::attach(pid).expect("attach child to job");
+        super::ManagedBackend {
+            children: vec![child],
+            lan: None,
+            _job: job,
+        }.stop();
+
+        unsafe {
+            let process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
+            assert!(!process.is_null(), "could not inspect stopped child process");
+            let mut exit_code = 0_u32;
+            let inspected = GetExitCodeProcess(process, &mut exit_code);
+            CloseHandle(process);
+            assert_ne!(inspected, 0, "could not read child process exit status");
+            assert_ne!(exit_code, 259, "backend child remained active after desktop shutdown");
+        }
+    }
+
     #[test]
     fn backend_health_failures_require_three_consecutive_checks() {
         let mut failures = 0;
