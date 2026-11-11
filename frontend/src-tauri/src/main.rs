@@ -191,6 +191,8 @@ impl Drop for JobGuard {
 
 struct ManagedBackend {
     children: Vec<Child>,
+    // Keep the optional LAN endpoint under supervision after startup too.
+    lan: Option<LanConfig>,
     // Closing this handle terminates every backend listener in the job.
     #[cfg(windows)]
     _job: JobGuard,
@@ -218,8 +220,23 @@ impl ManagedBackend {
                 Err(error) => return Some(format!("Could not monitor a SchoolBridge backend process: {error}")),
             }
         }
+        if let Some(config) = &self.lan {
+            if !lan_listener_is_reachable(config) {
+                return Some(format!(
+                    "The SchoolBridge HTTPS LAN listener at {}:{} stopped accepting connections.",
+                    config.bind_ip, config.port
+                ));
+            }
+        }
         None
     }
+}
+
+fn lan_listener_is_reachable(config: &LanConfig) -> bool {
+    TcpStream::connect_timeout(
+        &std::net::SocketAddr::from((config.bind_ip, config.port)),
+        Duration::from_millis(500),
+    ).is_ok()
 }
 
 // Own children while startup is in progress too. Any early error path therefore
@@ -572,7 +589,7 @@ fn start_backend() -> Result<ManagedBackend, String> {
                         log_dir.join("lan-backend.log").display()
                     ));
                 }
-                TcpStream::connect((config.bind_ip, config.port)).is_ok()
+                lan_listener_is_reachable(config)
             } else {
                 false
             }
@@ -582,6 +599,7 @@ fn start_backend() -> Result<ManagedBackend, String> {
         if backend_is_healthy(port) && lan_ready {
             return Ok(ManagedBackend {
                 children: std::mem::take(&mut children.0),
+                lan: lan.clone(),
                 #[cfg(windows)]
                 _job: job,
             });
@@ -756,6 +774,21 @@ mod tests {
         assert!(super::mark_restart_attempted(&mut attempted));
         assert!(attempted);
         assert!(!super::mark_restart_attempted(&mut attempted));
+    }
+
+    #[test]
+    fn lan_listener_health_check_detects_tcp_reachability() {
+        let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let config = super::LanConfig {
+            bind_ip: Ipv4Addr::LOCALHOST,
+            port,
+            cert_file: std::path::PathBuf::new(),
+            key_file: std::path::PathBuf::new(),
+        };
+        assert!(super::lan_listener_is_reachable(&config));
+        drop(listener);
+        assert!(!super::lan_listener_is_reachable(&config));
     }
 
     #[test]
