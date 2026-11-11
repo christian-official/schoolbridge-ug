@@ -34,6 +34,14 @@ test('desktop device sync uses the bundled loopback backend rather than the WebV
   assert.ok(devices.includes("const API_BASE_URL = isTauriDesktop"))
   assert.ok(devices.includes("? 'http://127.0.0.1:8080'"))
 })
+test('secure LAN clients use the local same-origin API instead of the hosted API', () => {
+  assert.match(app, /const isSchoolBridgeLanClient = typeof window/)
+  assert.match(app, /window\\.location\\.protocol === 'https:'/)
+  assert.match(app, /desktopApiBaseUrl \\|\\| \\(isSchoolBridgeLanClient \\? '' : configuredApiBaseUrl\\)/)
+  assert.match(devices, /const isSchoolBridgeLanClient = typeof window/)
+  assert.match(devices, /isSchoolBridgeLanClient \\? '' : \\(import\\.meta\\.env\\.VITE_API_BASE_URL \\|\\| ''\\)/)
+})
+
 test('desktop primary operation uses only its loopback backend and local data directory', () => {
   assert.match(app, /const desktopApiBaseUrl = isTauriDesktop \? 'http:\/\/127\.0\.0\.1:8080'/)
   assert.match(desktopShell, /"--host", "127\.0\.0\.1"/)
