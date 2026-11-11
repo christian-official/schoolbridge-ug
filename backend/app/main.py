@@ -3268,9 +3268,11 @@ def list_users(
 def create_parent_account(data: ParentAccountCreate, db: Session = Depends(get_db), admin=Depends(require_admin)):
     temporary_password = secrets.token_urlsafe(12)
     student_ids = list(dict.fromkeys(data.student_ids))
-    students = db.query(models.Student).filter(models.Student.id.in_(student_ids)).all()
+    students = db.query(models.Student).filter(
+        models.Student.id.in_(student_ids), models.Student.status == "active"
+    ).all()
     if len(students) != len(student_ids):
-        raise HTTPException(404, "One or more selected students could not be found.")
+        raise HTTPException(404, "One or more selected students could not be found or are no longer active.")
     already_linked = db.query(models.ParentStudentLink).filter(models.ParentStudentLink.student_id.in_(student_ids)).first()
     if already_linked:
         raise HTTPException(409, "At least one selected student already has a parent login. Use that same account for both guardians; do not create a second login.")
