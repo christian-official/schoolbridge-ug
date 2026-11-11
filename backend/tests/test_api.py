@@ -2780,3 +2780,48 @@ def test_parent_change_feed_includes_own_account_access_invalidations():
         ]
         assert len(own_access_events) == 1
         assert own_access_events[0]["operation"] == "update"
+
+
+
+def test_teacher_assignment_transfer_invalidates_both_previous_and_new_teacher_scopes():
+    reset_database()
+    with SessionLocal() as db:
+        previous = models.User(
+            username="previous-assignment-teacher",
+            email="previous-assignment-teacher@example.invalid",
+            hashed_password=password_hash.hash("TeacherPassword123!"),
+            role="teacher",
+        )
+        incoming = models.User(
+            username="incoming-assignment-teacher",
+            email="incoming-assignment-teacher@example.invalid",
+            hashed_password=password_hash.hash("TeacherPassword123!"),
+            role="teacher",
+        )
+        school_class = models.SchoolClass(name="Sync Transfer S2", section="A")
+        subject = models.Subject(name="Sync Transfer Biology", school_type="Secondary")
+        db.add_all([previous, incoming, school_class, subject])
+        db.flush()
+        assignment = models.TeacherAssignment(
+            teacher_id=previous.id,
+            class_id=school_class.id,
+            subject_id=subject.id,
+        )
+        db.add(assignment)
+        db.commit()
+        previous_id, incoming_id = previous.id, incoming.id
+        assignment_id = assignment.id
+
+        assignment = db.get(models.TeacherAssignment, assignment_id)
+        assignment.teacher_id = incoming_id
+        db.commit()
+
+        change = db.query(models.SyncChange).filter_by(
+            entity_type="TeacherAssignment",
+            entity_id=assignment_id,
+            operation="update",
+        ).order_by(models.SyncChange.id.desc()).first()
+        assert change is not None
+        scope = json.loads(change.scope_json)
+        assert scope["teacher_user_ids"] == sorted([previous_id, incoming_id])
+

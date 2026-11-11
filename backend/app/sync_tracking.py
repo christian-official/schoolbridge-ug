@@ -58,9 +58,31 @@ def _scope_for_target(connection, target):
     elif isinstance(target, models.ParentStudentLink):
         scope["parent_user_ids"].add(int(target.user_id)); add_student(target.student_id)
     elif isinstance(target, models.TeacherAssignment):
-        scope["teacher_user_ids"].add(int(target.teacher_id)); add_class(target.class_id); add_subject(target.subject_id)
+        # An assignment transfer affects both sides: the incoming teacher gains
+        # access, while the outgoing teacher must invalidate previously cached
+        # class/subject records. Capture historical FK values as well as the
+        # post-change values visible on the ORM object.
+        scope["teacher_user_ids"].add(int(target.teacher_id))
+        add_class(target.class_id)
+        add_subject(target.subject_id)
+        try:
+            state = sa_inspect(target)
+            for teacher_id in state.attrs.teacher_id.history.deleted:
+                scope["teacher_user_ids"].add(int(teacher_id))
+            for class_id in state.attrs.class_id.history.deleted:
+                add_class(class_id)
+            for subject_id in state.attrs.subject_id.history.deleted:
+                add_subject(subject_id)
+        except (AttributeError, TypeError, ValueError):
+            pass
     elif isinstance(target, models.ClassTeacherAssignment):
-        scope["teacher_user_ids"].add(int(target.teacher_id)); add_class(target.class_id)
+        scope["teacher_user_ids"].add(int(target.teacher_id))
+        add_class(target.class_id)
+        try:
+            history = sa_inspect(target).attrs.teacher_id.history
+            scope["teacher_user_ids"].update(int(value) for value in history.deleted)
+        except (AttributeError, TypeError, ValueError):
+            pass
     elif isinstance(target, models.SchoolClass): add_class(target.id)
     elif isinstance(target, models.Subject): add_subject(target.id)
     elif isinstance(target, models.Attendance): add_student(target.student_id)
