@@ -104,46 +104,33 @@ This is a delivery requirement, not a claim that the current stack already suppo
 
 Until those gates pass, report each OS as **in development / not yet certified**, not as supported. Do not replace this native-install requirement with browser-only access.
 
-## Feasibility decision and practical rollout
 
-1. **Primary no-WSL host:** prioritise a Docker-free native Windows 10/11 package using a supported Python runtime and local SQLite. This directly removes the WSL2 requirement without introducing an unsupported operating system or EOL runtime.
-2. **Windows 8.1 host:** keep as a separately gated experimental compatibility target. Python 3.12 is a technically supported runtime for Windows 8.1, but the OS is EOL. Do not advertise production support until security review, dependency audit, and clean-machine acceptance are complete.
-3. **Windows 8.0 host:** blocked for the current Python backend because the documented compatible Python path requires an EOL runtime. Do not claim native host support unless the backend is deliberately ported to a runtime with maintained Windows 8.0 support and that entire stack is audited and tested. A runtime downgrade is not an acceptable shortcut.
-4. **Older Windows PCs as clients:** investigate LAN browser access from Firefox ESR 115 while Mozilla security updates remain available. Treat this as a temporary compatibility path, not an OS security guarantee. Validate login, role permissions, service worker/offline behaviour, IndexedDB, Web Crypto, uploads and printing on the actual browser build.
-5. **Schools with no supported host PC:** offer a supported, low-cost dedicated host device on the school LAN, with existing older PCs connecting as clients where browser tests pass. The database remains on the host's local disk and is never shared as a network file.
+## Binding product delivery requirements
 
-The acceptance matrix must report host OS and client OS/browser independently. A passing Windows installer script or a browser smoke test does not certify a legacy host.
+The following requirements take precedence over earlier exploratory rollout suggestions in this document:
 
-## User-facing Windows compatibility policy
+- Windows 8.0 is the starting compatibility target. Windows 8.1 and newer Windows versions must follow; Windows 10/11 must not become the minimum product requirement.
+- The deliverable is an installed desktop application. A local web server that asks staff to open a separate browser is not completion. An embedded rendering component is acceptable only if it is part of the installed desktop application and passes the OS-specific compatibility and security gates.
+- The full installer travels on USB. The USB must contain the application, desktop runtime, backend/runtime dependencies, database setup, migrations, configuration templates, install/uninstall/repair/upgrade tools, integrity manifest and operator documentation. Installation and ordinary operation must not download anything.
+- Offline means usable, not merely cached. The app must launch, authenticate, access the school's local database and perform supported workflows with internet disconnected. The USB is for installation and recovery; the live database belongs on the computer's local disk, not on the removable drive.
+- No Docker Desktop or WSL2 prerequisite for the Windows 8 starting target.
+- No weakening security to force compatibility. Do not silently pin an obsolete browser/runtime, downgrade cryptography or password hashing, or claim an unsupported OS is secure.
+- Preserve newer Windows support. A compatibility implementation for Windows 8 must not regress Windows 10/11 and newer targets.
 
-The product goal is broad access, not an arbitrary minimum of Windows 10. SchoolBridge should aim to be usable from **Windows 8 through the latest supported Windows release**, with the installation role and browser clearly distinguished:
+## Current engineering blockers — explicitly not complete
 
-- **Windows 8 and 8.1 client access:** a supported-browser compatibility target, initially Firefox ESR 115. The current Vite 8 production build baseline is Firefox 114, so its declared JavaScript baseline is compatible on paper with Firefox 115. This is not yet an end-to-end certification: test authentication, all major workspaces, IndexedDB, service worker/offline flows, Web Crypto, uploads, printing and LAN connectivity on actual Windows 8 and 8.1 machines.
-- **Windows 8.1 as a native host:** experimental only. Python 3.12 supports Windows 8.1, but the operating system itself is out of support. A complete dependency, cryptography, TLS and lifecycle audit plus clean-machine acceptance is required before any production claim.
-- **Windows 8.0 as a native host:** not currently supported by the Python runtime path. Do not bundle an end-of-life runtime. Keep investigating a maintainable host option, or use a supported dedicated host on the school LAN while testing Windows 8 as a client.
-- **Windows 10/11 and later supported Windows releases:** retain the existing deployment path and develop a Docker-free host installer as the preferred route for schools without WSL2. The legacy compatibility work must not break this path.
+1. The existing prepare-usb.ps1 packages Docker Desktop + WSL2 images and installers. Its host preparation script rejects Windows 8/8.1.
+2. The current Docker-free package bundles CPython 3.12, FastAPI and SQLite, but the launcher starts Uvicorn and instructs the operator to open a localhost URL in a separate browser. It is not a desktop application.
+3. Python's currently maintained Windows runtime path does not cover Windows 8.0. Python 3.12 supports Windows 8.1, but the OS itself is out of support. A complete dependency and security review is still required.
+4. Electron 22 was the last Electron major to support Windows 8/8.1, and its support ended in 2023. Pinning it is not an acceptable long-term secure desktop-shell solution.
+5. No clean-machine Windows 8 or Windows 8.1 acceptance evidence exists. Hosted Windows Server CI does not prove either target.
 
-This means we are **not intentionally limiting SchoolBridge to Windows 10+**. The target is Windows 8 client access where browser validation passes, plus native hosting across supported Windows releases. The exact limitation today is native hosting on Windows 8.0; Windows 8.1 hosting remains gated. Never advertise a Windows version as supported until its corresponding host/client acceptance matrix passes.
+## Required next engineering sequence
 
-### Current frontend baseline evidence
+- D1 — Runtime and desktop-shell feasibility: evaluate a maintained, genuinely Windows 8-compatible desktop UI/runtime and backend strategy. Record exact versions, security-support status, architecture (x86/x64), required OS APIs and dependency compatibility. Reject options that depend on obsolete browser engines or unsupported runtimes.
+- D2 — Desktop application foundation: create the actual desktop window, secure local API/database lifecycle, startup/shutdown, logs, crash recovery and single-instance behaviour. Do not launch an external browser.
+- D3 — Offline USB build: produce a reproducible USB package containing all required verified components and no online installation dependency. Include install, repair, upgrade, rollback and uninstall paths.
+- D4 — Offline operations: verify first-run setup, authentication, school workflows, persistence, restart, backup and restore with internet disconnected. Keep permission-scoped sync and conflict controls.
+- D5 — OS acceptance: test Windows 8.0, Windows 8.1 and newer Windows versions independently on clean machines. Do not mark an OS supported from static analysis or modern hosted CI alone.
 
-The repository uses Vite 8. Its documented default production browser target includes Firefox 114. Mozilla's Firefox ESR 115 is the final line for Windows 7/8/8.1 and currently has security updates scheduled through March 2027, subject to Mozilla's re-evaluation. This makes Firefox ESR 115 a credible *temporary client test target*, not a guarantee that every SchoolBridge feature works there. The build's browser baseline and real browser feature tests are separate requirements.
-
-### Repository audit update (2026-11-11)
-
-A review of the current frontend manifest and CI workflow found these concrete validation gaps:
-
-- The frontend currently uses React 19.3, Vite 8.3 and TypeScript 7. The project does not currently declare a dedicated legacy-browser build target in its Vite configuration.
-- The frontend CI job runs the offline browser suite in Playwright Chromium only. It does not run Firefox, and it does not run Firefox ESR 115.
-- Therefore, the Firefox 114 Vite default target is only a build/transpilation baseline. It is not evidence that SchoolBridge's React application, browser APIs, service worker, IndexedDB, Web Crypto, file uploads or printing work on Firefox ESR 115 on Windows 8/8.1.
-- Do not lower the global build target or replace current browser dependencies just to obtain a nominal legacy-browser build. First add a separate compatibility build/test lane and identify unsupported APIs. Any polyfill must be narrowly scoped, maintained and covered by tests.
-
-#### Next implementation sequence
-
-1. Add a dedicated legacy-client build target and static compatibility audit without changing the modern production bundle.
-2. Add Firefox-based browser coverage for the legacy target, including login, role permissions, navigation, offline storage/service-worker behaviour, Web Crypto, uploads and print flows. Pin a reproducible browser build; distinguish modern Firefox CI from the actual ESR 115 acceptance run.
-3. Run the client acceptance matrix independently on Windows 8.0 and Windows 8.1 with Firefox ESR 115 while it remains maintained. A Linux Firefox test is useful but does not certify Windows 8 browser integration.
-4. For Windows 8.1 hosting, audit every pinned Python dependency and native wheel, TLS/certificate behaviour, startup/recovery and backup/restore before producing an installer prototype.
-5. For Windows 8.0 hosting, complete a runtime feasibility decision first. If no maintained compatible runtime exists, keep native hosting blocked and do not substitute an end-of-life runtime.
-
-**Current evidence status:** Windows 8.0 native host — blocked; Windows 8.1 native host — experimental/unverified; Windows 8.0 and 8.1 browser clients — unverified; Windows 10/11 native package — CI-verified on Windows Server 2022, with physical-machine acceptance still outstanding.
+Until D1–D5 pass, the Windows 8 desktop USB product is in development, not certified. Do not substitute browser access, a Docker/WSL2 package or a Windows 10-only installer and call the requirement complete.

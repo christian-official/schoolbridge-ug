@@ -1,4 +1,8 @@
-# SchoolBridge USB preparation and first installation
+# Existing Docker/WSL2 USB prototype — not the final desktop installer
+
+## Status and boundary
+
+This document describes the existing Docker Desktop + WSL2 prototype only. It is **not** the agreed final SchoolBridge installer: it requires a modern Windows host, launches the frontend in a separately opened browser, and does not meet the Windows 8 starting-compatibility requirement. Do not present this route as the completed USB deliverable. The final USB must carry the complete desktop application and runtime, install and launch it without internet, and support Windows 8 first, then Windows 8.1 and newer releases.
 
 ## Agreed architecture and installation boundary
 
@@ -18,14 +22,14 @@ The script downloads the official Docker and WSL runtime installers if they are 
 
 Never put the owner's private signing key or passphrase on the USB. Only the public verification key belongs in the school's local .env.
 
-## 2. Install on one computer without LAN or internet
+## 2. Prototype installation on one computer without LAN or internet
 
 1. On the school computer, open an elevated PowerShell window in the USB package folder and run prepare-school-host.ps1. Complete the interactive Docker Desktop setup and licence acceptance. Restart Windows if requested, start Docker Desktop and wait for its engine.
 2. Run check-school-host.ps1 and confirm every check passes.
 3. Copy the complete package folder to a local folder, such as C:\SchoolBridge. Do not run the database from the USB itself.
 4. Open PowerShell in that local folder and run install-schoolbridge.ps1.
 5. The installer verifies required package files and their SHA-256 hashes, rechecks host readiness, creates a local .env with fresh random database/application secrets, asks for the owner's Base64 public verification key, validates it, imports the saved images, and asks you to type START before starting services.
-6. Open http://localhost:8080 on the same computer. Complete owner activation using the unique installation ID and signed CHRISTIAN: code generated on the trusted owner computer, then complete the school's first-time setup.
+6. Open http://localhost:8080 on the same computer in a separate browser (this is a prototype limitation, not the required desktop experience). Complete owner activation using the unique installation ID and signed CHRISTIAN: code generated on the trusted owner computer, then complete the school's first-time setup.
 7. Restart the computer and confirm records remain available. Complete a backup and restore test before handover.
 
 No router, LAN, Wi-Fi or internet is required for the intended single-computer mode once the supported local runtime is installed.
