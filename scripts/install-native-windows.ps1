@@ -37,6 +37,7 @@ $pth=Join-Path $runtime "python312._pth"
 if(-not(Test-Path $python) -or -not(Test-Path $pth)){throw "Archive is not the expected CPython 3.12 x64 embeddable distribution."}
 $pthLines=@(Get-Content $pth | Where-Object {$_ -notmatch '^\s*#?\s*import site\s*$'})
 $pthLines += "Lib\site-packages"
+$pthLines += "..\backend"
 $pthLines += "import site"
 Set-Content $pth $pthLines -Encoding ASCII
 & $python (Join-Path $Target "get-pip.py") --no-index --find-links (Join-Path $Target "wheelhouse")
