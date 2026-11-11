@@ -3,7 +3,7 @@
 use std::{
     fs::{self, OpenOptions},
     io::{Read, Write},
-    net::TcpStream,
+    net::{Ipv4Addr, TcpStream},
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
     sync::Mutex,
@@ -136,6 +136,28 @@ impl JobGuard {
             Ok(Self(job))
         }
     }
+
+    fn attach_additional(&self, process_id: u32) -> Result<(), String> {
+        use windows_sys::Win32::{
+            Foundation::CloseHandle,
+            System::{
+                JobObjects::AssignProcessToJobObject,
+                Threading::{OpenProcess, PROCESS_SET_QUOTA, PROCESS_TERMINATE},
+            },
+        };
+        unsafe {
+            let process = OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, 0, process_id);
+            if process.is_null() {
+                return Err("Could not open the SchoolBridge LAN backend process.".into());
+            }
+            let assigned = AssignProcessToJobObject(self.0, process);
+            CloseHandle(process);
+            if assigned == 0 {
+                return Err("Could not attach the LAN backend to its lifetime-protection job.".into());
+            }
+        }
+        Ok(())
+    }
 }
 
 #[cfg(windows)]
@@ -148,19 +170,73 @@ impl Drop for JobGuard {
 }
 
 struct ManagedBackend {
-    child: Child,
-    // Closing this handle terminates any remaining processes in the job.
+    children: Vec<Child>,
+    // Closing this handle terminates every backend listener in the job.
     #[cfg(windows)]
     _job: JobGuard,
 }
 
 impl ManagedBackend {
     fn stop(mut self) {
-        // Request termination of the owned server, then wait so its process handle
-        // and resources are reaped before the desktop application exits.
-        let _ = self.child.kill();
-        let _ = self.child.wait();
+        // Stop every owned listener and reap each process before desktop exit.
+        for child in &mut self.children {
+            let _ = child.kill();
+        }
+        for child in &mut self.children {
+            let _ = child.wait();
+        }
     }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct LanConfig {
+    bind_ip: Ipv4Addr,
+    port: u16,
+    cert_file: PathBuf,
+    key_file: PathBuf,
+}
+
+fn configured_lan(env_file: &Path) -> Result<Option<LanConfig>, String> {
+    let contents = fs::read_to_string(env_file)
+        .map_err(|_| "SchoolBridge configuration (.env) is missing or unreadable.".to_string())?;
+    let values: std::collections::HashMap<String, String> = contents.lines().filter_map(|line| {
+        let (key, value) = line.split_once('=')?;
+        Some((key.trim().to_string(), value.trim().trim_matches('"').trim_matches('\'').to_string()))
+    }).collect();
+
+    let enabled = values.get("SCHOOLBRIDGE_LAN_ENABLED").map(String::as_str).unwrap_or("false");
+    match enabled.to_ascii_lowercase().as_str() {
+        "false" | "0" | "no" | "off" => return Ok(None),
+        "true" | "1" | "yes" | "on" => {}
+        _ => return Err("SCHOOLBRIDGE_LAN_ENABLED must be true or false.".into()),
+    }
+
+    let bind_raw = values.get("SCHOOLBRIDGE_LAN_BIND_IP")
+        .ok_or("LAN access requires SCHOOLBRIDGE_LAN_BIND_IP to be set to this computer's private Wi-Fi IPv4 address.")?;
+    let bind_ip = bind_raw.parse::<Ipv4Addr>()
+        .map_err(|_| "SCHOOLBRIDGE_LAN_BIND_IP must be a private IPv4 address.".to_string())?;
+    if !bind_ip.is_private() || bind_ip.is_loopback() || bind_ip.is_unspecified() {
+        return Err("LAN access may bind only to a private, non-loopback IPv4 address.".into());
+    }
+
+    let port = values.get("SCHOOLBRIDGE_LAN_PORT").map(String::as_str).unwrap_or("8443")
+        .parse::<u16>().map_err(|_| "SCHOOLBRIDGE_LAN_PORT must be a valid TCP port.".to_string())?;
+    if port < 1024 || port == DEFAULT_BACKEND_PORT {
+        return Err("SCHOOLBRIDGE_LAN_PORT must be an unprivileged port different from the desktop loopback port.".into());
+    }
+
+    let cert_file = values.get("SCHOOLBRIDGE_LAN_CERT_FILE")
+        .map(PathBuf::from).ok_or("LAN access requires an HTTPS certificate file.")?;
+    let key_file = values.get("SCHOOLBRIDGE_LAN_KEY_FILE")
+        .map(PathBuf::from).ok_or("LAN access requires an HTTPS private key file.")?;
+    if !cert_file.is_absolute() || !cert_file.is_file() {
+        return Err("The LAN HTTPS certificate path must be an existing absolute file path.".into());
+    }
+    if !key_file.is_absolute() || !key_file.is_file() || cert_file == key_file {
+        return Err("The LAN HTTPS private key path must be a separate existing absolute file path.".into());
+    }
+
+    Ok(Some(LanConfig { bind_ip, port, cert_file, key_file }))
 }
 
 #[derive(Default)]
@@ -284,6 +360,7 @@ fn start_backend() -> Result<ManagedBackend, String> {
     }
 
     let port = configured_port(&env_file)?;
+    let lan = configured_lan(&env_file)?;
     if TcpStream::connect(("127.0.0.1", port)).is_ok() {
         return Err(format!(
             "Port {port} is already in use. SchoolBridge will not attach to an unowned service."
@@ -335,18 +412,64 @@ fn start_backend() -> Result<ManagedBackend, String> {
         }
     };
 
+    let mut children = vec![child];
+    if let Some(config) = lan {
+        let lan_log_path = log_dir.join("lan-backend.log");
+        let lan_log = OpenOptions::new().create(true).append(true).open(&lan_log_path)
+            .map_err(|error| format!("Could not open the LAN backend log: {error}"))?;
+        let lan_error_log = lan_log.try_clone()
+            .map_err(|error| format!("Could not prepare LAN backend error logging: {error}"))?;
+        let bind_ip = config.bind_ip.to_string();
+        let port_text = config.port.to_string();
+        let cert_file = config.cert_file.to_string_lossy().into_owned();
+        let key_file = config.key_file.to_string_lossy().into_owned();
+        let mut lan_child = Command::new(&python)
+            .args([
+                "-m", "uvicorn", "app.main:app",
+                "--app-dir", backend_dir.to_string_lossy().as_ref(),
+                "--host", &bind_ip,
+                "--port", &port_text,
+                "--ssl-certfile", &cert_file,
+                "--ssl-keyfile", &key_file,
+            ])
+            .current_dir(&root)
+            .env("PYTHONPATH", &backend_dir)
+            .env("SCHOOLBRIDGE_STATIC_DIR", &static_dir)
+            .env("SCHOOLBRIDGE_DATA_DIR", &data_dir)
+            .env("SCHOOLBRIDGE_DATABASE_URL", &database_url)
+            .env("SCHOOLBRIDGE_CORS_ORIGINS", format!("https://{bind_ip}:{port_text}"))
+            .env("SCHOOLBRIDGE_ALLOWED_HOSTS", bind_ip.clone())
+            .stdout(Stdio::from(lan_log))
+            .stderr(Stdio::from(lan_error_log))
+            .spawn()
+            .map_err(|error| format!("Could not start the HTTPS LAN listener: {error}"))?;
+
+        #[cfg(windows)]
+        if let Err(error) = job.attach_additional(lan_child.id()) {
+            let _ = lan_child.kill();
+            let _ = lan_child.wait();
+            return Err(error);
+        }
+        children.push(lan_child);
+    }
+
     let deadline = Instant::now() + BACKEND_START_TIMEOUT;
     while Instant::now() < deadline {
-        if let Some(status) = child.try_wait()
+        if let Some(status) = children[0].try_wait()
             .map_err(|error| format!("Could not monitor the SchoolBridge backend: {error}"))? {
             return Err(format!(
                 "SchoolBridge backend exited during startup ({status}). Check {}.",
                 log_path.display()
             ));
         }
-        if backend_is_healthy(port) {
+        let lan_ready = if let Some(config) = &configured_lan(&env_file)? {
+            TcpStream::connect((config.bind_ip, config.port)).is_ok()
+        } else {
+            true
+        };
+        if backend_is_healthy(port) && lan_ready {
             return Ok(ManagedBackend {
-                child,
+                children,
                 #[cfg(windows)]
                 _job: job,
             });
@@ -354,8 +477,12 @@ fn start_backend() -> Result<ManagedBackend, String> {
         thread::sleep(Duration::from_millis(500));
     }
 
-    let _ = child.kill();
-    let _ = child.wait();
+    for child in &mut children {
+        let _ = child.kill();
+    }
+    for child in &mut children {
+        let _ = child.wait();
+    }
     Err(format!(
         "SchoolBridge backend did not become healthy within 90 seconds. Check {}.",
         log_path.display()
