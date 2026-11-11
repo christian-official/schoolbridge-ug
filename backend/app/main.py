@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 from uuid import UUID, uuid4
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Response, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import FileResponse
 from starlette.background import BackgroundTask
 from starlette.convertors import Convertor, register_url_convertor
@@ -500,6 +501,12 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
     allow_headers=["*"],
 )
+
+# The optional LAN listener supplies its exact private-IP Host allow-list.
+# Local desktop and hosted deployments retain their existing host behavior.
+allowed_hosts = [host.strip() for host in os.getenv("SCHOOLBRIDGE_ALLOWED_HOSTS", "").split(",") if host.strip()]
+if allowed_hosts:
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts)
 
 
 class ClassCreate(BaseModel):
