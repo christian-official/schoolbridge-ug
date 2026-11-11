@@ -142,6 +142,41 @@ const isTauriDesktop = typeof window !== 'undefined' && (
 const desktopApiBaseUrl = isTauriDesktop ? 'http://127.0.0.1:8080' : ''
 // Keep the deployed static site connected to its dedicated API even if a Render
 // build is triggered without the VITE_API_BASE_URL build-time variable.
+declare global {
+  interface Window {
+    __TAURI__?: { core?: { invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> } }
+  }
+}
+
+async function loadStoredSessionToken(): Promise<string> {
+  if (isTauriDesktop) {
+    const invoke = window.__TAURI__?.core?.invoke
+    if (!invoke) throw new Error('Secure desktop credential storage is unavailable.')
+    return (await invoke<string | null>('load_auth_token')) || ''
+  }
+  return sessionStorage.getItem('sb_token') || ''
+}
+
+async function storeSessionToken(token: string): Promise<void> {
+  if (isTauriDesktop) {
+    const invoke = window.__TAURI__?.core?.invoke
+    if (!invoke) throw new Error('Secure desktop credential storage is unavailable.')
+    await invoke<void>('store_auth_token', { token })
+    return
+  }
+  sessionStorage.setItem('sb_token', token)
+}
+
+async function clearStoredSessionToken(): Promise<void> {
+  if (isTauriDesktop) {
+    const invoke = window.__TAURI__?.core?.invoke
+    if (!invoke) throw new Error('Secure desktop credential storage is unavailable.')
+    await invoke<void>('clear_auth_token')
+    return
+  }
+  sessionStorage.removeItem('sb_token')
+}
+
 const API_BASE_URL = desktopApiBaseUrl || configuredApiBaseUrl || (
   typeof window !== 'undefined' && window.location.hostname === 'schoolbridge-ug-1.onrender.com'
     ? 'https://schoolbridge-ug.onrender.com'
@@ -817,7 +852,7 @@ function OfflineWorkspace({snapshot,onExit}:{snapshot:OfflineWorkspaceSnapshot;o
 }
 
 function App() {
-  const [token, setToken] = useState(sessionStorage.getItem('sb_token') || '')
+  const [token, setToken] = useState('')
   const [user, setUser] = useState<User | null>(null)
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -830,6 +865,15 @@ function App() {
   const [serverConnection, setServerConnection] = useState<'checking' | 'connected' | 'disconnected'>('checking')
   const [syncDeviceRevoked, setSyncDeviceRevoked] = useState(false)
   const [setupStatus,setSetupStatus] = useState<FirstSetupStatus>({loading:true,setup_completed:false,activated:false,installation_id:'',identity_locked:false,error:''})
+  useEffect(() => {
+    let cancelled = false
+    loadStoredSessionToken().then(savedToken => {
+      if (!cancelled && savedToken) setToken(savedToken)
+    }).catch(error => {
+      if (!cancelled) setLoginError(error instanceof Error ? error.message : 'Unable to access secure session storage.')
+    })
+    return () => { cancelled = true }
+  }, [])
   useEffect(()=>{
     let cancelled=false
     fetch(`${API_BASE_URL}/api/setup/status`).then(async response=>{
@@ -1164,7 +1208,7 @@ function App() {
         await loadSchoolData(authToken,profile)
       }
     } catch (error) {
-      sessionStorage.removeItem('sb_token')
+      void clearStoredSessionToken().catch(() => {})
       setToken('')
       setUser(null)
       setLoginError(error instanceof Error ? `Sign-in succeeded, but account verification failed: ${error.message}` : 'Sign-in succeeded, but account verification failed.')
@@ -1296,7 +1340,7 @@ function App() {
         if (response.status >= 500) throw new TypeError('SchoolBridge server is temporarily unavailable.')
         throw new Error(result.detail || 'Login failed')
       }
-      sessionStorage.setItem('sb_token', result.access_token)
+      await storeSessionToken(result.access_token)
       setToken(result.access_token)
       setPassword('')
     } catch (error) {
@@ -1325,7 +1369,7 @@ function App() {
   function logout() {
     const activeToken = token
     if (activeToken) void api('auth/logout', activeToken, { method: 'POST' }).catch(() => {})
-    sessionStorage.removeItem('sb_token')
+    void clearStoredSessionToken().catch(() => {})
     setToken('')
     setUser(null)
     setStudents([])

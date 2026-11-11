@@ -13,6 +13,62 @@ use std::{
 
 use tauri::{Manager, RunEvent};
 
+const AUTH_CREDENTIAL_SERVICE: &str = "ug.co.schoolbridge.desktop";
+const AUTH_CREDENTIAL_ACCOUNT: &str = "session";
+
+#[cfg(windows)]
+fn auth_credential_entry() -> Result<keyring::Entry, String> {
+    keyring::Entry::new(AUTH_CREDENTIAL_SERVICE, AUTH_CREDENTIAL_ACCOUNT)
+        .map_err(|error| format!("Could not access Windows Credential Manager: {error}"))
+}
+
+#[cfg(windows)]
+#[tauri::command]
+fn store_auth_token(token: String) -> Result<(), String> {
+    if token.is_empty() || token.len() > 16_384 {
+        return Err("The login token is invalid.".into());
+    }
+    auth_credential_entry()?.set_password(&token)
+        .map_err(|error| format!("Could not protect the SchoolBridge login token: {error}"))
+}
+
+#[cfg(windows)]
+#[tauri::command]
+fn load_auth_token() -> Result<Option<String>, String> {
+    match auth_credential_entry()?.get_password() {
+        Ok(token) => Ok(Some(token)),
+        Err(keyring::Error::NoEntry) => Ok(None),
+        Err(error) => Err(format!("Could not read the protected SchoolBridge login token: {error}")),
+    }
+}
+
+#[cfg(windows)]
+#[tauri::command]
+fn clear_auth_token() -> Result<(), String> {
+    match auth_credential_entry()?.delete_credential() {
+        Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+        Err(error) => Err(format!("Could not remove the protected SchoolBridge login token: {error}")),
+    }
+}
+
+// Non-Windows development builds fail closed instead of persisting credentials
+// in an unprotected fallback store.
+#[cfg(not(windows))]
+#[tauri::command]
+fn store_auth_token(_token: String) -> Result<(), String> {
+    Err("Protected desktop credential storage is only available on Windows.".into())
+}
+#[cfg(not(windows))]
+#[tauri::command]
+fn load_auth_token() -> Result<Option<String>, String> {
+    Err("Protected desktop credential storage is only available on Windows.".into())
+}
+#[cfg(not(windows))]
+#[tauri::command]
+fn clear_auth_token() -> Result<(), String> {
+    Err("Protected desktop credential storage is only available on Windows.".into())
+}
+
 const DEFAULT_BACKEND_PORT: u16 = 8080;
 const BACKEND_START_TIMEOUT: Duration = Duration::from_secs(90);
 
@@ -308,6 +364,7 @@ fn start_backend() -> Result<ManagedBackend, String> {
 
 fn main() {
     let app = tauri::Builder::default()
+        .invoke_handler(tauri::generate_handler![store_auth_token, load_auth_token, clear_auth_token])
         .manage(BackendProcess::default())
         .setup(|app| {
             let backend = start_backend()
