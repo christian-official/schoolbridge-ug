@@ -97,7 +97,20 @@ def _scope_for_target(connection, target):
     elif isinstance(target, models.StaffMember): add_staff(target.id)
     elif isinstance(target, (models.StaffAttendance, models.SalaryPayment)): add_staff(target.staff_id)
     elif isinstance(target, models.TimetableEntry):
+        # Timetable edits can move a lesson between classes, subjects or staff.
+        # Invalidate both the previous and replacement scopes so a teacher who
+        # loses a lesson cannot keep viewing it from an offline snapshot.
         add_class(target.class_id); add_subject(target.subject_id); add_staff(target.staff_id)
+        try:
+            state = sa_inspect(target)
+            for class_id in state.attrs.class_id.history.deleted:
+                add_class(class_id)
+            for subject_id in state.attrs.subject_id.history.deleted:
+                add_subject(subject_id)
+            for staff_id in state.attrs.staff_id.history.deleted:
+                add_staff(staff_id)
+        except (AttributeError, TypeError, ValueError):
+            pass
     elif isinstance(target, models.OtherExpense): scope["finance_only"] = True
     return {key: sorted(value) if isinstance(value, set) else value for key, value in scope.items()}
 

@@ -2783,6 +2783,66 @@ def test_parent_change_feed_includes_own_account_access_invalidations():
 
 
 
+def test_timetable_reassignment_invalidates_previous_and_new_staff_class_subject_scopes():
+    reset_database()
+    with SessionLocal() as db:
+        previous_staff = models.StaffMember(
+            staff_number="SYNC-TT-OLD", first_name="Old", last_name="Teacher",
+            category="Teaching", status="active",
+        )
+        incoming_staff = models.StaffMember(
+            staff_number="SYNC-TT-NEW", first_name="New", last_name="Teacher",
+            category="Teaching", status="active",
+        )
+        old_class = models.SchoolClass(name="Sync Timetable Old", section="A")
+        new_class = models.SchoolClass(name="Sync Timetable New", section="B")
+        old_subject = models.Subject(name="Sync Timetable Old Subject", school_type="Secondary")
+        new_subject = models.Subject(name="Sync Timetable New Subject", school_type="Secondary")
+        db.add_all([previous_staff, incoming_staff, old_class, new_class, old_subject, new_subject])
+        db.flush()
+        previous_teacher = models.User(
+            username="sync-timetable-old-teacher",
+            email="sync-timetable-old-teacher@example.invalid",
+            hashed_password=password_hash.hash("TeacherPassword123!"),
+            role="teacher", staff_id=previous_staff.id,
+        )
+        incoming_teacher = models.User(
+            username="sync-timetable-new-teacher",
+            email="sync-timetable-new-teacher@example.invalid",
+            hashed_password=password_hash.hash("TeacherPassword123!"),
+            role="teacher", staff_id=incoming_staff.id,
+        )
+        db.add_all([previous_teacher, incoming_teacher])
+        db.flush()
+        lesson = models.TimetableEntry(
+            class_id=old_class.id, subject_id=old_subject.id,
+            staff_id=previous_staff.id, day_of_week=1,
+            start_time="08:00", end_time="08:40",
+        )
+        db.add(lesson)
+        db.commit()
+        old_teacher_id, new_teacher_id = previous_teacher.id, incoming_teacher.id
+        old_class_id, new_class_id = old_class.id, new_class.id
+        old_subject_id, new_subject_id = old_subject.id, new_subject.id
+        lesson_id = lesson.id
+
+        lesson = db.get(models.TimetableEntry, lesson_id)
+        lesson.class_id = new_class_id
+        lesson.subject_id = new_subject_id
+        lesson.staff_id = incoming_staff.id
+        db.commit()
+
+        change = db.query(models.SyncChange).filter_by(
+            entity_type="TimetableEntry", entity_id=lesson_id, operation="update",
+        ).order_by(models.SyncChange.id.desc()).first()
+        assert change is not None
+        scope = json.loads(change.scope_json)
+        assert scope["teacher_user_ids"] == sorted([old_teacher_id, new_teacher_id])
+        assert scope["class_ids"] == sorted([old_class_id, new_class_id])
+        assert scope["subject_ids"] == sorted([old_subject_id, new_subject_id])
+
+
+
 def test_teacher_assignment_transfer_invalidates_both_previous_and_new_teacher_scopes():
     reset_database()
     with SessionLocal() as db:
