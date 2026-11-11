@@ -147,6 +147,20 @@ def test_logout_revokes_existing_access_tokens():
     assert after.status_code == 401
 
 
+def test_logout_revokes_tokens_on_routes_registered_later_in_module():
+    reset_database()
+    admin = create_admin()
+    token = create_access_token(admin)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    with TestClient(app) as client:
+        signed_out = client.post("/api/auth/logout", headers=headers)
+        later_route = client.get("/api/attendance/options", headers=headers)
+
+    assert signed_out.status_code == 200
+    assert later_route.status_code == 401
+
+
 def test_password_change_revokes_old_access_token():
     reset_database()
     create_admin()

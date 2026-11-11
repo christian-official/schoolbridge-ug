@@ -975,23 +975,6 @@ def list_students(db: Session = Depends(get_db)):
     return db.query(models.Student).order_by(models.Student.last_name).all()
 
 
-def get_current_user(
-    token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db),
-):
-    try:
-        payload = jwt.decode(
-            token, JWT_SECRET, algorithms=[JWT_ALGORITHM]
-        )
-        user_id = int(payload["sub"])
-    except (InvalidTokenError, ValueError, KeyError):
-        raise HTTPException(401, "Invalid or expired login token.")
-
-    user = db.get(models.User, user_id)
-    if not user or not user.is_active:
-        raise HTTPException(401, "Account is unavailable.")
-    return user
-
 
 @app.get("/api/attendance/options", tags=["Attendance"])
 def attendance_options(db: Session = Depends(get_db), user=Depends(get_current_user)):
