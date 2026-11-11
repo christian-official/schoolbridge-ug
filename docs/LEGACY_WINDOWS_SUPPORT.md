@@ -128,3 +128,22 @@ This means we are **not intentionally limiting SchoolBridge to Windows 10+**. Th
 ### Current frontend baseline evidence
 
 The repository uses Vite 8. Its documented default production browser target includes Firefox 114. Mozilla's Firefox ESR 115 is the final line for Windows 7/8/8.1 and currently has security updates scheduled through March 2027, subject to Mozilla's re-evaluation. This makes Firefox ESR 115 a credible *temporary client test target*, not a guarantee that every SchoolBridge feature works there. The build's browser baseline and real browser feature tests are separate requirements.
+
+### Repository audit update (2026-11-11)
+
+A review of the current frontend manifest and CI workflow found these concrete validation gaps:
+
+- The frontend currently uses React 19.3, Vite 8.3 and TypeScript 7. The project does not currently declare a dedicated legacy-browser build target in its Vite configuration.
+- The frontend CI job runs the offline browser suite in Playwright Chromium only. It does not run Firefox, and it does not run Firefox ESR 115.
+- Therefore, the Firefox 114 Vite default target is only a build/transpilation baseline. It is not evidence that SchoolBridge's React application, browser APIs, service worker, IndexedDB, Web Crypto, file uploads or printing work on Firefox ESR 115 on Windows 8/8.1.
+- Do not lower the global build target or replace current browser dependencies just to obtain a nominal legacy-browser build. First add a separate compatibility build/test lane and identify unsupported APIs. Any polyfill must be narrowly scoped, maintained and covered by tests.
+
+#### Next implementation sequence
+
+1. Add a dedicated legacy-client build target and static compatibility audit without changing the modern production bundle.
+2. Add Firefox-based browser coverage for the legacy target, including login, role permissions, navigation, offline storage/service-worker behaviour, Web Crypto, uploads and print flows. Pin a reproducible browser build; distinguish modern Firefox CI from the actual ESR 115 acceptance run.
+3. Run the client acceptance matrix independently on Windows 8.0 and Windows 8.1 with Firefox ESR 115 while it remains maintained. A Linux Firefox test is useful but does not certify Windows 8 browser integration.
+4. For Windows 8.1 hosting, audit every pinned Python dependency and native wheel, TLS/certificate behaviour, startup/recovery and backup/restore before producing an installer prototype.
+5. For Windows 8.0 hosting, complete a runtime feasibility decision first. If no maintained compatible runtime exists, keep native hosting blocked and do not substitute an end-of-life runtime.
+
+**Current evidence status:** Windows 8.0 native host — blocked; Windows 8.1 native host — experimental/unverified; Windows 8.0 and 8.1 browser clients — unverified; Windows 10/11 native package — CI-verified on Windows Server 2022, with physical-machine acceptance still outstanding.
