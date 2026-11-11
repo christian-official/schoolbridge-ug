@@ -5,6 +5,7 @@ import secrets
 import smtplib
 from email.message import EmailMessage
 from datetime import date, datetime, time
+from pathlib import Path
 from zoneinfo import ZoneInfo
 from uuid import UUID, uuid4
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Response, Query
@@ -715,8 +716,18 @@ def update_admission_settings(
     }
 
 
+def _schoolbridge_static_directory() -> Path:
+    configured = os.getenv("SCHOOLBRIDGE_STATIC_DIR")
+    if configured:
+        return Path(configured).expanduser().resolve()
+    return Path(__file__).resolve().parent / "static"
+
+
 @app.get("/", include_in_schema=False)
 def root():
+    index = _schoolbridge_static_directory() / "index.html"
+    if index.is_file():
+        return FileResponse(index)
     return {"message": "SchoolBridge API is running. Visit /docs for API documentation."}
 
 
@@ -5471,3 +5482,22 @@ def list_my_offline_teacher_mark_proposals(
         })
     return {"proposals": proposals}
 
+
+
+@app.get("/{frontend_path:path}", include_in_schema=False)
+def serve_schoolbridge_frontend(frontend_path: str):
+    """Serve the bundled SPA for a single-origin, container-free installation."""
+    if frontend_path.startswith(("api/", "docs", "redoc", "openapi.json")):
+        raise HTTPException(404, "Not found.")
+    static_dir = _schoolbridge_static_directory()
+    candidate = (static_dir / frontend_path).resolve()
+    try:
+        candidate.relative_to(static_dir)
+    except ValueError:
+        raise HTTPException(404, "Not found.")
+    if candidate.is_file():
+        return FileResponse(candidate)
+    index = static_dir / "index.html"
+    if index.is_file():
+        return FileResponse(index)
+    raise HTTPException(404, "Frontend bundle is not installed.")

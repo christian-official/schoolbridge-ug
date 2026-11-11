@@ -61,6 +61,31 @@ def create_admin():
         db.close()
 
 
+def test_optional_local_frontend_serving_supports_assets_and_spa_routes(tmp_path, monkeypatch):
+    monkeypatch.setenv("SCHOOLBRIDGE_STATIC_DIR", str(tmp_path))
+    (tmp_path / "index.html").write_text("<!doctype html><html><body>SchoolBridge local app</body></html>")
+    assets = tmp_path / "assets"
+    assets.mkdir()
+    (assets / "app.js").write_text("window.schoolbridgeReady = true")
+
+    with TestClient(app) as client:
+        root = client.get("/")
+        assert root.status_code == 200
+        assert "SchoolBridge local app" in root.text
+
+        asset = client.get("/assets/app.js")
+        assert asset.status_code == 200
+        assert asset.text == "window.schoolbridgeReady = true"
+
+        deep_link = client.get("/students")
+        assert deep_link.status_code == 200
+        assert "SchoolBridge local app" in deep_link.text
+
+        unknown_api = client.get("/api/not-a-real-endpoint")
+        assert unknown_api.status_code == 404
+        assert "Frontend bundle is not installed" not in unknown_api.text
+
+
 def test_health_endpoint_is_public():
     reset_database()
     with TestClient(app) as client:
