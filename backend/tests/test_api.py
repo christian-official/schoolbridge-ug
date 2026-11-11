@@ -1360,6 +1360,12 @@ def test_sync_device_registration_is_authenticated_user_scoped_and_revocable():
         assert teacher_devices.status_code == 200
         assert teacher_devices.json()["devices"] == []
 
+        # A registered device ID is scoped to its owning account.
+        other_user_sync = client.get(
+            f"/api/sync/changes?device_id={device_id}", headers=teacher_headers,
+        )
+        assert other_user_sync.status_code == 403
+
         teacher_registered = client.post(
             "/api/sync/devices", headers=teacher_headers,
             json={
@@ -1381,6 +1387,12 @@ def test_sync_device_registration_is_authenticated_user_scoped_and_revocable():
             f"/api/sync/devices/{device_id}", headers=admin_headers,
         )
         assert revoked.status_code == 200
+
+        # Revocation must stop future change-feed access immediately.
+        revoked_sync = client.get(
+            f"/api/sync/changes?device_id={device_id}", headers=admin_headers,
+        )
+        assert revoked_sync.status_code == 403
 
         listed_after_revoke = client.get("/api/sync/devices", headers=admin_headers)
         assert listed_after_revoke.json()["devices"][0]["active"] is False
