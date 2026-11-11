@@ -17,3 +17,14 @@ Credential commands reject empty or oversized tokens and fail closed if the Wind
 This protects the desktop login token using the operating system credential store. It does **not** encrypt the SQLite database, offline snapshots, or other school data at rest. It does not by itself protect a Windows account that is already compromised or unlocked by an unauthorised person.
 
 Local database encryption, offline snapshot key management, backup protection, and recovery validation remain separate security tasks. A successful CI build and test run is not a substitute for a real Windows-machine credential-store and account-isolation test.
+
+
+## Desktop offline workspace connectivity
+
+The registered-device and encrypted-offline-copy workspace uses the same
+loopback backend address as the main desktop application
+(`http://127.0.0.1:8080`). It must not issue relative API requests against
+the Tauri WebView origin. Browser and hosted builds continue to use their
+configured API base URL. The encrypted offline snapshot remains a separate,
+read-only cached workspace; this routing correction does not make it a
+write-capable offline synchronisation queue.
