@@ -79,6 +79,31 @@ These facts narrow the feasible deployment options and supersede any assumption 
 - Windows 8.1 can technically run a currently security-maintained CPython 3.12 runtime, but that does not make the Windows 8.1 operating system secure or supported. A native host prototype still requires an explicit risk decision and real-machine validation.
 - Microsoft Edge 109 was the final Edge release for Windows 8/8.1 and is no longer maintained. Mozilla currently states Firefox ESR 115 is the final Firefox line for these systems and will receive security updates through March 2027, subject to re-evaluation. Browser security updates do not replace missing OS security updates, and the SchoolBridge frontend feature baseline still needs testing on that browser.
 
+## Confirmed product requirement: native installation on both legacy systems
+
+The product owner has explicitly confirmed that **Windows 8.0 and Windows 8.1 must each receive a directly installable SchoolBridge package**. Browser-only access through another computer is not an acceptable completion of this requirement.
+
+This is a delivery requirement, not a claim that the current stack already supports either OS. The engineering track must continue until each OS has a tested local installation, local database, application startup/recovery, offline operation, upgrade and restore path.
+
+### Native-install architecture work
+
+- Keep the Windows 10/11 Docker-free installer as a separate target; do not regress it.
+- Build a single-computer package that starts SchoolBridge locally and stores its SQLite database on that computer's local disk.
+- For Windows 8.1, validate a pinned maintained Python 3.12 runtime against every direct and transitive dependency, then package the application and frontend without requiring preinstalled Python or Node.js.
+- For Windows 8.0, do not label an EOL CPython runtime as secure or supported. Evaluate a maintained alternative runtime or a deliberately isolated compatibility backend. If that requires a backend portability layer, implement it as a separate workstream rather than silently dropping Windows 8.0.
+- The installer must detect OS version and architecture before making changes, refuse unsupported package combinations, and explain legacy-OS security risk.
+- A Windows 8/8.1 deliverable is not complete merely because its installer opens. Each system must pass the full acceptance matrix on a clean machine, including disconnected installation and operation.
+
+### Delivery gates
+
+1. **Runtime proof:** produce a reproducible runtime/dependency matrix for Windows 8.0 and 8.1, including cryptography, TLS, password hashing, database drivers and offline wheels. No EOL runtime may be presented as security-maintained.
+2. **Local app proof:** run the API, built frontend and SQLite database on the target computer with no Docker, WSL2, external server or internet dependency.
+3. **Lifecycle proof:** demonstrate startup after reboot, process recovery, logs, backup scheduling, safe upgrade and rollback.
+4. **Installer proof:** generate OS-aware offline installers with checksums and preflight checks.
+5. **Machine acceptance:** pass the full clean-machine test suite independently on Windows 8.0 and Windows 8.1 before advertising either as supported.
+
+Until those gates pass, report each OS as **in development / not yet certified**, not as supported. Do not replace this native-install requirement with browser-only access.
+
 ## Feasibility decision and practical rollout
 
 1. **Primary no-WSL host:** prioritise a Docker-free native Windows 10/11 package using a supported Python runtime and local SQLite. This directly removes the WSL2 requirement without introducing an unsupported operating system or EOL runtime.
