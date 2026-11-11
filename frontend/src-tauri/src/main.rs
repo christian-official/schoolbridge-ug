@@ -530,7 +530,7 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("schoolbridge-lan-disabled-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let env_file = dir.join(".env");
-        std::fs::write(&env_file, "SCHOOLBRIDGE_PORT=8080\\n").unwrap();
+        std::fs::write(&env_file, "SCHOOLBRIDGE_PORT=8080\n").unwrap();
         assert_eq!(super::configured_lan(&env_file).unwrap(), None);
         let _ = std::fs::remove_dir_all(dir);
     }
@@ -545,7 +545,7 @@ mod tests {
         std::fs::write(&cert, "certificate placeholder").unwrap();
         std::fs::write(&key, "private key placeholder").unwrap();
         std::fs::write(&env_file, format!(
-            "SCHOOLBRIDGE_LAN_ENABLED=true\\nSCHOOLBRIDGE_LAN_BIND_IP=192.168.1.20\\nSCHOOLBRIDGE_LAN_PORT=8443\\nSCHOOLBRIDGE_LAN_CERT_FILE={}\\nSCHOOLBRIDGE_LAN_KEY_FILE={}\\n",
+            "SCHOOLBRIDGE_LAN_ENABLED=true\nSCHOOLBRIDGE_LAN_BIND_IP=192.168.1.20\nSCHOOLBRIDGE_LAN_PORT=8443\nSCHOOLBRIDGE_LAN_CERT_FILE={}\nSCHOOLBRIDGE_LAN_KEY_FILE={}\n",
             cert.display(), key.display()
         )).unwrap();
         let config = super::configured_lan(&env_file).unwrap().unwrap();
@@ -561,9 +561,9 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("schoolbridge-lan-invalid-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let env_file = dir.join(".env");
-        std::fs::write(&env_file, "SCHOOLBRIDGE_LAN_ENABLED=true\\nSCHOOLBRIDGE_LAN_BIND_IP=8.8.8.8\\n").unwrap();
+        std::fs::write(&env_file, "SCHOOLBRIDGE_LAN_ENABLED=true\nSCHOOLBRIDGE_LAN_BIND_IP=8.8.8.8\n").unwrap();
         assert!(super::configured_lan(&env_file).unwrap_err().contains("private"));
-        std::fs::write(&env_file, "SCHOOLBRIDGE_LAN_ENABLED=true\\nSCHOOLBRIDGE_LAN_BIND_IP=127.0.0.1\\n").unwrap();
+        std::fs::write(&env_file, "SCHOOLBRIDGE_LAN_ENABLED=true\nSCHOOLBRIDGE_LAN_BIND_IP=127.0.0.1\n").unwrap();
         assert!(super::configured_lan(&env_file).unwrap_err().contains("private"));
         let _ = std::fs::remove_dir_all(dir);
     }
