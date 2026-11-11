@@ -1,53 +1,76 @@
 # SchoolBridge desktop LAN access
 
 LAN access is disabled by default. Keep the desktop frontend on its loopback API at
-http://127.0.0.1:8080. The separate LAN API listener must use HTTPS on the
-configured private IPv4 address and a separate port (default 8443).
+http://127.0.0.1:8080. The separate LAN API listener uses HTTPS on the configured
+private IPv4 address and a separate port (default 8443).
 
-## Certificate requirements
+## Provision the host certificate
 
-Set these values in the installed .env only after a certificate has been
-provisioned for the host's exact private IPv4 address. The current desktop
-LAN configuration binds and allows the IP address only; client devices must
-connect using that same IP address (not a DNS alias):
+On the installed host, open an elevated PowerShell window in the USB package folder
+and run:
+
+    .\provision-lan-certificates.ps1 -BindAddress 192.168.1.20
+
+Use the actual private Wi-Fi IPv4 address assigned to the host. The provisioner
+uses the installed Python runtime and its bundled cryptography dependency. It
+creates a per-installation P-256 root CA and an IP-bound P-256 server certificate.
+The root CA is constrained to certificate signing; the server certificate has
+server-auth usage and the host IP as an IP Subject Alternative Name.
+
+Private keys are stored under
+%ProgramData%\SchoolBridge\secrets. The script removes inherited directory ACLs
+and grants full access only to the installing Windows account and SYSTEM. The CA
+private key never leaves the host. The public root certificate is exported to
+the operator's Desktop as SchoolBridge-LAN-Root-CA.pem. The script updates the
+installed .env with the host IP and certificate/key paths, but does not enable
+LAN access.
+
+The root CA is specific to this installation. Do not replace or copy its private
+key. If its five-year lifetime approaches expiry, plan an explicit CA rotation
+and reinstall the replacement public root certificate on every client. The
+server certificate is renewed when it has 30 days or less remaining, or when
+the host IP changes. Keep a protected backup of the CA key and certificate; loss
+of the CA key requires a new CA and client re-trust.
+
+## Trust the public root on client devices
+
+Transfer only SchoolBridge-LAN-Root-CA.pem to each authorised device using a
+trusted administrative method. Never transfer either private key.
+
+- **Windows:** import the public certificate into the Local Computer
+  Trusted Root Certification Authorities store, using an administrator-managed
+  certificate deployment process.
+- **Android:** install the CA certificate through the device's security
+  certificate settings. Android app trust behaviour can vary by OS version and
+  application; confirm the actual SchoolBridge client trusts user-installed CAs.
+- **iPhone/iPad:** install the CA certificate profile, then enable full trust for
+  that root in Certificate Trust Settings. Managed devices should use the
+  school's approved device-management process.
+
+Do not bypass browser/app TLS warnings. If a client platform does not permit the
+SchoolBridge client to trust this private CA, do not connect that client until a
+supported trust method is provided.
+
+## Enable the listener and firewall
+
+Only after the root CA is trusted on intended clients, edit the installed
+%ProgramData%\SchoolBridge\.env and set:
 
     SCHOOLBRIDGE_LAN_ENABLED=true
-    SCHOOLBRIDGE_LAN_BIND_IP=192.168.1.20
-    SCHOOLBRIDGE_LAN_PORT=8443
-    SCHOOLBRIDGE_LAN_CERT_FILE=C:\SchoolBridgeSecrets\lan-cert.pem
-    SCHOOLBRIDGE_LAN_KEY_FILE=C:\SchoolBridgeSecrets\lan-key.pem
 
-Use the actual private IPv4 address assigned to the host computer. The
-certificate must contain that IPv4 address as an IP Subject Alternative
-Name (IP SAN). A DNS-only SAN is not sufficient for the current IP-only
-listener and host allow-list. It must chain to a certificate authority trusted by
-every client device. Do not ask staff to bypass certificate warnings. Keep the
-private key outside the installation/USB directory, restrict its NTFS
-permissions to the SchoolBridge operator account, and never include it in a
-USB package or general staff backup.
-
-The backend verifies that both certificate files exist, are separate, and are
-outside the installation directory. Uvicorn validates the certificate/key pair
-when the HTTPS listener starts. File existence alone does not prove client trust.
-
-## Windows Firewall
-
-Run elevated PowerShell on the host after configuring the application and
-certificate. Replace the sample address with the host's actual private Wi-Fi
-IPv4 address:
+The provisioner has already set the bind IP and certificate/key paths. Then run
+elevated PowerShell from the installed package:
 
     .\configure-lan-firewall.ps1 -BindAddress 192.168.1.20 -Port 8443
 
-The script refuses public/loopback addresses, requires the selected interface
-to be classified as a Private network, and creates one inbound rule limited to:
+The script refuses public/loopback addresses, requires the selected interface to
+be classified as a Private network, and creates one inbound rule limited to the
+installed SchoolBridge Python runtime, configured local IPv4 address and TCP
+port, the Windows Private firewall profile, and LocalSubnet as the remote range.
+It does not open port 8080, change the network profile, disable the firewall, or
+expose the listener to public networks.
 
-- the installed SchoolBridge Python runtime executable;
-- the configured local IPv4 address and TCP port;
-- the Windows Private firewall profile; and
-- LocalSubnet as the remote address range.
-
-It does not open port 8080, change the network profile, disable the firewall,
-or expose the listener to public networks. To remove the rule:
+To remove the rule:
 
     .\configure-lan-firewall.ps1 -Disable
 
@@ -56,15 +79,13 @@ or expose the listener to public networks. To remove the rule:
 The LAN listener is opt-in and uses a separate HTTPS process while the desktop
 frontend remains loopback-only. Both processes use the same local SQLite file.
 SQLite WAL mode and a bounded busy timeout support concurrent readers/writers,
-but concurrent LAN load and backup/restore behavior still require integration
+but concurrent LAN load and backup/restore behaviour still require integration
 testing on the installed Windows application.
 
 User authentication and per-user device registration/revocation checks remain
-required. Device registration is intentionally free and self-service: a
-signed-in user can register their own device without administrator approval.
-Registration does not grant access to another user's records; sync endpoints
-must continue enforcing the authenticated account's scope and active-device
-status.
+required. Device registration is intentionally free and self-service: a signed-in
+user can register their own device without administrator approval. Registration
+does not grant access to another user's records.
 
 Before production LAN use, verify certificate trust from a second device,
 firewall scope on the actual school router, account permissions, device

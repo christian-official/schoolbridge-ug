@@ -24,6 +24,8 @@ Copy-Item $GetPipScript (Join-Path $PackageDir "get-pip.py")
 Copy-Item (Join-Path $PSScriptRoot "install-native-windows.ps1") $PackageDir
 Copy-Item (Join-Path $PSScriptRoot "run-native-windows.ps1") $PackageDir
 Copy-Item (Join-Path $PSScriptRoot "configure-lan-firewall.ps1") $PackageDir
+Copy-Item (Join-Path $PSScriptRoot "provision-lan-certificates.ps1") $PackageDir
+Copy-Item (Join-Path $PSScriptRoot "provision-lan-certificates.py") $PackageDir
 Copy-Item (Join-Path $RepoRoot "docs/DESKTOP_LAN_ACCESS.md") $PackageDir
 Copy-Item (Join-Path $PSScriptRoot "NATIVE_WINDOWS_INSTALLATION.md") $PackageDir
 $wheelhouse=Join-Path $PackageDir "wheelhouse"

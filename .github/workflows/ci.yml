@@ -411,7 +411,8 @@ jobs:
             "scripts/prepare-native-windows.ps1",
             "scripts/install-native-windows.ps1",
             "scripts/run-native-windows.ps1",
-            "scripts/configure-lan-firewall.ps1"
+            "scripts/configure-lan-firewall.ps1",
+            "scripts/provision-lan-certificates.ps1"
           )
           $runtime = Join-Path $env:TEMP "schoolbridge-runtime-validation"
           New-Item -ItemType Directory -Force -Path $runtime | Out-Null
@@ -441,10 +442,13 @@ jobs:
           $installer = Get-Content "scripts/install-native-windows.ps1" -Raw
           $launcher = Get-Content "scripts/run-native-windows.ps1" -Raw
           $lanFirewall = Get-Content "scripts/configure-lan-firewall.ps1" -Raw
+          $lanProvisioner = Get-Content "scripts/provision-lan-certificates.ps1" -Raw
+          $lanProvisionerPy = Get-Content "scripts/provision-lan-certificates.py" -Raw
           if ($builder -notmatch "--platform win_amd64" -or $builder -notmatch "--only-binary") { throw "Native package must resolve binary Windows wheels." }
           if ($installer -notmatch "--no-index" -or $installer -notmatch "SHA256SUMS.txt") { throw "Native installer must verify and install offline." }
           if ($launcher -notmatch "--host 127\.0\.0\.1") { throw "Initial native host must remain loopback-only." }
-          if ($builder -notmatch "configure-lan-firewall" -or $builder -notmatch "DESKTOP_LAN_ACCESS") { throw "Native USB package must include LAN firewall setup and security documentation." }
+          if ($builder -notmatch "configure-lan-firewall" -or $builder -notmatch "provision-lan-certificates" -or $builder -notmatch "DESKTOP_LAN_ACCESS") { throw "Native USB package must include LAN certificate provisioning, firewall setup, and security documentation." }
+          if ($lanProvisioner -notmatch "icacls" -or $lanProvisioner -notmatch "SCHOOLBRIDGE_LAN_ENABLED" -or $lanProvisionerPy -notmatch "SubjectAlternativeName" -or $lanProvisionerPy -notmatch "SERVER_AUTH") { throw "LAN certificate provisioning must restrict private-key ACLs, preserve opt-in, and issue an IP-bound server-auth certificate." }
           foreach ($requiredLanGuard in @("Profile = `"Private`"", "RemoteAddress = `"LocalSubnet`"", "LocalAddress = `$BindAddress", "Program = `$python", "EdgeTraversalPolicy = `"Block`"")) {
             if ($lanFirewall -notlike "*$requiredLanGuard*") { throw "LAN firewall rule is missing required scope: $requiredLanGuard" }
           }
