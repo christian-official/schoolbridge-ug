@@ -120,6 +120,13 @@ jobs:
             Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match "uvicorn app.main:app" } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
             if (-not $launcher.HasExited) { Stop-Process -Id $launcher.Id -Force -ErrorAction SilentlyContinue }
           }
+      - name: Publish tested native Windows package
+        uses: actions/upload-artifact@v4
+        with:
+          name: SchoolBridge-Native-Windows
+          path: dist/SchoolBridge-Native-Windows/
+          if-no-files-found: error
+          retention-days: 30
 
   postgres-recovery-integration:
     name: backend / postgres-recovery-integration
