@@ -68,3 +68,23 @@ Windows 8 and Windows 8.1 are out of Microsoft support. A legacy installer can i
 - **L4 — Acceptance:** automated tests plus separate clean-machine Windows 8 and Windows 8.1 acceptance evidence.
 
 Keep this track separate from the current Docker/WSL2 package. The existing Windows 10/11 path remains unchanged.
+
+## Verified legacy platform facts (checked 2026-11-11)
+
+These facts narrow the feasible deployment options and supersede any assumption that Windows 8 and 8.1 can share one supported Python host runtime:
+
+- **Windows 8.0** left Microsoft support on 2016-01-13. **Windows 8.1** left Microsoft support on 2023-01-10. Neither receives Windows security updates.
+- Current Python documentation states Python 3.12 supports Windows 8.1 and newer; Python 3.11 also supports Windows 8.1 and newer. This does not include Windows 8.0.
+- Python 3.8 is end-of-life (2024-10-07) and receives no security updates. Therefore, the existing Python/FastAPI backend has no currently supported CPython runtime documented for a native Windows 8.0 host. Do not ship an EOL Python runtime to bridge that gap.
+- Windows 8.1 can technically run a currently security-maintained CPython 3.12 runtime, but that does not make the Windows 8.1 operating system secure or supported. A native host prototype still requires an explicit risk decision and real-machine validation.
+- Microsoft Edge 109 was the final Edge release for Windows 8/8.1 and is no longer maintained. Mozilla currently states Firefox ESR 115 is the final Firefox line for these systems and will receive security updates through March 2027, subject to re-evaluation. Browser security updates do not replace missing OS security updates, and the SchoolBridge frontend feature baseline still needs testing on that browser.
+
+## Feasibility decision and practical rollout
+
+1. **Primary no-WSL host:** prioritise a Docker-free native Windows 10/11 package using a supported Python runtime and local SQLite. This directly removes the WSL2 requirement without introducing an unsupported operating system or EOL runtime.
+2. **Windows 8.1 host:** keep as a separately gated experimental compatibility target. Python 3.12 is a technically supported runtime for Windows 8.1, but the OS is EOL. Do not advertise production support until security review, dependency audit, and clean-machine acceptance are complete.
+3. **Windows 8.0 host:** blocked for the current Python backend because the documented compatible Python path requires an EOL runtime. Do not claim native host support unless the backend is deliberately ported to a runtime with maintained Windows 8.0 support and that entire stack is audited and tested. A runtime downgrade is not an acceptable shortcut.
+4. **Older Windows PCs as clients:** investigate LAN browser access from Firefox ESR 115 while Mozilla security updates remain available. Treat this as a temporary compatibility path, not an OS security guarantee. Validate login, role permissions, service worker/offline behaviour, IndexedDB, Web Crypto, uploads and printing on the actual browser build.
+5. **Schools with no supported host PC:** offer a supported, low-cost dedicated host device on the school LAN, with existing older PCs connecting as clients where browser tests pass. The database remains on the host's local disk and is never shared as a network file.
+
+The acceptance matrix must report host OS and client OS/browser independently. A passing Windows installer script or a browser smoke test does not certify a legacy host.
