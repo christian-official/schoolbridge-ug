@@ -422,6 +422,36 @@ fn start_backend() -> Result<ManagedBackend, String> {
     };
 
     let mut children = vec![child];
+
+    // The HTTPS LAN listener runs the same application against the same SQLite
+    // database. Wait until the loopback backend has completed startup (including
+    // migrations and restore handling) before starting a second process, so the
+    // two processes cannot race through database initialisation.
+    let primary_deadline = Instant::now() + BACKEND_START_TIMEOUT;
+    let mut primary_ready = false;
+    while Instant::now() < primary_deadline {
+        if let Some(status) = children[0].try_wait()
+            .map_err(|error| format!("Could not monitor the SchoolBridge backend: {error}"))? {
+            return Err(format!(
+                "SchoolBridge backend exited during startup ({status}). Check {}.",
+                log_path.display()
+            ));
+        }
+        if backend_is_healthy(port) {
+            primary_ready = true;
+            break;
+        }
+        thread::sleep(Duration::from_millis(500));
+    }
+    if !primary_ready {
+        let _ = children[0].kill();
+        let _ = children[0].wait();
+        return Err(format!(
+            "SchoolBridge loopback backend did not become healthy within 90 seconds. Check {}.",
+            log_path.display()
+        ));
+    }
+
     if let Some(config) = lan.clone() {
         let lan_log_path = log_dir.join("lan-backend.log");
         let lan_log = OpenOptions::new().create(true).append(true).open(&lan_log_path)
