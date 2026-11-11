@@ -59,6 +59,8 @@ SCHOOLBRIDGE_SECRET_KEY=$secret
 SCHOOLBRIDGE_DATABASE_URL=sqlite:///./data/schoolbridge.db
 SCHOOLBRIDGE_LICENSE_PUBLIC_KEY=$publicKey
 SCHOOLBRIDGE_PORT=8080
+SCHOOLBRIDGE_LAN_ENABLED=false
+SCHOOLBRIDGE_LAN_PORT=8443
 "@ | Set-Content (Join-Path $InstallStage ".env") -Encoding ASCII
  [IO.Directory]::Move($InstallStage,$Target)
  $shortcutDir=Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs"
