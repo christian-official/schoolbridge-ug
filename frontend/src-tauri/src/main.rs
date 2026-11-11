@@ -539,8 +539,31 @@ fn start_backend() -> Result<ManagedBackend, String> {
     ))
 }
 
+#[cfg(windows)]
+fn show_startup_error(message: &str) {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONERROR, MB_OK};
+
+    let body: Vec<u16> = std::ffi::OsStr::new(message)
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect();
+    let title: Vec<u16> = std::ffi::OsStr::new("SchoolBridge could not start")
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect();
+    unsafe {
+        MessageBoxW(std::ptr::null_mut(), body.as_ptr(), title.as_ptr(), MB_OK | MB_ICONERROR);
+    }
+}
+
+#[cfg(not(windows))]
+fn show_startup_error(message: &str) {
+    eprintln!("{message}");
+}
+
 fn main() {
-    let app = tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![store_auth_token, load_auth_token, clear_auth_token])
         .manage(BackendProcess::default())
         .setup(|app| {
@@ -549,9 +572,17 @@ fn main() {
             let state = app.state::<BackendProcess>();
             *state.0.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(backend);
             Ok(())
-        })
-        .build(tauri::generate_context!())
-        .expect("failed to initialise SchoolBridge desktop application");
+        });
+
+    let app = match builder.build(tauri::generate_context!()) {
+        Ok(app) => app,
+        Err(error) => {
+            show_startup_error(&format!(
+                "SchoolBridge could not initialise its desktop services.\n\n{error}\n\nCheck the SchoolBridge logs under %LOCALAPPDATA%\\SchoolBridge\\logs and correct the reported problem before restarting."
+            ));
+            return;
+        }
+    };
 
     app.run(|app_handle, event| {
         if matches!(event, RunEvent::Exit) {
