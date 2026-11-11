@@ -444,6 +444,7 @@ jobs:
           if ($builder -notmatch "--platform win_amd64" -or $builder -notmatch "--only-binary") { throw "Native package must resolve binary Windows wheels." }
           if ($installer -notmatch "--no-index" -or $installer -notmatch "SHA256SUMS.txt") { throw "Native installer must verify and install offline." }
           if ($launcher -notmatch "--host 127\.0\.0\.1") { throw "Initial native host must remain loopback-only." }
+          if ($builder -notmatch "configure-lan-firewall" -or $builder -notmatch "DESKTOP_LAN_ACCESS") { throw "Native USB package must include LAN firewall setup and security documentation." }
           foreach ($requiredLanGuard in @("Profile = `"Private`"", "RemoteAddress = `"LocalSubnet`"", "LocalAddress = `$BindAddress", "Program = `$python", "EdgeTraversalPolicy = `"Block`"")) {
             if ($lanFirewall -notlike "*$requiredLanGuard*") { throw "LAN firewall rule is missing required scope: $requiredLanGuard" }
           }

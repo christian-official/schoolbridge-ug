@@ -23,6 +23,8 @@ Copy-Item $PythonEmbedZip (Join-Path $PackageDir "python-3.12-embed-amd64.zip")
 Copy-Item $GetPipScript (Join-Path $PackageDir "get-pip.py")
 Copy-Item (Join-Path $PSScriptRoot "install-native-windows.ps1") $PackageDir
 Copy-Item (Join-Path $PSScriptRoot "run-native-windows.ps1") $PackageDir
+Copy-Item (Join-Path $PSScriptRoot "configure-lan-firewall.ps1") $PackageDir
+Copy-Item (Join-Path $RepoRoot "docs/DESKTOP_LAN_ACCESS.md") $PackageDir
 Copy-Item (Join-Path $PSScriptRoot "NATIVE_WINDOWS_INSTALLATION.md") $PackageDir
 $wheelhouse=Join-Path $PackageDir "wheelhouse"
 & python -m pip download --only-binary=:all: --platform win_amd64 --python-version 312 --implementation cp --abi cp312 --dest $wheelhouse -r (Join-Path $BackendDir "requirements.txt")
