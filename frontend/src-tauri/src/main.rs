@@ -463,14 +463,18 @@ fn start_backend() -> Result<ManagedBackend, String> {
             ));
         }
         let lan_ready = if let Some(config) = &lan {
-            let process_alive = if children.len() > 1 {
-                children[1].try_wait()
-                    .map_err(|error| format!("Could not monitor the HTTPS LAN listener: {error}"))?
-                    .is_none()
+            if children.len() > 1 {
+                if let Some(status) = children[1].try_wait()
+                    .map_err(|error| format!("Could not monitor the HTTPS LAN listener: {error}"))? {
+                    return Err(format!(
+                        "The HTTPS LAN listener exited during startup ({status}). Check {}.",
+                        log_dir.join("lan-backend.log").display()
+                    ));
+                }
+                TcpStream::connect((config.bind_ip, config.port)).is_ok()
             } else {
                 false
-            };
-            process_alive && TcpStream::connect((config.bind_ip, config.port)).is_ok()
+            }
         } else {
             true
         };
@@ -528,6 +532,27 @@ mod tests {
         let env_file = dir.join(".env");
         std::fs::write(&env_file, "SCHOOLBRIDGE_PORT=8080\\n").unwrap();
         assert_eq!(super::configured_lan(&env_file).unwrap(), None);
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn lan_listener_accepts_private_ip_only_with_existing_https_files() {
+        let dir = std::env::temp_dir().join(format!("schoolbridge-lan-valid-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let cert = dir.join("lan-cert.pem");
+        let key = dir.join("lan-key.pem");
+        let env_file = dir.join(".env");
+        std::fs::write(&cert, "certificate placeholder").unwrap();
+        std::fs::write(&key, "private key placeholder").unwrap();
+        std::fs::write(&env_file, format!(
+            "SCHOOLBRIDGE_LAN_ENABLED=true\\nSCHOOLBRIDGE_LAN_BIND_IP=192.168.1.20\\nSCHOOLBRIDGE_LAN_PORT=8443\\nSCHOOLBRIDGE_LAN_CERT_FILE={}\\nSCHOOLBRIDGE_LAN_KEY_FILE={}\\n",
+            cert.display(), key.display()
+        )).unwrap();
+        let config = super::configured_lan(&env_file).unwrap().unwrap();
+        assert_eq!(config.bind_ip, "192.168.1.20".parse().unwrap());
+        assert_eq!(config.port, 8443);
+        assert_eq!(config.cert_file, cert);
+        assert_eq!(config.key_file, key);
         let _ = std::fs::remove_dir_all(dir);
     }
 
