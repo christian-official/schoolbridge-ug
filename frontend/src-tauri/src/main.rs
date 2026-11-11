@@ -6,7 +6,8 @@ use std::{
     net::{Ipv4Addr, TcpStream},
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
-    sync::Mutex,
+    ops::{Deref, DerefMut},
+    sync::{atomic::{AtomicBool, Ordering}, Mutex},
     thread,
     time::{Duration, Instant},
 };
@@ -186,6 +187,44 @@ impl ManagedBackend {
             let _ = child.wait();
         }
     }
+
+    fn failure_reason(&mut self) -> Option<String> {
+        for (index, child) in self.children.iter_mut().enumerate() {
+            match child.try_wait() {
+                Ok(Some(status)) => {
+                    let service = if index == 0 { "loopback backend" } else { "HTTPS LAN listener" };
+                    return Some(format!("The SchoolBridge {service} stopped unexpectedly ({status})."));
+                }
+                Ok(None) => {}
+                Err(error) => return Some(format!("Could not monitor a SchoolBridge backend process: {error}")),
+            }
+        }
+        None
+    }
+}
+
+// Own children while startup is in progress too. Any early error path therefore
+// kills and reaps processes on every platform, not only through the Windows job.
+struct ChildGuard(Vec<Child>);
+
+impl Deref for ChildGuard {
+    type Target = Vec<Child>;
+    fn deref(&self) -> &Self::Target { &self.0 }
+}
+
+impl DerefMut for ChildGuard {
+    fn deref_mut(&mut self) -> &mut Self::Target { &mut self.0 }
+}
+
+impl Drop for ChildGuard {
+    fn drop(&mut self) {
+        for child in &mut self.0 {
+            let _ = child.kill();
+        }
+        for child in &mut self.0 {
+            let _ = child.wait();
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -249,11 +288,15 @@ fn configured_lan(env_file: &Path, installation_dir: &Path) -> Result<Option<Lan
 }
 
 #[derive(Default)]
-struct BackendProcess(Mutex<Option<ManagedBackend>>);
+struct BackendProcess {
+    backend: Mutex<Option<ManagedBackend>>,
+    stopping: AtomicBool,
+}
 
 impl BackendProcess {
     fn stop(&self) {
-        let backend = self.0.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).take();
+        self.stopping.store(true, Ordering::Release);
+        let backend = self.backend.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).take();
         if let Some(backend) = backend {
             backend.stop();
         }
@@ -421,7 +464,7 @@ fn start_backend() -> Result<ManagedBackend, String> {
         }
     };
 
-    let mut children = vec![child];
+    let mut children = ChildGuard(vec![child]);
 
     // The HTTPS LAN listener runs the same application against the same SQLite
     // database. Wait until the loopback backend has completed startup (including
@@ -519,7 +562,7 @@ fn start_backend() -> Result<ManagedBackend, String> {
         };
         if backend_is_healthy(port) && lan_ready {
             return Ok(ManagedBackend {
-                children,
+                children: std::mem::take(&mut children.0),
                 #[cfg(windows)]
                 _job: job,
             });
@@ -537,6 +580,85 @@ fn start_backend() -> Result<ManagedBackend, String> {
         "SchoolBridge backend did not become healthy within 90 seconds. Check {}.",
         log_path.display()
     ))
+}
+
+fn supervise_backend(app_handle: tauri::AppHandle) {
+    thread::spawn(move || {
+        let mut consecutive_health_failures = 0_u8;
+        let mut restart_attempted = false;
+
+        loop {
+            thread::sleep(Duration::from_secs(2));
+            let state = app_handle.state::<BackendProcess>();
+            if state.stopping.load(Ordering::Acquire) {
+                break;
+            }
+
+            let failure = {
+                let mut backend = state.backend.lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner());
+                match backend.as_mut() {
+                    Some(backend) => {
+                        if let Some(reason) = backend.failure_reason() {
+                            Some(reason)
+                        } else if backend_is_healthy(DEFAULT_BACKEND_PORT) {
+                            consecutive_health_failures = 0;
+                            None
+                        } else {
+                            consecutive_health_failures = consecutive_health_failures.saturating_add(1);
+                            if consecutive_health_failures >= 3 {
+                                Some("The SchoolBridge backend stopped responding to health checks.".into())
+                            } else {
+                                None
+                            }
+                        }
+                    }
+                    None => Some("The SchoolBridge backend process group is unavailable.".into()),
+                }
+            };
+
+            let Some(reason) = failure else { continue };
+
+            // Remove and stop the complete process group before attempting a
+            // restart. This prevents duplicate listeners and SQLite writers.
+            let old_backend = state.backend.lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()).take();
+            if let Some(backend) = old_backend {
+                backend.stop();
+            }
+
+            if state.stopping.load(Ordering::Acquire) {
+                break;
+            }
+
+            if restart_attempted {
+                show_startup_error(&format!(
+                    "{reason}\n\nSchoolBridge tried one automatic recovery, but the backend failed again. Close and reopen the desktop app. Diagnostic logs are under %LOCALAPPDATA%\\SchoolBridge\\logs."
+                ));
+                break;
+            }
+
+            restart_attempted = true;
+            match start_backend() {
+                Ok(restarted) => {
+                    let mut backend = state.backend.lock()
+                        .unwrap_or_else(|poisoned| poisoned.into_inner());
+                    if state.stopping.load(Ordering::Acquire) {
+                        drop(backend);
+                        restarted.stop();
+                        break;
+                    }
+                    *backend = Some(restarted);
+                }
+                Err(error) => {
+                    show_startup_error(&format!(
+                        "{reason}\n\nSchoolBridge could not recover automatically: {error}\n\nCheck the logs under %LOCALAPPDATA%\\SchoolBridge\\logs, correct the reported problem, then reopen the app."
+                    ));
+                    break;
+                }
+            }
+        }
+    });
 }
 
 #[cfg(windows)]
@@ -570,7 +692,8 @@ fn main() {
             let backend = start_backend()
                 .map_err(|message| std::io::Error::new(std::io::ErrorKind::Other, message))?;
             let state = app.state::<BackendProcess>();
-            *state.0.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(backend);
+            *state.backend.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(backend);
+            supervise_backend(app.handle().clone());
             Ok(())
         });
 
