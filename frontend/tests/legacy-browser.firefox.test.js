@@ -7,7 +7,7 @@ import { firefox } from 'playwright'
 const baseUrl = 'http://127.0.0.1:4174'
 
 test('Firefox legacy-client smoke test covers app boot and required browser APIs', async () => {
-  const server = spawn('npm', ['run', 'preview:legacy', '--', '--host', '127.0.0.1', '--port', '4174', '--strictPort'], {
+  const server = spawn('npm', ['run', 'preview', '--', '--host', '127.0.0.1', '--port', '4174', '--strictPort'], {
     stdio: 'ignore',
     shell: process.platform === 'win32',
   })
