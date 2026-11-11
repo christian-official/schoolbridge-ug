@@ -561,7 +561,7 @@ mod tests {
             cert.display(), key.display()
         )).unwrap();
         let config = super::configured_lan(&env_file, &install).unwrap().unwrap();
-        assert_eq!(config.bind_ip, "192.168.1.20".parse().unwrap());
+        assert_eq!(config.bind_ip, "192.168.1.20".parse::<Ipv4Addr>().unwrap());
         assert_eq!(config.port, 8443);
         assert_eq!(config.cert_file, cert.canonicalize().unwrap());
         assert_eq!(config.key_file, key.canonicalize().unwrap());
