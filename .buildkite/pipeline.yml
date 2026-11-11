@@ -1,0 +1,22 @@
+steps:
+  - label: ":python: Backend test suite"
+    key: "backend-tests"
+    command: |
+      python3 -m venv .venv
+      .venv/bin/python -m pip install --upgrade pip
+      .venv/bin/python -m pip install -r backend/requirements-dev.txt
+      PYTHONPATH=backend SCHOOLBRIDGE_DATABASE_URL=sqlite:///./schoolbridge_buildkite.db SCHOOLBRIDGE_SECRET_KEY=ci-only-secret-key-not-for-production .venv/bin/python -m pytest -q backend/tests
+
+  - label: ":node: Frontend lint, tests and production build"
+    key: "frontend-validation"
+    command: |
+      cd frontend
+      npm ci
+      npm run lint
+      npm run test:offline
+      npm run test:pwa
+      npm run build
+
+  - label: ":docker: Compose configuration validation"
+    key: "compose-config"
+    command: "docker compose config --quiet"
