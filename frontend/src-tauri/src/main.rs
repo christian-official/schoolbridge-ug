@@ -140,7 +140,10 @@ fn desktop_data_directory() -> Result<PathBuf, String> {
 
 fn sqlite_database_url(database_path: &Path) -> String {
     // SQLAlchemy accepts forward slashes in absolute Windows SQLite paths.
-    format!("sqlite:///{}", database_path.to_string_lossy().replace('\\', "/"))
+    let path = database_path.to_string_lossy().replace('\\', "/");
+    // Windows drive roots have one slash after the colon in a SQLAlchemy URL.
+    let path = path.replacen(":/", ":", 1);
+    format!("sqlite:///{}", path)
 }
 
 fn configured_port(env_file: &Path) -> Result<u16, String> {
