@@ -108,7 +108,11 @@ jobs:
               throw "Native SchoolBridge did not become healthy with local SQLite."
             }
             $page = Invoke-WebRequest -Uri "http://127.0.0.1:8080/" -UseBasicParsing
-            if ($page.StatusCode -ne 200 -or $page.Content -notmatch "SchoolBridge") { throw "Native frontend did not serve successfully." }
+            if ($page.StatusCode -ne 200 -or $page.Content -notmatch '<div id="root">') { throw "Native frontend index.html was not served." }
+            if ($page.Content -notmatch 'src="(/assets/[^"]+\.js)"') { throw "Native frontend JavaScript bundle reference is missing." }
+            $asset = Invoke-WebRequest -Uri ("http://127.0.0.1:8080" + $Matches[1]) -UseBasicParsing
+            if ($asset.StatusCode -ne 200 -or $asset.Content.Length -lt 1000) { throw "Native frontend JavaScript bundle did not load." }
+            if (-not (Test-Path (Join-Path $root "backend/app/static/index.html"))) { throw "Frontend static files were not installed in the backend bundle." }
             if (-not (Test-Path (Join-Path $root "data/schoolbridge.db"))) { throw "Native SQLite database file was not created." }
             Write-Host "Native package booted: frontend served and SQLite health is OK."
           } finally {
