@@ -88,3 +88,18 @@ These facts narrow the feasible deployment options and supersede any assumption 
 5. **Schools with no supported host PC:** offer a supported, low-cost dedicated host device on the school LAN, with existing older PCs connecting as clients where browser tests pass. The database remains on the host's local disk and is never shared as a network file.
 
 The acceptance matrix must report host OS and client OS/browser independently. A passing Windows installer script or a browser smoke test does not certify a legacy host.
+
+## User-facing Windows compatibility policy
+
+The product goal is broad access, not an arbitrary minimum of Windows 10. SchoolBridge should aim to be usable from **Windows 8 through the latest supported Windows release**, with the installation role and browser clearly distinguished:
+
+- **Windows 8 and 8.1 client access:** a supported-browser compatibility target, initially Firefox ESR 115. The current Vite 8 production build baseline is Firefox 114, so its declared JavaScript baseline is compatible on paper with Firefox 115. This is not yet an end-to-end certification: test authentication, all major workspaces, IndexedDB, service worker/offline flows, Web Crypto, uploads, printing and LAN connectivity on actual Windows 8 and 8.1 machines.
+- **Windows 8.1 as a native host:** experimental only. Python 3.12 supports Windows 8.1, but the operating system itself is out of support. A complete dependency, cryptography, TLS and lifecycle audit plus clean-machine acceptance is required before any production claim.
+- **Windows 8.0 as a native host:** not currently supported by the Python runtime path. Do not bundle an end-of-life runtime. Keep investigating a maintainable host option, or use a supported dedicated host on the school LAN while testing Windows 8 as a client.
+- **Windows 10/11 and later supported Windows releases:** retain the existing deployment path and develop a Docker-free host installer as the preferred route for schools without WSL2. The legacy compatibility work must not break this path.
+
+This means we are **not intentionally limiting SchoolBridge to Windows 10+**. The target is Windows 8 client access where browser validation passes, plus native hosting across supported Windows releases. The exact limitation today is native hosting on Windows 8.0; Windows 8.1 hosting remains gated. Never advertise a Windows version as supported until its corresponding host/client acceptance matrix passes.
+
+### Current frontend baseline evidence
+
+The repository uses Vite 8. Its documented default production browser target includes Firefox 114. Mozilla's Firefox ESR 115 is the final line for Windows 7/8/8.1 and currently has security updates scheduled through March 2027, subject to Mozilla's re-evaluation. This makes Firefox ESR 115 a credible *temporary client test target*, not a guarantee that every SchoolBridge feature works there. The build's browser baseline and real browser feature tests are separate requirements.
