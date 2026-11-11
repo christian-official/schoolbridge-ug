@@ -15,7 +15,7 @@ test('desktop offline sign-in remains reachable when the local API is unavailabl
 
 test('offline login metadata and encrypted snapshot are bound to one installation', () => {
   assert.match(devices, /installationId:installation\.installation_id/)
-  assert.match(devices, /installation_id:installation\.installation_id/)
+  assert.match(devices, /installation_id:string;setup_completed:boolean;activated:boolean/)
   assert.match(app, /snapshot\.installationId!==index\.installationId/)
   assert.match(devices, /snapshot\.installationId!==installation\.installation_id/)
 })
