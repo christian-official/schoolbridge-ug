@@ -28,7 +28,17 @@ type Proposal = {
 }
 
 type Props = { token: string; userId: number; isAdmin: boolean }
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
+// Desktop sync management must reach the bundled loopback backend just like the
+// main application; relative URLs resolve against tauri.localhost and cannot
+// reach the local FastAPI service.
+const isTauriDesktop = typeof window !== 'undefined' && (
+  '__TAURI_INTERNALS__' in window ||
+  window.location.hostname === 'tauri.localhost' ||
+  window.location.protocol === 'tauri:'
+)
+const API_BASE_URL = isTauriDesktop
+  ? 'http://127.0.0.1:8080'
+  : (import.meta.env.VITE_API_BASE_URL || '')
 
 function deviceStorageKey(userId: number) {
   return 'schoolbridge-sync-device-' + userId
