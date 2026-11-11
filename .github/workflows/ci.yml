@@ -35,6 +35,18 @@ jobs:
       - name: Test desktop backend lifecycle health validation
         working-directory: frontend
         run: cargo test --manifest-path src-tauri/Cargo.toml
+      - name: Build and verify standalone Windows executable
+        working-directory: frontend
+        shell: pwsh
+        run: |
+          cargo build --manifest-path src-tauri/Cargo.toml --release --features desktop,custom-protocol
+          $executable = Join-Path $PWD "src-tauri/target/release/schoolbridge.exe"
+          if (-not (Test-Path $executable -PathType Leaf)) {
+            Write-Host "Release directory contents:"
+            Get-ChildItem "src-tauri/target/release" -ErrorAction SilentlyContinue | Select-Object Name, Length
+            throw "The standalone SchoolBridge desktop executable was not produced at $executable"
+          }
+          Write-Host "Verified standalone executable: $executable"
       - name: Publish standalone desktop executable
         uses: actions/upload-artifact@v4
         with:
