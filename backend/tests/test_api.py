@@ -3066,3 +3066,25 @@ def test_sync_change_feed_cannot_be_read_through_another_users_device():
         assert registered.status_code == 200
         denied = client.get(f"/api/sync/changes?device_id={device}", headers=teacher_headers)
         assert denied.status_code == 403
+
+
+def test_sync_proposal_rejects_base_sequence_not_issued_to_device():
+    reset_database()
+    admin = create_admin()
+    headers = {"Authorization": f"Bearer {create_access_token(admin)}"}
+    device = "00000000-0000-4000-8000-000000000503"
+    with TestClient(app) as client:
+        registered = client.post(
+            "/api/sync/devices", headers=headers,
+            json={"device_id": device, "device_name": "Proposal sequence"},
+        )
+        assert registered.status_code == 200
+        rejected = client.post(
+            "/api/sync/proposals", headers=headers,
+            json={
+                "device_id": device, "idempotency_key": "unissued-base-sequence-0001",
+                "entity_type": "Student", "entity_id": None, "operation": "create",
+                "base_sequence": 1, "payload": {"first_name": "Offline"},
+            },
+        )
+        assert rejected.status_code == 409
