@@ -141,7 +141,7 @@ const isTauriDesktop = typeof window !== 'undefined' && (
 )
 const desktopApiBaseUrl = isTauriDesktop ? 'http://127.0.0.1:8080' : ''
 function isPrivateLanAddress(hostname: string): boolean {
-  const octets = hostname.split('.').map(part => /^\\d{1,3}$/.test(part) ? Number(part) : -1)
+  const octets = hostname.split('.').map(part => /^\d{1,3}$/.test(part) ? Number(part) : -1)
   if (octets.length !== 4 || octets.some(part => part < 0 || part > 255)) return false
   const [first, second] = octets
   return first === 10 || (first === 172 && second >= 16 && second <= 31) || (first === 192 && second === 168)
