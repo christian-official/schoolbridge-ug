@@ -72,6 +72,11 @@ fn clear_auth_token() -> Result<(), String> {
 
 const DEFAULT_BACKEND_PORT: u16 = 8080;
 const BACKEND_START_TIMEOUT: Duration = Duration::from_secs(90);
+
+// Serialise all startup/recovery attempts inside this desktop process. The port
+// check alone is not sufficient: two concurrent callers could both pass it
+// before either child has bound the loopback listener.
+static BACKEND_START_LOCK: Mutex<()> = Mutex::new(());
 const HEALTH_FAILURE_LIMIT: u8 = 3;
 
 fn health_check_failed(consecutive_failures: &mut u8) -> bool {
@@ -424,6 +429,9 @@ fn is_healthy_response(response: &str) -> bool {
 }
 
 fn start_backend() -> Result<ManagedBackend, String> {
+    let _startup_guard = BACKEND_START_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     let root = installation_root()?;
     let python = root.join("runtime").join("python.exe");
     let backend_dir = root.join("backend");
@@ -816,6 +824,40 @@ mod tests {
             assert_ne!(inspected, 0, "could not read child process exit status");
             assert_ne!(exit_code, 259, "backend child remained active after desktop shutdown");
         }
+    }
+
+    #[test]
+    fn concurrent_backend_start_attempts_are_serialised() {
+        use std::sync::{atomic::{AtomicUsize, Ordering}, Arc, Barrier};
+        use std::{thread, time::Duration};
+
+        let barrier = Arc::new(Barrier::new(3));
+        let active = Arc::new(AtomicUsize::new(0));
+        let maximum = Arc::new(AtomicUsize::new(0));
+        let mut workers = Vec::new();
+
+        for _ in 0..2 {
+            let barrier = Arc::clone(&barrier);
+            let active = Arc::clone(&active);
+            let maximum = Arc::clone(&maximum);
+            workers.push(thread::spawn(move || {
+                barrier.wait();
+                let _guard = super::BACKEND_START_LOCK
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner());
+                let current = active.fetch_add(1, Ordering::SeqCst) + 1;
+                maximum.fetch_max(current, Ordering::SeqCst);
+                thread::sleep(Duration::from_millis(40));
+                active.fetch_sub(1, Ordering::SeqCst);
+            }));
+        }
+
+        barrier.wait();
+        for worker in workers {
+            worker.join().expect("startup worker should finish");
+        }
+        assert_eq!(maximum.load(Ordering::SeqCst), 1,
+            "backend startup attempts must never overlap");
     }
 
     #[test]
