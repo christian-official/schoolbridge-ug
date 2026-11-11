@@ -833,6 +833,7 @@ function App() {
   },[])
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressTriggered = useRef(false)
+  const syncPollInFlight = useRef(false)
   useEffect(() => {
     if (!user) { setOverviewShortcuts([]); return }
     try {
@@ -1209,6 +1210,64 @@ function App() {
     const interval = window.setInterval(() => { void checkServerConnection() }, 15000)
     return () => { cancelled = true; window.clearInterval(interval) }
   }, [token])
+
+  // Keep the encrypted, read-only offline copy aligned with the server change journal.
+  // The journal carries invalidations, not record payloads, so any authorised change
+  // invalidates the snapshot and requires a fresh, consistent download.
+  useEffect(() => {
+    if (!token || !user || serverConnection !== 'connected') return
+    let cancelled = false
+    const pollChanges = async () => {
+      if (syncPollInFlight.current || cancelled) return
+      const deviceId = localStorage.getItem('schoolbridge-sync-device-' + user.id)
+      if (!deviceId) return
+      const metaKey = 'schoolbridge-offline-snapshot-meta-' + user.id + '-' + deviceId
+      const rawMeta = localStorage.getItem(metaKey)
+      if (!rawMeta) return
+      syncPollInFlight.current = true
+      try {
+        const meta = JSON.parse(rawMeta) as { fingerprint: string; sequence: number }
+        if (!Number.isSafeInteger(meta.sequence) || meta.sequence < 0) throw new Error('Invalid offline sync cursor.')
+        const account = await api<{ role: string; permissions: Record<string, string[]> }>('auth/me', token)
+        if (cancelled) return
+        const fingerprint = JSON.stringify({ role: account.role, permissions: Object.fromEntries(Object.entries(account.permissions || {}).sort(([a], [b]) => a.localeCompare(b))) })
+        if (meta.fingerprint !== fingerprint) {
+          await deleteEncryptedOfflineSnapshot(user.id, deviceId)
+          localStorage.removeItem(metaKey)
+          localStorage.removeItem('schoolbridge-offline-login-index')
+          return
+        }
+        let cursor = meta.sequence
+        for (let page = 0; page < 10; page += 1) {
+          const feed = await api<{ changes: unknown[]; next_cursor: number; has_more: boolean }>(
+            'sync/changes?device_id=' + encodeURIComponent(deviceId) + '&cursor=' + cursor + '&limit=500', token,
+          )
+          if (cancelled) return
+          if (feed.changes.length) {
+            await deleteEncryptedOfflineSnapshot(user.id, deviceId)
+            localStorage.removeItem(metaKey)
+            localStorage.removeItem('schoolbridge-offline-login-index')
+            return
+          }
+          if (!Number.isSafeInteger(feed.next_cursor) || feed.next_cursor < cursor) throw new Error('The server returned an invalid sync cursor.')
+          const previousCursor = cursor
+          if (feed.next_cursor > cursor) {
+            await api('sync/devices/' + encodeURIComponent(deviceId) + '/checkpoint?sequence=' + feed.next_cursor, token, { method: 'POST' })
+            cursor = feed.next_cursor
+            localStorage.setItem(metaKey, JSON.stringify({ ...meta, sequence: cursor }))
+          }
+          if (!feed.has_more || feed.next_cursor === previousCursor) break
+        }
+      } catch {
+        // A transient connection failure must not destroy a still-valid encrypted copy.
+      } finally {
+        syncPollInFlight.current = false
+      }
+    }
+    void pollChanges()
+    const interval = window.setInterval(() => { void pollChanges() }, 15000)
+    return () => { cancelled = true; window.clearInterval(interval) }
+  }, [token, user?.id, serverConnection])
 
 
   async function login(event: React.FormEvent<HTMLFormElement>) {
