@@ -140,6 +140,14 @@ const isTauriDesktop = typeof window !== 'undefined' && (
   window.location.protocol === 'tauri:'
 )
 const desktopApiBaseUrl = isTauriDesktop ? 'http://127.0.0.1:8080' : ''
+function isPrivateLanAddress(hostname: string): boolean {
+  const octets = hostname.split('.').map(part => /^\\d{1,3}$/.test(part) ? Number(part) : -1)
+  if (octets.length !== 4 || octets.some(part => part < 0 || part > 255)) return false
+  const [first, second] = octets
+  return first === 10 || (first === 172 && second >= 16 && second <= 31) || (first === 192 && second === 168)
+}
+const isSchoolBridgeLanClient = typeof window !== 'undefined' &&
+  window.location.protocol === 'https:' && isPrivateLanAddress(window.location.hostname)
 // Keep the deployed static site connected to its dedicated API even if a Render
 // build is triggered without the VITE_API_BASE_URL build-time variable.
 declare global {
@@ -177,7 +185,7 @@ async function clearStoredSessionToken(): Promise<void> {
   sessionStorage.removeItem('sb_token')
 }
 
-const API_BASE_URL = desktopApiBaseUrl || configuredApiBaseUrl || (
+const API_BASE_URL = desktopApiBaseUrl || (isSchoolBridgeLanClient ? '' : configuredApiBaseUrl) || (
   typeof window !== 'undefined' && window.location.hostname === 'schoolbridge-ug-1.onrender.com'
     ? 'https://schoolbridge-ug.onrender.com'
     : ''
