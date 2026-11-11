@@ -428,6 +428,28 @@ fn is_healthy_response(response: &str) -> bool {
         && body.contains("\"SchoolBridge\"")
 }
 
+fn wait_for_readiness<F>(
+    timeout: Duration,
+    poll_interval: Duration,
+    timeout_message: &str,
+    mut is_ready: F,
+) -> Result<(), String>
+where
+    F: FnMut() -> Result<bool, String>,
+{
+    let deadline = Instant::now() + timeout;
+    loop {
+        if Instant::now() >= deadline {
+            return Err(timeout_message.to_string());
+        }
+        if is_ready()? {
+            return Ok(());
+        }
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        thread::sleep(poll_interval.min(remaining));
+    }
+}
+
 fn start_backend() -> Result<ManagedBackend, String> {
     let _startup_guard = BACKEND_START_LOCK
         .lock()
@@ -514,30 +536,25 @@ fn start_backend() -> Result<ManagedBackend, String> {
     // database. Wait until the loopback backend has completed startup (including
     // migrations and restore handling) before starting a second process, so the
     // two processes cannot race through database initialisation.
-    let primary_deadline = Instant::now() + BACKEND_START_TIMEOUT;
-    let mut primary_ready = false;
-    while Instant::now() < primary_deadline {
-        if let Some(status) = children[0].try_wait()
-            .map_err(|error| format!("Could not monitor the SchoolBridge backend: {error}"))? {
-            return Err(format!(
-                "SchoolBridge backend exited during startup ({status}). Check {}.",
-                log_path.display()
-            ));
-        }
-        if backend_is_healthy(port) {
-            primary_ready = true;
-            break;
-        }
-        thread::sleep(Duration::from_millis(500));
-    }
-    if !primary_ready {
-        let _ = children[0].kill();
-        let _ = children[0].wait();
-        return Err(format!(
-            "SchoolBridge loopback backend did not become healthy within 90 seconds. Check {}.",
-            log_path.display()
-        ));
-    }
+    let primary_timeout = format!(
+        "SchoolBridge loopback backend did not become healthy within 90 seconds. Check {}.",
+        log_path.display()
+    );
+    wait_for_readiness(
+        BACKEND_START_TIMEOUT,
+        Duration::from_millis(500),
+        &primary_timeout,
+        || {
+            if let Some(status) = children[0].try_wait()
+                .map_err(|error| format!("Could not monitor the SchoolBridge backend: {error}"))? {
+                return Err(format!(
+                    "SchoolBridge backend exited during startup ({status}). Check {}.",
+                    log_path.display()
+                ));
+            }
+            Ok(backend_is_healthy(port))
+        },
+    )?;
 
     if let Some(config) = lan.clone() {
         let lan_log_path = log_dir.join("lan-backend.log");
@@ -579,52 +596,48 @@ fn start_backend() -> Result<ManagedBackend, String> {
         children.push(lan_child);
     }
 
-    let deadline = Instant::now() + BACKEND_START_TIMEOUT;
-    while Instant::now() < deadline {
-        if let Some(status) = children[0].try_wait()
-            .map_err(|error| format!("Could not monitor the SchoolBridge backend: {error}"))? {
-            return Err(format!(
-                "SchoolBridge backend exited during startup ({status}). Check {}.",
-                log_path.display()
-            ));
-        }
-        let lan_ready = if let Some(config) = &lan {
-            if children.len() > 1 {
-                if let Some(status) = children[1].try_wait()
-                    .map_err(|error| format!("Could not monitor the HTTPS LAN listener: {error}"))? {
-                    return Err(format!(
-                        "The HTTPS LAN listener exited during startup ({status}). Check {}.",
-                        log_dir.join("lan-backend.log").display()
-                    ));
-                }
-                lan_listener_is_reachable(config)
-            } else {
-                false
-            }
-        } else {
-            true
-        };
-        if backend_is_healthy(port) && lan_ready {
-            return Ok(ManagedBackend {
-                children: std::mem::take(&mut children.0),
-                lan: lan.clone(),
-                #[cfg(windows)]
-                _job: job,
-            });
-        }
-        thread::sleep(Duration::from_millis(500));
-    }
-
-    for child in &mut children.0 {
-        let _ = child.kill();
-    }
-    for child in &mut children.0 {
-        let _ = child.wait();
-    }
-    Err(format!(
+    let startup_timeout = format!(
         "SchoolBridge backend did not become healthy within 90 seconds. Check {}.",
         log_path.display()
-    ))
+    );
+    wait_for_readiness(
+        BACKEND_START_TIMEOUT,
+        Duration::from_millis(500),
+        &startup_timeout,
+        || {
+            if let Some(status) = children[0].try_wait()
+                .map_err(|error| format!("Could not monitor the SchoolBridge backend: {error}"))? {
+                return Err(format!(
+                    "SchoolBridge backend exited during startup ({status}). Check {}.",
+                    log_path.display()
+                ));
+            }
+            let lan_ready = if let Some(config) = &lan {
+                if children.len() > 1 {
+                    if let Some(status) = children[1].try_wait()
+                        .map_err(|error| format!("Could not monitor the HTTPS LAN listener: {error}"))? {
+                        return Err(format!(
+                            "The HTTPS LAN listener exited during startup ({status}). Check {}.",
+                            log_dir.join("lan-backend.log").display()
+                        ));
+                    }
+                    lan_listener_is_reachable(config)
+                } else {
+                    false
+                }
+            } else {
+                true
+            };
+            Ok(backend_is_healthy(port) && lan_ready)
+        },
+    )?;
+
+    Ok(ManagedBackend {
+        children: std::mem::take(&mut children.0),
+        lan: lan.clone(),
+        #[cfg(windows)]
+        _job: job,
+    })
 }
 
 fn supervise_backend(app_handle: tauri::AppHandle) {
@@ -826,6 +839,40 @@ mod tests {
             assert_ne!(inspected, 0, "could not read child process exit status");
             assert_ne!(exit_code, 259, "backend child remained active after desktop shutdown");
         }
+    }
+
+    #[test]
+    fn startup_readiness_timeout_is_deterministic_and_reports_failure() {
+        use std::time::Duration;
+
+        let mut checks = 0_u32;
+        let error = super::wait_for_readiness(
+            Duration::from_millis(25),
+            Duration::from_millis(5),
+            "backend startup timed out",
+            || {
+                checks += 1;
+                Ok(false)
+            },
+        ).expect_err("an unavailable backend must time out");
+
+        assert_eq!(error, "backend startup timed out");
+        assert!(checks > 0, "readiness must be checked before timing out");
+    }
+
+    #[test]
+    fn startup_readiness_returns_immediately_when_backend_is_ready() {
+        let mut checks = 0_u32;
+        super::wait_for_readiness(
+            std::time::Duration::from_secs(1),
+            std::time::Duration::from_millis(5),
+            "backend startup timed out",
+            || {
+                checks += 1;
+                Ok(true)
+            },
+        ).expect("ready backend should pass startup");
+        assert_eq!(checks, 1);
     }
 
     #[test]
