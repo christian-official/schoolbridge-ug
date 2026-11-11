@@ -216,6 +216,34 @@ export default function StaffFinance({token,active,classes=[],refreshKey=0,initi
     }catch(error){setOfflineFinanceStatus(error instanceof Error?error.message:'Unable to save offline payment.')}
     finally{setOfflineFinanceBusy(false)}
   }
+  async function loadOfflineFinanceDrafts(){
+    if(offlineFinancePassphrase.length<12){setOfflineFinanceStatus('Enter the passphrase used to protect the queue.');return}
+    setOfflineFinanceBusy(true);setOfflineFinanceStatus('')
+    try{
+      const loginIndex=JSON.parse(localStorage.getItem('schoolbridge-offline-login-index')||'null') as {userId:number;deviceId:string}|null
+      if(!loginIndex||!Number.isInteger(loginIndex.userId)||!loginIndex.deviceId)throw new Error('No registered offline snapshot is available on this browser.')
+      if(localStorage.getItem('schoolbridge-sync-device-'+loginIndex.userId)!==loginIndex.deviceId)throw new Error('The registered device identity has changed. Revalidate this browser online.')
+      const queue=await loadEncryptedFinanceQueue<OfflineFinancePayment[]>(loginIndex.userId,loginIndex.deviceId,offlineFinancePassphrase)
+      setOfflineFinanceQueue(queue)
+      setOfflineFinanceStatus(queue.length+' saved payment(s) loaded. Review pending entries before synchronising.')
+    }catch(error){setOfflineFinanceStatus(error instanceof Error?error.message:'Unable to load offline payments.')}
+    finally{setOfflineFinanceBusy(false)}
+  }
+  async function discardOfflineFinanceDraft(idempotencyKey:string){
+    if(!window.confirm('Remove this unsynchronised payment draft from this device? This does not reverse any payment already accepted by the school.'))return
+    if(offlineFinancePassphrase.length<12){setOfflineFinanceStatus('Enter the queue passphrase before removing a draft.');return}
+    setOfflineFinanceBusy(true);setOfflineFinanceStatus('')
+    try{
+      const loginIndex=JSON.parse(localStorage.getItem('schoolbridge-offline-login-index')||'null') as {userId:number;deviceId:string}|null
+      if(!loginIndex||localStorage.getItem('schoolbridge-sync-device-'+loginIndex.userId)!==loginIndex.deviceId)throw new Error('Revalidate this registered device online before changing its queue.')
+      const queue=await loadEncryptedFinanceQueue<OfflineFinancePayment[]>(loginIndex.userId,loginIndex.deviceId,offlineFinancePassphrase)
+      const next=queue.filter(item=>item.idempotency_key!==idempotencyKey)
+      await saveEncryptedFinanceQueue(loginIndex.userId,loginIndex.deviceId,offlineFinancePassphrase,next)
+      setOfflineFinanceQueue(next)
+      setOfflineFinanceStatus('Draft removed from this device. No school payment was recorded or reversed.')
+    }catch(error){setOfflineFinanceStatus(error instanceof Error?error.message:'Unable to remove offline payment draft.')}
+    finally{setOfflineFinanceBusy(false)}
+  }
   async function syncOfflinePayments(){
     if(offlineFinancePassphrase.length<12){setOfflineFinanceStatus('Enter the passphrase used to protect the queue.');return}
     setOfflineFinanceBusy(true);setOfflineFinanceStatus('')
@@ -299,7 +327,7 @@ export default function StaffFinance({token,active,classes=[],refreshKey=0,initi
         <label className="field-span-full">Reference / transaction ID<input value={payment.reference} onChange={e=>setPayment({...payment,reference:e.target.value})} placeholder="Optional bank or mobile money reference"/></label>
       </div></section>
       <div className="form-actions"><button className="primary-button" disabled={savingPayment||!selectedStudentCharges.some(c=>c.balance>0)||!payment.charge_id||Number(payment.amount)<=0}>{savingPayment?'Recording payment...':'Record payment and issue receipt'}</button><button type="button" className="secondary-button" disabled={offlineFinanceBusy||!payment.charge_id||Number(payment.amount)<=0} onClick={()=>void saveOfflinePayment()}><LockKeyhole size={15}/> Save encrypted offline draft</button></div>
-      <section className="form-section"><div className="form-section-heading"><span className="form-section-number">OFFLINE</span><div><h4>Offline payment queue</h4><p>Encrypted on this browser. Drafts expire after 24 hours. A queued item is not a receipt or confirmed payment until accepted by the server.</p></div></div><label className="field-span-full">Offline queue passphrase<input type="password" autoComplete="off" value={offlineFinancePassphrase} onChange={e=>setOfflineFinancePassphrase(e.target.value)} placeholder="At least 12 characters"/></label><div className="form-actions"><button type="button" className="secondary-button" disabled={offlineFinanceBusy} onClick={()=>void syncOfflinePayments()}><CloudUpload size={15}/> Synchronise queued payments</button><span>{offlineFinanceQueue.length} loaded draft(s)</span></div>{offlineFinanceStatus&&<p className="field-hint" role="status">{offlineFinanceStatus}</p>}</section>
+      <section className="form-section"><div className="form-section-heading"><span className="form-section-number">OFFLINE</span><div><h4>Offline payment queue</h4><p>Encrypted on this browser. Drafts expire after 24 hours. A queued item is not a receipt or confirmed payment until accepted by the server.</p></div></div><label className="field-span-full">Offline queue passphrase<input type="password" autoComplete="off" value={offlineFinancePassphrase} onChange={e=>setOfflineFinancePassphrase(e.target.value)} placeholder="At least 12 characters"/></label><div className="form-actions"><button type="button" className="secondary-button" disabled={offlineFinanceBusy} onClick={()=>void loadOfflineFinanceDrafts()}>Load saved queue</button><button type="button" className="secondary-button" disabled={offlineFinanceBusy} onClick={()=>void syncOfflinePayments()}><CloudUpload size={15}/> Synchronise queued payments</button><span>{offlineFinanceQueue.length} loaded draft(s)</span></div>{offlineFinanceQueue.length>0&&<div className="table-wrap"><table><thead><tr><th>Student</th><th>Admission no.</th><th>Term</th><th>Amount (UGX)</th><th>Action</th></tr></thead><tbody>{offlineFinanceQueue.map(item=><tr key={item.idempotency_key}><td>{item.student_name}</td><td>{item.admission_number}</td><td>{item.term} {item.year}</td><td>{item.amount.toLocaleString()}</td><td><button type="button" className="secondary-button" disabled={offlineFinanceBusy} onClick={()=>void discardOfflineFinanceDraft(item.idempotency_key)}>Remove draft</button></td></tr>)}</tbody></table></div>}{offlineFinanceStatus&&<p className="field-hint" role="status">{offlineFinanceStatus}</p>}</section>
     </form>}
     {receipt&&<section className="panel receipt-print"><div className="panel-heading"><div><h2>{schoolProfile.name||'SchoolBridge'}</h2><p>Official fee payment receipt · {schoolProfile.phone||''} {schoolProfile.email||''}</p></div><button className="secondary-button" type="button" onClick={()=>window.print()}>Print receipt</button></div><div className="receipt-details"><strong>Receipt: {receipt.receipt_number}</strong><p>Student: {receipt.charge.student_name}</p><p>Admission number: {receipt.charge.admission_number}</p><p>Class: {receipt.charge.class_name||'—'} {receipt.charge.stream||''}</p><p>Fee: {receipt.charge.term} {receipt.charge.year}</p><p>Amount received: UGX {receipt.amount.toLocaleString()}</p><p>Payment method: {receipt.method}</p><p>Date: {receipt.date}</p></div></section>}
     </>}
