@@ -152,10 +152,22 @@ jobs:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: backend/requirements-dev.txt
-      - name: Install PostgreSQL client and Python dependencies
+      - name: Prepare PostgreSQL client tools from the service image
+        shell: bash
         run: |
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/pg-tools"
+          for tool in pg_dump pg_restore createdb dropdb psql; do
+            cat > "$RUNNER_TEMP/pg-tools/$tool" <<EOF
+          #!/usr/bin/env bash
+          set -euo pipefail
+          exec docker run --rm --network host -v /tmp:/tmp -e PGPASSWORD="${PGPASSWORD:-}" postgres:16 $tool "$@"
+          EOF
+            chmod +x "$RUNNER_TEMP/pg-tools/$tool"
+          done
+          echo "$RUNNER_TEMP/pg-tools" >> "$GITHUB_PATH"
+      - name: Install Python dependencies
+        run: |
           python -m pip install --upgrade pip
           python -m pip install -r backend/requirements-dev.txt
       - name: Run real PostgreSQL backup and restore drill
@@ -190,7 +202,7 @@ jobs:
         working-directory: frontend
         run: |
           npm install --no-save --no-package-lock playwright@1.56.1
-          npx playwright install --with-deps chromium
+          npx playwright install chromium
       - name: Run real-browser offline tests
         working-directory: frontend
         run: npm run test:offline:browser
