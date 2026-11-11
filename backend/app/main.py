@@ -550,6 +550,11 @@ class StudentCreate(BaseModel):
     photo_data: str | None = Field(default=None, max_length=1_800_000)
 
 
+class StudentDismissal(BaseModel):
+    reason: str = Field(min_length=3, max_length=1000)
+    effective_date: date = Field(default_factory=date.today)
+
+
 class StudentUpdate(BaseModel):
     first_name: str | None = None
     middle_name: str | None = None
@@ -572,7 +577,7 @@ class StudentUpdate(BaseModel):
     admission_date: date | None = None
     class_id: int | None = None
     photo_data: str | None = Field(default=None, max_length=1_800_000)
-    status: str | None = Field(default=None, pattern="^(active|transferred|dismissed|inactive)$")
+    status: str | None = Field(default=None, pattern="^(active|transferred|inactive)$")
     academic_level: str | None = Field(default=None, pattern="^(O-Level|A-Level)$")
     combination: str | None = None
     optional_subjects: str | None = None
@@ -971,8 +976,13 @@ def create_student(data: StudentCreate, db: Session = Depends(get_db), admin=Dep
     return item
 
 @app.get("/api/students", response_model=list[StudentOut], tags=["Students"])
-def list_students(db: Session = Depends(get_db)):
-    return db.query(models.Student).order_by(models.Student.last_name).all()
+def list_students(status: str = "active", db: Session = Depends(get_db), admin=Depends(require_admin)):
+    if status not in {"active", "dismissed", "transferred", "inactive", "all"}:
+        raise HTTPException(422, "Choose a valid student status.")
+    query = db.query(models.Student)
+    if status != "all":
+        query = query.filter(models.Student.status == status)
+    return query.order_by(models.Student.last_name, models.Student.first_name).all()
 
 
 
@@ -1415,6 +1425,8 @@ def linked_parent_student(db: Session, parent, student_id: int):
     student = db.get(models.Student, student_id)
     if not student:
         raise HTTPException(404, "Student record not found.")
+    if student.status != "active":
+        raise HTTPException(404, "This student is no longer active on the parent portal.")
     return student
 
 
@@ -3314,14 +3326,14 @@ def create_parent_account(data: ParentAccountCreate, db: Session = Depends(get_d
 
 @app.get("/api/parent-accounts", tags=["Parent Access"])
 def list_parent_accounts(db: Session = Depends(get_db), admin=Depends(require_admin)):
-    parents = db.query(models.User).filter_by(role="parent").order_by(models.User.username).all()
+    parents = db.query(models.User).filter_by(role="parent", is_active=True).order_by(models.User.username).all()
     output = []
     for parent in parents:
         links = db.query(models.ParentStudentLink).filter_by(user_id=parent.id).all()
         children = []
         for link in links:
             student = db.get(models.Student, link.student_id)
-            if student:
+            if student and student.status == "active":
                 children.append({"id": student.id, "name": " ".join(x for x in [student.first_name, student.middle_name, student.last_name] if x), "admission_number": student.admission_number, "guardians": [name for name in [student.guardian_name, student.guardian2_name] if name], "guardian_phones": [phone for phone in [student.guardian_phone, student.guardian2_phone] if phone]})
         output.append({"id": parent.id, "username": parent.username, "email": parent.email, "active": parent.is_active, "children": children})
     return output
@@ -3334,15 +3346,15 @@ def remove_parent_account(parent_id: int, db: Session = Depends(get_db), admin=D
         raise HTTPException(404, "Parent account not found.")
     links = db.query(models.ParentStudentLink).filter_by(user_id=parent.id).all()
     linked_student_ids = [str(link.student_id) for link in links]
-    for link in links:
-        db.delete(link)
+    if parent.is_active:
+        parent.is_active = False
+        parent.token_version = int(parent.token_version or 0) + 1
     write_audit(
-        db, admin, "parent_account_removed", "user", parent.id,
-        f"username={parent.username}; unlinked_student_ids={','.join(linked_student_ids)}",
+        db, admin, "parent_account_deactivated", "user", parent.id,
+        f"username={parent.username}; retained_student_links={','.join(linked_student_ids)}",
     )
-    db.delete(parent)
     db.commit()
-    return {"removed": True, "parent_id": parent_id, "unlinked_students": len(links)}
+    return {"deactivated": True, "parent_id": parent_id, "retained_student_links": len(links)}
 
 
 @app.get("/api/parent/children", tags=["Parent Portal"])
@@ -3351,7 +3363,7 @@ def parent_children(db: Session = Depends(get_db), parent=Depends(require_parent
     output = []
     for link in links:
         student = db.get(models.Student, link.student_id)
-        if not student:
+        if not student or student.status != "active":
             continue
         school_class = db.get(models.SchoolClass, student.class_id) if student.class_id else None
         charges = db.query(models.FeeCharge).filter_by(student_id=student.id).all()
@@ -4243,7 +4255,7 @@ upgrade_class_stream_uniqueness()
 @app.get("/api/students/search", tags=["Students"])
 def search_students(page: int = 1, page_size: int = 25, search: str = "", class_id: int | None = None, db: Session = Depends(get_db)):
     page_size = min(max(page_size, 1), 100)
-    query = db.query(models.Student)
+    query = db.query(models.Student).filter(models.Student.status == "active")
     if search.strip():
         term = "%" + search.strip() + "%"
         query = query.filter(or_(models.Student.admission_number.ilike(term), models.Student.first_name.ilike(term), models.Student.middle_name.ilike(term), models.Student.last_name.ilike(term)))
@@ -4936,10 +4948,50 @@ def update_student(student_id: int, data: StudentUpdate, db: Session = Depends(g
     return {"message": "Student profile updated.", "student": student}
 
 
+@app.post("/api/students/{student_id}/dismiss", tags=["Students"])
+def dismiss_student(student_id: int, data: StudentDismissal, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    student = db.get(models.Student, student_id)
+    if not student:
+        raise HTTPException(404, "Student not found.")
+    if student.status == "dismissed":
+        raise HTTPException(409, "This student has already been dismissed.")
+    if student.status != "active":
+        raise HTTPException(409, "Only an active student can be dismissed.")
+    student.status = "dismissed"
+    linked_parents = db.query(models.User).join(
+        models.ParentStudentLink, models.ParentStudentLink.user_id == models.User.id
+    ).filter(
+        models.ParentStudentLink.student_id == student.id,
+        models.User.role == "parent",
+        models.User.is_active.is_(True),
+    ).all()
+    deactivated_parent_ids = []
+    for parent in linked_parents:
+        other_active_children = db.query(models.Student.id).join(
+            models.ParentStudentLink, models.ParentStudentLink.student_id == models.Student.id
+        ).filter(
+            models.ParentStudentLink.user_id == parent.id,
+            models.Student.id != student.id,
+            models.Student.status == "active",
+        ).first()
+        if not other_active_children:
+            parent.is_active = False
+            parent.token_version = int(parent.token_version or 0) + 1
+            deactivated_parent_ids.append(parent.id)
+            write_audit(db, admin, "parent_account_deactivated", "user", parent.id,
+                        f"All linked students inactive after dismissal of student {student.id}.")
+    write_audit(db, admin, "student_dismissed", "student", student.id,
+                f"reason={data.reason.strip()}; effective_date={data.effective_date.isoformat()}; deactivated_parent_ids={deactivated_parent_ids}")
+    db.commit()
+    return {"message": "Student dismissed. Academic, attendance and financial history has been retained.",
+            "student_id": student.id, "status": student.status, "effective_date": data.effective_date,
+            "deactivated_parent_ids": deactivated_parent_ids}
+
+
 @app.patch("/api/students/{student_id}/status", tags=["Students"])
 def change_student_status(student_id: int, status: str, db: Session = Depends(get_db), admin=Depends(require_admin)):
-    if status not in {"active", "transferred", "dismissed", "inactive"}:
-        raise HTTPException(422, "Status must be active, transferred, dismissed or inactive.")
+    if status not in {"active", "transferred", "inactive"}:
+        raise HTTPException(422, "Use the formal dismissal workflow to dismiss a student.")
     student = db.get(models.Student, student_id)
     if not student:
         raise HTTPException(404, "Student not found.")
