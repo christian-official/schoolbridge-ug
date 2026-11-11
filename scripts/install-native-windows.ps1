@@ -1,4 +1,3 @@
-$null = $null
 #requires -RunAsAdministrator
 param([string]$LicensePublicKey)
 $ErrorActionPreference="Stop"
