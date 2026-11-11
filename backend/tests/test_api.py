@@ -2831,6 +2831,43 @@ def test_parent_change_feed_includes_own_account_access_invalidations():
 
 
 
+
+def test_sync_change_feed_invalidates_teacher_account_permission_changes():
+    reset_database()
+    teacher = create_teacher()
+    headers = {"Authorization": "Bearer " + create_access_token(teacher)}
+    device_id = "00000000-0000-4000-8000-000000000926"
+    with TestClient(app) as client:
+        registered = client.post(
+            "/api/sync/devices", headers=headers,
+            json={"device_id": device_id, "device_name": "Teacher account invalidation"},
+        )
+        assert registered.status_code == 200, registered.text
+        initial = client.get(
+            f"/api/sync/changes?device_id={device_id}", headers=headers,
+        )
+        assert initial.status_code == 200, initial.text
+
+        # Removing all workspace permissions must still publish an account
+        # invalidation to the affected teacher's existing device.
+        with SessionLocal() as db:
+            account = db.get(models.User, teacher.id)
+            account.permissions_json = json.dumps({})
+            db.commit()
+
+        updated = client.get(
+            f"/api/sync/changes?device_id={device_id}&cursor={initial.json()['next_cursor']}",
+            headers=headers,
+        )
+        assert updated.status_code == 200, updated.text
+        own_access_events = [
+            item for item in updated.json()["changes"]
+            if item["entity_type"] == "UserAccess" and item["entity_id"] == teacher.id
+        ]
+        assert len(own_access_events) == 1
+        assert own_access_events[0]["operation"] == "update"
+
+
 def test_timetable_reassignment_invalidates_previous_and_new_staff_class_subject_scopes():
     reset_database()
     with SessionLocal() as db:
