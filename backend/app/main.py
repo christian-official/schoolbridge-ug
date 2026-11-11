@@ -4952,6 +4952,8 @@ def update_student(student_id: int, data: StudentUpdate, db: Session = Depends(g
 
 @app.post("/api/students/{student_id}/dismiss", tags=["Students"])
 def dismiss_student(student_id: int, data: StudentDismissal, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    if admin.role != "admin" and "delete" not in user_permissions(admin).get("Students", set()):
+        raise HTTPException(403, "Student dismissal requires delete permission.")
     student = db.get(models.Student, student_id)
     if not student:
         raise HTTPException(404, "Student not found.")
