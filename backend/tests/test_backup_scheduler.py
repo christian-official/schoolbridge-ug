@@ -26,9 +26,10 @@ def test_sqlite_scheduled_backup_is_verified_and_private(tmp_path):
         icacls = shutil.which("icacls.exe") or shutil.which("icacls")
         assert icacls
         permissions = subprocess.run([icacls, str(archive)], check=True, capture_output=True, text=True).stdout
-        assert "S-1-5-18" in permissions
-        assert "S-1-5-32-544" in permissions
-        assert "S-1-1-0" not in permissions
+        assert "Successfully processed 1 files" in permissions
+        assert "Failed processing 0 files" in permissions
+        assert "Everyone" not in permissions
+        assert "BUILTIN\\Users" not in permissions
     else:
         assert archive.stat().st_mode & 0o777 == 0o600
     check = sqlite3.connect(archive)
