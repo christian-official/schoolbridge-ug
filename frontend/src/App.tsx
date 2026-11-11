@@ -729,6 +729,7 @@ function FirstTimeSetupWizard({status,onStatusChange}:{status:FirstSetupStatus;o
       })
       const result=await response.json().catch(()=>({}))
       if(!response.ok)throw new Error(result.detail||'Installation activation failed.')
+      try { localStorage.setItem('schoolbridge-installation-id', status.installation_id) } catch { /* Ignore unavailable browser storage. */ }
       onStatusChange({...status,activated:true,error:''})
     } catch(e) { setError(e instanceof Error?e.message:'Installation activation failed.') }
     finally { setBusy(false) }
@@ -742,7 +743,10 @@ function FirstTimeSetupWizard({status,onStatusChange}:{status:FirstSetupStatus;o
       })
       const result=await response.json().catch(()=>({}))
       if(!response.ok)throw new Error(result.detail||'School setup could not be completed.')
-      try { window.sessionStorage.removeItem(draftKey) } catch { /* Ignore unavailable browser storage. */ }
+      try {
+        localStorage.setItem('schoolbridge-installation-id', status.installation_id)
+        window.sessionStorage.removeItem(draftKey)
+      } catch { /* Ignore unavailable browser storage. */ }
       onStatusChange({...status,setup_completed:true,activated:true,identity_locked:true,error:''})
       setSchool({...school,admin_password:''})
       setLicense('')
@@ -821,10 +825,12 @@ function readOfflineLoginIndex(): { userId:number; deviceId:string; username:str
     const raw = localStorage.getItem('schoolbridge-offline-login-index')
     if (!raw) return null
     const index = JSON.parse(raw)
+    const installedIdentity = localStorage.getItem('schoolbridge-installation-id')
     if (!Number.isSafeInteger(index?.userId) || index.userId < 1 ||
         typeof index.deviceId !== 'string' || !index.deviceId ||
         typeof index.username !== 'string' || !index.username ||
-        typeof index.installationId !== 'string' || !index.installationId) return null
+        typeof index.installationId !== 'string' || !index.installationId ||
+        !installedIdentity || index.installationId !== installedIdentity) return null
     return index
   } catch {
     return null
@@ -894,7 +900,13 @@ function App() {
     fetch(`${API_BASE_URL}/api/setup/status`).then(async response=>{
       const result=await response.json().catch(()=>({}))
       if(!response.ok)throw new Error(result.detail||'Unable to check installation setup.')
-      if(!cancelled)setSetupStatus({loading:false,setup_completed:Boolean(result.setup_completed),activated:Boolean(result.activated),installation_id:result.installation_id||'',identity_locked:Boolean(result.identity_locked),error:''})
+      if(!cancelled) {
+        try {
+          if(result.setup_completed && result.activated && result.installation_id) localStorage.setItem('schoolbridge-installation-id', result.installation_id)
+          else localStorage.removeItem('schoolbridge-installation-id')
+        } catch { /* Ignore unavailable browser storage. */ }
+        setSetupStatus({loading:false,setup_completed:Boolean(result.setup_completed),activated:Boolean(result.activated),installation_id:result.installation_id||'',identity_locked:Boolean(result.identity_locked),error:''})
+      }
     }).catch(e=>{if(!cancelled)setSetupStatus({loading:false,setup_completed:false,activated:false,installation_id:'',identity_locked:false,error:e instanceof Error?e.message:'Unable to check installation setup.'})})
     return ()=>{cancelled=true}
   },[])

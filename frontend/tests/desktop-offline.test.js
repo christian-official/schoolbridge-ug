@@ -17,6 +17,8 @@ test('offline login metadata and encrypted snapshot are bound to one installatio
   assert.match(devices, /installationId:installation\.installation_id/)
   assert.match(devices, /installation_id:string;setup_completed:boolean;activated:boolean/)
   assert.match(app, /snapshot\.installationId!==index\.installationId/)
+  assert.match(app, /index\.installationId !== installedIdentity/)
+  assert.match(app, /localStorage\.setItem\('schoolbridge-installation-id', result\.installation_id\)/)
   assert.match(devices, /snapshot\.installationId!==installation\.installation_id/)
 })
 

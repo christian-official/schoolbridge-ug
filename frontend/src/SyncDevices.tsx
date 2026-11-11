@@ -268,6 +268,7 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
       const total=Object.keys(snapshot).filter(key=>Array.isArray(snapshot[key])).reduce((sum,key)=>sum+snapshot[key].length,0)
       if(total>20000)throw new Error('This account has more than 20,000 authorised records. Narrow the data scope before downloading.')
       snapshot.sequence=sequences[0]
+      localStorage.setItem('schoolbridge-installation-id', installation.installation_id)
       await saveEncryptedOfflineSnapshot(userId,deviceId,offlinePassphrase,snapshot)
       localStorage.setItem('schoolbridge-offline-snapshot-meta-'+userId+'-'+deviceId,JSON.stringify({fingerprint:snapshot.permissionFingerprint,sequence:snapshot.sequence}))
       // Lookup metadata is not an authenticator; the account and records stay encrypted in IndexedDB.
@@ -288,6 +289,7 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
       const snapshot=await loadEncryptedOfflineSnapshot<any>(userId,id,offlinePassphrase)
       const installation=await request<{installation_id:string;setup_completed:boolean;activated:boolean}>('setup/status',token)
       if(snapshot.version!==1||snapshot.userId!==userId||snapshot.deviceId!==id||snapshot.installationId!==installation.installation_id||!installation.setup_completed||!installation.activated)throw new Error('This offline snapshot belongs to a different account, device, or SchoolBridge installation.')
+      localStorage.setItem('schoolbridge-installation-id', installation.installation_id)
       if(!snapshot.expiresAt||snapshot.expiresAt<Date.now()){
         await deleteEncryptedOfflineSnapshot(userId,id)
         localStorage.removeItem('schoolbridge-offline-snapshot-meta-'+userId+'-'+id)
