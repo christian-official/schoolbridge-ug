@@ -196,7 +196,7 @@ struct LanConfig {
     key_file: PathBuf,
 }
 
-fn configured_lan(env_file: &Path) -> Result<Option<LanConfig>, String> {
+fn configured_lan(env_file: &Path, installation_dir: &Path) -> Result<Option<LanConfig>, String> {
     let contents = fs::read_to_string(env_file)
         .map_err(|_| "SchoolBridge configuration (.env) is missing or unreadable.".to_string())?;
     let values: std::collections::HashMap<String, String> = contents.lines().filter_map(|line| {
@@ -235,8 +235,17 @@ fn configured_lan(env_file: &Path) -> Result<Option<LanConfig>, String> {
     if !key_file.is_absolute() || !key_file.is_file() || cert_file == key_file {
         return Err("The LAN HTTPS private key path must be a separate existing absolute file path.".into());
     }
+    let install_root = installation_dir.canonicalize()
+        .map_err(|_| "Could not resolve the SchoolBridge installation directory.".to_string())?;
+    let cert_resolved = cert_file.canonicalize()
+        .map_err(|_| "Could not resolve the LAN HTTPS certificate path.".to_string())?;
+    let key_resolved = key_file.canonicalize()
+        .map_err(|_| "Could not resolve the LAN HTTPS private key path.".to_string())?;
+    if cert_resolved.starts_with(&install_root) || key_resolved.starts_with(&install_root) {
+        return Err("LAN certificate and private key must be stored outside the SchoolBridge installation/USB directory.".into());
+    }
 
-    Ok(Some(LanConfig { bind_ip, port, cert_file, key_file }))
+    Ok(Some(LanConfig { bind_ip, port, cert_file: cert_resolved, key_file: key_resolved }))
 }
 
 #[derive(Default)]
@@ -360,7 +369,7 @@ fn start_backend() -> Result<ManagedBackend, String> {
     }
 
     let port = configured_port(&env_file)?;
-    let lan = configured_lan(&env_file)?;
+    let lan = configured_lan(&env_file, &root)?;
     if TcpStream::connect(("127.0.0.1", port)).is_ok() {
         return Err(format!(
             "Port {port} is already in use. SchoolBridge will not attach to an unowned service."
@@ -531,7 +540,7 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let env_file = dir.join(".env");
         std::fs::write(&env_file, "SCHOOLBRIDGE_PORT=8080\n").unwrap();
-        assert_eq!(super::configured_lan(&env_file).unwrap(), None);
+        assert_eq!(super::configured_lan(&env_file, &dir).unwrap(), None);
         let _ = std::fs::remove_dir_all(dir);
     }
 
@@ -562,7 +571,7 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let env_file = dir.join(".env");
         std::fs::write(&env_file, "SCHOOLBRIDGE_LAN_ENABLED=true\nSCHOOLBRIDGE_LAN_BIND_IP=8.8.8.8\n").unwrap();
-        assert!(super::configured_lan(&env_file).unwrap_err().contains("private"));
+        assert!(super::configured_lan(&env_file, &dir).unwrap_err().contains("private"));
         std::fs::write(&env_file, "SCHOOLBRIDGE_LAN_ENABLED=true\nSCHOOLBRIDGE_LAN_BIND_IP=127.0.0.1\n").unwrap();
         assert!(super::configured_lan(&env_file).unwrap_err().contains("private"));
         let _ = std::fs::remove_dir_all(dir);
