@@ -18,13 +18,18 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import update, func, or_, text
 
+from dotenv import load_dotenv
+
+# Load the installed configuration before importing database.py, which captures
+# SCHOOLBRIDGE_DATABASE_URL when its SQLAlchemy engine is created.
+load_dotenv()
+
 from .database import DATABASE_URL, Base, engine, get_db, SessionLocal, create_sqlite_backup, apply_sqlite_restore, sqlite_connection_diagnostics
 from .migrations import upgrade_database
 from . import models
 from .sync_tracking import register_sync_tracking
 from .school_setup import verify_activation_license, license_fingerprint
 
-from dotenv import load_dotenv
 import jwt
 from datetime import timedelta, timezone
 from pwdlib import PasswordHash
@@ -45,8 +50,6 @@ class FrontendPathConvertor(Convertor):
 
 register_url_convertor("frontend", FrontendPathConvertor())
 
-
-load_dotenv()
 password_hash = PasswordHash.recommended()
 JWT_SECRET = os.environ["SCHOOLBRIDGE_SECRET_KEY"]
 JWT_ALGORITHM = "HS256"
