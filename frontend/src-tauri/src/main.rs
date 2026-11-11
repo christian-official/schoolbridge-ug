@@ -19,6 +19,11 @@ const BACKEND_START_TIMEOUT: Duration = Duration::from_secs(90);
 #[cfg(windows)]
 struct JobGuard(windows_sys::Win32::Foundation::HANDLE);
 
+// The handle is an owned kernel handle. Moving ownership between threads is safe;
+// access and closure remain serialized by BackendProcess's Mutex.
+#[cfg(windows)]
+unsafe impl Send for JobGuard {}
+
 #[cfg(windows)]
 impl JobGuard {
     fn attach(process_id: u32) -> Result<Self, String> {
@@ -287,7 +292,7 @@ fn main() {
         .expect("failed to initialise SchoolBridge desktop application");
 
     app.run(|app_handle, event| {
-        if matches!(event, RunEvent::Exit | RunEvent::ExitRequested { .. }) {
+        if matches!(event, RunEvent::Exit) {
             app_handle.state::<BackendProcess>().stop();
         }
     });
