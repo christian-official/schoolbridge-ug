@@ -4673,7 +4673,19 @@ def submit_offline_finance_payment(data: OfflineFinancePaymentCreate, db: Sessio
                 "applied": False, "payment_id": None, "conflict_sequence": changed.id}
     paid = db.query(func.coalesce(func.sum(models.FeePayment.amount), 0)).filter(models.FeePayment.charge_id == charge.id).scalar() or 0
     if data.amount > charge.amount - paid:
-        raise HTTPException(409, "The outstanding balance has changed; refresh the finance snapshot before retrying.")
+        # Persist a terminal conflict so retries remain idempotent and the
+        # device can review/discard the same proposal instead of retrying forever.
+        proposal = models.SyncChangeProposal(user_id=user.id, device_id=device.device_id,
+            idempotency_key=data.idempotency_key, entity_type="FinancePayment", entity_id=charge.id,
+            operation="create", payload_json=payload, base_sequence=data.base_sequence,
+            status="conflict", resolution="system_conflict", resolved_at=datetime.utcnow())
+        db.add(proposal)
+        db.flush()
+        write_audit(db, user, "offline_finance_payment_conflict", "sync_change_proposal", proposal.id,
+                    f"charge={charge.id}; reason=outstanding_balance_changed")
+        db.commit()
+        return {"proposal_id": proposal.id, "status": "conflict", "duplicate": False,
+                "applied": False, "payment_id": None, "conflict_sequence": None}
     proposal = models.SyncChangeProposal(user_id=user.id, device_id=device.device_id,
         idempotency_key=data.idempotency_key, entity_type="FinancePayment", entity_id=charge.id,
         operation="create", payload_json=payload, base_sequence=data.base_sequence,
