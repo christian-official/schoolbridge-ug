@@ -816,8 +816,23 @@ function FirstTimeSetupWizard({status,onStatusChange}:{status:FirstSetupStatus;o
   </main>
 }
 
+function readOfflineLoginIndex(): { userId:number; deviceId:string; username:string; installationId:string } | null {
+  try {
+    const raw = localStorage.getItem('schoolbridge-offline-login-index')
+    if (!raw) return null
+    const index = JSON.parse(raw)
+    if (!Number.isSafeInteger(index?.userId) || index.userId < 1 ||
+        typeof index.deviceId !== 'string' || !index.deviceId ||
+        typeof index.username !== 'string' || !index.username ||
+        typeof index.installationId !== 'string' || !index.installationId) return null
+    return index
+  } catch {
+    return null
+  }
+}
+
 type OfflineWorkspaceSnapshot = {
-  version:number; userId:number; deviceId:string; username:string; role:string; role_label?:string;
+  version:number; userId:number; deviceId:string; username:string; installationId:string; role:string; role_label?:string;
   permissions?:Record<string,string[]>; downloadedAt:number; expiresAt:number;
   students:any[]; classes:any[]; attendance:any[]; exams:any[]; marks:any[];
   charges:any[]; payments:any[]; class_fees:any[];
@@ -1347,12 +1362,11 @@ function App() {
       // Only a network outage may activate the local read-only sign-in path.
       if (error instanceof TypeError || !navigator.onLine) {
         try {
-          const raw=localStorage.getItem('schoolbridge-offline-login-index')
-          if(!raw) throw new Error('Offline sign-in has not been prepared on this browser. Connect and save an encrypted offline copy first.')
-          const index=JSON.parse(raw) as {userId:number;deviceId:string;username:string}
-          if(!index.userId||!index.deviceId||index.username.toLowerCase()!==username.trim().toLowerCase()) throw new Error('Use the exact account username saved during online sign-in.')
+          const index=readOfflineLoginIndex()
+          if(!index) throw new Error('Offline sign-in has not been prepared for this SchoolBridge installation. Connect and save a fresh encrypted offline copy first.')
+          if(index.username.toLowerCase()!==username.trim().toLowerCase()) throw new Error('Use the exact account username saved during online sign-in.')
           const snapshot=await loadEncryptedOfflineSnapshot<OfflineWorkspaceSnapshot>(index.userId,index.deviceId,password)
-          if(snapshot.version!==1||snapshot.userId!==index.userId||snapshot.deviceId!==index.deviceId||snapshot.username?.toLowerCase()!==username.trim().toLowerCase()) throw new Error('The encrypted offline copy does not match this account or device.')
+          if(snapshot.version!==1||snapshot.userId!==index.userId||snapshot.deviceId!==index.deviceId||snapshot.username?.toLowerCase()!==username.trim().toLowerCase()||snapshot.installationId!==index.installationId) throw new Error('The encrypted offline copy does not match this account, device, or SchoolBridge installation.')
           if(!snapshot.expiresAt||snapshot.expiresAt<Date.now()||snapshot.downloadedAt>Date.now()+60000) throw new Error('The offline copy has expired. Reconnect and download a fresh copy.')
           setOfflineWorkspace(snapshot)
           setPassword('')
@@ -1387,9 +1401,11 @@ function App() {
 
   if (!token || !user) {
     if(setupStatus.loading) return <main className="login-page"><section className="login-card"><div className="brand-name">School<span>Bridge</span></div><p className="muted">Checking school installation...</p></section></main>
-    if(setupStatus.error && !localStorage.getItem('schoolbridge-offline-login-index')) return <main className="login-page"><section className="login-card"><div className="brand-name">School<span>Bridge</span></div><h1>Unable to check setup</h1><p className="error" role="alert">{setupStatus.error}</p><button className="primary-button login-button" onClick={()=>window.location.reload()}>Try again</button></section></main>
-    // A cached offline-login index must never bypass first-time setup on an unconfigured database.
-    if(!setupStatus.setup_completed) return <FirstTimeSetupWizard status={setupStatus} onStatusChange={setSetupStatus}/>
+    const offlineLoginIndex = setupStatus.error ? readOfflineLoginIndex() : null
+    if(setupStatus.error && !offlineLoginIndex) return <main className="login-page"><section className="login-card"><div className="brand-name">School<span>Bridge</span></div><h1>Unable to check setup</h1><p className="error" role="alert">{setupStatus.error}</p><button className="primary-button login-button" onClick={()=>window.location.reload()}>Try again</button></section></main>
+    // A cached offline identity is accepted only when the setup service is unavailable.
+    // A reachable, unconfigured database must always complete first-time setup.
+    if(!setupStatus.setup_completed && !offlineLoginIndex) return <FirstTimeSetupWizard status={setupStatus} onStatusChange={setSetupStatus}/>
     return (
       <main className="login-page">
         <section className="login-card">
