@@ -29,6 +29,11 @@ test('offline copies remain encrypted, expiring, and read-only', () => {
   assert.match(app, /Offline mode is read-only/)
 })
 
+test('desktop device sync uses the bundled loopback backend rather than the WebView origin', () => {
+  assert.match(devices, /window\\.location\\.hostname === 'tauri\\.localhost'/)
+  assert.match(devices, /const API_BASE_URL = isTauriDesktop\\s*\\? 'http:\\/\\/127\\.0\\.0\\.1:8080'/)
+})
+
 test('desktop primary operation uses only its loopback backend and local data directory', () => {
   assert.match(app, /const desktopApiBaseUrl = isTauriDesktop \? 'http:\/\/127\.0\.0\.1:8080'/)
   assert.match(desktopShell, /"--host", "127\.0\.0\.1"/)
