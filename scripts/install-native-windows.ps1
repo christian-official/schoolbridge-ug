@@ -1,4 +1,6 @@
+$null = $null
 #requires -RunAsAdministrator
+param([string]$LicensePublicKey)
 $ErrorActionPreference="Stop"
 $PackageDir=$PSScriptRoot
 $Target=Join-Path $env:ProgramData "SchoolBridge"
@@ -40,7 +42,8 @@ $secretBytes=New-Object byte[] 48
 $rng=[Security.Cryptography.RandomNumberGenerator]::Create()
 try{$rng.GetBytes($secretBytes)}finally{$rng.Dispose()}
 $secret=[Convert]::ToBase64String($secretBytes)
-$publicKey=Read-Host "Enter owner's Base64 Ed25519 public verification key"
+$publicKey=$LicensePublicKey
+if([string]::IsNullOrWhiteSpace($publicKey)){$publicKey=Read-Host "Enter owner's Base64 Ed25519 public verification key"}
 try{$decoded=[Convert]::FromBase64String($publicKey)}catch{throw "Public key must be valid Base64."}
 if($decoded.Length -ne 32){throw "Ed25519 public key must decode to exactly 32 bytes."}
 @"
