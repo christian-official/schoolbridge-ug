@@ -18,8 +18,9 @@ connect using that same IP address (not a DNS alias):
     SCHOOLBRIDGE_LAN_KEY_FILE=C:\SchoolBridgeSecrets\lan-key.pem
 
 Use the actual private IPv4 address assigned to the host computer. The
-certificate must contain that address (or the DNS name used by clients) in its
-Subject Alternative Name. It must chain to a certificate authority trusted by
+certificate must contain that IPv4 address as an IP Subject Alternative
+Name (IP SAN). A DNS-only SAN is not sufficient for the current IP-only
+listener and host allow-list. It must chain to a certificate authority trusted by
 every client device. Do not ask staff to bypass certificate warnings. Keep the
 private key outside the installation/USB directory, restrict its NTFS
 permissions to the SchoolBridge operator account, and never include it in a
