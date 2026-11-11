@@ -353,32 +353,15 @@ jobs:
       - run:
           name: Parse all Windows PowerShell installer scripts
           command: |
+            $ErrorActionPreference = "Stop"
             $files = @(
               "scripts/prepare-usb.ps1",
               "scripts/install-schoolbridge.ps1",
               "scripts/check-school-host.ps1",
               "scripts/prepare-school-host.ps1"
             )
-            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-            $runtime = Join-Path $env:TEMP "schoolbridge-runtime-validation"
-            New-Item -ItemType Directory -Force -Path $runtime | Out-Null
-            $dockerPath = Join-Path $runtime "Docker Desktop Installer.exe"
-            $wslPath = Join-Path $runtime "wsl.msi"
-            Invoke-WebRequest -Uri "https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe" -OutFile $dockerPath -UseBasicParsing
-            $release = Invoke-RestMethod -Uri "https://api.github.com/repos/microsoft/WSL/releases/latest"
-            $wslAssets = @($release.assets | Where-Object { $_.name.ToLowerInvariant().EndsWith(".x64.msi") })
-            if ($wslAssets.Count -ne 1) { throw "Could not identify exactly one official stable x64 WSL MSI." }
-            Invoke-WebRequest -Uri $wslAssets[0].browser_download_url -OutFile $wslPath -UseBasicParsing
-            foreach ($runtimeFile in @(
-              @{ Path = $dockerPath; Publisher = "Docker" },
-              @{ Path = $wslPath; Publisher = "Microsoft Corporation" }
-            )) {
-              $signature = Get-AuthenticodeSignature -FilePath $runtimeFile.Path
-              if ($signature.Status -ne "Valid") { throw "Invalid Authenticode signature: $($runtimeFile.Path) ($($signature.Status))" }
-              if ($signature.SignerCertificate.Subject -notmatch $runtimeFile.Publisher) { throw "Unexpected signer for $($runtimeFile.Path): $($signature.SignerCertificate.Subject)" }
-              Write-Host "Authenticode signature verified: $($runtimeFile.Path) — $($signature.SignerCertificate.Subject)"
-            }
             foreach ($file in $files) {
+              Write-Host "Parsing $file"
               $tokens = $null
               $errors = $null
               [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file), [ref]$tokens, [ref]$errors) | Out-Null
@@ -387,6 +370,41 @@ jobs:
                 throw "PowerShell syntax validation failed for $file"
               }
               Write-Host "PowerShell syntax OK: $file"
+            }
+      - run:
+          name: Download official Windows runtime installers
+          command: |
+            $ErrorActionPreference = "Stop"
+            $runtime = Join-Path $env:TEMP "schoolbridge-runtime-validation"
+            New-Item -ItemType Directory -Force -Path $runtime | Out-Null
+            $dockerPath = Join-Path $runtime "Docker Desktop Installer.exe"
+            $wslPath = Join-Path $runtime "wsl.msi"
+            Write-Host "Downloading Docker Desktop installer (maximum 240 seconds)"
+            & curl.exe --fail --location --retry 2 --connect-timeout 30 --max-time 240 --output $dockerPath "https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe"
+            if ($LASTEXITCODE -ne 0) { throw "Docker Desktop installer download failed (curl exit $LASTEXITCODE)." }
+            Write-Host "Docker Desktop installer download complete"
+            Write-Host "Resolving the official stable WSL x64 MSI"
+            $release = Invoke-RestMethod -Uri "https://api.github.com/repos/microsoft/WSL/releases/latest" -TimeoutSec 45
+            $wslAssets = @($release.assets | Where-Object { $_.name.ToLowerInvariant().EndsWith(".x64.msi") })
+            if ($wslAssets.Count -ne 1) { throw "Could not identify exactly one official stable x64 WSL MSI." }
+            Write-Host "Downloading WSL MSI (maximum 240 seconds)"
+            & curl.exe --fail --location --retry 2 --connect-timeout 30 --max-time 240 --output $wslPath $wslAssets[0].browser_download_url
+            if ($LASTEXITCODE -ne 0) { throw "WSL MSI download failed (curl exit $LASTEXITCODE)." }
+            Write-Host "WSL MSI download complete"
+      - run:
+          name: Verify Windows runtime installer signatures
+          command: |
+            $ErrorActionPreference = "Stop"
+            $runtime = Join-Path $env:TEMP "schoolbridge-runtime-validation"
+            foreach ($runtimeFile in @(
+              @{ Path = (Join-Path $runtime "Docker Desktop Installer.exe"); Publisher = "Docker" },
+              @{ Path = (Join-Path $runtime "wsl.msi"); Publisher = "Microsoft Corporation" }
+            )) {
+              if (-not (Test-Path -LiteralPath $runtimeFile.Path)) { throw "Missing downloaded runtime installer: $($runtimeFile.Path)" }
+              $signature = Get-AuthenticodeSignature -FilePath $runtimeFile.Path
+              if ($signature.Status -ne "Valid") { throw "Invalid Authenticode signature: $($runtimeFile.Path) ($($signature.Status))" }
+              if ($signature.SignerCertificate.Subject -notmatch $runtimeFile.Publisher) { throw "Unexpected signer for $($runtimeFile.Path): $($signature.SignerCertificate.Subject)" }
+              Write-Host "Authenticode signature verified: $($runtimeFile.Path) — $($signature.SignerCertificate.Subject)"
             }
 
 workflows:
