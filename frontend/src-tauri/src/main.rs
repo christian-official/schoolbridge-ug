@@ -886,16 +886,24 @@ mod tests {
         let lan_pid = lan.id();
         job.attach_additional(lan_pid).expect("attach LAN child to same job");
 
+        // Keep handles open across shutdown. Windows may discard the process
+        // object from PID lookup once the child has exited, even though a handle
+        // opened while it was alive remains valid for exit-code inspection.
+        let process_handles = [backend_pid, lan_pid].map(|pid| unsafe {
+            OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid)
+        });
+        for (pid, process) in [backend_pid, lan_pid].into_iter().zip(process_handles.iter()) {
+            assert!(!process.is_null(), "could not open child process {pid} before shutdown");
+        }
+
         super::ManagedBackend {
             children: vec![backend, lan],
             lan: None,
             _job: job,
         }.stop();
 
-        for pid in [backend_pid, lan_pid] {
+        for (pid, process) in [backend_pid, lan_pid].into_iter().zip(process_handles) {
             unsafe {
-                let process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
-                assert!(!process.is_null(), "could not inspect stopped child {pid}");
                 let mut exit_code = 0_u32;
                 let inspected = GetExitCodeProcess(process, &mut exit_code);
                 CloseHandle(process);
