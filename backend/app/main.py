@@ -24,6 +24,12 @@ from dotenv import load_dotenv
 # SCHOOLBRIDGE_DATABASE_URL when its SQLAlchemy engine is created.
 load_dotenv()
 
+# Desktop builds provide a per-user data directory. Resolve its SQLite file before
+# database.py creates the SQLAlchemy engine; this deliberately overrides any
+# install-relative database URL shipped in the USB configuration template.
+from .desktop_storage import configure_desktop_database
+configure_desktop_database()
+
 from .database import DATABASE_URL, Base, engine, get_db, SessionLocal, create_sqlite_backup, apply_sqlite_restore, sqlite_connection_diagnostics
 from .migrations import upgrade_database
 from . import models

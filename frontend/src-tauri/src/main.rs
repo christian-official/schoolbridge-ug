@@ -128,6 +128,21 @@ fn installation_root() -> Result<PathBuf, String> {
         .ok_or_else(|| "Could not determine the SchoolBridge installation directory.".into())
 }
 
+fn desktop_data_directory() -> Result<PathBuf, String> {
+    let local_app_data = std::env::var_os("LOCALAPPDATA")
+        .map(PathBuf::from)
+        .ok_or_else(|| "Windows did not provide LOCALAPPDATA; cannot select a persistent SchoolBridge data directory.".to_string())?;
+    let data_dir = local_app_data.join("SchoolBridge").join("data");
+    fs::create_dir_all(&data_dir)
+        .map_err(|error| format!("Could not create the SchoolBridge data directory: {error}"))?;
+    Ok(data_dir)
+}
+
+fn sqlite_database_url(database_path: &Path) -> String {
+    // SQLAlchemy accepts forward slashes in absolute Windows SQLite paths.
+    format!("sqlite:///{}", database_path.to_string_lossy().replace('\\', "/"))
+}
+
 fn configured_port(env_file: &Path) -> Result<u16, String> {
     let contents = fs::read_to_string(env_file)
         .map_err(|_| "SchoolBridge configuration (.env) is missing or unreadable.".to_string())?;
@@ -193,6 +208,9 @@ fn start_backend() -> Result<ManagedBackend, String> {
     let backend_dir = root.join("backend");
     let env_file = root.join(".env");
     let static_dir = backend_dir.join("app").join("static");
+    let data_dir = desktop_data_directory()?;
+    let database_path = data_dir.join("schoolbridge.sqlite3");
+    let database_url = sqlite_database_url(&database_path);
 
     for (path, description) in [
         (&python, "bundled Python runtime"),
@@ -238,6 +256,10 @@ fn start_backend() -> Result<ManagedBackend, String> {
         .current_dir(&root)
         .env("PYTHONPATH", &backend_dir)
         .env("SCHOOLBRIDGE_STATIC_DIR", &static_dir)
+        .env("SCHOOLBRIDGE_DATA_DIR", &data_dir)
+        // Force the desktop database into per-user local storage, never the USB
+        // installation directory or the process working directory.
+        .env("SCHOOLBRIDGE_DATABASE_URL", &database_url)
         // Restrict cross-origin access to the packaged Tauri WebView and the
         // loopback Vite origin used by desktop development.
         .env("SCHOOLBRIDGE_CORS_ORIGINS", "http://tauri.localhost,http://localhost:5173,http://127.0.0.1:5173")
@@ -306,6 +328,15 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::is_healthy_response;
+
+    #[test]
+    fn creates_an_absolute_local_app_data_sqlite_url() {
+        let path = std::path::Path::new(r"C:\\Users\\School User\\AppData\\Local\\SchoolBridge\\data\\schoolbridge.sqlite3");
+        assert_eq!(
+            super::sqlite_database_url(path),
+            "sqlite:///C:/Users/School User/AppData/Local/SchoolBridge/data/schoolbridge.sqlite3"
+        );
+    }
 
     #[test]
     fn accepts_only_a_successful_schoolbridge_health_response() {
