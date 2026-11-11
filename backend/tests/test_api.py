@@ -528,6 +528,54 @@ def test_fee_payment_amount_must_be_positive():
     assert response.status_code == 422
 
 
+
+def test_fee_payment_creates_exactly_one_parent_scoped_sync_event():
+    reset_database()
+    admin = create_admin()
+    db = SessionLocal()
+    try:
+        parent = models.User(
+            username="payment-parent", email="payment-parent@example.invalid",
+            hashed_password=password_hash.hash("ParentPassword123!"),
+            role="parent", is_active=True,
+        )
+        student = models.Student(
+            admission_number="PAY-SYNC-001", first_name="Amina", last_name="Learner",
+        )
+        db.add_all([parent, student])
+        db.flush()
+        charge = models.FeeCharge(
+            student_id=student.id, term="Term 1", year=2026, amount=100000,
+        )
+        db.add(charge)
+        db.flush()
+        db.add(models.ParentStudentLink(user_id=parent.id, student_id=student.id))
+        db.commit()
+        parent_id, charge_id = parent.id, charge.id
+    finally:
+        db.close()
+
+    headers = {"Authorization": f"Bearer {create_access_token(admin)}"}
+    with TestClient(app) as client:
+        response = client.post("/api/finance/payments", headers=headers, json={
+            "charge_id": charge_id, "amount": 25000,
+            "payment_date": "2026-11-11", "method": "Cash",
+            "reference": "PARENT-SYNC-001",
+        })
+        assert response.status_code == 200, response.text
+
+    db = SessionLocal()
+    try:
+        events = db.query(models.SyncChange).filter_by(
+            entity_type="FeePayment", entity_id=response.json()["id"],
+        ).all()
+        assert len(events) == 1
+        assert json.loads(events[0].scope_json)["parent_user_ids"] == [parent_id]
+    finally:
+        db.close()
+
+
+
 def test_phase_one_staff_and_finance_workflow_end_to_end():
     reset_database()
     admin = create_admin()
