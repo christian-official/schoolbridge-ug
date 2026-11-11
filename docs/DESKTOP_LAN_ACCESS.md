@@ -7,7 +7,9 @@ configured private IPv4 address and a separate port (default 8443).
 ## Certificate requirements
 
 Set these values in the installed .env only after a certificate has been
-provisioned for the exact LAN DNS name or IP address used by client devices:
+provisioned for the host's exact private IPv4 address. The current desktop
+LAN configuration binds and allows the IP address only; client devices must
+connect using that same IP address (not a DNS alias):
 
     SCHOOLBRIDGE_LAN_ENABLED=true
     SCHOOLBRIDGE_LAN_BIND_IP=192.168.1.20
@@ -57,9 +59,11 @@ but concurrent LAN load and backup/restore behavior still require integration
 testing on the installed Windows application.
 
 User authentication and per-user device registration/revocation checks remain
-required. Device registration is currently self-service; it is not yet a
-school-administrator approval workflow. Do not describe a device as
-administrator-approved until that workflow is implemented and tested.
+required. Device registration is intentionally free and self-service: a
+signed-in user can register their own device without administrator approval.
+Registration does not grant access to another user's records; sync endpoints
+must continue enforcing the authenticated account's scope and active-device
+status.
 
 Before production LAN use, verify certificate trust from a second device,
 firewall scope on the actual school router, account permissions, device
