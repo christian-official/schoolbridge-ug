@@ -331,7 +331,7 @@ mod tests {
 
     #[test]
     fn creates_an_absolute_local_app_data_sqlite_url() {
-        let path = std::path::Path::new(r"C:\\Users\\School User\\AppData\\Local\\SchoolBridge\\data\\schoolbridge.sqlite3");
+        let path = std::path::Path::new(r"C:\Users\School User\AppData\Local\SchoolBridge\data\schoolbridge.sqlite3");
         assert_eq!(
             super::sqlite_database_url(path),
             "sqlite:///C:/Users/School User/AppData/Local/SchoolBridge/data/schoolbridge.sqlite3"

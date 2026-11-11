@@ -14,7 +14,10 @@ def configure_desktop_database() -> Path | None:
     data_directory = Path(configured_directory).expanduser()
     data_directory.mkdir(parents=True, exist_ok=True)
     database_path = (data_directory / "schoolbridge.sqlite3").resolve()
+    database_location = str(database_path)
+    if os.name == "nt":
+        database_location = database_location.replace("\\", "/")
     os.environ["SCHOOLBRIDGE_DATABASE_URL"] = URL.create(
-        "sqlite", database=str(database_path)
+        "sqlite", database=database_location
     ).render_as_string(hide_password=False)
     return database_path

@@ -1,7 +1,9 @@
 import ast
 from pathlib import Path
 
-import pytest
+import os
+
+from sqlalchemy.engine import make_url
 
 from app.desktop_storage import configure_desktop_database
 
@@ -16,7 +18,8 @@ def test_desktop_database_is_created_under_the_per_user_data_directory(tmp_path,
     assert database_path == (data_directory / "schoolbridge.sqlite3").resolve()
     assert data_directory.is_dir()
     assert Path(database_path).parent == data_directory.resolve()
-    assert "schoolbridge.sqlite3" in __import__("os").environ["SCHOOLBRIDGE_DATABASE_URL"]
+    configured_url = make_url(os.environ["SCHOOLBRIDGE_DATABASE_URL"])
+    assert configured_url.database.replace("\\", "/") == str(database_path).replace("\\", "/")
     assert not Path("usb-install/schoolbridge.db").exists()
 
 
@@ -25,7 +28,7 @@ def test_non_desktop_configuration_is_left_unchanged(monkeypatch):
     monkeypatch.setenv("SCHOOLBRIDGE_DATABASE_URL", "sqlite:///./development.db")
 
     assert configure_desktop_database() is None
-    assert __import__("os").environ["SCHOOLBRIDGE_DATABASE_URL"] == "sqlite:///./development.db"
+    assert os.environ["SCHOOLBRIDGE_DATABASE_URL"] == "sqlite:///./development.db"
 
 
 def test_dotenv_and_desktop_database_are_configured_before_database_module_import():
