@@ -1573,7 +1573,7 @@ function App() {
 
   return (
     <div className={`app-shell redesigned-app-shell ${user.role==='admin'||/^(school administrator|system administrator|administrator)$/i.test(user.role_label||'')?'role-theme-admin':/director of studies|\bdos\b/i.test(user.role_label||'')?'role-theme-dos':/bursar|accountant|finance/i.test(user.role_label||'')?'role-theme-finance':/secretary|office administrator/i.test(user.role_label||'')?'role-theme-secretary':/attendance/i.test(user.role_label||'')?'role-theme-attendance':/teacher|head\s?teacher/i.test(user.role_label||'')?'role-theme-teacher':''}`} onSubmitCapture={validateRequiredFields}>
-      <aside className={`sidebar ${mobileMenu ? 'sidebar-open' : ''}`}>
+      <aside id="schoolbridge-sidebar" className={`sidebar ${mobileMenu ? 'sidebar-open' : ''}`}>
         <div className="sidebar-brand">
           <div className="brand-mark"><GraduationCap size={25} /></div>
           <div className="brand-name">School<span>Bridge</span></div>
@@ -1614,7 +1614,7 @@ function App() {
 
       <main className="main-area">
         <header className="topbar">
-          <button className="mobile-menu-button" onClick={() => setMobileMenu(true)}><Menu /></button>
+          <button type="button" className="mobile-menu-button" aria-label="Open navigation menu" aria-controls="schoolbridge-sidebar" aria-expanded={mobileMenu} onClick={() => setMobileMenu(true)}><Menu size={19} /><span>Menu</span></button>
           <div className="breadcrumb">School workspace <span>/</span> <strong>{active}</strong></div>
           <div className="top-actions">
             <span className={`connection-indicator connection-${serverConnection}`} role="status" aria-live="polite">
