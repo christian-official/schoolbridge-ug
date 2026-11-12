@@ -31,4 +31,7 @@ test('production entry registers the service worker and exposes install guidance
   assert.match(entry, /serviceWorker\.register\('\/service-worker\.js'\)/)
   assert.match(installUi, /beforeinstallprompt/)
   assert.match(installUi, /Add to Home Screen/)
+  assert.match(entry, /schoolbridge:pwa-update/)
+  assert.match(installUi, /Update now/)
+  assert.match(installUi, /SCHOOLBRIDGE_SKIP_WAITING/)
 })
