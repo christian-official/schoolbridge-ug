@@ -42,6 +42,7 @@ export default function SyncDevices({ token, userId, schoolId, isAdmin }: Props)
   const [message, setMessage] = useState('')
   const [schoolQrUrl, setSchoolQrUrl] = useState('')
   const [schoolAccessUrl, setSchoolAccessUrl] = useState('')
+  const [schoolName, setSchoolName] = useState('')
   const [qrUnavailableReason, setQrUnavailableReason] = useState('')
 
   const load = useCallback(async () => {
@@ -75,10 +76,17 @@ export default function SyncDevices({ token, userId, schoolId, isAdmin }: Props)
       .catch(err => { if (err.name !== 'AbortError') setError(err instanceof Error ? err.message : 'Unable to create the school access QR code.') })
     fetchSchoolBridge(API_BASE_URL + '/api/public/school?school=' + encodeURIComponent(schoolId), { cache: 'no-store', signal: controller.signal })
       .then(response => response.ok ? response.json() : Promise.reject(new Error('School identity is unavailable.')))
-      .then(identity => setSchoolAccessUrl(destination + encodeURIComponent(identity.school_id)))
+      .then(identity => { setSchoolName(identity.school_name || 'School'); setSchoolAccessUrl(destination + encodeURIComponent(identity.school_id)) })
       .catch(err => { if (err.name !== 'AbortError') setError(err instanceof Error ? err.message : 'Unable to load school identity.') })
     return () => { controller.abort(); if (objectUrl) URL.revokeObjectURL(objectUrl) }
   }, [isAdmin, schoolId, token])
+
+  function printSchoolQr() {
+    const cleanup = () => { delete document.body.dataset.schoolbridgePrint }
+    document.body.dataset.schoolbridgePrint = 'school-qr'
+    window.addEventListener('afterprint', cleanup, { once: true })
+    window.print()
+  }
 
   async function register(replaceIdentity = false) {
     setBusy(true); setError(''); setMessage('')
@@ -111,13 +119,19 @@ export default function SyncDevices({ token, userId, schoolId, isAdmin }: Props)
     <p className="form-hint">Manage the devices associated with your account. School records and dashboards are retrieved directly from the school server.</p>
     {isAdmin && !isTauriDesktop && <section className="offline-record-tools school-access-qr">
       <h3>School mobile access QR</h3>
-      <p className="form-hint">This reusable QR code opens this school's SchoolBridge registration page. Parents and teachers enter their details, which are checked automatically against the school's existing records. Successful verification opens the correct dashboard; the QR code itself does not expose student records or grant access.</p>
       {qrUnavailableReason ? <p className="form-hint">{qrUnavailableReason}</p> : schoolQrUrl ? <div className="school-access-qr-content">
-        <img src={schoolQrUrl} alt="Reusable SchoolBridge school access QR code" width="240" height="240" />
-        <div><strong>School access link</strong><input readOnly value={schoolAccessUrl} onFocus={event => event.currentTarget.select()} aria-label="School access link" />
+        <div className="school-access-qr-print">
+          <div className="school-access-qr-print-brand">SchoolBridge</div>
+          <h2>{schoolName}</h2>
+          <img src={schoolQrUrl} alt="School access QR code" width="280" height="280" />
+          <strong>Parent &amp; Teacher Access</strong>
+          <p>Scan to open the school's secure registration page.</p>
+          <small>{schoolAccessUrl}</small>
+        </div>
+        <div className="school-access-qr-screen"><strong>School access link</strong><input readOnly value={schoolAccessUrl} onFocus={event => event.currentTarget.select()} aria-label="School access link" />
           <div className="proposal-review-actions">
             <button className="secondary-button" type="button" onClick={() => { void navigator.clipboard?.writeText(schoolAccessUrl).then(() => setMessage('School access link copied.')).catch(() => setMessage('Select and copy the school access link manually.')) }}>Copy access link</button>
-            <button className="secondary-button" type="button" onClick={() => window.print()}>Print QR</button>
+            <button className="secondary-button" type="button" onClick={printSchoolQr}>Print QR</button>
           </div>
         </div>
       </div> : <p className="form-hint">Preparing the school QR code…</p>}
