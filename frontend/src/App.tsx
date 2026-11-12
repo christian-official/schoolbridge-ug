@@ -824,7 +824,7 @@ function FirstTimeSetupWizard({status,onStatusChange}:{status:FirstSetupStatus;o
   </main>
 }
 
-function readOfflineLoginIndex(): { userId:number; deviceId:string; username:string; installationId:string } | null {
+function readOfflineLoginIndex(expectedSchoolId = ''): { userId:number; deviceId:string; username:string; installationId:string; schoolId?:string } | null {
   try {
     const raw = localStorage.getItem('schoolbridge-offline-login-index')
     if (!raw) return null
@@ -834,6 +834,8 @@ function readOfflineLoginIndex(): { userId:number; deviceId:string; username:str
         typeof index.deviceId !== 'string' || !index.deviceId ||
         typeof index.username !== 'string' || !index.username ||
         typeof index.installationId !== 'string' || !index.installationId ||
+        (index.schoolId !== undefined && (typeof index.schoolId !== 'string' || !index.schoolId)) ||
+        (expectedSchoolId && index.schoolId !== expectedSchoolId) ||
         !installedIdentity || index.installationId !== installedIdentity) return null
     return index
   } catch {
@@ -935,6 +937,12 @@ function App() {
   useEffect(() => {
     const expectedSchoolId = selectedSchoolId
     if (!expectedSchoolId || setupStatus.loading) return
+    if (setupStatus.error && !navigator.onLine) {
+      const cachedName = localStorage.getItem('schoolbridge-school-name-' + expectedSchoolId) || ''
+      if (cachedName) { setQrSchoolName(cachedName); setQrSchoolError('') }
+      else setQrSchoolError('This school identity has not been saved on this device. Reconnect once to verify the school QR code.')
+      return
+    }
     if (!setupStatus.setup_completed || expectedSchoolId !== setupStatus.school_id) {
       setQrSchoolError('This QR code belongs to a different SchoolBridge installation. Ask your school for its current access QR code.')
       return
@@ -945,6 +953,7 @@ function App() {
         const identity = await response.json().catch(() => ({}))
         if (!response.ok) throw new Error(identity.detail || 'Unable to verify the school identity.')
         if (identity.school_id !== expectedSchoolId) throw new Error('The QR code does not match this school.')
+        try { localStorage.setItem('schoolbridge-school-name-' + expectedSchoolId, identity.school_name) } catch { /* The current verified identity remains usable for this session. */ }
         if (!cancelled) setQrSchoolName(identity.school_name)
       })
       .catch(error => { if (!cancelled) setQrSchoolError(error instanceof Error ? error.message : 'Unable to verify the school identity.') })
@@ -1447,7 +1456,7 @@ function App() {
           if(!index) throw new Error('Offline sign-in has not been prepared for this SchoolBridge installation. Connect and save a fresh encrypted offline copy first.')
           if(index.username.toLowerCase()!==username.trim().toLowerCase()) throw new Error('Use the exact account username saved during online sign-in.')
           const snapshot=await loadEncryptedOfflineSnapshot<OfflineWorkspaceSnapshot>(index.userId,index.deviceId,password)
-          if(snapshot.version!==1||snapshot.userId!==index.userId||snapshot.deviceId!==index.deviceId||snapshot.username?.toLowerCase()!==username.trim().toLowerCase()||snapshot.installationId!==index.installationId) throw new Error('The encrypted offline copy does not match this account, device, or SchoolBridge installation.')
+          if(snapshot.version!==1||snapshot.userId!==index.userId||snapshot.deviceId!==index.deviceId||snapshot.username?.toLowerCase()!==username.trim().toLowerCase()||snapshot.installationId!==index.installationId||(index.schoolId&&snapshot.schoolId!==index.schoolId)||(selectedSchoolId&&snapshot.schoolId!==selectedSchoolId)) throw new Error('The encrypted offline copy does not match this account, device, school, or SchoolBridge installation.')
           if(!snapshot.expiresAt||snapshot.expiresAt<Date.now()||snapshot.downloadedAt>Date.now()+60000) throw new Error('The offline copy has expired. Reconnect and download a fresh copy.')
           setOfflineWorkspace(snapshot)
           setPassword('')
@@ -1482,7 +1491,7 @@ function App() {
 
   if (!token || !user) {
     if(setupStatus.loading) return <main className="login-page"><section className="login-card"><div className="brand-name">School<span>Bridge</span></div><p className="muted">Checking school installation...</p></section></main>
-    const offlineLoginIndex = setupStatus.error ? readOfflineLoginIndex() : null
+    const offlineLoginIndex = setupStatus.error ? readOfflineLoginIndex(selectedSchoolId) : null
     if(setupStatus.error && !offlineLoginIndex) return <main className="login-page"><section className="login-card"><div className="brand-name">School<span>Bridge</span></div><h1>{!navigator.onLine ? "You're offline" : setupStatus.error.includes("Select your school") ? "School selection required" : "Unable to check setup"}</h1>{!navigator.onLine ? <p className="form-hint">The app is open, but this device has no prepared offline sign-in yet. Reconnect once, sign in, register this browser and save an encrypted offline copy under Settings → Registered devices. Then you can open that saved read-only workspace without internet.</p> : <p className="error" role="alert">{setupStatus.error}</p>}<p className="form-hint">For shared SchoolBridge access, open the official QR code provided by your school. It identifies the school but does not sign you in.</p><button className="secondary-button" onClick={()=>window.location.reload()}>Try again</button></section></main>
     // A cached offline identity is accepted only when the setup service is unavailable.
     // A reachable, unconfigured database must always complete first-time setup.

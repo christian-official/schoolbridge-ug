@@ -361,13 +361,15 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
     setOfflineBusy(true);setOfflineStatus('')
     try{
       const account=await request<{username:string;role:string;role_label?:string;permissions:Record<string,string[]>}>('auth/me',token)
-      const installation=await request<{installation_id:string;setup_completed:boolean;activated:boolean}>('setup/status',token)
-      if(!installation.setup_completed||!installation.activated||!installation.installation_id)throw new Error('Complete and activate this SchoolBridge installation before preparing offline records.')
+      const installation=await request<{installation_id:string;school_id:string;setup_completed:boolean;activated:boolean}>('setup/status',token)
+      if(!installation.setup_completed||!installation.activated||!installation.installation_id||!installation.school_id)throw new Error('Complete and activate this SchoolBridge installation before preparing offline records.')
+      const schoolIdentity=await request<{school_id:string;school_name:string}>('public/school?school='+encodeURIComponent(installation.school_id),token)
+      if(schoolIdentity.school_id!==installation.school_id||!schoolIdentity.school_name)throw new Error('The school identity could not be verified for this offline copy.')
       const permissions=account.permissions||{}
       const can=(section:string)=>account.role==='admin'||(permissions[section]||[]).includes('view')
       const parent=account.role==='parent', teacher=account.role==='teacher'
       const sequences:number[]=[]
-      const snapshot:any={version:1,userId,deviceId,username:account.username,installationId:installation.installation_id,role:account.role,role_label:account.role_label||account.role,permissions:account.permissions||{},permissionFingerprint:permissionFingerprint(account),downloadedAt:Date.now(),expiresAt:Date.now()+24*60*60*1000,sequence:0,students:[],classes:[],attendance:[],exams:[],marks:[],charges:[],payments:[],class_fees:[]}
+      const snapshot:any={version:1,userId,deviceId,username:account.username,schoolId:installation.school_id,schoolName:schoolIdentity.school_name,installationId:installation.installation_id,role:account.role,role_label:account.role_label||account.role,permissions:account.permissions||{},permissionFingerprint:permissionFingerprint(account),downloadedAt:Date.now(),expiresAt:Date.now()+24*60*60*1000,sequence:0,students:[],classes:[],attendance:[],exams:[],marks:[],charges:[],payments:[],class_fees:[]}
       const tasks:Promise<void>[]=[]
       if(parent||can('Students')||(teacher&&can('My Classes'))){
         tasks.push(collectSnapshotPages<any>('students','students',deviceId,sequences).then(rows=>{snapshot.students=rows}))
@@ -401,11 +403,12 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
       if(total>20000)throw new Error('This account has more than 20,000 authorised records. Narrow the data scope before downloading.')
       snapshot.sequence=sequences[0]
       localStorage.setItem('schoolbridge-installation-id', installation.installation_id)
+      localStorage.setItem('schoolbridge-school-name-'+installation.school_id, schoolIdentity.school_name)
       await saveEncryptedOfflineSnapshot(userId,deviceId,offlinePassphrase,snapshot)
       localStorage.setItem('schoolbridge-offline-snapshot-meta-'+userId+'-'+deviceId,JSON.stringify({fingerprint:snapshot.permissionFingerprint,sequence:snapshot.sequence}))
       // Lookup metadata is not an authenticator; the account and records stay encrypted in IndexedDB.
       // The installation ID prevents a cached snapshot from being mistaken for another school's data.
-      localStorage.setItem('schoolbridge-offline-login-index',JSON.stringify({userId,deviceId,username:account.username,installationId:installation.installation_id}))
+      localStorage.setItem('schoolbridge-offline-login-index',JSON.stringify({userId,deviceId,username:account.username,schoolId:installation.school_id,installationId:installation.installation_id}))
       setOfflineSnapshot(snapshot)
       setOfflineStatus('Authorised records were encrypted and saved on this browser. The copy expires in 24 hours and is cleared if changed permissions or records are detected after reconnecting.')
     }catch(error){setOfflineStatus(error instanceof Error?error.message:'Unable to create the encrypted offline snapshot.')}
