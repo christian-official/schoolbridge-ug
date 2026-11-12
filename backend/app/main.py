@@ -106,6 +106,56 @@ def resolve_school_tenant(db: Session, school_id: str | None = None):
     return tenant
 
 
+def sync_legacy_guardian_contacts(db: Session, student: models.Student) -> None:
+    """Keep legacy guardian fields represented as explicitly unverified contacts."""
+    for slot, name, relationship, phone, is_primary in (
+        ("primary", student.guardian_name, student.guardian_relationship, student.guardian_phone, True),
+        ("secondary", student.guardian2_name, student.guardian2_relationship, student.guardian2_phone, False),
+    ):
+        guardian_name = (name or "").strip()
+        contact = db.query(models.StudentGuardianContact).filter_by(
+            student_id=student.id, legacy_slot=slot
+        ).first()
+        if not guardian_name:
+            if contact:
+                contact.active = False
+                contact.verification_status = "unverified"
+                contact.verified_at = None
+                contact.verified_by = None
+            continue
+        normalized_relationship = (relationship or "").strip() or None
+        normalized_phone = (phone or "").strip() or None
+        if contact is None:
+            db.add(models.StudentGuardianContact(
+                school_tenant_id=student.school_tenant_id,
+                student_id=student.id,
+                guardian_name=guardian_name,
+                relationship=normalized_relationship,
+                phone=normalized_phone,
+                legacy_slot=slot,
+                source="legacy_student_fields",
+                verification_status="unverified",
+                is_primary=is_primary,
+                active=True,
+            ))
+            continue
+        changed = (
+            contact.guardian_name != guardian_name
+            or contact.relationship != normalized_relationship
+            or contact.phone != normalized_phone
+        )
+        contact.guardian_name = guardian_name
+        contact.relationship = normalized_relationship
+        contact.phone = normalized_phone
+        contact.is_primary = is_primary
+        contact.active = True
+        if changed:
+            contact.source = "legacy_student_fields"
+            contact.verification_status = "unverified"
+            contact.verified_at = None
+            contact.verified_by = None
+
+
 
 
 def token_version_matches(payload, user) -> bool:
@@ -604,6 +654,17 @@ class StudentCreate(BaseModel):
     photo_data: str | None = Field(default=None, max_length=1_800_000)
 
 
+class GuardianContactCreate(BaseModel):
+    guardian_name: str = Field(min_length=2, max_length=160)
+    relationship: str | None = Field(default=None, max_length=60)
+    phone: str | None = Field(default=None, max_length=30)
+    is_primary: bool = False
+
+
+class GuardianContactVerificationUpdate(BaseModel):
+    status: str = Field(pattern="^(school_verified|unverified|rejected)$")
+
+
 class StudentDismissal(BaseModel):
     reason: str = Field(min_length=3, max_length=1000)
     effective_date: date = Field(default_factory=date.today)
@@ -1009,6 +1070,7 @@ def create_student(data: StudentCreate, db: Session = Depends(get_db), admin=Dep
             parts.append(str(next_value).zfill(settings.admission_padding))
             item.admission_number = settings.admission_separator.join(parts)
         db.flush()
+        sync_legacy_guardian_contacts(db, item)
         if item.class_id is not None:
             school_settings = get_or_create_school_settings(db)
             active_term = school_settings.active_term
@@ -4898,7 +4960,7 @@ def create_staff(data: StaffCreate, db: Session = Depends(get_db), admin=Depends
             break
     if not staff_number:
         raise HTTPException(503, "A unique staff login could not be generated. Please try again.")
-    item = models.StaffMember(staff_number=staff_number, **data.model_dump())
+    item = models.StaffMember(staff_number=staff_number, phone_source="school_record", **data.model_dump())
     # Create the staff profile and login together so registration is one step.
     temporary_passcode = secrets.token_urlsafe(9)
     account_role = "teacher" if data.category == "Teaching" else "staff"
@@ -5318,10 +5380,66 @@ def update_student(student_id: int, data: StudentUpdate, db: Session = Depends(g
         raise HTTPException(404, "Class not found.")
     for key, value in changes.items():
         setattr(student, key, value)
+    sync_legacy_guardian_contacts(db, student)
     write_audit(db, admin, "student_updated", "student", student.id, ", ".join(changes.keys()))
     db.commit()
     db.refresh(student)
     return {"message": "Student profile updated.", "student": student}
+
+
+@app.get("/api/students/{student_id}/guardian-contacts", tags=["Parent Access"])
+def list_student_guardian_contacts(student_id: int, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    student = db.get(models.Student, student_id)
+    if not student:
+        raise HTTPException(404, "Student not found.")
+    return db.query(models.StudentGuardianContact).filter(
+        models.StudentGuardianContact.student_id == student_id,
+        models.StudentGuardianContact.active.is_(True),
+    ).order_by(models.StudentGuardianContact.is_primary.desc(), models.StudentGuardianContact.id).all()
+
+
+@app.post("/api/students/{student_id}/guardian-contacts", tags=["Parent Access"])
+def add_student_guardian_contact(student_id: int, data: GuardianContactCreate, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    student = db.get(models.Student, student_id)
+    if not student:
+        raise HTTPException(404, "Student not found.")
+    contact = models.StudentGuardianContact(
+        school_tenant_id=get_current_tenant_id(db),
+        student_id=student.id,
+        guardian_name=data.guardian_name.strip(),
+        relationship=data.relationship.strip() if data.relationship and data.relationship.strip() else None,
+        phone=data.phone.strip() if data.phone and data.phone.strip() else None,
+        source="school_record",
+        verification_status="unverified",
+        is_primary=data.is_primary,
+        active=True,
+    )
+    db.add(contact)
+    db.flush()
+    write_audit(db, admin, "guardian_contact_added", "student_guardian_contact", contact.id,
+                f"student_id={student.id}; contact initially unverified")
+    db.commit()
+    db.refresh(contact)
+    return contact
+
+
+@app.patch("/api/guardian-contacts/{contact_id}/verification", tags=["Parent Access"])
+def update_guardian_contact_verification(contact_id: int, data: GuardianContactVerificationUpdate, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    contact = db.get(models.StudentGuardianContact, contact_id)
+    if not contact or not contact.active:
+        raise HTTPException(404, "Guardian contact not found.")
+    if data.status == "school_verified" and not (contact.phone or "").strip():
+        raise HTTPException(409, "A guardian contact without a recorded phone number cannot be verified.")
+    contact.verification_status = data.status
+    contact.verified_at = datetime.utcnow() if data.status == "school_verified" else None
+    contact.verified_by = admin.id if data.status == "school_verified" else None
+    if data.status == "school_verified":
+        contact.source = "admin_verified_school_record"
+    write_audit(db, admin, "guardian_contact_verification_changed", "student_guardian_contact",
+                contact.id, f"status={data.status}; student_id={contact.student_id}")
+    db.commit()
+    db.refresh(contact)
+    return contact
 
 
 @app.post("/api/students/{student_id}/dismiss", tags=["Students"])
@@ -5394,6 +5512,10 @@ class StaffUpdate(BaseModel):
     status: str | None = Field(default=None, pattern="^(active|archived|inactive)$")
 
 
+class StaffPhoneVerificationUpdate(BaseModel):
+    status: str = Field(pattern="^(school_verified|unverified|rejected)$")
+
+
 class SalaryPaymentCreate(BaseModel):
     staff_id: int
     amount: int = Field(gt=0)
@@ -5457,7 +5579,13 @@ def update_my_staff_profile(data: MyStaffProfileUpdate, user=Depends(get_current
         validate_profile_photo(data.photo_data)
         staff.photo_data = data.photo_data
     staff.first_name = data.first_name.strip()
-    staff.phone = data.phone.strip() if data.phone and data.phone.strip() else None
+    next_phone = data.phone.strip() if data.phone and data.phone.strip() else None
+    if next_phone != staff.phone:
+        staff.phone_source = "staff_self_updated"
+        staff.phone_verification_status = "unverified"
+        staff.phone_verified_at = None
+        staff.phone_verified_by = None
+    staff.phone = next_phone
     staff.email = email
     db.commit()
     db.refresh(staff)
@@ -5492,12 +5620,36 @@ def update_staff(staff_id: int, data: StaffUpdate, db: Session = Depends(get_db)
     if not staff:
         raise HTTPException(404, "Staff member not found.")
     changes = data.model_dump(exclude_unset=True)
+    if "phone" in changes and changes["phone"] != staff.phone:
+        staff.phone_source = "staff_record_updated"
+        staff.phone_verification_status = "unverified"
+        staff.phone_verified_at = None
+        staff.phone_verified_by = None
     for key, value in changes.items():
         setattr(staff, key, value)
     write_audit(db, admin, "staff_updated", "staff", staff.id, ", ".join(changes.keys()))
     db.commit()
     db.refresh(staff)
     return {"message": "Staff profile updated.", "staff": staff}
+
+
+@app.patch("/api/staff/{staff_id}/phone-verification", tags=["Staff"])
+def update_staff_phone_verification(staff_id: int, data: StaffPhoneVerificationUpdate, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    staff = db.get(models.StaffMember, staff_id)
+    if not staff:
+        raise HTTPException(404, "Staff member not found.")
+    if data.status == "school_verified" and not (staff.phone or "").strip():
+        raise HTTPException(409, "A staff member without a recorded phone number cannot be verified.")
+    staff.phone_verification_status = data.status
+    staff.phone_verified_at = datetime.utcnow() if data.status == "school_verified" else None
+    staff.phone_verified_by = admin.id if data.status == "school_verified" else None
+    if data.status == "school_verified":
+        staff.phone_source = "admin_verified_school_record"
+    write_audit(db, admin, "staff_phone_verification_changed", "staff", staff.id,
+                f"status={data.status}; staff_number={staff.staff_number}")
+    db.commit()
+    db.refresh(staff)
+    return {"message": "Staff contact verification updated.", "staff": staff}
 
 
 @app.post("/api/staff/{staff_id}/archive", tags=["Staff"])
