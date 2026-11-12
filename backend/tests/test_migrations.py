@@ -439,3 +439,31 @@ def test_all_school_owned_tables_receive_tenant_ownership_keys(migrated_database
             ).scalar_one()
             assert count == 0, table
     engine.dispose()
+
+
+
+def test_postgres_unique_constraint_backing_index_is_not_dropped_twice():
+    from importlib import import_module
+
+    migration = import_module("migrations.versions.0033_tenant_scoped_uniqueness")
+
+    class Inspector:
+        def get_indexes(self, table):
+            return [
+                {
+                    "name": "uq_classes_name_section",
+                    "unique": True,
+                    "column_names": ["name", "section"],
+                    "duplicates_constraint": "uq_classes_name_section",
+                },
+                {
+                    "name": "uq_classes_legacy_manual",
+                    "unique": True,
+                    "column_names": ["name", "section"],
+                },
+            ]
+
+    indexes = migration._independent_unique_indexes(
+        Inspector(), "classes", ("name", "section")
+    )
+    assert [item["name"] for item in indexes] == ["uq_classes_legacy_manual"]
