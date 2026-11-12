@@ -3850,6 +3850,7 @@ def test_teachers_use_qr_registration_instead_of_password_login():
         )
         assert account.status_code == 200
         assert account.json()["username"] == "sam.teacher"
+        assert account.json()["school_id"] == "00000000-0000-4000-8000-000000000001"
         assert account.json()["must_change_password"] is False
 
 
@@ -4112,6 +4113,7 @@ def test_parent_qr_registration_matches_school_records_and_opens_dashboard_witho
         account = client.get("/api/auth/me", headers=headers)
         assert account.status_code == 200, account.text
         assert account.json()["role"] == "parent"
+        assert account.json()["school_id"] == school_id
 
         repeated = client.post("/api/public/registration/parent", json=payload)
         assert repeated.status_code == 200, repeated.text
