@@ -10,9 +10,9 @@ permissions:
   contents: read
 
 concurrency:
-  # Keep only the newest CI run for each branch; stale runs must not consume runner capacity.
-  group: schoolbridge-ci-${{ github.ref }}
-  cancel-in-progress: true
+  # Give every commit its own group so later pushes never cancel its CI run.
+  group: schoolbridge-ci-${{ github.run_id }}-${{ github.run_attempt }}
+  cancel-in-progress: false
 
 jobs:
   desktop-shell-build:
