@@ -363,6 +363,73 @@ fn desktop_data_directory() -> Result<PathBuf, String> {
     Ok(data_dir)
 }
 
+fn desktop_config_file(python: &Path) -> Result<PathBuf, String> {
+    let local_app_data = std::env::var_os("LOCALAPPDATA")
+        .map(PathBuf::from)
+        .ok_or_else(|| "Windows did not provide LOCALAPPDATA; cannot select a persistent SchoolBridge configuration directory.".to_string())?;
+    let config_dir = local_app_data.join("SchoolBridge").join("config");
+    fs::create_dir_all(&config_dir)
+        .map_err(|error| format!("Could not create the SchoolBridge configuration directory: {error}"))?;
+    let env_file = config_dir.join(".env");
+
+    if !env_file.exists() {
+        // Ask the bundled CPython runtime for cryptographically secure entropy.
+        // The generated application secret is written once to the per-user
+        // configuration directory and is never stored in the install folder.
+        let output = Command::new(python)
+            .args(["-c", "import secrets; print(secrets.token_urlsafe(48))"])
+            .output()
+            .map_err(|error| format!("Could not generate the initial SchoolBridge application secret: {error}"))?;
+        if !output.status.success() {
+            return Err("The bundled Python runtime could not generate the initial SchoolBridge application secret.".into());
+        }
+        let secret = String::from_utf8(output.stdout)
+            .map_err(|_| "The generated SchoolBridge application secret was not valid UTF-8.".to_string())?
+            .trim()
+            .to_string();
+        if secret.len() < 48 || secret.contains(['\\r', '\\n', '=']) {
+            return Err("The bundled Python runtime returned an invalid application secret.".into());
+        }
+
+        let contents = format!(
+            "SCHOOLBRIDGE_SECRET_KEY={secret}\\nSCHOOLBRIDGE_LICENSE_PUBLIC_KEY=\\nSCHOOLBRIDGE_PORT={DEFAULT_BACKEND_PORT}\\nSCHOOLBRIDGE_LAN_ENABLED=false\\nSCHOOLBRIDGE_LAN_PORT=8443\\n"
+        );
+        match OpenOptions::new().write(true).create_new(true).open(&env_file) {
+            Ok(mut file) => file.write_all(contents.as_bytes())
+                .map_err(|error| format!("Could not save the initial SchoolBridge configuration: {error}"))?,
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {},
+            Err(error) => return Err(format!("Could not create the initial SchoolBridge configuration: {error}")),
+        }
+    }
+
+    Ok(env_file)
+}
+
+fn resolve_resource_root(resource_dir: &Path) -> Result<PathBuf, String> {
+    let has_packaged_runtime = |root: &Path| {
+        root.join("runtime").join("python.exe").is_file()
+            && root.join("backend").join("app").join("main.py").is_file()
+            && root.join("backend").join("app").join("static").join("index.html").is_file()
+    };
+
+    if has_packaged_runtime(resource_dir) {
+        return Ok(resource_dir.to_path_buf());
+    }
+
+    // Preserve the side-by-side development/prototype layout while preferring
+    // Tauri's managed resource directory for an installed application.
+    if let Ok(root) = installation_root() {
+        if has_packaged_runtime(&root) {
+            return Ok(root);
+        }
+    }
+
+    Err(format!(
+        "The packaged SchoolBridge backend or Python runtime is missing from {}. Reinstall the complete SchoolBridge package.",
+        resource_dir.display()
+    ))
+}
+
 fn sqlite_database_url(database_path: &Path) -> String {
     // SQLAlchemy accepts forward slashes in absolute Windows SQLite paths.
     let path = database_path.to_string_lossy().replace('\\', "/");
@@ -450,14 +517,14 @@ where
     }
 }
 
-fn start_backend() -> Result<ManagedBackend, String> {
+fn start_backend(resource_dir: &Path) -> Result<ManagedBackend, String> {
     let _startup_guard = BACKEND_START_LOCK
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let root = installation_root()?;
+    let root = resolve_resource_root(resource_dir)?;
     let python = root.join("runtime").join("python.exe");
     let backend_dir = root.join("backend");
-    let env_file = root.join(".env");
+    let env_file = desktop_config_file(&python)?;
     let static_dir = backend_dir.join("app").join("static");
     let data_dir = desktop_data_directory()?;
     let database_path = data_dir.join("schoolbridge.sqlite3");
@@ -640,7 +707,7 @@ fn start_backend() -> Result<ManagedBackend, String> {
     })
 }
 
-fn supervise_backend(app_handle: tauri::AppHandle) {
+fn supervise_backend(app_handle: tauri::AppHandle, resource_dir: PathBuf) {
     thread::spawn(move || {
         let mut consecutive_health_failures = 0_u8;
         let mut restart_attempted = false;
@@ -694,7 +761,7 @@ fn supervise_backend(app_handle: tauri::AppHandle) {
             }
 
             restart_attempted = true;
-            match start_backend() {
+            match start_backend(&resource_dir) {
                 Ok(restarted) => {
                     let mut backend = state.backend.lock()
                         .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -748,11 +815,13 @@ fn main() {
         .invoke_handler(tauri::generate_handler![store_auth_token, load_auth_token, clear_auth_token])
         .manage(BackendProcess::default())
         .setup(|app| {
-            let backend = start_backend()
+            let resource_dir = app.path().resource_dir()
+                .map_err(|error| std::io::Error::new(std::io::ErrorKind::Other, format!("Could not locate packaged SchoolBridge resources: {error}")))?;
+            let backend = start_backend(&resource_dir)
                 .map_err(|message| std::io::Error::new(std::io::ErrorKind::Other, message))?;
             let state = app.state::<BackendProcess>();
             *state.backend.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(backend);
-            supervise_backend(app.handle().clone());
+            supervise_backend(app.handle().clone(), resource_dir);
             Ok(())
         });
 
