@@ -20,7 +20,7 @@ function examGroupKey(exam: Exam) { return [exam.exam_type || 'Other', exam.term
 
 
 async function request<T>(path: string, token: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetchSchoolBridge(`${API_BASE_URL}/api/${path}`, {
+  const response = await fetchSchoolBridge(`${apiBaseUrl}/api/${path}`, {
     ...options,
     headers: {
       Authorization: 'Bearer ' + token,
