@@ -2016,15 +2016,26 @@ async def protect_school_data(request: Request, call_next):
 
     from starlette.responses import JSONResponse
 
+    auth = request.headers.get("Authorization", "")
+    tenant_id = 1
+    if auth.startswith("Bearer "):
+        try:
+            claims = jwt.decode(auth[7:], JWT_SECRET, algorithms=[JWT_ALGORITHM])
+            tenant_id = int(claims["tenant"])
+        except (InvalidTokenError, KeyError, TypeError, ValueError):
+            # The authentication dependency returns the standard 401 response.
+            pass
+
     setup_db = SessionLocal()
     try:
-        setup_state = setup_get_tenant_singleton(db, models.SchoolSetupState)
+        from .database import set_tenant_context
+        set_tenant_context(setup_db, tenant_id)
+        setup_state = get_tenant_singleton(setup_db, models.SchoolSetupState)
         if not setup_state or not setup_state.setup_completed_at:
             return JSONResponse({"detail": "Complete SchoolBridge first-time setup before accessing school records."}, status_code=403)
     finally:
         setup_db.close()
 
-    auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
         return JSONResponse({"detail": "Login required."}, status_code=401)
 
