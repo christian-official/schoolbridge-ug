@@ -79,6 +79,9 @@ class Exam(Base):
     year: Mapped[int] = mapped_column(Integer)
     class_id: Mapped[int | None] = mapped_column(ForeignKey("classes.id"), nullable=True, index=True)
     exam_type: Mapped[str] = mapped_column(String(40), nullable=False, default="Other", server_default="Other")
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="draft", server_default="draft")
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 class Mark(Base):

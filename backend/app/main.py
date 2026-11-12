@@ -714,6 +714,9 @@ class ExamOut(BaseModel):
     term: str
     year: int
     class_id: int | None = None
+    status: str = "draft"
+    closed_at: datetime | None = None
+    published_at: datetime | None = None
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -1085,6 +1088,54 @@ def attendance_summary(
     }
 
 
+def require_exam_open(exam: models.Exam) -> None:
+    if exam.status != "draft":
+        raise HTTPException(409, "This examination is closed. Marks can no longer be changed.")
+
+
+@app.post("/api/exams/{exam_id}/close", tags=["Exams"])
+def close_exam(
+    exam_id: int,
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+):
+    exam = db.get(models.Exam, exam_id)
+    if not exam:
+        raise HTTPException(404, "Examination not found.")
+    if exam.status != "draft":
+        raise HTTPException(409, "Only a draft examination can be closed.")
+    marks = db.query(models.Mark).filter(models.Mark.exam_id == exam.id).all()
+    if not marks:
+        raise HTTPException(409, "Results must be entered before this examination can be closed.")
+    if any(not mark.verified for mark in marks):
+        raise HTTPException(409, "All examination results must be verified before the examination can be closed.")
+    exam.status = "closed"
+    exam.closed_at = datetime.utcnow()
+    write_audit(db, admin, "exam_closed", "exam", exam.id, f"{exam.name}; class={exam.class_id}")
+    db.commit()
+    db.refresh(exam)
+    return {"id": exam.id, "status": exam.status, "closed_at": exam.closed_at}
+
+
+@app.post("/api/exams/{exam_id}/publish", tags=["Exams"])
+def publish_exam(
+    exam_id: int,
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+):
+    exam = db.get(models.Exam, exam_id)
+    if not exam:
+        raise HTTPException(404, "Examination not found.")
+    if exam.status != "closed":
+        raise HTTPException(409, "Close and verify the examination before publishing results.")
+    exam.status = "published"
+    exam.published_at = datetime.utcnow()
+    write_audit(db, admin, "exam_results_published", "exam", exam.id, f"{exam.name}; class={exam.class_id}")
+    db.commit()
+    db.refresh(exam)
+    return {"id": exam.id, "status": exam.status, "published_at": exam.published_at}
+
+
 @app.post("/api/exams", response_model=ExamOut, tags=["Exams"])
 def create_exam(data: ExamCreate, db: Session = Depends(get_db)):
     if not db.get(models.SchoolClass, data.class_id):
@@ -1122,6 +1173,7 @@ def record_mark(data: MarkCreate, db: Session = Depends(get_db)):
         raise HTTPException(404, "Subject not found.")
     if not exam:
         raise HTTPException(404, "Exam not found.")
+    require_exam_open(exam)
     if exam.class_id is not None and student.class_id != exam.class_id:
         raise HTTPException(422, "The selected student does not belong to this examination's class.")
     item = models.Mark(**data.model_dump())
@@ -1151,6 +1203,8 @@ def update_mark(mark_id: int, data: MarkUpdate, db: Session = Depends(get_db)):
     if not item:
         raise HTTPException(404, "Mark record not found.")
     exam = db.get(models.Exam, item.exam_id)
+    if exam:
+        require_exam_open(exam)
     student = db.get(models.Student, item.student_id)
     if exam and exam.class_id is not None and student and student.class_id != exam.class_id:
         raise HTTPException(409, "This mark no longer matches the examination class.")
@@ -1166,6 +1220,9 @@ def verify_mark(mark_id: int, verified: bool, db: Session = Depends(get_db), adm
     item = db.get(models.Mark, mark_id)
     if not item:
         raise HTTPException(404, "Mark record not found.")
+    exam = db.get(models.Exam, item.exam_id)
+    if exam:
+        require_exam_open(exam)
     item.verified = verified
     write_audit(
         db, admin, "mark_verified" if verified else "mark_unlocked",
@@ -1188,6 +1245,7 @@ def verify_subject_marks_batch(
     subject = db.get(models.Subject, subject_id)
     if not exam or not subject:
         raise HTTPException(404, "Examination or subject not found.")
+    require_exam_open(exam)
     query = db.query(models.Mark).filter(
         models.Mark.exam_id == exam_id,
         models.Mark.subject_id == subject_id,
@@ -1223,6 +1281,7 @@ def verify_exam_results_batch(
     exam = db.get(models.Exam, exam_id)
     if not exam:
         raise HTTPException(404, "Examination not found.")
+    require_exam_open(exam)
     query = db.query(models.Mark).filter(models.Mark.exam_id == exam_id)
     if exam.class_id is not None:
         query = query.join(models.Student, models.Student.id == models.Mark.student_id).filter(
@@ -2890,7 +2949,10 @@ def list_sync_exam_snapshot(
                 models.Student.id.in_(student_ids), models.Student.class_id.isnot(None)
             ).all()
         } if student_ids else set()
-        query = query.filter(models.Exam.class_id.in_(class_ids) if class_ids else models.Exam.id == -1)
+        query = query.filter(
+            models.Exam.class_id.in_(class_ids) if class_ids else models.Exam.id == -1,
+            models.Exam.status == "published",
+        )
         scope = "linked_students"
     elif user.role == "teacher":
         if "view" not in user_permissions(user).get("My Results", set()):
@@ -2911,7 +2973,7 @@ def list_sync_exam_snapshot(
     next_after_id = rows[-1].id if rows else after_id
     payload = [
         {"id": row.id, "name": row.name, "term": row.term, "year": row.year,
-         "class_id": row.class_id, "exam_type": row.exam_type}
+         "class_id": row.class_id, "exam_type": row.exam_type, "status": row.status}
         for row in rows
     ]
     snapshot_sequence = _sync_snapshot_sequence(db)
@@ -2942,9 +3004,10 @@ def list_sync_mark_snapshot(
         scope = "school"
     elif user.role == "parent":
         student_ids = _sync_linked_student_ids(db, user)
-        query = query.filter(
+        query = query.join(models.Exam, models.Exam.id == models.Mark.exam_id).filter(
             models.Mark.student_id.in_(student_ids) if student_ids else models.Mark.id == -1,
             models.Mark.verified.is_(True),
+            models.Exam.status == "published",
         )
         scope = "linked_verified_results"
     elif user.role == "teacher":
@@ -3383,7 +3446,8 @@ def parent_child_results(student_id: int, db: Session = Depends(get_db), parent=
     rows = db.query(models.Mark, models.Exam, models.Subject).join(
         models.Exam, models.Exam.id == models.Mark.exam_id
     ).join(models.Subject, models.Subject.id == models.Mark.subject_id).filter(
-        models.Mark.student_id == student.id, models.Mark.verified.is_(True)
+        models.Mark.student_id == student.id, models.Mark.verified.is_(True),
+        models.Exam.status == "published",
     ).order_by(models.Exam.year.desc(), models.Exam.term, models.Exam.name, models.Subject.name).all()
     return [{"exam": exam.name, "term": exam.term, "year": exam.year, "subject": subject.name, "score": mark.score} for mark, exam, subject in rows]
 
@@ -4019,6 +4083,7 @@ def save_teacher_marks_bulk(data: BulkMarkCreate, db: Session = Depends(get_db),
     subject = db.get(models.Subject, data.subject_id)
     if not exam or not subject or exam.class_id is None:
         raise HTTPException(404, "Class examination or subject not found.")
+    require_exam_open(exam)
     assigned = db.query(models.TeacherAssignment).filter_by(
         teacher_id=teacher.id, class_id=exam.class_id, subject_id=subject.id
     ).first()
@@ -4086,6 +4151,7 @@ def save_teacher_mark(data: MarkCreate, db: Session = Depends(get_db),
     exam = db.get(models.Exam, data.exam_id)
     if not student or not subject or not exam:
         raise HTTPException(404, "Student, subject or examination not found.")
+    require_exam_open(exam)
     if exam.class_id is None or student.class_id != exam.class_id:
         raise HTTPException(422, "The student does not belong to this class examination.")
     assignment = db.query(models.TeacherAssignment).filter_by(

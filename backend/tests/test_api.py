@@ -799,6 +799,59 @@ def test_phase_one_staff_and_finance_workflow_end_to_end():
         assert archived.status_code == 200, archived.text
 
 
+def test_exam_must_be_closed_and_published_before_parent_results_are_visible():
+    reset_database()
+    admin = create_admin()
+    admin_headers = {"Authorization": f"Bearer {create_access_token(admin)}"}
+    with SessionLocal() as db:
+        school_class = models.SchoolClass(name="Senior 2", section="A")
+        subject = models.Subject(name="English", code="ENG")
+        parent = models.User(
+            username="publication-parent", email="publication-parent@example.invalid",
+            hashed_password=password_hash.hash("ParentPassword123!"), role="parent", is_active=True,
+        )
+        db.add_all([school_class, subject, parent])
+        db.flush()
+        student = models.Student(
+            admission_number="SB-PUBLISH-001", first_name="Amina", last_name="Learner",
+            class_id=school_class.id,
+        )
+        db.add(student)
+        db.flush()
+        exam = models.Exam(name="Term Assessment", term="Term 1", year=2026, class_id=school_class.id)
+        db.add(exam)
+        db.flush()
+        db.add_all([
+            models.ParentStudentLink(user_id=parent.id, student_id=student.id),
+            models.Mark(student_id=student.id, subject_id=subject.id, exam_id=exam.id, score=82, verified=True),
+        ])
+        db.commit()
+        student_id, exam_id = student.id, exam.id
+        parent_headers = {"Authorization": f"Bearer {create_access_token(SimpleNamespace(id=parent.id, role='parent'))}"}
+
+    with TestClient(app) as client:
+        hidden = client.get(f"/api/parent/children/{student_id}/results", headers=parent_headers)
+        assert hidden.status_code == 200
+        assert hidden.json() == []
+
+        closed = client.post(f"/api/exams/{exam_id}/close", headers=admin_headers)
+        assert closed.status_code == 200, closed.text
+        assert closed.json()["status"] == "closed"
+        still_hidden = client.get(f"/api/parent/children/{student_id}/results", headers=parent_headers)
+        assert still_hidden.json() == []
+
+        blocked_edit = client.patch("/api/marks/1", headers=admin_headers, json={"score": 91})
+        assert blocked_edit.status_code == 409
+
+        published = client.post(f"/api/exams/{exam_id}/publish", headers=admin_headers)
+        assert published.status_code == 200, published.text
+        assert published.json()["status"] == "published"
+        visible = client.get(f"/api/parent/children/{student_id}/results", headers=parent_headers)
+        assert visible.status_code == 200
+        assert len(visible.json()) == 1
+        assert visible.json()[0]["score"] == 82
+
+
 def test_class_scoped_exams_and_mark_correction():
     reset_database()
     admin = create_admin()
