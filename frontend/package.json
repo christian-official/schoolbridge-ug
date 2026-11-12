@@ -12,7 +12,7 @@
     "test:pwa": "node --test tests/pwa.test.js tests/desktop-offline.test.js tests/school-qr.test.js",
     "test:offline:browser": "node --test tests/service-worker.browser.test.js tests/registration.browser.test.js",
     "desktop:dev": "npx --yes @tauri-apps/cli@2 dev",
-    "desktop:build": "npx --yes @tauri-apps/cli@2 build --no-bundle"
+    "desktop:build": "npx --yes @tauri-apps/cli@2 build"
   },
   "dependencies": {
     "lucide-react": "^1.70.0",
