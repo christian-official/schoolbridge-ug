@@ -17,7 +17,7 @@ const EXAM_TYPES = ['Beginning of Term', 'Mid-Term', 'End of Term', 'Mock', 'Pro
 
 function examGroupKey(exam: Exam) { return [exam.exam_type || 'Other', exam.term, exam.year].join('::') }
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
+
 
 async function request<T>(path: string, token: string, options: RequestInit = {}): Promise<T> {
   const response = await fetchSchoolBridge(`${API_BASE_URL}/api/${path}`, {
@@ -93,7 +93,7 @@ async function fetchClassStudents(token: string, classId: number | null): Promis
   return [first, ...remaining].flatMap(page => page.items)
 }
 
-export default function AcademicManagement({ token, classes, canVerify = false, userId, isTeacher = false, isAdmin = false }: { token: string; classes: SchoolClass[]; canVerify?: boolean; userId: number; isTeacher?: boolean; isAdmin?: boolean }) {
+export default function AcademicManagement({ token, classes, canVerify = false, userId, isTeacher = false, isAdmin = false, apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '') }: { token: string; classes: SchoolClass[]; canVerify?: boolean; userId: number; isTeacher?: boolean; isAdmin?: boolean; apiBaseUrl?: string }) {
   const [exams, setExams] = useState<Exam[]>([])
   const [subjects, setSubjects] = useState<Subject[]>([])
   const [students, setStudents] = useState<Student[]>([])
