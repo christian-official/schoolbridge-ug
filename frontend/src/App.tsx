@@ -14,6 +14,7 @@ import OperationsManagement from './OperationsManagement'
 import Phase4Workspace from './Phase4Workspace'
 import ParentLiaisonWorkspace from './ParentLiaison'
 import SyncDevices from './SyncDevices'
+import RegistrationFlow from './RegistrationFlow'
 import { clearLocalSyncData, saveEncryptedOfflineDraft, loadEncryptedOfflineDraft, deleteEncryptedOfflineDraft, loadEncryptedOfflineSnapshot, deleteEncryptedOfflineSnapshot } from './syncStorage'
 import './App.css'
 import './DashboardRedesign.css'
@@ -897,6 +898,7 @@ function App() {
   const [loginError, setLoginError] = useState('')
   const [offlineWorkspace, setOfflineWorkspace] = useState<OfflineWorkspaceSnapshot | null>(null)
   const [showRecovery, setShowRecovery] = useState(false)
+  const [showRegistration, setShowRegistration] = useState(false)
   const [loading, setLoading] = useState(false)
   const [active, setActive] = useState('Overview')
   const [overviewShortcuts, setOverviewShortcuts] = useState<string[]>([])
@@ -1496,7 +1498,7 @@ function App() {
           <div className="brand-mark"><GraduationCap size={30} /></div>
           <div className="brand-name">School<span>Bridge</span></div>
           <p className="login-subtitle">Your school's operations, connected.</p>
-          {showRecovery ? <PasswordRecovery schoolId={selectedSchoolId} onBack={()=>setShowRecovery(false)}/> : <>
+          {showRecovery ? <PasswordRecovery schoolId={selectedSchoolId} onBack={()=>setShowRecovery(false)}/> : showRegistration && selectedSchoolId && qrSchoolName && !qrSchoolError ? <RegistrationFlow schoolId={selectedSchoolId} schoolName={qrSchoolName} onBack={()=>setShowRegistration(false)}/> : <>
             <h1>Welcome back</h1>
             <p className="muted">Sign in to your school workspace.</p>
             {qrSchoolName && <p className="form-hint">School: <strong>{qrSchoolName}</strong></p>}
@@ -1513,6 +1515,7 @@ function App() {
               </button>
             </form>
             <button type="button" className="recovery-link" onClick={()=>{setShowRecovery(true);setLoginError('')}}>Forgot your password?</button>
+            {selectedSchoolId && qrSchoolName && !qrSchoolError && <button type="button" className="recovery-link" onClick={()=>{setShowRegistration(true);setLoginError('')}}>Create a parent or teacher account</button>}
             <p className="login-foot"><ShieldCheck size={15} /> Secure school access</p>
           </>}
         </section>
