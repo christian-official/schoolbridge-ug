@@ -892,6 +892,8 @@ function App() {
   const [serverConnection, setServerConnection] = useState<'checking' | 'connected' | 'disconnected'>('checking')
   const [syncDeviceRevoked, setSyncDeviceRevoked] = useState(false)
   const [setupStatus,setSetupStatus] = useState<FirstSetupStatus>({loading:true,setup_completed:false,activated:false,installation_id:'',identity_locked:false,error:''})
+  const [qrSchoolName,setQrSchoolName] = useState('')
+  const [qrSchoolError,setQrSchoolError] = useState('')
   useEffect(() => {
     let cancelled = false
     loadStoredSessionToken().then(savedToken => {
@@ -916,6 +918,25 @@ function App() {
     }).catch(e=>{if(!cancelled)setSetupStatus({loading:false,setup_completed:false,activated:false,installation_id:'',identity_locked:false,error:e instanceof Error?e.message:'Unable to check installation setup.'})})
     return ()=>{cancelled=true}
   },[])
+  useEffect(() => {
+    const expectedInstallation = new URLSearchParams(window.location.search).get('school')
+    if (!expectedInstallation || setupStatus.loading) return
+    if (!setupStatus.setup_completed || expectedInstallation !== setupStatus.installation_id) {
+      setQrSchoolError('This QR code belongs to a different SchoolBridge installation. Ask your school for its current access QR code.')
+      return
+    }
+    let cancelled = false
+    fetch(API_BASE_URL + '/api/public/school', { cache: 'no-store' })
+      .then(async response => {
+        const identity = await response.json().catch(() => ({}))
+        if (!response.ok) throw new Error(identity.detail || 'Unable to verify the school identity.')
+        if (identity.installation_id !== expectedInstallation) throw new Error('The QR code does not match this school installation.')
+        if (!cancelled) setQrSchoolName(identity.school_name)
+      })
+      .catch(error => { if (!cancelled) setQrSchoolError(error instanceof Error ? error.message : 'Unable to verify the school identity.') })
+    return () => { cancelled = true }
+  }, [setupStatus.loading, setupStatus.setup_completed, setupStatus.installation_id])
+
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressTriggered = useRef(false)
   const syncPollInFlight = useRef(false)
@@ -1451,7 +1472,7 @@ function App() {
               <input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter your password or offline passphrase" required />
               <p className="form-hint">Offline sign-in works only after you register this browser and save an encrypted offline copy under Settings → Registered devices. Use that offline passphrase when disconnected.</p>
               {loginError && <p className="error">{loginError}</p>}
-              <button className="primary-button login-button" disabled={loading}>
+              <button className="primary-button login-button" disabled={loading || Boolean(qrSchoolError) || (new URLSearchParams(window.location.search).has('school') && !qrSchoolName)}>
                 {loading ? <><LoaderCircle className="spin" size={18} /> Signing in...</> : 'Sign in'}
               </button>
             </form>
