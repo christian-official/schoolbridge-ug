@@ -16,6 +16,7 @@ async function api<T>(path: string, token: string, options: RequestInit = {}): P
 type StudentOption = { id: number; first_name: string; middle_name?: string | null; last_name: string; admission_number: string; class_id?: number | null; guardian_name?: string | null; guardian_relationship?: string | null; guardian_phone?: string | null; guardian2_name?: string | null; guardian2_relationship?: string | null; guardian2_phone?: string | null }
 type ParentChild = { id: number; name: string; admission_number: string; status: string; class_name: string; stream: string; fees_charged: number; fees_paid: number; balance: number }
 type Announcement = { id: number; title: string; message: string; audience: string; published: boolean; created_at: string }
+type RegistrationClaim = { id: number; claim_type: 'parent' | 'teacher'; status: string; submitted_name: string; details_json: string; candidate_student_ids_json: string; candidate_staff_id?: number | null; phone_masked?: string | null; created_at: string; review_note?: string | null }
 type ChildResult = { exam: string; term: string; year: number; subject: string; score: number }
 type ChildAttendance = { date: string; status: string }
 type ChildFee = { term: string; year: number; charged: number; paid: number; balance: number; payments: { date: string; amount: number; receipt_number?: string | null }[] }
@@ -24,6 +25,9 @@ export default function Phase4Workspace({ token, role, active, permissions }: { 
   const canPublish = role === 'admin' || (permissions?.Announcements || []).includes('add')
   const [students, setStudents] = useState<StudentOption[]>([])
   const [parents, setParents] = useState<any[]>([])
+  const [registrationClaims, setRegistrationClaims] = useState<RegistrationClaim[]>([])
+  const [claimFilter, setClaimFilter] = useState('pending_review')
+  const [reviewingClaimId, setReviewingClaimId] = useState<number | null>(null)
   const [selectedStudentIds, setSelectedStudentIds] = useState<number[]>([])
   const [studentSearch, setStudentSearch] = useState('')
   const [account, setAccount] = useState({ username: '', email: '' })
@@ -44,6 +48,37 @@ export default function Phase4Workspace({ token, role, active, permissions }: { 
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
 
+  async function loadRegistrationClaims(status = claimFilter) {
+    const rows = await api<RegistrationClaim[]>('admin/registration-claims?status=' + encodeURIComponent(status), token)
+    setRegistrationClaims(rows)
+  }
+
+  async function decideRegistrationClaim(claim: RegistrationClaim, status: 'approved' | 'rejected') {
+    if (status === 'approved') {
+      const studentIds = JSON.parse(claim.candidate_student_ids_json || '[]') as number[]
+      if (claim.claim_type === 'parent' && !studentIds.length) {
+        setError('This request has no safe automatic student match. Review the school records before approving it.')
+        return
+      }
+      if (claim.claim_type === 'teacher' && !claim.candidate_staff_id) {
+        setError('This request has no safe automatic teaching-staff match. Review the staff records before approving it.')
+        return
+      }
+    }
+    setReviewingClaimId(claim.id); setError(''); setMessage('')
+    try {
+      const details = JSON.parse(claim.details_json || '{}') as Record<string, unknown>
+      const note = status === 'approved' ? 'Approved after reviewing the submitted details and matched school records.' : 'Rejected after school review.'
+      await api('admin/registration-claims/' + claim.id + '/decision', token, {
+        method: 'POST',
+        body: JSON.stringify({ status, note }),
+      })
+      await loadRegistrationClaims()
+      setMessage('Registration request ' + status + '.')
+    } catch (e) { setError(e instanceof Error ? e.message : 'Unable to save registration review.') }
+    finally { setReviewingClaimId(null) }
+  }
+
   async function loadAdminParents() {
     const [studentData, parentData] = await Promise.all([
       api<{ items: StudentOption[] }>('students/search?page=1&page_size=5&search='+encodeURIComponent(studentSearch.trim()), token),
@@ -52,6 +87,15 @@ export default function Phase4Workspace({ token, role, active, permissions }: { 
     setStudents(studentData.items || [])
     setParents(parentData)
   }
+
+  useEffect(() => {
+    if (role !== 'admin' || active !== 'Parent Access') return
+    let cancelled = false
+    api<RegistrationClaim[]>('admin/registration-claims?status=' + encodeURIComponent(claimFilter), token)
+      .then(rows => { if (!cancelled) setRegistrationClaims(rows) })
+      .catch(e => { if (!cancelled) setError(e instanceof Error ? e.message : 'Unable to load registration requests.') })
+    return () => { cancelled = true }
+  }, [token, role, active, claimFilter])
 
   useEffect(() => {
     if (role === 'parent' || active !== 'Parent Access') return
@@ -148,6 +192,7 @@ export default function Phase4Workspace({ token, role, active, permissions }: { 
         <button type="button" className={parentTab === 'overview' ? 'active' : ''} onClick={() => setParentTab('overview')}>Overview</button>
         <button type="button" className={parentTab === 'add' ? 'active' : ''} onClick={() => setParentTab('add')}><PlusCircle size={15}/> Add parent</button>
         <button type="button" className={parentTab === 'manage' ? 'active' : ''} onClick={() => setParentTab('manage')}>Manage parents <span>{parents.length}</span></button>
+        {role === 'admin' && <button type="button" className={parentTab === 'review' ? 'active' : ''} onClick={() => setParentTab('review')}>Registration requests <span>{registrationClaims.length}</span></button>}
       </nav>
       {issuedPasscode && <div className="success-notice parent-passcode-handover" role="status">
         <strong>New parent login — hand over securely</strong>
@@ -195,6 +240,33 @@ export default function Phase4Workspace({ token, role, active, permissions }: { 
         </div>
         <div className="form-actions"><button className="primary-button" disabled={savingAccount || !selectedStudentIds.length}>{savingAccount ? 'Creating account...' : 'Create parent account'}</button><button type="button" className="secondary-button" onClick={() => setParentTab('overview')}>Cancel</button></div>
       </form>}
+      {parentTab === 'review' && role === 'admin' && <div>
+        <div className="panel-heading"><div><h3>Self-registration review</h3><p>Review parent and teacher requests before account creation. Approval uses only matched records from this school.</p></div>
+          <select aria-label="Registration request status" value={claimFilter} onChange={e => setClaimFilter(e.target.value)}>
+            <option value="pending_review">Needs review</option><option value="verification_pending">Phone verification pending</option><option value="verified">Phone verified</option><option value="approved">Approved</option><option value="rejected">Rejected</option><option value="completed">Completed</option>
+          </select>
+        </div>
+        <div className="form-actions"><button type="button" className="secondary-button" onClick={() => void loadRegistrationClaims()}>Refresh requests</button></div>
+        <div className="table-wrap"><table><thead><tr><th>Applicant</th><th>Type & submitted details</th><th>Trusted phone</th><th>Status</th><th>Decision</th></tr></thead><tbody>
+          {registrationClaims.map(claim => {
+            const details = (() => { try { return JSON.parse(claim.details_json || '{}') as Record<string, any> } catch { return {} } })()
+            const children = Array.isArray(details.children) ? details.children : []
+            const matchedStudents = (() => { try { return JSON.parse(claim.candidate_student_ids_json || '[]') as number[] } catch { return [] } })()
+            const canApprove = claim.status !== 'completed' && claim.status !== 'rejected' && (claim.claim_type === 'parent' ? matchedStudents.length === children.length && children.length > 0 : !!claim.candidate_staff_id)
+            return <tr key={claim.id}>
+              <td><strong>{claim.submitted_name}</strong><small>Request #{claim.id} · {new Date(claim.created_at).toLocaleString('en-UG')}</small></td>
+              <td><strong>{claim.claim_type === 'parent' ? 'Parent' : 'Teacher'}</strong><small>{claim.claim_type === 'parent' ? children.map((child: any) => [child.first_name, child.last_name].filter(Boolean).join(' ')).join(', ') : [details.first_name, details.last_name, details.staff_number].filter(Boolean).join(' · ')}</small><small>{claim.claim_type === 'parent' ? matchedStudents.length + ' matched learner record(s)' : claim.candidate_staff_id ? 'Matched active teaching staff record' : 'No automatic staff match'}</small></td>
+              <td>{claim.phone_masked || 'No trusted phone — manual review'}</td>
+              <td><span className="attendance-status-pill">{claim.status.replaceAll('_', ' ')}</span></td>
+              <td><div className="proposal-review-actions">
+                {claim.status !== 'completed' && claim.status !== 'rejected' && <><button type="button" className="primary-button" disabled={!canApprove || reviewingClaimId === claim.id} onClick={() => void decideRegistrationClaim(claim, 'approved')}>{reviewingClaimId === claim.id ? 'Saving…' : 'Approve'}</button><button type="button" className="danger-button" disabled={reviewingClaimId === claim.id} onClick={() => void decideRegistrationClaim(claim, 'rejected')}>Reject</button></>}
+                {!canApprove && claim.status !== 'completed' && claim.status !== 'rejected' && <small>Needs manual record matching; approval is disabled.</small>}
+              </div></td>
+            </tr>
+          })}
+          {!registrationClaims.length && <tr><td colSpan={5}>{busy ? 'Loading requests…' : 'No requests in this status.'}</td></tr>}
+        </tbody></table></div>
+      </div>}
       {parentTab === 'manage' && <div>
         <div className="panel-heading"><div><h3>Parent directory</h3><p>Review linked students and remove parent accounts that should no longer have portal access.</p></div><button type="button" className="secondary-button" onClick={() => void loadAdminParents()}>Refresh list</button></div>
         <div className="table-wrap"><table><thead><tr><th>Parent account</th><th>Linked students</th><th>Status</th><th>Action</th></tr></thead><tbody>
