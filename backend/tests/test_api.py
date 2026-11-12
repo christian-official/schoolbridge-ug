@@ -4277,3 +4277,41 @@ def test_registration_claim_review_is_isolated_to_the_admin_school():
         persisted = db.query(models.RegistrationClaim).filter_by(id=claim_id).one()
         assert persisted.status == "pending_review"
 
+def test_registration_review_cannot_approve_inactive_student_records():
+    reset_database()
+    admin = create_admin()
+    with SessionLocal() as db:
+        inactive = models.Student(
+            school_tenant_id=1, first_name="Inactive", last_name="Learner",
+            status="inactive",
+        )
+        db.add(inactive)
+        db.flush()
+        claim = models.RegistrationClaim(
+            school_tenant_id=1,
+            reference_hash="c" * 64,
+            claim_type="parent",
+            status="pending_review",
+            submitted_name="Parent Applicant",
+            details_json=json.dumps({"children": [{"first_name": "Inactive", "last_name": "Learner"}]}),
+            candidate_student_ids_json="[]",
+            expires_at=datetime.utcnow(),
+        )
+        db.add(claim)
+        db.commit()
+        claim_id = claim.id
+        student_id = inactive.id
+
+    headers = {"Authorization": f"Bearer {create_access_token(admin)}"}
+    with TestClient(app) as client:
+        response = client.post(
+            f"/api/admin/registration-claims/{claim_id}/decision",
+            headers=headers,
+            json={"status": "approved", "student_ids": [student_id], "note": "Must not link inactive learner."},
+        )
+        assert response.status_code == 422, response.text
+
+    with SessionLocal() as db:
+        claim = db.query(models.RegistrationClaim).filter_by(id=claim_id).one()
+        assert claim.status == "pending_review"
+

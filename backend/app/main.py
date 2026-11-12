@@ -2942,7 +2942,10 @@ def decide_registration_claim(claim_id: int, data: RegistrationClaimDecisionRequ
         if claim.claim_type == "parent":
             student_ids = list(dict.fromkeys(data.student_ids or json.loads(claim.candidate_student_ids_json or "[]")))
             expected_count = len(json.loads(claim.details_json or "{}").get("children", []))
-            students = db.query(models.Student).filter(models.Student.id.in_(student_ids)).all()
+            students = db.query(models.Student).filter(
+                models.Student.id.in_(student_ids),
+                models.Student.status == "active",
+            ).all()
             if not student_ids or len(student_ids) != expected_count or len(students) != len(student_ids):
                 raise HTTPException(422, "Select one valid student record for every child before approving the parent request.")
             claim.candidate_student_ids_json = json.dumps(student_ids)
