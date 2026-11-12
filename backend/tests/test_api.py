@@ -1209,7 +1209,10 @@ def test_parent_portal_only_exposes_linked_child_records_and_audience_announceme
         subject = models.Subject(name="English")
         db.add_all([school_class, subject])
         db.flush()
-        child = models.Student(admission_number="SB-PARENT-001", first_name="Amina", last_name="Learner", class_id=school_class.id)
+        child = models.Student(
+            admission_number="SB-PARENT-001", first_name="Amina", last_name="Learner",
+            class_id=school_class.id, guardian_name="Amina Parent", guardian_relationship="Mother",
+        )
         unrelated = models.Student(admission_number="SB-PARENT-002", first_name="Brian", last_name="Learner", class_id=school_class.id)
         db.add_all([child, unrelated])
         db.flush()
@@ -1226,18 +1229,14 @@ def test_parent_portal_only_exposes_linked_child_records_and_audience_announceme
         db.close()
 
     with TestClient(app) as client:
-        created = client.post("/api/parent-accounts", headers=admin_headers, json={
-            "username": "amina-parent", "email": "parent@example.invalid",
-            "student_ids": [child_id],
+        created = client.post("/api/public/registration/parent", json={
+            "school_id": "00000000-0000-4000-8000-000000000001",
+            "parent_name": "Amina Parent", "relationship": "Mother",
+            "children": [{"first_name": "Amina", "last_name": "Learner", "admission_number": "SB-PARENT-001"}],
         })
         assert created.status_code == 200, created.text
-        temporary_password = created.json()["temporary_password"]
-        assert temporary_password
-        parent_login = client.post("/api/auth/login", data={
-            "username": "amina-parent", "password": temporary_password,
-        })
-        assert parent_login.status_code == 200
-        parent_headers = {"Authorization": f"Bearer {parent_login.json()['access_token']}"}
+        assert created.json()["role"] == "parent"
+        parent_headers = {"Authorization": f"Bearer {created.json()['access_token']}"}
 
         children = client.get("/api/parent/children", headers=parent_headers)
         assert children.status_code == 200
@@ -3322,8 +3321,14 @@ def test_student_dismissal_preserves_history_and_shared_parent_access():
         school_class = models.SchoolClass(name="Primary 5", section="Green")
         db.add(school_class)
         db.flush()
-        first = models.Student(admission_number="SB-DISMISS-001", first_name="Amina", last_name="Learner", class_id=school_class.id)
-        second = models.Student(admission_number="SB-DISMISS-002", first_name="Brian", last_name="Learner", class_id=school_class.id)
+        first = models.Student(
+            admission_number="SB-DISMISS-001", first_name="Amina", last_name="Learner",
+            class_id=school_class.id, guardian_name="Shared Parent", guardian_relationship="Mother",
+        )
+        second = models.Student(
+            admission_number="SB-DISMISS-002", first_name="Brian", last_name="Learner",
+            class_id=school_class.id, guardian_name="Shared Parent", guardian_relationship="Mother",
+        )
         db.add_all([first, second])
         db.flush()
         db.add(models.Attendance(student_id=first.id, attendance_date=date(2026, 3, 1), status="Present"))
@@ -3334,18 +3339,20 @@ def test_student_dismissal_preserves_history_and_shared_parent_access():
         db.close()
 
     with TestClient(app) as client:
-        created = client.post("/api/parent-accounts", headers=admin_headers, json={
-            "username": "shared-parent", "email": "shared-parent@example.invalid",
-            "student_ids": [first_id, second_id],
+        created = client.post("/api/public/registration/parent", json={
+            "school_id": "00000000-0000-4000-8000-000000000001",
+            "parent_name": "Shared Parent", "relationship": "Mother",
+            "children": [
+                {"first_name": "Amina", "last_name": "Learner", "admission_number": "SB-DISMISS-001"},
+                {"first_name": "Brian", "last_name": "Learner", "admission_number": "SB-DISMISS-002"},
+            ],
         })
         assert created.status_code == 200, created.text
-        parent_id = created.json()["id"]
-        parent_login = client.post("/api/auth/login", data={
-            "username": "shared-parent", "password": created.json()["temporary_password"],
-        })
-        assert parent_login.status_code == 200
-        parent_token = parent_login.json()["access_token"]
+        parent_token = created.json()["access_token"]
         parent_headers = {"Authorization": f"Bearer {parent_token}"}
+        parent_account = client.get("/api/auth/me", headers=parent_headers)
+        assert parent_account.status_code == 200
+        parent_id = parent_account.json()["id"]
 
         dismissed = client.post(f"/api/students/{first_id}/dismiss", headers=admin_headers, json={
             "reason": "Family relocation", "effective_date": "2026-03-02",
