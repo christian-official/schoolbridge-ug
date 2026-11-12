@@ -31,6 +31,41 @@ def test_fresh_database_is_created_and_versioned(migrated_database):
     assert "school_identity_corrections" in tables
 
 
+def test_trusted_contact_migration_backfills_existing_staff_defaults():
+    from importlib import import_module
+    from alembic.migration import MigrationContext
+    from alembic.operations import Operations
+
+    migration = import_module("migrations.versions.0036_trusted_school_contacts")
+    engine = create_engine("sqlite://")
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            "CREATE TABLE staff_members (id INTEGER PRIMARY KEY, staff_number VARCHAR(40))"
+        )
+        connection.exec_driver_sql(
+            "INSERT INTO staff_members (id, staff_number) VALUES (1, 'STAFF-001')"
+        )
+        connection.exec_driver_sql(
+            "CREATE TABLE students (id INTEGER PRIMARY KEY, school_tenant_id INTEGER)"
+        )
+
+        context = MigrationContext.configure(connection)
+        with Operations.context(context):
+            migration.upgrade()
+
+        values = connection.exec_driver_sql(
+            "SELECT phone_source, phone_verification_status FROM staff_members WHERE id=1"
+        ).one()
+        assert values == ("legacy_staff_record", "unverified")
+
+        columns = {item["name"]: item for item in inspect(connection).get_columns("staff_members")}
+        assert columns["phone_source"]["nullable"] is False
+        assert columns["phone_verification_status"]["nullable"] is False
+        assert columns["phone_verified_at"]["nullable"] is True
+        assert columns["phone_verified_by"]["nullable"] is True
+    engine.dispose()
+
+
 def test_baseline_adds_missing_tables_without_losing_existing_records(tmp_path):
     database_path = tmp_path / "existing-school.sqlite3"
     database_url = f"sqlite:///{database_path}"
@@ -61,7 +96,6 @@ def test_baseline_adds_missing_tables_without_losing_existing_records(tmp_path):
     assert "students" in tables
     assert "fee_charges" in tables
     assert "alembic_version" in tables
-
 
 
 def test_existing_database_is_backed_up_before_pending_migrations(tmp_path):
@@ -122,7 +156,6 @@ def test_fresh_database_includes_user_scoped_sync_device_registry(migrated_datab
     engine.dispose()
 
 
-
 def test_fresh_database_includes_sync_change_journal(migrated_database):
     database_url = migrated_database
 
@@ -132,7 +165,6 @@ def test_fresh_database_includes_sync_change_journal(migrated_database):
     columns = {column["name"] for column in inspector.get_columns("sync_changes")}
     assert {"id", "entity_type", "entity_id", "operation", "changed_at"}.issubset(columns)
     engine.dispose()
-
 
 
 def test_sync_device_checkpoint_column_is_migrated(migrated_database):
@@ -154,14 +186,12 @@ def test_sync_change_proposals_migration(migrated_database):
     engine.dispose()
 
 
-
 def test_sync_change_journal_migrates_historical_scope_column(migrated_database):
     url = migrated_database
     engine = create_engine(url)
     columns = {item["name"] for item in inspect(engine).get_columns("sync_changes")}
     assert "scope_json" in columns
     engine.dispose()
-
 
 
 def test_legacy_school_with_users_is_grandfathered_by_setup_migration(tmp_path):
@@ -172,8 +202,6 @@ def test_legacy_school_with_users_is_grandfathered_by_setup_migration(tmp_path):
     database_url = f"sqlite:///{database_path}"
     connection = sqlite3.connect(database_path)
     try:
-        # Model an older deployed schema so forward migrations, rather than
-        # create_all, add the newer user and profile columns.
         connection.execute("""
             CREATE TABLE users (
                 id INTEGER PRIMARY KEY,
@@ -234,7 +262,6 @@ def test_legacy_school_with_users_is_grandfathered_by_setup_migration(tmp_path):
     assert identity["school_structure"] is None
 
 
-
 def test_legacy_school_profile_without_users_is_grandfathered(tmp_path):
     import sqlite3
 
@@ -280,7 +307,6 @@ def test_legacy_school_profile_without_users_is_grandfathered(tmp_path):
     assert state[0] is not None
     assert state[1] is not None
     assert "Configured School Without Accounts" in state[2]
-
 
 
 def test_partial_school_setup_state_table_gets_missing_activation_columns(tmp_path):
@@ -349,7 +375,6 @@ def test_user_session_version_column_is_migrated(migrated_database):
     assert columns["token_version"]["default"] in {"0", "'0'"}
 
 
-
 def test_existing_student_table_migrates_to_optional_admission_number(tmp_path):
     import sqlite3
 
@@ -404,7 +429,6 @@ def test_existing_student_table_migrates_to_optional_admission_number(tmp_path):
     assert any(index[2] for index in indexes)
 
 
-
 def test_all_school_owned_tables_receive_tenant_ownership_keys(migrated_database):
     tenant_tables = (
         "classes", "subjects", "students", "attendance", "exams", "marks",
@@ -439,7 +463,6 @@ def test_all_school_owned_tables_receive_tenant_ownership_keys(migrated_database
             ).scalar_one()
             assert count == 0, table
     engine.dispose()
-
 
 
 def test_postgres_unique_constraint_backing_index_is_not_dropped_twice():
