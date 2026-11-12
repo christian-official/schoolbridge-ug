@@ -186,6 +186,8 @@ td strong { color: #34445e; font-size: 11px; }
 
 .clickable-row { cursor: pointer; }
 .clickable-row:hover { background: rgba(59, 130, 246, 0.06); }
+.student-name-link { border: 0; padding: 0; margin: 0; background: transparent; color: var(--text, #172033); font: inherit; font-weight: 700; text-align: left; cursor: pointer; }
+.student-name-link:hover, .student-name-link:focus-visible { color: var(--blue, #2563eb); text-decoration: underline; outline-offset: 3px; }
 .modal-backdrop { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(15, 23, 42, 0.62); }
 .student-profile-modal .student-profile-details { display: block !important; visibility: visible !important; opacity: 1 !important; }
 .student-profile-modal { width: min(980px, 100%); max-height: 90vh; overflow: auto; background: var(--panel, #fff); box-shadow: 0 24px 80px rgba(0,0,0,.25); }
