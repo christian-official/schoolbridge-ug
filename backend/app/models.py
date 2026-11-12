@@ -153,7 +153,7 @@ class User(Base):
     school_tenant_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1", index=True)
     id: Mapped[int] = mapped_column(primary_key=True)
     username: Mapped[str] = mapped_column(String(80))
-    email: Mapped[str] = mapped_column(String(150))
+    email: Mapped[str | None] = mapped_column(String(150), nullable=True)
     hashed_password: Mapped[str] = mapped_column(String(255))
     role: Mapped[str] = mapped_column(String(20), default="teacher")
     role_label: Mapped[str | None] = mapped_column(String(80), nullable=True)
@@ -424,6 +424,35 @@ class ParentLiaisonMessage(Base):
     message: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     read_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class RegistrationClaim(Base):
+    __tablename__ = "registration_claims"
+    __table_args__ = (
+        Index("ix_registration_claims_tenant_status", "school_tenant_id", "status"),
+    )
+
+    school_tenant_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1", index=True)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    reference_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    claim_type: Mapped[str] = mapped_column(String(20))
+    status: Mapped[str] = mapped_column(String(30), default="pending_review", server_default="pending_review")
+    submitted_name: Mapped[str] = mapped_column(String(160))
+    details_json: Mapped[str] = mapped_column(Text, default="{}")
+    candidate_student_ids_json: Mapped[str] = mapped_column(Text, default="[]", server_default="[]")
+    candidate_contact_ids_json: Mapped[str] = mapped_column(Text, default="[]", server_default="[]")
+    candidate_staff_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    phone_masked: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    verification_code_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    verification_expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    verification_attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    requester_ip_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    reviewed_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    review_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 class SyncDevice(Base):
