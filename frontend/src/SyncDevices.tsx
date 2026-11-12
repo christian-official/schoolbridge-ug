@@ -100,6 +100,7 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
   const [invitationExpiry, setInvitationExpiry] = useState('1440')
   const [issuedInvitationToken, setIssuedInvitationToken] = useState('')
   const [invitationBusy, setInvitationBusy] = useState(false)
+  const [redeemToken, setRedeemToken] = useState('')
   const [schoolQrUrl, setSchoolQrUrl] = useState('')
   const [schoolAccessUrl, setSchoolAccessUrl] = useState('')
 
@@ -239,6 +240,26 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
     } finally {
       setBusy(false)
     }
+  }
+
+  async function redeemInvitation(event: React.FormEvent) {
+    event.preventDefault()
+    if (!redeemToken.trim()) return
+    setBusy(true); setError(''); setMessage('')
+    try {
+      const id = crypto.randomUUID()
+      await request('enrolment/redeem', token, {
+        method: 'POST',
+        body: JSON.stringify({ token: redeemToken.trim(), device_id: id, device_name: browserDeviceName() }),
+      })
+      localStorage.setItem(deviceStorageKey(userId), id)
+      setDeviceId(id)
+      setRedeemToken('')
+      setMessage('Invitation accepted. This device is now registered to your account and this school.')
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to redeem this enrolment invitation.')
+    } finally { setBusy(false) }
   }
 
   async function revoke(id: string) {
@@ -474,6 +495,16 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
         </tr>)}
       </tbody></table></div>}
     </section>}
+    <section className="offline-record-tools mobile-enrolment-redemption">
+      <h3>Join this school on this device</h3>
+      <p className="form-hint">After signing in with your own school account, enter the one-time invitation supplied by your school administrator. Invitations are tied to your account and this school, and can only be used once.</p>
+      <form className="student-form" onSubmit={redeemInvitation}>
+        <label>One-time enrolment invitation
+          <input value={redeemToken} onChange={event => setRedeemToken(event.target.value)} autoComplete="off" spellCheck={false} placeholder="Paste invitation token" required />
+        </label>
+        <div className="form-actions"><button className="primary-button" type="submit" disabled={busy || !redeemToken.trim()}>{busy ? 'Verifying…' : 'Verify invitation and register device'}</button></div>
+      </form>
+    </section>
     <div className="offline-record-tools">
       <h3>Encrypted offline records</h3>
       <p className="form-hint">Use a private passphrase of at least 12 characters. It is never stored. The encrypted copy expires after 24 hours and is cleared when changed permissions or records are detected after reconnecting.</p>
