@@ -3779,3 +3779,42 @@ def test_shared_multi_school_database_blocks_whole_database_backup_and_restore()
     assert backup.status_code == 403
     assert restore.status_code == 403
     assert "shared multi-school mode" in backup.json()["detail"]
+
+
+def test_usernames_and_emails_are_unique_per_school_not_globally():
+    reset_database()
+    with SessionLocal() as db:
+        db.add_all([
+            models.User(
+                school_tenant_id=1, username="shared-parent",
+                email="shared-parent@example.invalid",
+                hashed_password=password_hash.hash("SchoolOnePassword123!"),
+                role="parent",
+            ),
+            models.User(
+                school_tenant_id=2, username="shared-parent",
+                email="shared-parent@example.invalid",
+                hashed_password=password_hash.hash("SchoolTwoPassword123!"),
+                role="parent",
+            ),
+        ])
+        db.commit()
+
+    with SessionLocal() as db:
+        db.add(models.User(
+            school_tenant_id=1, username="shared-parent",
+            email="another@example.invalid",
+            hashed_password=password_hash.hash("DuplicatePassword123!"),
+            role="parent",
+        ))
+        with pytest.raises(IntegrityError):
+            db.commit()
+        db.rollback()
+
+    with SessionLocal() as db:
+        set_tenant_context(db, 2)
+        account = main_module.find_password_recovery_account(
+            db, "shared-parent@example.invalid"
+        )
+        assert account is not None
+        assert account.school_tenant_id == 2
