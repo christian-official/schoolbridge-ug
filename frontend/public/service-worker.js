@@ -1,10 +1,11 @@
 const CACHE_NAME = 'schoolbridge-shell-v1'
-const APP_SHELL = ['/', '/index.html']
+const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest']
+const PRECACHE_ASSETS = []
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(APP_SHELL)),
+      .then((cache) => cache.addAll([...APP_SHELL, ...PRECACHE_ASSETS])),
   )
 })
 

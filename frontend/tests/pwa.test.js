@@ -35,3 +35,16 @@ test('production entry registers the service worker and exposes install guidance
   assert.match(installUi, /Update now/)
   assert.match(installUi, /SCHOOLBRIDGE_SKIP_WAITING/)
 })
+
+
+test('production build injects every generated JS, CSS and imported asset into the offline precache', async () => {
+  const viteConfig = await readFile(new URL('../vite.config.ts', import.meta.url), 'utf8')
+  const serviceWorker = await readFile(new URL('../public/service-worker.js', import.meta.url), 'utf8')
+  assert.match(viteConfig, /build:\s*\{\s*manifest:\s*true\s*\}/)
+  assert.match(viteConfig, /name:\s*'schoolbridge-offline-precache'/)
+  assert.match(viteConfig, /entry\.file/)
+  assert.match(viteConfig, /entry\.css/)
+  assert.match(viteConfig, /entry\.assets/)
+  assert.match(viteConfig, /PRECACHE_ASSETS/)
+  assert.match(serviceWorker, /cache\.addAll\(\[\.\.\.APP_SHELL, \.\.\.PRECACHE_ASSETS\]\)/)
+})

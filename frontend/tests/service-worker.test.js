@@ -99,3 +99,20 @@ test('static assets use a cached response before attempting the network', async 
   })
   assert.equal(await response, cachedAsset)
 })
+
+
+test('service worker installation precaches the complete generated app asset list', async () => {
+  const listeners = {}
+  let added = null
+  const self = {
+    location: { origin: 'https://school.example' },
+    addEventListener: (name, handler) => { listeners[name] = handler },
+    skipWaiting: async () => {},
+    clients: { claim: async () => {} },
+  }
+  const caches = { open: async () => ({ addAll: async paths => { added = paths } }) }
+  const source = serviceWorkerSource.replace('const PRECACHE_ASSETS = []', "const PRECACHE_ASSETS = ['/assets/app-123.js', '/assets/app-123.css', '/assets/vendor-456.js']")
+  vm.runInNewContext(source, { self, caches, fetch, URL, Promise })
+  await listeners.install({ waitUntil: promise => promise })
+  assert.deepEqual(Array.from(added), ['/', '/index.html', '/manifest.webmanifest', '/assets/app-123.js', '/assets/app-123.css', '/assets/vendor-456.js'])
+})
