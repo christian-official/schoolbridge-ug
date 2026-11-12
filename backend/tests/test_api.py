@@ -3906,3 +3906,213 @@ def test_staff_phone_trust_is_admin_verified_and_resets_when_phone_changes():
         assert changed.status_code == 200, changed.text
         assert changed.json()["staff"]["phone_verification_status"] == "unverified"
         assert changed.json()["staff"]["phone_verified_at"] is None
+
+
+def test_parent_self_registration_uses_school_verified_numbers_and_links_multiple_children(monkeypatch):
+    reset_database()
+    admin = create_admin()
+    school_id = "00000000-0000-4000-8000-000000000001"
+    with SessionLocal() as db:
+        students = [
+            models.Student(
+                school_tenant_id=1, first_name="Amina", last_name="One",
+                date_of_birth=date(2012, 1, 1), guardian_name="Parent One",
+            ),
+            models.Student(
+                school_tenant_id=1, first_name="Brian", last_name="One",
+                date_of_birth=date(2014, 2, 2), guardian_name="Parent One",
+            ),
+        ]
+        db.add_all(students)
+        db.flush()
+        for student in students:
+            db.add(models.StudentGuardianContact(
+                school_tenant_id=1, student_id=student.id,
+                guardian_name="Parent One", relationship="Mother",
+                phone="+256701234567", source="admin_verified_school_record",
+                verification_status="school_verified", verified_by=admin.id,
+                verified_at=datetime.utcnow(), active=True,
+            ))
+        db.commit()
+        student_ids = [student.id for student in students]
+
+    sent_messages = []
+    monkeypatch.setattr(
+        main_module, "send_schoolbridge_sms",
+        lambda phone, message: sent_messages.append((phone, message)) or True,
+    )
+    with TestClient(app) as client:
+        payload = {
+            "school_id": school_id,
+            "parent_name": "Parent One",
+            "relationship": "Mother",
+            "children": [
+                {"first_name": "Amina", "last_name": "One", "date_of_birth": "2012-01-01"},
+                {"first_name": "Brian", "last_name": "One", "date_of_birth": "2014-02-02"},
+            ],
+        }
+        supplied_phone = client.post(
+            "/api/public/registration/parent",
+            json={**payload, "phone": "+256701234567"},
+        )
+        assert supplied_phone.status_code == 422
+
+        submitted = client.post("/api/public/registration/parent", json=payload)
+        assert submitted.status_code == 200, submitted.text
+        assert submitted.json()["status"] == "verification_pending"
+        assert submitted.json()["phone_masked"]
+        assert "+256701234567" not in submitted.text
+        assert sent_messages[0][0] == "+256701234567"
+        code = sent_messages[0][1].split("code is ", 1)[1][:6]
+
+        reference = submitted.json()["claim_reference"]
+        verified = client.post(
+            f"/api/public/registration/claims/{reference}/verify",
+            json={"school_id": school_id, "code": code},
+        )
+        assert verified.status_code == 200, verified.text
+
+        completed = client.post(
+            f"/api/public/registration/claims/{reference}/complete",
+            json={
+                "school_id": school_id,
+                "username": "parent.one",
+                "password": "ParentAccountPassword123!",
+            },
+        )
+        assert completed.status_code == 200, completed.text
+        login = client.post("/api/auth/login", data={
+            "username": "parent.one",
+            "password": "ParentAccountPassword123!",
+            "school_id": school_id,
+        })
+        assert login.status_code == 200, login.text
+        headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+        account = client.get("/api/auth/me", headers=headers)
+        assert account.status_code == 200
+        assert account.json()["role"] == "parent"
+
+    with SessionLocal() as db:
+        links = db.query(models.ParentStudentLink).filter(
+            models.ParentStudentLink.user_id == account.json()["id"]
+        ).all()
+        assert {link.student_id for link in links} == set(student_ids)
+
+
+def test_parent_registration_without_school_verified_phone_goes_to_admin_review():
+    reset_database()
+    admin = create_admin()
+    school_id = "00000000-0000-4000-8000-000000000001"
+    with SessionLocal() as db:
+        student = models.Student(
+            school_tenant_id=1, first_name="Daniel", last_name="Two",
+            guardian_name="Parent Two",
+        )
+        db.add(student)
+        db.flush()
+        db.add(models.StudentGuardianContact(
+            school_tenant_id=1, student_id=student.id,
+            guardian_name="Parent Two", relationship="Father",
+            phone="+256701111222", source="legacy_student_fields",
+            verification_status="unverified", active=True,
+        ))
+        db.commit()
+        student_id = student.id
+
+    token = create_access_token(admin)
+    headers = {"Authorization": f"Bearer {token}"}
+    with TestClient(app) as client:
+        submitted = client.post("/api/public/registration/parent", json={
+            "school_id": school_id,
+            "parent_name": "Parent Two",
+            "relationship": "Father",
+            "children": [{"first_name": "Daniel", "last_name": "Two"}],
+        })
+        assert submitted.status_code == 200, submitted.text
+        assert submitted.json()["status"] == "pending_review"
+
+        decision = client.post(
+            "/api/admin/registration-claims/1/decision",
+            headers=headers,
+            json={"status": "approved", "student_ids": [student_id], "note": "Matched paper record"},
+        )
+        assert decision.status_code == 200, decision.text
+        reference = submitted.json()["claim_reference"]
+        completed = client.post(
+            f"/api/public/registration/claims/{reference}/complete",
+            json={
+                "school_id": school_id,
+                "username": "parent.two",
+                "password": "ParentAccountPassword123!",
+            },
+        )
+        assert completed.status_code == 200, completed.text
+
+
+def test_teacher_self_registration_uses_staff_record_and_assigns_teacher_role(monkeypatch):
+    reset_database()
+    school_id = "00000000-0000-4000-8000-000000000001"
+    with SessionLocal() as db:
+        staff = models.StaffMember(
+            school_tenant_id=1, staff_number="TEACH-REG-01",
+            first_name="Grace", last_name="Teacher", category="Teaching",
+            position="Teacher", department="Sciences", phone="+256702222333",
+            phone_verification_status="school_verified",
+            phone_source="admin_verified_school_record",
+            phone_verified_at=datetime.utcnow(),
+        )
+        db.add(staff)
+        db.commit()
+        staff_id = staff.id
+
+    sent_messages = []
+    monkeypatch.setattr(
+        main_module, "send_schoolbridge_sms",
+        lambda phone, message: sent_messages.append((phone, message)) or True,
+    )
+    with TestClient(app) as client:
+        payload = {
+            "school_id": school_id,
+            "first_name": "Grace",
+            "last_name": "Teacher",
+            "staff_number": "TEACH-REG-01",
+            "position": "Teacher",
+            "department": "Sciences",
+        }
+        invalid_role = client.post(
+            "/api/public/registration/teacher",
+            json={**payload, "role": "admin"},
+        )
+        assert invalid_role.status_code == 422
+
+        submitted = client.post("/api/public/registration/teacher", json=payload)
+        assert submitted.status_code == 200, submitted.text
+        assert submitted.json()["status"] == "verification_pending"
+        assert sent_messages[0][0] == "+256702222333"
+        code = sent_messages[0][1].split("code is ", 1)[1][:6]
+        reference = submitted.json()["claim_reference"]
+        verified = client.post(
+            f"/api/public/registration/claims/{reference}/verify",
+            json={"school_id": school_id, "code": code},
+        )
+        assert verified.status_code == 200, verified.text
+        completed = client.post(
+            f"/api/public/registration/claims/{reference}/complete",
+            json={
+                "school_id": school_id,
+                "username": "grace.teacher",
+                "password": "TeacherAccountPassword123!",
+            },
+        )
+        assert completed.status_code == 200, completed.text
+        login = client.post("/api/auth/login", data={
+            "username": "grace.teacher",
+            "password": "TeacherAccountPassword123!",
+            "school_id": school_id,
+        })
+        assert login.status_code == 200, login.text
+        headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+        account = client.get("/api/auth/me", headers=headers)
+        assert account.status_code == 200
+        assert account.json()["role"] == "teacher"
+        assert account.json()["staff_id"] == staff_id
