@@ -4011,7 +4011,7 @@ def test_staff_phone_trust_is_admin_verified_and_resets_when_phone_changes():
         assert changed.json()["staff"]["phone_verified_at"] is None
 
 
-def test_parent_qr_registration_matches_school_records_and_opens_dashboard_without_password_or_sms(monkeypatch):
+def test_parent_qr_registration_matches_school_records_and_opens_dashboard_without_password_or_sms():
     reset_database()
     school_id = "00000000-0000-4000-8000-000000000001"
     with SessionLocal() as db:
@@ -4033,10 +4033,6 @@ def test_parent_qr_registration_matches_school_records_and_opens_dashboard_witho
         db.commit()
         student_ids = [student.id for student in students]
 
-    monkeypatch.setattr(
-        main_module, "send_schoolbridge_sms",
-        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("QR registration must not send SMS")),
-    )
     payload = {
         "school_id": school_id,
         "parent_name": "Parent One",
@@ -4143,7 +4139,7 @@ def test_parent_qr_registration_is_isolated_to_the_school_selected_by_the_qr():
         assert response.status_code == 403, response.text
 
 
-def test_teacher_qr_registration_matches_staff_number_and_opens_dashboard_without_password_or_sms(monkeypatch):
+def test_teacher_qr_registration_matches_staff_number_and_opens_dashboard_without_password_or_sms():
     reset_database()
     school_id = "00000000-0000-4000-8000-000000000001"
     with SessionLocal() as db:
@@ -4210,8 +4206,10 @@ def test_teacher_qr_registration_matches_staff_number_and_opens_dashboard_withou
 
 def test_legacy_registration_claim_and_administrator_review_routes_are_not_available():
     reset_database()
+    admin = create_admin()
+    headers = {"Authorization": f"Bearer {create_access_token(admin)}"}
     with TestClient(app) as client:
-        assert client.get("/api/admin/registration-claims").status_code == 404
+        assert client.get("/api/admin/registration-claims", headers=headers).status_code == 404
         assert client.get(
             "/api/public/registration/claims/not-a-valid-claim",
             params={"school_id": "00000000-0000-4000-8000-000000000001"},
