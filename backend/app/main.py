@@ -834,7 +834,7 @@ class ParentSelfRegistrationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     school_id: UUID
     parent_name: str = Field(min_length=2, max_length=160)
-    relationship: str | None = Field(default=None, max_length=60)
+    relationship: str = Field(min_length=2, max_length=60)
     children: list[ParentRegistrationChild] = Field(min_length=1, max_length=10)
 
 
