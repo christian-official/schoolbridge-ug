@@ -1133,6 +1133,7 @@ def test_staff_registration_handles_contact_email_already_used_by_another_login(
         "position": "Secretary",
         "department": "Administration",
         "email": "shared-staff@example.com",
+        "create_login": True,
     }
     with TestClient(app) as client:
         first = client.post("/api/staff", headers=headers, json={
@@ -3803,12 +3804,13 @@ def test_public_school_selector_scopes_identity_login_and_school_records():
         assert unknown.status_code == 404
 
 
-def test_staff_surname_is_not_a_login_identifier_but_staff_number_is():
+def test_teachers_use_qr_registration_instead_of_password_login():
     reset_database()
     with SessionLocal() as db:
         staff = models.StaffMember(
             staff_number="AUTH-ST-001", first_name="Sam", last_name="Surname",
-            category="Teaching", school_tenant_id=1,
+            category="Teaching", position="Teacher", department="Sciences",
+            status="active", school_tenant_id=1,
         )
         db.add(staff)
         db.flush()
@@ -3825,11 +3827,58 @@ def test_staff_surname_is_not_a_login_identifier_but_staff_number_is():
         })
         assert surname_login.status_code == 401
 
+        password_login = client.post("/api/auth/login", data={
+            "username": "sam.teacher", "password": "StaffPassword123!",
+        })
+        assert password_login.status_code == 403
+
         staff_number_login = client.post("/api/auth/login", data={
             "username": "AUTH-ST-001", "password": "StaffPassword123!",
         })
-        assert staff_number_login.status_code == 200, staff_number_login.text
-        assert staff_number_login.json()["username"] == "sam.teacher"
+        assert staff_number_login.status_code == 403
+
+        qr_registration = client.post("/api/public/registration/teacher", json={
+            "school_id": "00000000-0000-4000-8000-000000000001",
+            "first_name": "Sam", "last_name": "Surname", "staff_number": "AUTH-ST-001",
+        })
+        assert qr_registration.status_code == 200, qr_registration.text
+        assert qr_registration.json()["role"] == "teacher"
+        account = client.get(
+            "/api/auth/me",
+            headers={"Authorization": f"Bearer {qr_registration.json()['access_token']}"},
+        )
+        assert account.status_code == 200
+        assert account.json()["username"] == "sam.teacher"
+
+
+def test_teaching_staff_profile_does_not_create_a_password_account():
+    reset_database()
+    admin = create_admin()
+    headers = {"Authorization": f"Bearer {create_access_token(admin)}"}
+    with TestClient(app) as client:
+        created = client.post("/api/staff", headers=headers, json={
+            "first_name": "Grace", "last_name": "Teacher",
+            "category": "Teaching", "position": "Teacher",
+            "department": "Sciences", "subjects": "Biology",
+        })
+        assert created.status_code == 200, created.text
+        assert created.json()["login"] is None
+        assert created.json()["access_method"] == "school_qr"
+        staff_number = created.json()["staff_number"]
+
+        with SessionLocal() as db:
+            assert db.query(models.User).filter_by(staff_id=created.json()["id"]).count() == 0
+
+        registered = client.post("/api/public/registration/teacher", json={
+            "school_id": "00000000-0000-4000-8000-000000000001",
+            "first_name": "Grace", "last_name": "Teacher", "staff_number": staff_number,
+        })
+        assert registered.status_code == 200, registered.text
+        assert registered.json()["role"] == "teacher"
+        assert client.get(
+            "/api/auth/me",
+            headers={"Authorization": f"Bearer {registered.json()['access_token']}"},
+        ).status_code == 200
 
 
 def test_sync_change_journal_writes_and_scopes_events_to_the_target_tenant():
