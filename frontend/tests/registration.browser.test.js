@@ -80,7 +80,7 @@ test('QR access opens the correct school registration flow on a mobile viewport 
         await route.fulfill({
           status: 200, headers: { ...corsHeaders, 'content-type': 'application/json' },
           body: JSON.stringify({
-            id: 41, username: 'parent-mobile-test', email: null, role: 'parent',
+            id: 41, school_id: schoolId, username: 'parent-mobile-test', email: null, role: 'parent',
             role_label: 'Parent', permissions: {}, active: true, must_change_password: false,
           }),
         })
