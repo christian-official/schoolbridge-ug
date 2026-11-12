@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Download, Share, X } from 'lucide-react'
 import './PWAInstallPrompt.css'
 
@@ -14,6 +14,7 @@ export default function PWAInstallPrompt() {
   const [dismissed, setDismissed] = useState(false)
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null)
   const [applyingUpdate, setApplyingUpdate] = useState(false)
+  const applyingUpdateRef = useRef(false)
 
   useEffect(() => {
     const handleUpdate = (event: Event) => {
@@ -21,7 +22,7 @@ export default function PWAInstallPrompt() {
       if (worker) setWaitingWorker(worker)
     }
     const handleControllerChange = () => {
-      if (applyingUpdate) window.location.reload()
+      if (applyingUpdateRef.current) window.location.reload()
     }
     window.addEventListener('schoolbridge:pwa-update', handleUpdate)
     navigator.serviceWorker?.addEventListener('controllerchange', handleControllerChange)
@@ -29,10 +30,11 @@ export default function PWAInstallPrompt() {
       window.removeEventListener('schoolbridge:pwa-update', handleUpdate)
       navigator.serviceWorker?.removeEventListener('controllerchange', handleControllerChange)
     }
-  }, [applyingUpdate])
+  }, [])
 
   function applyUpdate() {
     if (!waitingWorker) return
+    applyingUpdateRef.current = true
     setApplyingUpdate(true)
     waitingWorker.postMessage({ type: 'SCHOOLBRIDGE_SKIP_WAITING' })
   }
@@ -71,7 +73,7 @@ export default function PWAInstallPrompt() {
     if (choice.outcome === 'accepted') setDismissed(true)
   }
 
-  if (dismissed || (!installEvent && !isAppleMobile && !waitingWorker)) return null
+  if ((dismissed && !waitingWorker) || (!installEvent && !isAppleMobile && !waitingWorker)) return null
 
   return (
     <aside className="pwa-install-card" aria-label="Install SchoolBridge">
