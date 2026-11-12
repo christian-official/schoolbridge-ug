@@ -879,7 +879,6 @@ class RegistrationClaimCompleteRequest(BaseModel):
     school_id: UUID
     username: str = Field(min_length=3, max_length=80, pattern=r"^[A-Za-z0-9._-]+$")
     password: str = Field(min_length=8, max_length=128)
-    email: str | None = Field(default=None, max_length=150)
 
 
 class RegistrationClaimDecisionRequest(BaseModel):
@@ -2982,10 +2981,6 @@ def complete_public_registration_claim(reference: str, data: RegistrationClaimCo
         raise HTTPException(410, "This registration request has expired.")
     if db.query(models.User).filter(func.lower(models.User.username) == data.username.strip().lower()).first():
         raise HTTPException(409, "That username is already in use at this school.")
-    email = data.email.strip().lower() if data.email and data.email.strip() else None
-    if email and db.query(models.User).filter(func.lower(models.User.email) == email).first():
-        raise HTTPException(409, "That email address is already in use at this school.")
-
     if claim.claim_type == "parent":
         student_ids = list(dict.fromkeys(json.loads(claim.candidate_student_ids_json or "[]")))
         students = db.query(models.Student).filter(models.Student.id.in_(student_ids)).all()
@@ -2998,7 +2993,7 @@ def complete_public_registration_claim(reference: str, data: RegistrationClaimCo
             raise HTTPException(409, "A parent account is already linked to at least one selected student. Ask the school to review the request.")
         user = models.User(
             school_tenant_id=get_current_tenant_id(db),
-            username=data.username.strip(), email=email,
+            username=data.username.strip(), email=None,
             hashed_password=password_hash.hash(data.password),
             role="parent", is_active=True,
         )
@@ -3020,7 +3015,7 @@ def complete_public_registration_claim(reference: str, data: RegistrationClaimCo
         user = models.User(
             school_tenant_id=get_current_tenant_id(db),
             username=data.username.strip(),
-            email=email or (staff.email.strip().lower() if staff.email and staff.email.strip() else None),
+            email=(staff.email.strip().lower() if staff.email and staff.email.strip() else None),
             hashed_password=password_hash.hash(data.password),
             role="teacher", staff_id=staff.id, is_active=True,
         )
