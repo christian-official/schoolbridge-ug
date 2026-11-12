@@ -23,6 +23,13 @@ def reset_database():
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     with SessionLocal() as db:
+        db.add(models.SchoolTenant(
+            id=1,
+            public_id="00000000-0000-4000-8000-000000000001",
+            installation_id="test-existing-installation",
+            name="Test School",
+            status="active",
+        ))
         db.add(models.SchoolSetupState(
             id=1,
             installation_id="test-existing-installation",
@@ -3380,6 +3387,7 @@ def test_public_school_identity_and_admin_reusable_qr_are_scoped_to_current_orig
         assert identity.status_code == 200, identity.text
         assert identity.json() == {
             "school_name": "Test School",
+            "school_id": "00000000-0000-4000-8000-000000000001",
             "school_type": "Secondary",
             "country": "Uganda",
             "installation_id": "test-existing-installation",
@@ -3395,6 +3403,7 @@ def test_public_school_identity_and_admin_reusable_qr_are_scoped_to_current_orig
         assert qr.status_code == 200, qr.text
         assert qr.headers["content-type"].startswith("image/svg+xml")
         assert "test-existing-installation" not in qr.text
+        assert "00000000-0000-4000-8000-000000000001" in qr.text
         assert "<svg" in qr.text
 
         external_origin = client.get(
@@ -3621,3 +3630,65 @@ def test_school_profile_settings_and_setup_state_are_tenant_singletons():
         assert main_module.get_tenant_singleton(db, models.SchoolProfile) is None
         assert main_module.get_tenant_singleton(db, models.SchoolSetupState).id == first_state_id
         assert main_module.get_tenant_singleton(db, models.SchoolSettings).id == first_settings_id
+
+
+def test_public_school_selector_scopes_identity_login_and_school_records():
+    reset_database()
+    school_id = "00000000-0000-4000-8000-000000000002"
+    with SessionLocal() as db:
+        db.add_all([
+            models.SchoolTenant(
+                id=2, public_id=school_id, installation_id="second-school-installation",
+                name="Second School", status="active",
+            ),
+            models.SchoolSetupState(
+                school_tenant_id=2, installation_id="second-school-installation",
+                activated_at=datetime.utcnow(), setup_completed_at=datetime.utcnow(),
+                original_identity_json=json.dumps({"school_name": "Second School"}),
+            ),
+            models.SchoolProfile(
+                school_tenant_id=2, name="Second School", school_type="Primary",
+                country="Uganda", school_structure="Day",
+            ),
+            models.User(
+                school_tenant_id=2, username="second-admin",
+                email="second-admin@example.invalid",
+                hashed_password=password_hash.hash("SecondSchoolPassword123!"),
+                role="admin", is_active=True,
+            ),
+            models.Student(
+                school_tenant_id=1, first_name="First", last_name="Tenant",
+            ),
+            models.Student(
+                school_tenant_id=2, first_name="Second", last_name="Tenant",
+            ),
+        ])
+        db.commit()
+
+    with TestClient(app) as client:
+        identity = client.get(f"/api/public/school?school={school_id}")
+        assert identity.status_code == 200, identity.text
+        assert identity.json()["school_id"] == school_id
+        assert identity.json()["school_name"] == "Second School"
+
+        missing_selector = client.post("/api/auth/login", data={
+            "username": "second-admin", "password": "SecondSchoolPassword123!",
+        })
+        assert missing_selector.status_code == 400
+
+        login = client.post("/api/auth/login", data={
+            "username": "second-admin", "password": "SecondSchoolPassword123!",
+            "school_id": school_id,
+        })
+        assert login.status_code == 200, login.text
+        headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+        account = client.get("/api/auth/me", headers=headers)
+        assert account.status_code == 200, account.text
+        assert account.json()["username"] == "second-admin"
+
+        students = client.get("/api/students", headers=headers)
+        assert students.status_code == 200, students.text
+        assert [row["first_name"] for row in students.json()] == ["Second"]
+
+        unknown = client.get("/api/public/school?school=00000000-0000-4000-8000-000000000099")
+        assert unknown.status_code == 404
