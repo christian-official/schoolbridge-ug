@@ -16,7 +16,7 @@ import Phase4Workspace from './Phase4Workspace'
 import ParentLiaisonWorkspace from './ParentLiaison'
 import SyncDevices from './SyncDevices'
 import RegistrationFlow from './RegistrationFlow'
-import { clearLocalSyncData, saveEncryptedOfflineDraft, loadEncryptedOfflineDraft, deleteEncryptedOfflineDraft, loadEncryptedOfflineSnapshot, deleteEncryptedOfflineSnapshot } from './syncStorage'
+import { clearLocalSyncData } from './syncStorage'
 import './App.css'
 import './DashboardRedesign.css'
 
@@ -854,60 +854,6 @@ function FirstTimeSetupWizard({status,onStatusChange}:{status:FirstSetupStatus;o
   </main>
 }
 
-function readOfflineLoginIndex(expectedSchoolId = ''): { userId:number; deviceId:string; username:string; installationId:string; schoolId?:string } | null {
-  try {
-    const raw = localStorage.getItem('schoolbridge-offline-login-index')
-    if (!raw) return null
-    const index = JSON.parse(raw)
-    const installedIdentity = localStorage.getItem('schoolbridge-installation-id')
-    if (!Number.isSafeInteger(index?.userId) || index.userId < 1 ||
-        typeof index.deviceId !== 'string' || !index.deviceId ||
-        typeof index.username !== 'string' || !index.username ||
-        typeof index.installationId !== 'string' || !index.installationId ||
-        (index.schoolId !== undefined && (typeof index.schoolId !== 'string' || !index.schoolId)) ||
-        (expectedSchoolId && index.schoolId !== expectedSchoolId) ||
-        !installedIdentity || index.installationId !== installedIdentity) return null
-    return index
-  } catch {
-    return null
-  }
-}
-
-type OfflineWorkspaceSnapshot = {
-  version:number; userId:number; deviceId:string; username:string; schoolId?:string; schoolName?:string; installationId:string; role:string; role_label?:string;
-  permissions?:Record<string,string[]>; downloadedAt:number; expiresAt:number;
-  students:any[]; classes:any[]; attendance:any[]; exams:any[]; marks:any[];
-  charges:any[]; payments:any[]; class_fees:any[];
-}
-function OfflineWorkspace({snapshot,onExit}:{snapshot:OfflineWorkspaceSnapshot;onExit:()=>void}) {
-  const [section,setSection]=useState<'students'|'classes'|'attendance'|'exams'|'marks'|'finance'>('students')
-  const labels:{key:typeof section;label:string;rows:any[]}[]=[
-    {key:'students',label:'Students',rows:snapshot.students||[]},{key:'classes',label:'Classes',rows:snapshot.classes||[]},
-    {key:'attendance',label:'Attendance',rows:snapshot.attendance||[]},{key:'exams',label:'Examinations',rows:snapshot.exams||[]},
-    {key:'marks',label:'Results',rows:snapshot.marks||[]},
-    {key:'finance',label:'Finance',rows:[...(snapshot.charges||[]),...(snapshot.payments||[]),...(snapshot.class_fees||[])]},
-  ]
-  const current=labels.find(item=>item.key===section)!
-  const fields=section==='students'?['name','first_name','last_name','admission_number','class_name','section']:
-    section==='classes'?['name','section']:section==='attendance'?['student_name','date','status','class_name']:
-    section==='exams'?['name','term','year','class_name']:section==='marks'?['student_name','subject_name','score','grade','verified']:
-    ['student_name','description','amount','date','status']
-  const value=(row:any,key:string)=>{const v=row?.[key];return v===null||v===undefined?'—':typeof v==='object'?JSON.stringify(v):String(v)}
-  return <main className="login-page"><section className="login-card" style={{width:'min(1100px,96vw)',maxWidth:1100,textAlign:'left'}}>
-    <div className="brand-name">School<span>Bridge</span></div><h1>Offline workspace</h1>
-    <p className="muted">Signed in locally as {snapshot.username} · {snapshot.role_label||snapshot.role}</p>
-    <p className="form-hint">Read-only copy from {new Date(snapshot.downloadedAt).toLocaleString()}. Expires {new Date(snapshot.expiresAt).toLocaleString()}. Reconnect to validate access and synchronise changes.</p>
-    <div style={{display:'flex',flexWrap:'wrap',gap:8,margin:'16px 0'}}>{labels.map(item=><button key={item.key} type="button" className={section===item.key?'primary-button':'secondary-button'} onClick={()=>setSection(item.key)}>{item.label} ({item.rows.length})</button>)}</div>
-    <div className="table-wrap"><table><thead><tr>{fields.map(field=><th key={field}>{field.replace(/_/g,' ')}</th>)}</tr></thead><tbody>
-      {current.rows.slice(0,500).map((row:any,index:number)=><tr key={row.id??index}>{fields.map(field=><td key={field}>{value(row,field)}</td>)}</tr>)}
-      {!current.rows.length&&<tr><td colSpan={fields.length}>No {current.label.toLowerCase()} were included in this offline copy.</td></tr>}
-    </tbody></table></div>
-    {current.rows.length>500&&<p className="form-hint">Showing the first 500 records. Reconnect for the complete school data.</p>}
-    <p className="form-hint">Offline mode is read-only. Creating or changing school records requires a verified connection.</p>
-    <button type="button" className="secondary-button" onClick={onExit}>Return to sign in</button>
-  </section></main>
-}
-
 function getSelectedSchoolId(): string {
   if (typeof window === 'undefined') return ''
   const fromUrl = new URLSearchParams(window.location.search).get('school')
@@ -923,7 +869,6 @@ function App() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [loginError, setLoginError] = useState('')
-  const [offlineWorkspace, setOfflineWorkspace] = useState<OfflineWorkspaceSnapshot | null>(null)
   const [showRecovery, setShowRecovery] = useState(false)
   const [showRegistration, setShowRegistration] = useState(() => Boolean(new URLSearchParams(window.location.search).get('school')))
   const [loading, setLoading] = useState(false)
@@ -1443,80 +1388,6 @@ function App() {
     }
   }, [token])
 
-  // Keep the encrypted, read-only offline copy aligned with the server change journal.
-  // The journal carries invalidations, not record payloads, so any authorised change
-  // invalidates the snapshot and requires a fresh, consistent download.
-  useEffect(() => {
-    if (!token || !user || serverConnection !== 'connected') return
-    let cancelled = false
-    const pollChanges = async () => {
-      if (syncPollInFlight.current || cancelled) return
-      const deviceId = localStorage.getItem('schoolbridge-sync-device-' + user.id)
-      if (!deviceId) return
-      const metaKey = 'schoolbridge-offline-snapshot-meta-' + user.id + '-' + deviceId
-      const rawMeta = localStorage.getItem(metaKey)
-      if (!rawMeta) return
-      syncPollInFlight.current = true
-      try {
-        const meta = JSON.parse(rawMeta) as { fingerprint: string; sequence: number }
-        if (!Number.isSafeInteger(meta.sequence) || meta.sequence < 0) throw new Error('Invalid offline sync cursor.')
-        const registeredDevices = await api<{ devices: { device_id: string; active: boolean }[] }>('sync/devices', token)
-        if (cancelled) return
-        const currentDevice = registeredDevices.devices.find(device => device.device_id === deviceId)
-        if (!currentDevice?.active) {
-          // A revoked device must lose every local offline record and pending draft.
-          await clearLocalSyncData(user.id, deviceId)
-          localStorage.removeItem(metaKey)
-          const offlineIndex = readOfflineLoginIndex()
-          if (offlineIndex?.userId === user.id && offlineIndex.deviceId === deviceId) {
-            localStorage.removeItem('schoolbridge-offline-login-index')
-          }
-          return
-        }
-        const account = await api<{ role: string; permissions: Record<string, string[]> }>('auth/me', token)
-        if (cancelled) return
-        const fingerprint = JSON.stringify({ role: account.role, permissions: Object.fromEntries(Object.entries(account.permissions || {}).sort(([a], [b]) => a.localeCompare(b))) })
-        if (meta.fingerprint !== fingerprint) {
-          // Permission/role changes invalidate both cached records and offline drafts.
-          await clearLocalSyncData(user.id, deviceId)
-          localStorage.removeItem(metaKey)
-          const offlineIndex = readOfflineLoginIndex()
-          if (offlineIndex?.userId === user.id && offlineIndex.deviceId === deviceId) {
-            localStorage.removeItem('schoolbridge-offline-login-index')
-          }
-          return
-        }
-        let cursor = meta.sequence
-        for (let page = 0; page < 10; page += 1) {
-          const feed = await api<{ changes: unknown[]; next_cursor: number; has_more: boolean }>(
-            'sync/changes?device_id=' + encodeURIComponent(deviceId) + '&cursor=' + cursor + '&limit=500', token,
-          )
-          if (cancelled) return
-          if (feed.changes.length) {
-            await deleteEncryptedOfflineSnapshot(user.id, deviceId)
-            localStorage.removeItem(metaKey)
-            localStorage.removeItem('schoolbridge-offline-login-index')
-            return
-          }
-          if (!Number.isSafeInteger(feed.next_cursor) || feed.next_cursor < cursor) throw new Error('The server returned an invalid sync cursor.')
-          const previousCursor = cursor
-          if (feed.next_cursor > cursor) {
-            await api('sync/devices/' + encodeURIComponent(deviceId) + '/checkpoint?sequence=' + feed.next_cursor, token, { method: 'POST' })
-            cursor = feed.next_cursor
-            localStorage.setItem(metaKey, JSON.stringify({ ...meta, sequence: cursor }))
-          }
-          if (!feed.has_more || feed.next_cursor === previousCursor) break
-        }
-      } catch {
-        // A transient connection failure must not destroy a still-valid encrypted copy.
-      } finally {
-        syncPollInFlight.current = false
-      }
-    }
-    void pollChanges()
-    const interval = window.setInterval(() => { void pollChanges() }, 15000)
-    return () => { cancelled = true; window.clearInterval(interval) }
-  }, [token, user?.id, serverConnection])
 
 
   async function login(event: React.FormEvent<HTMLFormElement>) {
@@ -1541,23 +1412,6 @@ function App() {
       await storeSessionToken(result.access_token)
       setToken(result.access_token)
       setPassword('')
-    } catch (error) {
-      // Only a network outage may activate the local read-only sign-in path.
-      if (error instanceof TypeError || !navigator.onLine) {
-        try {
-          const index=readOfflineLoginIndex()
-          if(!index) throw new Error('Offline sign-in has not been prepared for this SchoolBridge installation. Connect and save a fresh encrypted offline copy first.')
-          if(index.username.toLowerCase()!==username.trim().toLowerCase()) throw new Error('Use the exact account username saved during online sign-in.')
-          const snapshot=await loadEncryptedOfflineSnapshot<OfflineWorkspaceSnapshot>(index.userId,index.deviceId,password)
-          if(snapshot.version!==1||snapshot.userId!==index.userId||snapshot.deviceId!==index.deviceId||snapshot.username?.toLowerCase()!==username.trim().toLowerCase()||snapshot.installationId!==index.installationId||(index.schoolId&&snapshot.schoolId!==index.schoolId)||(selectedSchoolId&&snapshot.schoolId!==selectedSchoolId)) throw new Error('The encrypted offline copy does not match this account, device, school, or SchoolBridge installation.')
-          if(!snapshot.expiresAt||snapshot.expiresAt<Date.now()||snapshot.downloadedAt>Date.now()+60000) throw new Error('The offline copy has expired. Reconnect and download a fresh copy.')
-          setOfflineWorkspace(snapshot)
-          setPassword('')
-          setLoginError('')
-        } catch (offlineError) {
-          setLoginError(offlineError instanceof Error ? offlineError.message : 'Offline sign-in is unavailable. Reconnect and try again.')
-        }
-      } else setLoginError(error instanceof Error ? error.message : 'Unable to sign in')
     } finally {
       setLoading(false)
     }
@@ -1571,19 +1425,12 @@ function App() {
   const selectedAcademicLevel = /^(s|senior\s*)[56]$/.test(className) || /senior\s*[56]/.test(className) ? 'A-Level' : /^(s|senior\s*)[1-4]$/.test(className) || /senior\s*[1-4]/.test(className) ? 'O-Level' : ''
   const [artsCombinations, sciencesCombinations] = (schoolConfig.a_level_combinations || '').split(/\r?\n/).reduce((groups: string[][], line: string) => { const match = line.match(/^(ARTS|SCIENCES)::(.*)$/i); if (match && match[2].trim()) groups[match[1].toUpperCase() === 'ARTS' ? 0 : 1].push(match[2].trim()); return groups }, [[], []])
 
-  if (offlineWorkspace) return <OfflineWorkspace snapshot={offlineWorkspace} onExit={()=>setOfflineWorkspace(null)}/>;
-
   if (!token && sessionRestoring) return <main className="login-page"><section className="login-card"><div className="brand-name">School<span>Bridge</span></div><p className="muted">Restoring your saved session…</p></section></main>;
 
   if (token && !user) return <main className="login-page"><section className="login-card"><div className="brand-mark"><ShieldCheck size={30}/></div><div className="brand-name">School<span>Bridge</span></div><h1>Restoring your session</h1><p className="muted">{sessionError || 'Verifying your saved device session. You do not need to enter your password again.'}</p><button type="button" className="primary-button login-button" onClick={()=>void loadUser(token)} disabled={!navigator.onLine}>Retry connection</button><button type="button" className="recovery-link" onClick={()=>void signOut()}>Sign out</button></section></main>;
 
   if (!token || !user) {
     if(setupStatus.loading) return <main className="login-page"><section className="login-card"><div className="brand-name">School<span>Bridge</span></div><p className="muted">Checking school installation...</p></section></main>
-    const offlineLoginIndex = setupStatus.error ? readOfflineLoginIndex(selectedSchoolId) : null
-    if(setupStatus.error && !offlineLoginIndex) return <main className="login-page"><section className="login-card"><div className="brand-name">School<span>Bridge</span></div><h1>{!navigator.onLine ? "You're offline" : setupStatus.error.includes("Select your school") ? "School selection required" : "Unable to check setup"}</h1>{!navigator.onLine ? <p className="form-hint">The app is open, but this device has no prepared offline sign-in yet. Reconnect once, sign in, register this browser and save an encrypted offline copy under Settings → Registered devices. Then you can open that saved read-only workspace without internet.</p> : <p className="error" role="alert">{setupStatus.error}</p>}<p className="form-hint">For shared SchoolBridge access, open the official QR code provided by your school. It identifies the school but does not sign you in.</p><button className="secondary-button" onClick={()=>window.location.reload()}>Try again</button></section></main>
-    // A cached offline identity is accepted only when the setup service is unavailable.
-    // A reachable, unconfigured database must always complete first-time setup.
-    if(!setupStatus.setup_completed && !offlineLoginIndex) return <FirstTimeSetupWizard status={setupStatus} onStatusChange={setSetupStatus}/>
     return (
       <main className="login-page">
         <section className="login-card">
@@ -1598,9 +1445,8 @@ function App() {
             <form onSubmit={login}>
               <label htmlFor="username">Username</label>
               <input id="username" value={username} onChange={e => setUsername(e.target.value)} placeholder="Enter your username" required />
-              <label htmlFor="password">Password / offline passphrase</label>
-              <input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter your password or offline passphrase" required />
-              <p className="form-hint">Offline sign-in works only after you register this browser and save an encrypted offline copy under Settings → Registered devices. Use that offline passphrase when disconnected.</p>
+              <label htmlFor="password">Password</label>
+              <input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter your password" autoComplete="current-password" required />
               {loginError && <p className="error">{loginError}</p>}
               <button className="primary-button login-button" disabled={loading || Boolean(qrSchoolError) || (Boolean(selectedSchoolId) && !qrSchoolName)}>
                 {loading ? <><LoaderCircle className="spin" size={18} /> Signing in...</> : 'Sign in'}
@@ -2039,7 +1885,6 @@ type TeacherStudent = {id:number;first_name:string;last_name:string;admission_nu
 type TeacherExam = {id:number;name:string;term:string;year:number;class_id:number|null;assigned_subjects:{id:number;name:string}[]}
 type TeacherMark = {id:number;student_id:number;subject_id:number;exam_id:number;score:number;verified:boolean;student_name:string;admission_number:string;class_id:number|null}
 type TeacherResultStatus = {subject_id:number;submitted_count:number;pending_count:number;verified_count:number;status:'Not verified'|'Verified'|'Not submitted'}
-type TeacherOfflineProposal = {id:number;exam_name:string;term:string;year:number|null;subject_name:string;status:string;record_count:number;submitted_at:string;resolved_at:string|null;resolution:string|null;conflict_sequence:number|null}
 type TeacherOwnAttendance = {staff_name:string;staff_number:string;today:{attendance_date:string;status:string;check_in_at?:string|null;check_out_at?:string|null};records:{id:number;attendance_date:string;status:string;notes?:string|null;check_in_at?:string|null;check_out_at?:string|null}[]}
 type ClassTeacherAssignment = {assignment_id:number;class_id:number;class:string}
 
@@ -2065,15 +1910,6 @@ function TeacherWorkspace({token,active,userId}:{token:string;active:string;user
   const [resultError,setResultError]=useState('')
   const [resultSaving,setResultSaving]=useState(false)
   const [resultSubmissionComplete,setResultSubmissionComplete]=useState(false)
-  const lastOfflineScoreContext=useRef('')
-  const [offlinePassphrase,setOfflinePassphrase]=useState('')
-  const [offlineDraftMessage,setOfflineDraftMessage]=useState('')
-  const [offlineDraftBusy,setOfflineDraftBusy]=useState(false)
-  const [offlineDraftUnlocked,setOfflineDraftUnlocked]=useState(false)
-  const [teacherOfflineProposals,setTeacherOfflineProposals]=useState<TeacherOfflineProposal[]>([])
-  const [teacherOfflineProposalsLoading,setTeacherOfflineProposalsLoading]=useState(false)
-  const [teacherOfflineProposalsError,setTeacherOfflineProposalsError]=useState('')
-  const [resultSnapshotSequence,setResultSnapshotSequence]=useState<number|null>(null)
   const [ownAttendance,setOwnAttendance]=useState<TeacherOwnAttendance|null>(null)
   const [ownAttendanceError,setOwnAttendanceError]=useState('')
   const [ownAttendanceLoading,setOwnAttendanceLoading]=useState(false)
@@ -2096,15 +1932,6 @@ function TeacherWorkspace({token,active,userId}:{token:string;active:string;user
       } else {setExamId('');setSelectedSubjectId('');setSelectedTeacherExamGroupKey('')}
     }).catch(e=>setResultError(e.message))
   },[active,token])
-  useEffect(()=>{
-    if(active!=='My Results')return
-    void refreshTeacherOfflineProposals()
-    const deviceId=localStorage.getItem('schoolbridge-sync-device-'+userId)
-    if(!deviceId){setResultSnapshotSequence(null);return}
-    api<{snapshot_sequence:number}>('sync/marks?device_id='+encodeURIComponent(deviceId)+'&limit=200',token)
-      .then(result=>setResultSnapshotSequence(result.snapshot_sequence))
-      .catch(()=>setResultSnapshotSequence(null))
-  },[active,token,userId])
   useEffect(()=>{
     if(active!=='My Attendance')return
     let cancelled=false
@@ -2172,106 +1999,6 @@ function TeacherWorkspace({token,active,userId}:{token:string;active:string;user
     return ()=>{cancelled=true}
   },[active,examId,selectedTeacherExam?.class_id,token])
   async function saveClassAttendance(){if(!classId||!students.length){setMessage('Choose a responsible class with active students.');return}setBusy(-1);setMessage('');try{const result=await api<{saved:number}>('attendance/register',token,{method:'PUT',body:JSON.stringify({class_id:Number(classId),attendance_date:attendanceDate,records:students.map(student=>({student_id:student.id,status:statuses[student.id]||'Present'}))})});setMessage(result.saved+' student attendance records saved for '+attendanceDate+'.')}catch(e){setMessage(e instanceof Error?e.message:'Unable to save class attendance.')}finally{setBusy(null)}}
-  useEffect(()=>{const context=String(examId)+':'+String(selectedSubjectId);const changed=lastOfflineScoreContext.current!==context;lastOfflineScoreContext.current=context;if(!selectedSubjectId){setResultScores({});return}if(changed&&offlineDraftUnlocked)setOfflineDraftUnlocked(false);const preserveUnlockedDraft=offlineDraftUnlocked&&!changed;setResultScores(current=>{const next:Record<number,string>=changed?{}:{...current};resultStudents.forEach(student=>{const mark=resultMarks.find(row=>row.student_id===student.id&&row.subject_id===Number(selectedSubjectId));if(preserveUnlockedDraft){if(next[student.id]===undefined)next[student.id]=''}else if(mark)next[student.id]=String(mark.score);else if(next[student.id]===undefined)next[student.id]=''});return next})},[examId,selectedSubjectId,resultStudents,resultMarks,offlineDraftUnlocked])
-  async function refreshTeacherOfflineProposals(){
-    setTeacherOfflineProposalsLoading(true);setTeacherOfflineProposalsError('')
-    try{
-      const result=await api<{proposals:TeacherOfflineProposal[]}>('sync/teacher-mark-proposals/mine',token)
-      setTeacherOfflineProposals(result.proposals)
-    }catch(error){setTeacherOfflineProposalsError(error instanceof Error?error.message:'Unable to refresh offline submission status.')}
-    finally{setTeacherOfflineProposalsLoading(false)}
-  }
-  async function saveOfflineTeacherMarksDraft(){
-    if(!selectedTeacherExam||!selectedSubjectId||!resultStudents.length){setOfflineDraftMessage('Choose an examination, assigned subject and class register first.');return}
-    if(currentSubjectIsVerified){setOfflineDraftMessage('These results are verified and locked. Ask the administrator to unlock them before saving changes.');return}
-    if(!window.confirm('Save the current class scores as the encrypted offline draft? This replaces the previous saved draft on this browser, if one exists.'))return
-    if(offlinePassphrase.trim().length<12){setOfflineDraftMessage('Use a strong offline passphrase of at least 12 characters. It is not stored by SchoolBridge.');return}
-    const deviceId=localStorage.getItem('schoolbridge-sync-device-'+userId)
-    if(!deviceId){setOfflineDraftMessage('Register this browser in Device Management before preparing an offline draft.');return}
-    if(resultSnapshotSequence===null){setOfflineDraftMessage('Connect while online and refresh your results snapshot before saving an offline draft.');return}
-    setOfflineDraftBusy(true);setOfflineDraftMessage('')
-    try{
-      const records=resultStudents.map(student=>({student_id:student.id,score:resultScores[student.id]===undefined||resultScores[student.id].trim()===''?0:Number(resultScores[student.id])}))
-      if(records.some(row=>!Number.isFinite(row.score)||row.score<0||row.score>100)){throw new Error('Every score must be between 0 and 100.')}
-      await saveEncryptedOfflineDraft(userId,deviceId,offlinePassphrase,{
-        version:1,device_id:deviceId,idempotency_key:crypto.randomUUID(),
-        exam:selectedTeacherExam,subject_id:Number(selectedSubjectId),base_sequence:resultSnapshotSequence,
-        students:resultStudents.map(student=>({id:student.id,first_name:student.first_name,last_name:student.last_name,admission_number:student.admission_number,class_id:student.class_id})),scores:resultScores,records,
-        base_mark_ids:Object.fromEntries(resultStudents.map(student=>[student.id,resultMarks.find(mark=>mark.student_id===student.id&&mark.subject_id===Number(selectedSubjectId))?.id??null])),
-      },true)
-      setOfflineDraftMessage('Encrypted offline draft saved on this browser. It has not changed official results.')
-    }catch(error){setOfflineDraftMessage(error instanceof Error?error.message:'Unable to save the encrypted offline draft.')}
-    finally{setOfflineDraftBusy(false)}
-  }
-  async function unlockOfflineTeacherMarksDraft(){
-    const deviceId=localStorage.getItem('schoolbridge-sync-device-'+userId)
-    if(!deviceId){setOfflineDraftMessage('This browser has no registered device identity.');return}
-    if(offlinePassphrase.trim().length<12){setOfflineDraftMessage('Enter the 12-character-or-longer passphrase used when saving this draft.');return}
-    setOfflineDraftBusy(true);setOfflineDraftMessage('')
-    try{
-      const draft=await loadEncryptedOfflineDraft<any>(userId,deviceId,offlinePassphrase)
-      if(draft.version!==1||draft.device_id!==deviceId||!draft.exam||!Array.isArray(draft.students)||!Array.isArray(draft.records))throw new Error('The saved draft is not valid for this registered device.')
-      setTeacherExams([draft.exam]);setExamId(String(draft.exam.id))
-      setSelectedTeacherExamGroupKey([draft.exam.name||'Other',draft.exam.term,draft.exam.year].join('|'))
-      setActiveTeacherExamType('All exams');lastOfflineScoreContext.current=String(draft.exam.id)+':'+String(draft.subject_id);setSelectedSubjectId(String(draft.subject_id))
-      setResultStudents(draft.students);setResultScores(draft.scores||{});setOfflineDraftUnlocked(true)
-      setResultSnapshotSequence(draft.base_sequence);setResultSubmissionComplete(false)
-      setOfflineDraftMessage('Encrypted draft unlocked. Check the class and scores before submitting it when online.')
-    }catch(error){setOfflineDraftMessage(error instanceof Error?error.message:'Unable to unlock the offline draft.')}
-    finally{setOfflineDraftBusy(false)}
-  }
-  async function refreshOfflineTeacherMarksBaseline(){
-    const deviceId=localStorage.getItem('schoolbridge-sync-device-'+userId)
-    if(!deviceId||!selectedTeacherExam||!selectedSubjectId){setOfflineDraftMessage('Register this browser and choose an assigned examination and subject first.');return}
-    setOfflineDraftBusy(true);setOfflineDraftMessage('')
-    try{
-      const [examRows,studentRows,markRows,statusRows,snapshot]=await Promise.all([
-        api<TeacherExam[]>('teacher/exams',token),
-        api<TeacherStudent[]>('teacher/students?class_id='+selectedTeacherExam.class_id,token),
-        api<TeacherMark[]>('teacher/marks?exam_id='+selectedTeacherExam.id,token),
-        api<TeacherResultStatus[]>('teacher/result-status?exam_id='+selectedTeacherExam.id,token),
-        api<{snapshot_sequence:number}>('sync/marks?device_id='+encodeURIComponent(deviceId)+'&limit=200',token),
-      ])
-      const currentExam=examRows.find(row=>row.id===selectedTeacherExam.id)
-      if(!currentExam||!currentExam.assigned_subjects.some(subject=>subject.id===Number(selectedSubjectId))){
-        throw new Error('Your class or subject assignment has changed. This draft cannot be refreshed for submission.')
-      }
-      if(statusRows.some(row=>row.subject_id===Number(selectedSubjectId)&&row.status==='Verified')){
-        throw new Error('These results are verified and locked. Ask the administrator to unlock them before making changes.')
-      }
-      setTeacherExams(examRows);setResultStudents(studentRows);setResultMarks(markRows);setResultStatuses(statusRows)
-      setResultSnapshotSequence(snapshot.snapshot_sequence)
-      setOfflineDraftMessage('Fresh server baseline loaded. Your unlocked scores were retained. Review them, then save a new encrypted draft before resubmitting.')
-    }catch(error){setOfflineDraftMessage(error instanceof Error?error.message:'Unable to refresh the offline marks baseline.')}
-    finally{setOfflineDraftBusy(false)}
-  }
-  async function submitOfflineTeacherMarksDraft(){
-    const deviceId=localStorage.getItem('schoolbridge-sync-device-'+userId)
-    if(!deviceId||offlinePassphrase.trim().length<12){setOfflineDraftMessage('Enter the offline passphrase and make sure this browser is registered.');return}
-    setOfflineDraftBusy(true);setOfflineDraftMessage('')
-    try{
-      const draft=await loadEncryptedOfflineDraft<any>(userId,deviceId,offlinePassphrase)
-      const currentDraftIsOpen=selectedTeacherExam?.id===draft.exam.id&&Number(selectedSubjectId)===draft.subject_id&&resultStudents.length>0
-      if(!currentDraftIsOpen)throw new Error('Unlock the saved draft and check its scores before submitting it.')
-      const currentRecords:{student_id:number;score:number}[]=resultStudents.map(student=>({student_id:student.id,score:resultScores[student.id]===undefined||resultScores[student.id].trim()===''?0:Number(resultScores[student.id])}))
-      if(currentRecords.some(record=>!Number.isFinite(record.score)||record.score<0||record.score>100))throw new Error('Every score must be between 0 and 100.')
-      const result=await api<{proposal_id:number;status:string;duplicate:boolean;applied:boolean;saved:number}>('sync/teacher-mark-proposals',token,{method:'POST',body:JSON.stringify({
-        device_id:draft.device_id,idempotency_key:draft.idempotency_key,exam_id:draft.exam.id,
-        subject_id:draft.subject_id,base_sequence:draft.base_sequence,base_mark_ids:draft.base_mark_ids||{},records:currentRecords,
-      })})
-      if(result.status==='conflict'||!result.applied){
-        setOfflineDraftMessage('Proposal #'+result.proposal_id+' has a conflict. Your encrypted draft was kept. Refresh the baseline, review the retained scores, save a new encrypted draft, then submit again.')
-        await refreshTeacherOfflineProposals()
-      }else{
-        await deleteEncryptedOfflineDraft(userId,deviceId)
-        setOfflineDraftUnlocked(false)
-        setOfflineDraftMessage(result.applied?'Offline marks #'+result.proposal_id+' were automatically applied by the system. '+(result.saved||0)+' marks were saved and remain unverified for normal academic verification.':'Offline marks #'+result.proposal_id+' were not applied because a conflict was detected. Your encrypted draft was kept. Refresh the baseline, review the scores, and save a new draft before resubmitting.')
-        setOfflinePassphrase('')
-        await refreshTeacherOfflineProposals()
-      }
-    }catch(error){setOfflineDraftMessage(error instanceof Error?error.message:'Unable to submit the saved draft.')}
-    finally{setOfflineDraftBusy(false)}
-  }
   async function saveTeacherMarksBulk(e:React.FormEvent){
     e.preventDefault()
     if(!selectedTeacherExam||!selectedSubjectId){setResultError('Choose an examination and one of your assigned subjects.');return}
@@ -2312,31 +2039,6 @@ function TeacherWorkspace({token,active,userId}:{token:string;active:string;user
       <div className="panel-heading"><div><h2>Class results entry</h2><p>Your assigned subject and class are loaded automatically. Enter the whole class register and submit once. Blank scores are submitted as <strong>No score (0)</strong> for academic officers to review.</p></div>{selectedTeacherExam&&<button type="button" className="secondary-button" disabled={resultSaving} onClick={()=>void refreshTeacherResultStatus()}>Refresh status</button>}</div>
       {resultError&&<div className="form-error" role="alert">{resultError}</div>}
       {resultMessage&&<div className="success-notice" role="status">{resultMessage}</div>}
-      <section className="offline-mark-draft-tools">
-        <div><strong>Offline marks draft</strong><p className="form-hint">Prepare and save this class register while online. If the connection drops, unlock it with the same passphrase and continue editing. Save / update again before closing the browser, then unlock and submit for administrator review after reconnecting.</p></div>
-        <label>Offline passphrase<input type="password" minLength={12} autoComplete="off" value={offlinePassphrase} onChange={event=>setOfflinePassphrase(event.target.value)} placeholder="At least 12 characters"/></label>
-        <div className="form-actions">
-          <button type="button" className="secondary-button" disabled={offlineDraftBusy||resultSaving||!selectedTeacherExam||!selectedSubjectId} onClick={()=>void refreshOfflineTeacherMarksBaseline()}>Refresh baseline online</button>
-          <button type="button" className="secondary-button" disabled={offlineDraftBusy||resultSaving||!selectedTeacherExam||!selectedSubjectId} onClick={()=>void saveOfflineTeacherMarksDraft()}>{offlineDraftBusy?'Working...':'Save encrypted offline draft'}</button>
-          <button type="button" className="secondary-button" disabled={offlineDraftBusy} onClick={()=>void unlockOfflineTeacherMarksDraft()}>Unlock saved draft</button>
-          <button type="button" className="primary-button" disabled={offlineDraftBusy} onClick={()=>void submitOfflineTeacherMarksDraft()}>Submit saved draft when online</button>
-        </div>
-        {offlineDraftMessage&&<div className="form-hint" role="status">{offlineDraftMessage}</div>}
-        <p className="form-hint">{resultSnapshotSequence===null?'No current sync baseline is available. Connect online and refresh your results first.':'Offline baseline sequence: '+resultSnapshotSequence}</p>
-      </section>
-      <section className="offline-mark-proposal-status">
-        <div className="panel-heading"><div><h3>Your offline submissions</h3><p className="form-hint">Track administrator review without exposing the submitted score payload again.</p></div><button type="button" className="secondary-button" disabled={teacherOfflineProposalsLoading} onClick={()=>void refreshTeacherOfflineProposals()}>{teacherOfflineProposalsLoading?'Refreshing...':'Refresh status'}</button></div>
-        {teacherOfflineProposalsError&&<div className="form-error" role="alert">{teacherOfflineProposalsError}</div>}
-        {teacherOfflineProposalsLoading&&!teacherOfflineProposals.length?<p className="form-hint">Loading submission status...</p>:!teacherOfflineProposals.length?<p className="empty-state">You have not submitted any offline marks yet.</p>:<div className="table-wrap"><table><thead><tr><th>Examination</th><th>Subject</th><th>Entries</th><th>Status</th><th>Submitted</th></tr></thead><tbody>
-          {teacherOfflineProposals.map(item=><tr key={item.id}>
-            <td>{item.exam_name}<small className="form-hint">{item.term} {item.year||''} · Proposal #{item.id}</small></td>
-            <td>{item.subject_name}</td>
-            <td>{item.record_count}</td>
-            <td>{item.status==='pending_review'?'Waiting for administrator':item.status==='conflict'?'Conflict — refresh and resubmit':item.status==='applied'?'Applied — awaiting academic verification':item.status==='rejected'?'Rejected':item.status==='discarded'?'Discarded':item.status}</td>
-            <td>{item.submitted_at?new Date(item.submitted_at+(item.submitted_at.endsWith('Z')?'':'Z')).toLocaleString():'—'}</td>
-          </tr>)}
-        </tbody></table></div>}
-      </section>
       <div className="teacher-exam-selection">
          <div className="exam-flow-step"><span className="form-section-number">01</span><div><strong>Choose exam type</strong><small>Choose the category used by the school examination register.</small></div></div>
          <nav className="exam-type-tabs" aria-label="Examination types">{teacherExamCategories.map(type=><button type="button" key={type} className={activeTeacherExamType===type?'exam-type-tab active':'exam-type-tab'} aria-pressed={activeTeacherExamType===type} onClick={()=>{setActiveTeacherExamType(type);setSelectedTeacherExamGroupKey('');setExamId('');setSelectedSubjectId('');setResultSubmissionComplete(false)}}>{type}</button>)}</nav>
