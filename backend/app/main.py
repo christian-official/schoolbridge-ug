@@ -2,6 +2,7 @@ import os
 import json
 import re
 import secrets
+import hashlib
 import smtplib
 from email.message import EmailMessage
 from datetime import date, datetime, time
@@ -1405,6 +1406,17 @@ class SyncChangeProposalResolution(BaseModel):
     decision: str = Field(pattern="^(discard|rebase)$")
 
 
+class EnrolmentInvitationCreate(BaseModel):
+    user_id: int = Field(ge=1)
+    expires_in_minutes: int = Field(default=60, ge=5, le=10080)
+
+
+class EnrolmentRedeemRequest(BaseModel):
+    token: str = Field(min_length=30, max_length=200)
+    device_id: UUID
+    device_name: str = Field(min_length=1, max_length=100)
+
+
 class SyncDeviceRegistration(BaseModel):
     device_id: UUID
     device_name: str = Field(min_length=1, max_length=100)
@@ -2019,7 +2031,7 @@ async def protect_school_data(request: Request, call_next):
             # Self-service profile, password and personal dashboard endpoints
             # are scoped to the authenticated account.
             pass
-        elif path == "/api/sync/devices" or path.startswith("/api/sync/devices/") or path in {"/api/sync/changes", "/api/sync/students", "/api/sync/classes", "/api/sync/attendance", "/api/sync/exams", "/api/sync/marks", "/api/sync/fees", "/api/sync/proposals", "/api/sync/attendance-baseline", "/api/sync/attendance-batches", "/api/sync/finance-payments"} or path.startswith("/api/sync/teacher-mark-proposals"):
+        elif path == "/api/enrolment/redeem" or path == "/api/sync/devices" or path.startswith("/api/sync/devices/") or path in {"/api/sync/changes", "/api/sync/students", "/api/sync/classes", "/api/sync/attendance", "/api/sync/exams", "/api/sync/marks", "/api/sync/fees", "/api/sync/proposals", "/api/sync/attendance-baseline", "/api/sync/attendance-batches", "/api/sync/finance-payments"} or path.startswith("/api/sync/teacher-mark-proposals"):
             # Sync routes enforce account, device and record scope in each handler.
             pass
         elif path.startswith("/api/teacher/"):
@@ -2417,6 +2429,94 @@ def current_account(user=Depends(get_current_user)):
         "permissions": {k: sorted(v) for k, v in user_permissions(user).items()},
         "active": user.is_active,
         "must_change_password": bool(user.must_change_password),
+    }
+
+
+@app.post("/api/enrolment/invitations", tags=["Mobile Enrolment"])
+def create_enrolment_invitation(
+    data: EnrolmentInvitationCreate,
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+):
+    state = db.get(models.SchoolSetupState, 1)
+    if not state or not state.setup_completed_at:
+        raise HTTPException(409, "Complete school setup before issuing device enrolment invitations.")
+    target = db.get(models.User, data.user_id)
+    if not target or not target.is_active:
+        raise HTTPException(404, "The target account is unavailable.")
+    token = secrets.token_urlsafe(32)
+    now = datetime.utcnow()
+    invitation = models.EnrolmentInvitation(
+        token_hash=hashlib.sha256(token.encode("utf-8")).hexdigest(),
+        installation_id=state.installation_id,
+        target_user_id=target.id,
+        created_by=admin.id,
+        created_at=now,
+        expires_at=now + timedelta(minutes=data.expires_in_minutes),
+    )
+    db.add(invitation)
+    db.commit()
+    db.refresh(invitation)
+    return {
+        "id": invitation.id,
+        "token": token,
+        "target_user_id": target.id,
+        "expires_at": invitation.expires_at,
+        "message": "Copy this invitation token now. It is shown only once and can enrol one device for the named account.",
+    }
+
+
+@app.post("/api/enrolment/redeem", tags=["Mobile Enrolment"])
+def redeem_enrolment_invitation(
+    data: EnrolmentRedeemRequest,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    token_hash = hashlib.sha256(data.token.encode("utf-8")).hexdigest()
+    now = datetime.utcnow()
+    # A conditional UPDATE makes redemption single-use even when two requests
+    # attempt to redeem the same token concurrently.
+    invitation = db.query(models.EnrolmentInvitation).filter_by(token_hash=token_hash).first()
+    if not invitation:
+        raise HTTPException(404, "The enrolment invitation is invalid or unavailable.")
+    if invitation.target_user_id != user.id:
+        raise HTTPException(403, "This invitation was issued for another account.")
+    state = db.get(models.SchoolSetupState, 1)
+    if not state or invitation.installation_id != state.installation_id:
+        raise HTTPException(403, "This invitation belongs to another school installation.")
+    claimed = db.query(models.EnrolmentInvitation).filter(
+        models.EnrolmentInvitation.id == invitation.id,
+        models.EnrolmentInvitation.redeemed_at.is_(None),
+        models.EnrolmentInvitation.revoked_at.is_(None),
+        models.EnrolmentInvitation.expires_at > now,
+    ).update({models.EnrolmentInvitation.redeemed_at: now}, synchronize_session=False)
+    if claimed != 1:
+        db.rollback()
+        raise HTTPException(409, "This invitation has expired, been revoked, or has already been used.")
+    device_id = str(data.device_id)
+    existing = db.query(models.SyncDevice).filter_by(user_id=user.id, device_id=device_id).first()
+    if existing and existing.revoked_at is not None:
+        db.rollback()
+        raise HTTPException(409, "This device identity was previously revoked. Use a new device identity.")
+    if existing is None:
+        existing = models.SyncDevice(
+            user_id=user.id, device_id=device_id, device_name=data.device_name.strip(),
+            created_at=now, last_seen_at=now,
+        )
+        db.add(existing)
+    else:
+        existing.device_name = data.device_name.strip()
+        existing.last_seen_at = now
+    if not data.device_name.strip():
+        db.rollback()
+        raise HTTPException(422, "Device name cannot be empty.")
+    db.commit()
+    return {
+        "device_id": existing.device_id,
+        "device_name": existing.device_name,
+        "active": True,
+        "school_installation_id": state.installation_id,
+        "message": "School enrolment verified and this device registered.",
     }
 
 
