@@ -71,17 +71,15 @@ test('connection indicator responds immediately to browser offline and online ev
   assert.match(app, /window\.removeEventListener\('online', handleOnline\)/)
 })
 
-test('reconnect invalidates encrypted offline access when the registered device is revoked', async () => {
+test('offline passphrases, cached record snapshots and offline marks drafts are no longer part of account access', async () => {
   const app = await readFile(new URL('../src/App.tsx', import.meta.url), 'utf8')
-  assert.ok(app.includes("api<{ devices: { device_id: string; active: boolean }[] }>('sync/devices', token)"))
-  assert.match(app, /find\(device => device\.device_id === deviceId\)/)
-  assert.match(app, /if \(!currentDevice\?\.active\)/)
-  assert.match(app, /if \(!currentDevice\?\.active\)[\s\S]*?clearLocalSyncData\(user\.id, deviceId\)/)
-  assert.match(app, /offlineIndex\?\.userId === user\.id && offlineIndex\.deviceId === deviceId/)
-})
-
-test('role or permission changes clear the full local offline database and pending drafts', async () => {
-  const app = await readFile(new URL('../src/App.tsx', import.meta.url), 'utf8')
-  assert.match(app, /if \(meta\.fingerprint !== fingerprint\)[\s\S]*?clearLocalSyncData\(user\.id, deviceId\)/)
-  assert.match(app, /Permission\/role changes invalidate both cached records and offline drafts/)
+  const devices = await readFile(new URL('../src/SyncDevices.tsx', import.meta.url), 'utf8')
+  const storage = await readFile(new URL('../src/syncStorage.ts', import.meta.url), 'utf8')
+  assert.doesNotMatch(app, /offline passphrase|Password \/ offline|OfflineWorkspace|saveEncryptedOfflineDraft|loadEncryptedOfflineDraft|teacher-mark-proposals/)
+  assert.doesNotMatch(devices, /offlinePassphrase|EncryptedOfflineSnapshot|Download authorised records|Unlock saved records|enrolment\/invitations/)
+  assert.doesNotMatch(storage, /deriveOfflineDraftKey|saveEncryptedOfflineDraft|loadEncryptedOfflineDraft|saveEncryptedOfflineSnapshot|loadEncryptedOfflineSnapshot/)
+  assert.match(app, /clearLocalSyncData\(user\.id, deviceId\)/)
+  assert.match(devices, /School mobile access QR/)
+  assert.match(devices, /Devices linked to this account/)
+  assert.match(devices, /async function revoke\(/)
 })
