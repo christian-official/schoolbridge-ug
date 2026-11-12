@@ -1762,14 +1762,6 @@ class BulkMarkCreate(BaseModel):
     records: list[BulkMarkEntry] = Field(min_length=1, max_length=500)
 
 
-class ParentAccountCreate(BaseModel):
-    username: str = Field(min_length=3, max_length=80)
-    email: str = Field(min_length=5, max_length=150)
-    student_ids: list[int] = Field(min_length=1, max_length=10)
-
-
-
-
 class ParentLiaisonThreadCreate(BaseModel):
     student_id: int
     parent_user_id: int | None = None
@@ -3909,68 +3901,6 @@ def list_users(
     ]
 
 
-
-
-@app.post("/api/parent-accounts", tags=["Parent Access"])
-def create_parent_account(data: ParentAccountCreate, db: Session = Depends(get_db), admin=Depends(require_admin)):
-    temporary_password = secrets.token_urlsafe(12)
-    student_ids = list(dict.fromkeys(data.student_ids))
-    students = db.query(models.Student).filter(
-        models.Student.id.in_(student_ids), models.Student.status == "active"
-    ).all()
-    if len(students) != len(student_ids):
-        raise HTTPException(404, "One or more selected students could not be found or are no longer active.")
-    already_linked = db.query(models.ParentStudentLink).filter(models.ParentStudentLink.student_id.in_(student_ids)).first()
-    if already_linked:
-        raise HTTPException(409, "At least one selected student already has a parent login. Use that same account for both guardians; do not create a second login.")
-    parent = models.User(
-        username=data.username.strip(),
-        email=data.email.strip().lower(),
-        hashed_password=password_hash.hash(temporary_password),
-        role="parent",
-    )
-    db.add(parent)
-    try:
-        db.flush()
-        db.add_all([models.ParentStudentLink(user_id=parent.id, student_id=student_id) for student_id in student_ids])
-        write_audit(db, admin, "parent_account_created", "user", parent.id, f"Linked student IDs: {', '.join(map(str, student_ids))}")
-        db.commit()
-        db.refresh(parent)
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(409, "That username or email is already registered, or a parent link already exists.")
-    email_sent = False
-    email_error = None
-    smtp_host = os.getenv("SCHOOLBRIDGE_SMTP_HOST", "smtp.gmail.com").strip()
-    smtp_user = os.getenv("SCHOOLBRIDGE_SMTP_USERNAME", "").strip()
-    smtp_password = os.getenv("SCHOOLBRIDGE_SMTP_PASSWORD", "")
-    smtp_from = os.getenv("SCHOOLBRIDGE_SMTP_FROM", smtp_user).strip()
-    if smtp_host and smtp_user and smtp_password and smtp_from:
-        try:
-            message = EmailMessage()
-            message["Subject"] = "Your SchoolBridge parent account"
-            message["From"] = smtp_from
-            message["To"] = parent.email
-            message.set_content(
-                f"Hello,\n\nYour SchoolBridge parent account has been created.\n"
-                f"Username: {parent.username}\nTemporary passcode: {temporary_password}\n\n"
-                "Sign in using the SchoolBridge portal and change your passcode after signing in. Keep these details private.\n"
-            )
-            smtp_port = int(os.getenv("SCHOOLBRIDGE_SMTP_PORT", "587"))
-            with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as server:
-                server.ehlo()
-                if os.getenv("SCHOOLBRIDGE_SMTP_USE_TLS", "true").lower() not in ("0", "false", "no"):
-                    server.starttls()
-                    server.ehlo()
-                if smtp_user:
-                    server.login(smtp_user, smtp_password)
-                server.send_message(message)
-            email_sent = True
-        except Exception:
-            email_error = "Email delivery could not be completed. Use the displayed local handover details."
-    else:
-        email_error = "Email delivery needs the school's SMTP username and app password in server settings."
-    return {"id": parent.id, "username": parent.username, "email": parent.email, "role": parent.role, "linked_students": len(student_ids), "guardians": list(dict.fromkeys(name for student in students for name in [student.guardian_name, student.guardian2_name] if name)), "guardian_phones": list(dict.fromkeys(phone for student in students for phone in [student.guardian_phone, student.guardian2_phone] if phone)), "temporary_password": temporary_password, "email_sent": email_sent, "email_error": email_error}
 
 
 @app.get("/api/parent-accounts", tags=["Parent Access"])
