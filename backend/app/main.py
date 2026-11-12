@@ -3,6 +3,10 @@ import json
 import re
 import secrets
 import hashlib
+from io import BytesIO
+from urllib.parse import urlsplit
+import qrcode
+from qrcode.image.svg import SvgPathImage
 import smtplib
 from email.message import EmailMessage
 from datetime import date, datetime, time
@@ -1975,7 +1979,7 @@ def delete_timetable_entry(
 @app.middleware("http")
 async def protect_school_data(request: Request, call_next):
     path = request.url.path
-    public_paths = {"/api/health", "/api/auth/login", "/api/setup/status", "/api/setup/activate", "/api/setup/complete"}
+    public_paths = {"/api/health", "/api/auth/login", "/api/setup/status", "/api/setup/activate", "/api/setup/complete", "/api/public/school"}
 
     # Browser CORS preflight requests must reach CORSMiddleware without auth.
     if request.method == "OPTIONS":
@@ -2430,6 +2434,59 @@ def current_account(user=Depends(get_current_user)):
         "active": user.is_active,
         "must_change_password": bool(user.must_change_password),
     }
+
+
+@app.get("/api/public/school", tags=["Public School Identity"])
+def public_school_identity(db: Session = Depends(get_db)):
+    state = db.get(models.SchoolSetupState, 1)
+    profile = db.get(models.SchoolProfile, 1)
+    if not state or not state.setup_completed_at or not profile:
+        raise HTTPException(404, "School identity is not available.")
+    return {
+        "school_name": profile.name,
+        "school_type": profile.school_type,
+        "country": profile.country,
+        "installation_id": state.installation_id,
+    }
+
+
+@app.get("/api/enrolment/school-qr.svg", tags=["Mobile Enrolment"])
+def school_access_qr(
+    origin: str = Query(..., min_length=8, max_length=300),
+    request: Request = None,
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+):
+    state = db.get(models.SchoolSetupState, 1)
+    if not state or not state.setup_completed_at:
+        raise HTTPException(409, "Complete school setup before creating an access QR code.")
+    parsed = urlsplit(origin)
+    request_host = request.url.hostname if request else None
+    if (
+        parsed.scheme not in {"http", "https"}
+        or not parsed.hostname
+        or parsed.username or parsed.password
+        or parsed.hostname.lower() != (request_host or "").lower()
+        or parsed.query or parsed.fragment or parsed.path not in {"", "/"}
+    ):
+        raise HTTPException(400, "The QR destination must be this SchoolBridge installation's current web origin.")
+    target = origin.rstrip("/") + "/?school=" + state.installation_id
+    qr = qrcode.QRCode(
+        version=None,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=8,
+        border=4,
+    )
+    qr.add_data(target)
+    qr.make(fit=True)
+    image = qr.make_image(image_factory=SvgPathImage)
+    output = BytesIO()
+    image.save(output)
+    return Response(
+        content=output.getvalue(),
+        media_type="image/svg+xml",
+        headers={"Cache-Control": "no-store", "Content-Disposition": 'inline; filename="schoolbridge-school-access.svg"'},
+    )
 
 
 @app.post("/api/enrolment/invitations", tags=["Mobile Enrolment"])
