@@ -82,8 +82,16 @@ export default function SyncDevices({ token, userId, schoolId, isAdmin }: Props)
   }, [isAdmin, schoolId, token])
 
   function printSchoolQr() {
-    const cleanup = () => { delete document.body.dataset.schoolbridgePrint }
+    const printSheet = document.querySelector<HTMLElement>('.school-access-qr-print')
+    if (!printSheet) return
+    const originalParent = printSheet.parentElement
+    const originalNextSibling = printSheet.nextSibling
+    const cleanup = () => {
+      if (originalParent) originalParent.insertBefore(printSheet, originalNextSibling)
+      delete document.body.dataset.schoolbridgePrint
+    }
     document.body.dataset.schoolbridgePrint = 'school-qr'
+    document.body.appendChild(printSheet)
     window.addEventListener('afterprint', cleanup, { once: true })
     window.print()
   }
