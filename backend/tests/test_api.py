@@ -4284,3 +4284,42 @@ def test_legacy_registration_claim_and_administrator_review_routes_are_not_avail
             "password": "LongTestPassword123!",
         }).status_code == 404
 
+
+
+
+def test_parent_qr_registration_rejects_ambiguous_student_records():
+    reset_database()
+    school_id = "00000000-0000-4000-8000-000000000001"
+    with SessionLocal() as db:
+        db.add_all([
+            models.Student(
+                school_tenant_id=1, admission_number="AMB-001",
+                first_name="Amina", last_name="Nsubuga",
+                date_of_birth=date(2012, 5, 6),
+                guardian_name="Parent One", guardian_relationship="Mother",
+            ),
+            models.Student(
+                school_tenant_id=1, admission_number="AMB-002",
+                first_name="Amina", last_name="Nsubuga",
+                date_of_birth=date(2012, 5, 6),
+                guardian_name="Parent One", guardian_relationship="Mother",
+            ),
+        ])
+        db.commit()
+
+    with TestClient(app) as client:
+        response = client.post("/api/public/registration/parent", json={
+            "school_id": school_id,
+            "parent_name": "Parent One",
+            "relationship": "Mother",
+            "children": [{
+                "first_name": "Amina", "last_name": "Nsubuga",
+                "date_of_birth": "2012-05-06",
+            }],
+        })
+        assert response.status_code == 403, response.text
+        assert "uniquely verified" in response.json()["detail"]
+
+    with SessionLocal() as db:
+        assert db.query(models.User).filter(models.User.role == "parent").count() == 0
+        assert db.query(models.ParentStudentLink).count() == 0
