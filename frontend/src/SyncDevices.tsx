@@ -115,7 +115,7 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
   const [offlineSnapshot, setOfflineSnapshot] = useState<any>(null)
 
   useEffect(() => {
-    if (!isAdmin) return
+    if (!isAdmin || isTauriDesktop) return
     let objectUrl = ''
     const controller = new AbortController()
     const destination = window.location.origin + '/?school='
@@ -446,7 +446,7 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
     <div className="panel-heading"><div><h2>Registered devices</h2><p>Review the browsers and computers authorised to synchronise data for this account.</p></div><button className="secondary-button" type="button" onClick={() => void load()} disabled={loading || busy}>Refresh</button></div>
     <div className="form-hint">Registered devices can keep a short-lived encrypted copy of records currently authorised for this account. The server remains authoritative.</div>
 
-    {isAdmin && <section className="offline-record-tools school-access-qr">
+    {isAdmin && !isTauriDesktop && <section className="offline-record-tools school-access-qr">
       <h3>School mobile access QR</h3>
       <p className="form-hint">This reusable QR code opens this school's SchoolBridge sign-in page. It identifies the school installation only; it does not sign anyone in or grant permissions. Staff and parents must still use their own accounts.</p>
       {schoolQrUrl ? <div className="school-access-qr-content">
