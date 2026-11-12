@@ -1,73 +1,92 @@
 # SchoolBridge shared browser preview
 
-This is a temporary preview deployment for interface, QR onboarding, and integration testing. It is separate from each school's offline Windows installation. **Use fictional test records only; do not enter real student, parent, staff, financial, or other personal information.**
+This is a controlled preview deployment for hosted PWA delivery, school QR onboarding, and remote-access integration testing. It is separate from each school's offline Windows installation. **Use fictional test records only; do not enter real student, parent, staff, financial, or other personal information.**
 
 ## Shared hosting design
 
-One shared web application serves every school. Each school uses its own school QR identity and tenant-scoped records inside the same application. Do not create a separate deployment, paid domain, tunnel, or database for each school.
+One shared hosted application serves multiple schools. Each school uses its own public QR identity and tenant-scoped records.
 
-The preview uses:
-- **Cloudflare Pages** for the Vite frontend, with its HTTPS `.pages.dev` address.
-- **Koyeb** for the FastAPI service, with its HTTPS `.koyeb.app` address.
-- **Neon** for PostgreSQL persistence. The database is shared by the application, while SchoolBridge enforces school-level tenant separation.
+- **Cloudflare Pages** serves the Vite frontend over HTTPS.
+- **Render** runs the FastAPI backend using the repository's `backend/Dockerfile`.
+- **The existing Neon project** provides the hosted PostgreSQL database. Reuse the database already created for the `schoolbridge-ug` Render service; do not create another Neon project for this deployment.
+- **The local school installation** continues to use its own local database and must remain usable without internet access.
 
-The frontend's `VITE_API_BASE_URL` points to the one shared Koyeb API. The API's `SCHOOLBRIDGE_CORS_ORIGINS` must contain the exact Cloudflare Pages origin, not a wildcard.
+The hosted API and Neon database support remote access. They do not, by themselves, synchronise a school's local SQLite database with Neon. Do not assume local records are mirrored to the hosted database; only use a separately implemented and tested synchronisation workflow for that purpose.
 
-## 1. Create the shared PostgreSQL database
+## 1. Check the existing Neon connection
 
-1. Create a PostgreSQL project in Neon.
-2. Choose a region close to the Koyeb service region (Frankfurt is a suitable pairing for the free preview regions).
-3. Copy the pooled connection string from the Neon dashboard and keep it private.
-4. Convert the URL scheme to `postgresql+psycopg://` so SQLAlchemy uses the project's installed Psycopg 3 driver. Retain the host, database, credentials, and required TLS query parameters such as `sslmode=require`.
-5. Do not commit the connection string to Git or place it in frontend variables.
+1. Open the existing Neon project and use its PostgreSQL connection details. Do not create a replacement project.
+2. Use the pooled connection string for the hosted Render service. Keep it private; never put it in Git, a frontend variable, a screenshot, or a message.
+3. SchoolBridge uses SQLAlchemy with Psycopg 3. The connection URL supplied to `SCHOOLBRIDGE_DATABASE_URL` must use the `postgresql+psycopg://` scheme and retain Neon’s required TLS query parameters (normally `sslmode=require`).
+4. Confirm that the existing Render service has the connection string stored as the private environment variable `SCHOOLBRIDGE_DATABASE_URL`. If it is already configured and healthy, do not replace it.
+5. SchoolBridge runs its pending database migrations during backend startup. Keep a verified backup before deploying schema changes.
 
-## 2. Deploy the API on Koyeb
+## 2. Configure the Render API service
 
-1. Create a Web Service and connect the `christian-official/schoolbridge-ug` GitHub repository.
-2. Select branch `feature/student-staff-finance`.
-3. Select the Python buildpack and set the working directory / root directory to `backend`.
-4. Set the run command to:
+Use the existing Render Web Service named `schoolbridge-ug`; do not create a second API service unless the existing one is confirmed unusable.
 
-   ```sh
-   uvicorn app.main:app --host 0.0.0.0 --port 8001
-   ```
+The repository contains a Dockerfile at `backend/Dockerfile`. In the Render service settings, verify:
 
-5. Expose port `8001` as an HTTP service port.
-6. Configure these environment variables in the Koyeb dashboard:
+| Setting | Expected value |
+| --- | --- |
+| Runtime | Docker |
+| Repository | `christian-official/schoolbridge-ug` |
+| Branch | `feature/student-staff-finance` while this work is reviewed |
+| Dockerfile path | `backend/Dockerfile` |
+| Health check path | `/api/health` |
 
-   | Variable | Value |
-   | --- | --- |
-   | `SCHOOLBRIDGE_DATABASE_URL` | The private Neon pooled PostgreSQL URL using `postgresql+psycopg://` |
-   | `SCHOOLBRIDGE_SECRET_KEY` | A newly generated, long random secret; never reuse a CI or local-development secret |
-   | `SCHOOLBRIDGE_LICENSE_PUBLIC_KEY` | The owner's base64 public verification key; never upload the private signing key |
-   | `SCHOOLBRIDGE_CORS_ORIGINS` | The exact Pages origin after step 3, e.g. `https://schoolbridge-preview.pages.dev` |
-   | `SCHOOLBRIDGE_SEED_DEMO_DATA` | `false` |
+The Dockerfile installs the backend requirements and starts Uvicorn on port `8001`; do not add a conflicting start command or change the port without changing and testing the Dockerfile.
 
-7. Wait for the generated `.koyeb.app` service URL to become healthy at `/api/health`. Keep the service URL; it is the one shared API origin.
-8. Set `SCHOOLBRIDGE_ALLOWED_HOSTS` to the API hostname only (for example, `schoolbridge-preview-api.koyeb.app`; no scheme, path, or wildcard), then redeploy. This enables the backend's trusted-host check for the public API domain.
+Check these Render environment variables:
 
-## 3. Deploy the frontend on Cloudflare Pages
+| Variable | Required configuration |
+| --- | --- |
+| `SCHOOLBRIDGE_DATABASE_URL` | Existing private Neon pooled URL, using `postgresql+psycopg://` |
+| `SCHOOLBRIDGE_SECRET_KEY` | A long, randomly generated private secret; never reuse a public, CI, or development secret |
+| `SCHOOLBRIDGE_CORS_ORIGINS` | Exact Cloudflare Pages origin, with no path and no trailing slash |
+| `SCHOOLBRIDGE_ALLOWED_HOSTS` | Render API hostname only, without scheme or path, if the trusted-host allow-list is enabled |
+| `SCHOOLBRIDGE_SEED_DEMO_DATA` | `false` for the existing database |
 
-1. In Cloudflare Pages, create a project connected to the same GitHub repository.
-2. Set the production branch to `feature/student-staff-finance` while this work is being reviewed.
-3. Set the project build configuration:
+Do not paste secret values into GitHub or share them in chat. The application defaults demo seeding to off; leave it off for the existing database.
 
-   | Setting | Value |
-   | --- | --- |
-   | Root directory | `frontend` |
-   | Build command | `npm ci && npm run build` |
-   | Build output directory | `dist` |
+After deployment, open the Render service's HTTPS URL followed by `/api/health`. A healthy response should report `status: ok` and a connected database. If it reports a database error, stop and correct the private database configuration before proceeding.
 
-4. Add the build environment variable `VITE_API_BASE_URL` with the Koyeb API origin, e.g. `https://schoolbridge-preview-api.koyeb.app` (no trailing slash).
-5. Deploy and copy the exact HTTPS Pages origin, e.g. `https://schoolbridge-preview.pages.dev`.
-6. Return to Koyeb and set `SCHOOLBRIDGE_CORS_ORIGINS` to that exact origin. Redeploy the API.
-7. Confirm the browser loads the frontend and calls the Koyeb API successfully. QR registration, claim status, verification, and account completion must all use this same API origin.
+## 3. Configure Cloudflare Pages
+
+Use the existing Cloudflare Pages project if one has already been created for this preview. Configure it as follows:
+
+| Setting | Value |
+| --- | --- |
+| Production branch | `feature/student-staff-finance` while this work is reviewed |
+| Root directory | `frontend` |
+| Build command | `npm ci && npm run build` |
+| Build output directory | `dist` |
+| Build environment variable | `VITE_API_BASE_URL` = the Render API origin |
+
+Set `VITE_API_BASE_URL` to the Render service's HTTPS origin only, without an API path or trailing slash. For example, use `https://your-service.onrender.com` with the actual hostname shown in the Render dashboard.
+
+Copy the exact deployed Cloudflare Pages origin (for example, `https://your-project.pages.dev`) and set that exact origin in Render's `SCHOOLBRIDGE_CORS_ORIGINS`. Redeploy the API after changing the CORS value. CORS must not be configured as a wildcard for the public preview.
+
+The API hostname in `SCHOOLBRIDGE_ALLOWED_HOSTS` must match the actual Render hostname. Do not include `https://`, a path, or a wildcard. If changing this setting causes the health endpoint to reject requests, correct the hostname to the exact service hostname.
+
+## 4. Verify the hosted school-access journey
+
+Use fictional preview data only.
+
+1. Confirm the Render `/api/health` endpoint reports a connected PostgreSQL database.
+2. Open the Cloudflare Pages HTTPS origin and confirm the frontend loads.
+3. Confirm browser requests reach the Render API without CORS or host-validation errors.
+4. From the school admin's registered-device area, generate the school QR code. Scan it with a phone on a separate internet connection (not the school Wi-Fi) and confirm it opens the correct school-specific hosted URL.
+5. Confirm the school identity resolves and the public registration/login journey loads for that school.
+6. Test PWA installation and reload the installed app. Confirm the app shell opens offline. Do not interpret offline shell access as proof that online API data or pending school records are synchronised offline.
+
+If a step fails, record the failing URL, status, and non-sensitive error message. Never share access tokens, passwords, database URLs, or verification codes.
 
 ## Preview limits and production boundary
 
-- Koyeb's free Web Service is a small preview instance, scales down after inactivity, and does not include persistent service volumes. Do not store the database on its local disk.
-- Neon Free includes 1 GB database storage and 100 compute-hours per project per month; the compute can scale to zero. The free quota can be exhausted and suspend database compute until the allowance resets or the project is upgraded.
-- Cloudflare Pages provides the static HTTPS frontend; it does not host the Python API.
-- These free tiers are suitable only for a low-traffic demonstration and integration checks. They do not provide production uptime, capacity, or support guarantees.
-- Before any real school data or production rollout, move the API and database to appropriately sized, durable services with tested backups, restore procedures, monitoring, and a data-protection review. Keep one shared application origin; do not create per-school paid domains or tunnels.
-- The school desktop/USB installation remains local-first and must continue to work without internet. This hosted preview is not a replacement for it.
+- Render's free service may spin down after inactivity, causing a cold start, and its local filesystem is not durable. Do not store the hosted database on Render's local disk.
+- Neon Free has usage and storage limits and may scale database compute to zero after inactivity. Check the current Neon dashboard for the project's actual usage and limits.
+- Cloudflare Pages hosts the static frontend; it does not run the Python API.
+- Free hosting is suitable only for controlled demonstrations and integration checks. It does not provide production uptime, capacity, or support guarantees. Do not use it for real school records.
+- Before any real-school rollout, use appropriately sized durable services, tested backups and restore procedures, monitoring, access controls, and a data-protection review.
+- The school desktop/USB installation remains local-first and must continue operating without internet. The hosted preview is not a replacement for the local installation.
