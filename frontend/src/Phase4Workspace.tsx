@@ -33,7 +33,7 @@ export default function Phase4Workspace({ token, role, active, permissions }: { 
   const [account, setAccount] = useState({ username: '', email: '' })
   const [issuedPasscode, setIssuedPasscode] = useState<{ username: string; email: string; password: string; emailSent: boolean; emailError?: string; phone: string } | null>(null)
   const [savingAccount, setSavingAccount] = useState(false)
-  const [parentTab, setParentTab] = useState<'overview' | 'add' | 'manage'>('overview')
+  const [parentTab, setParentTab] = useState<'overview' | 'add' | 'manage' | 'review'>('overview')
   const [removingParentId, setRemovingParentId] = useState<number | null>(null)
   const [children, setChildren] = useState<ParentChild[]>([])
   const [selectedChildId, setSelectedChildId] = useState<number | null>(null)
