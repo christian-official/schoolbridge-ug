@@ -4033,6 +4033,86 @@ def test_parent_self_registration_uses_school_verified_numbers_and_links_multipl
         assert {link.student_id for link in links} == set(student_ids)
 
 
+def test_parent_registration_matches_only_the_school_selected_by_its_qr(monkeypatch):
+    reset_database()
+    school_two_id = "00000000-0000-4000-8000-000000000002"
+    with SessionLocal() as db:
+        db.add(models.SchoolTenant(
+            id=2, public_id=school_two_id, installation_id="registration-school-two",
+            name="Second School", status="active",
+        ))
+        admin_two = models.User(
+            school_tenant_id=2, username="school-two-admin",
+            hashed_password=password_hash.hash("SchoolTwoAdminPassword123!"),
+            role="admin", is_active=True,
+        )
+        db.add(admin_two)
+        db.flush()
+        school_one_student = models.Student(
+            school_tenant_id=1, first_name="Amina", last_name="Nsubuga",
+            date_of_birth=date(2012, 1, 1),
+        )
+        school_two_student = models.Student(
+            school_tenant_id=2, first_name="Amina", last_name="Nsubuga",
+            date_of_birth=date(2012, 1, 1),
+        )
+        db.add_all([school_one_student, school_two_student])
+        db.flush()
+        db.add_all([
+            models.StudentGuardianContact(
+                school_tenant_id=1, student_id=school_one_student.id,
+                guardian_name="Parent One", relationship="Mother",
+                phone="+256700111222", source="admin_verified_school_record",
+                verification_status="school_verified", active=True,
+            ),
+            models.StudentGuardianContact(
+                school_tenant_id=2, student_id=school_two_student.id,
+                guardian_name="Parent One", relationship="Mother",
+                phone="+256700333444", source="admin_verified_school_record",
+                verification_status="school_verified", verified_by=admin_two.id,
+                verified_at=datetime.utcnow(), active=True,
+            ),
+        ])
+        db.commit()
+        school_two_student_id = school_two_student.id
+
+    sent_messages = []
+    monkeypatch.setattr(
+        main_module, "send_schoolbridge_sms",
+        lambda phone, message: sent_messages.append((phone, message)) or True,
+    )
+    payload = {
+        "school_id": school_two_id,
+        "parent_name": "Parent One",
+        "relationship": "Mother",
+        "children": [{
+            "first_name": "Amina", "last_name": "Nsubuga",
+            "date_of_birth": "2012-01-01",
+        }],
+    }
+    with TestClient(app) as client:
+        submitted = client.post("/api/public/registration/parent", json=payload)
+        assert submitted.status_code == 200, submitted.text
+        assert submitted.json()["status"] == "verification_pending"
+        assert sent_messages[0][0] == "+256700333444"
+        reference = submitted.json()["claim_reference"]
+
+        # The claim reference is not portable between schools, even with the
+        # same student identity and a valid QR for the other school.
+        wrong_school = client.get(
+            f"/api/public/registration/claims/{reference}",
+            params={"school_id": "00000000-0000-4000-8000-000000000001"},
+        )
+        assert wrong_school.status_code == 404
+
+    with SessionLocal() as db:
+        set_tenant_context(db, 2)
+        claim = db.query(models.RegistrationClaim).filter_by(
+            reference_hash=main_module._registration_reference_hash(reference),
+        ).one()
+        assert json.loads(claim.candidate_student_ids_json) == [school_two_student_id]
+
+
 def test_parent_registration_without_school_verified_phone_goes_to_admin_review():
     reset_database()
     admin = create_admin()
