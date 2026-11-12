@@ -890,7 +890,7 @@ function App() {
     setMobileMenu(false)
     setLoginError('')
     setShowRecovery(false)
-    setShowRegistration(passwordlessRole ? Boolean(schoolIdForReturn) : Boolean(schoolIdForReturn))
+    setShowRegistration(passwordlessRole && Boolean(schoolIdForReturn))
   }
   const [overviewShortcuts, setOverviewShortcuts] = useState<string[]>([])
   const [serverConnection, setServerConnection] = useState<'checking' | 'connected' | 'disconnected'>('checking')
