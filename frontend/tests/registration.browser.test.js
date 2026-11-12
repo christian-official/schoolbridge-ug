@@ -69,9 +69,37 @@ test('QR access opens the correct school registration flow on a mobile viewport 
         await route.fulfill({
           status: 200, headers: { ...corsHeaders, 'content-type': 'application/json' },
           body: JSON.stringify({
-            claim_reference: 'mobile-test-claim', status: 'pending_review',
-            phone_masked: null, message: 'Your request is awaiting school review.',
+            access_token: 'mobile-qr-parent-session', token_type: 'bearer',
+            role: 'parent', username: 'parent-mobile-test',
+            message: 'Your details have been verified. Opening your parent dashboard.',
           }),
+        })
+        return
+      }
+      if (url.pathname === '/api/auth/me' && request.method() === 'GET') {
+        await route.fulfill({
+          status: 200, headers: { ...corsHeaders, 'content-type': 'application/json' },
+          body: JSON.stringify({
+            id: 41, username: 'parent-mobile-test', email: null, role: 'parent',
+            role_label: 'Parent', permissions: {}, active: true, must_change_password: false,
+          }),
+        })
+        return
+      }
+      if (url.pathname === '/api/parent/children' && request.method() === 'GET') {
+        await route.fulfill({
+          status: 200, headers: { ...corsHeaders, 'content-type': 'application/json' },
+          body: JSON.stringify([{
+            id: 7, name: 'Test Learner', admission_number: 'TEST-001', status: 'active',
+            class_name: 'Primary 3', stream: '', fees_charged: 0, fees_paid: 0, balance: 0,
+          }]),
+        })
+        return
+      }
+      if (url.pathname === '/api/parent/children/7/results' && request.method() === 'GET') {
+        await route.fulfill({
+          status: 200, headers: { ...corsHeaders, 'content-type': 'application/json' },
+          body: JSON.stringify([]),
         })
         return
       }
@@ -82,25 +110,21 @@ test('QR access opens the correct school registration flow on a mobile viewport 
     })
 
     await page.goto(baseUrl + '/?school=' + schoolId)
-    await page.getByRole('heading', { name: 'Welcome back' }).waitFor()
+    await page.getByRole('heading', { name: 'Join your school' }).waitFor()
     await page.getByText('Mobile QR Test School').waitFor()
-    const loginWidth = await page.evaluate(() => ({ viewport: innerWidth, document: document.documentElement.scrollWidth }))
-    assert.ok(loginWidth.document <= loginWidth.viewport, `QR login must fit a phone viewport: ${JSON.stringify(loginWidth)}`)
+    const registrationWidth = await page.evaluate(() => ({ viewport: innerWidth, document: document.documentElement.scrollWidth }))
+    assert.ok(registrationWidth.document <= registrationWidth.viewport, `QR registration must fit a phone viewport: ${JSON.stringify(registrationWidth)}`)
 
-    await page.getByRole('button', { name: 'Create a parent or teacher account' }).click()
-    await page.getByRole('heading', { name: 'Create your account' }).waitFor()
     assert.equal(await page.locator('input[name="phone"]').count(), 0, 'registration must not collect a replacement verification phone')
-    await page.getByLabel('Your full name').fill('Test Parent')
-    await page.getByLabel('Relationship to child(ren)').fill('Guardian')
+    await page.getByLabel('Your full name as recorded by the school').fill('Test Parent')
+    await page.getByLabel('Relationship to the child(ren)').fill('Guardian')
     await page.getByLabel('First name').fill('Test')
     await page.getByLabel('Last name').fill('Learner')
-    await page.getByLabel('Admission number (optional)').fill('TEST-001')
+    await page.getByLabel('Admission number').fill('TEST-001')
 
-    const registrationWidth = await page.evaluate(() => ({ viewport: innerWidth, document: document.documentElement.scrollWidth }))
-    assert.ok(registrationWidth.document <= registrationWidth.viewport, `registration form must fit a phone viewport: ${JSON.stringify(registrationWidth)}`)
-
-    await page.getByRole('button', { name: 'Submit registration' }).click()
-    await page.getByRole('heading', { name: 'Waiting for school review' }).waitFor()
+    await page.getByRole('button', { name: 'Verify and open my dashboard' }).click()
+    await page.getByRole('heading', { name: 'My children' }).waitFor()
+    await page.getByText('Test Learner').waitFor()
     assert.deepEqual(submittedPayload, {
       school_id: schoolId,
       parent_name: 'Test Parent',
