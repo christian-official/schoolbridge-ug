@@ -103,6 +103,7 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
   const [redeemToken, setRedeemToken] = useState('')
   const [schoolQrUrl, setSchoolQrUrl] = useState('')
   const [schoolAccessUrl, setSchoolAccessUrl] = useState('')
+  const [qrUnavailableReason, setQrUnavailableReason] = useState('')
 
   const [deviceId, setDeviceId] = useState('')
   const [loading, setLoading] = useState(true)
@@ -116,6 +117,11 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
 
   useEffect(() => {
     if (!isAdmin || isTauriDesktop) return
+    const host = window.location.hostname.toLowerCase()
+    if (window.location.protocol !== 'https:' || host === 'localhost' || host === '127.0.0.1' || host === '::1') {
+      setQrUnavailableReason('Open SchoolBridge from its shared HTTPS school address to create a mobile QR code. Localhost and insecure HTTP links cannot be used for secure mobile/PWA access.')
+      return
+    }
     let objectUrl = ''
     const controller = new AbortController()
     const destination = window.location.origin + '/?school='
@@ -449,7 +455,7 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
     {isAdmin && !isTauriDesktop && <section className="offline-record-tools school-access-qr">
       <h3>School mobile access QR</h3>
       <p className="form-hint">This reusable QR code opens this school's SchoolBridge sign-in page. It identifies the school installation only; it does not sign anyone in or grant permissions. Staff and parents must still use their own accounts.</p>
-      {schoolQrUrl ? <div className="school-access-qr-content">
+      {qrUnavailableReason ? <p className="form-hint">{qrUnavailableReason}</p> : schoolQrUrl ? <div className="school-access-qr-content">
         <img src={schoolQrUrl} alt="Reusable SchoolBridge school access QR code" width="240" height="240" />
         <div>
           <strong>School access link</strong>
