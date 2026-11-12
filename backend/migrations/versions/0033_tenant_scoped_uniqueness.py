@@ -51,6 +51,12 @@ def _replace_unique(table, old_columns, new_columns, new_name, as_index=False):
 
 
 def upgrade():
+    bind = op.get_bind()
+    if bind.dialect.name == "sqlite":
+        # Keep FK checks deferred while SQLite rebuilds tables that may be
+        # referenced by other school-owned tables in the same migration.
+        bind.exec_driver_sql("PRAGMA defer_foreign_keys=ON")
+
     constraint_changes = [
         ("classes", ("name", "section"), ("school_tenant_id", "name", "section"), "uq_classes_tenant_name_section"),
         ("subjects", ("name", "school_type"), ("school_tenant_id", "name", "school_type"), "uq_subjects_tenant_name_school_type"),

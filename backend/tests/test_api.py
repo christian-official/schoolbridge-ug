@@ -3558,18 +3558,12 @@ def test_school_business_identifiers_are_unique_within_each_tenant():
             models.GradeBand(grade="A", min_score=80, max_score=100, school_tenant_id=2),
             models.StaffMember(staff_number="ST-001", first_name="Alex", last_name="One", school_tenant_id=1),
             models.StaffMember(staff_number="ST-001", first_name="Alex", last_name="Two", school_tenant_id=2),
-            models.FeePayment(charge_id=1, amount=100, receipt_number="RCPT-001", school_tenant_id=1),
-            models.FeePayment(charge_id=2, amount=100, receipt_number="RCPT-001", school_tenant_id=2),
         ])
-        # FeePayment references real charges; create them before inserting payments.
-        db.rollback()
-        first_student = models.Student(admission_number="ADM-001", first_name="Amina", last_name="One", school_tenant_id=1)
-        second_student = models.Student(admission_number="ADM-001", first_name="Brian", last_name="Two", school_tenant_id=2)
-        db.add_all([first_student, second_student])
         db.flush()
+        students = db.query(models.Student).order_by(models.Student.school_tenant_id).all()
         db.add_all([
-            models.FeeCharge(student_id=first_student.id, term="Term 1", year=2026, amount=100, school_tenant_id=1),
-            models.FeeCharge(student_id=second_student.id, term="Term 1", year=2026, amount=100, school_tenant_id=2),
+            models.FeeCharge(student_id=students[0].id, term="Term 1", year=2026, amount=100, school_tenant_id=1),
+            models.FeeCharge(student_id=students[1].id, term="Term 1", year=2026, amount=100, school_tenant_id=2),
         ])
         db.flush()
         charges = db.query(models.FeeCharge).order_by(models.FeeCharge.school_tenant_id).all()
@@ -3580,11 +3574,10 @@ def test_school_business_identifiers_are_unique_within_each_tenant():
         db.commit()
 
     with SessionLocal() as db:
-        duplicate = models.Student(
+        db.add(models.Student(
             admission_number="ADM-001", first_name="Duplicate", last_name="One",
             school_tenant_id=1,
-        )
-        db.add(duplicate)
+        ))
         with pytest.raises(IntegrityError):
             db.commit()
         db.rollback()
