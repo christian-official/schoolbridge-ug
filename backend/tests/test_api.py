@@ -2435,8 +2435,15 @@ def test_offline_attendance_batch_is_automatically_applied_and_idempotent():
         applied = client.post("/api/sync/attendance-batches", headers=headers, json=body)
         assert applied.status_code == 200, applied.text
         assert applied.json()["applied"] is True and applied.json()["saved"] == 1
+        # Simulate a lost response followed by a retry, then ensure the
+        # same key cannot be reused to submit altered attendance content.
         repeated = client.post("/api/sync/attendance-batches", headers=headers, json=body)
         assert repeated.status_code == 200 and repeated.json()["duplicate"] is True
+        collision = client.post(
+            "/api/sync/attendance-batches", headers=headers,
+            json={**body, "records": [{"student_id": student_id, "status": "Absent"}]},
+        )
+        assert collision.status_code == 409
         with SessionLocal() as db:
             row = db.query(models.Attendance).filter_by(student_id=student_id, attendance_date=date(2026, 11, 10)).one()
             assert row.status == "Present"
