@@ -28,6 +28,13 @@ type Proposal = {
 }
 
 type Props = { token: string; userId: number; isAdmin: boolean }
+type EnrolmentUser = { id: number; username: string; role: string; active: boolean }
+type EnrolmentInvitation = {
+  id: number; target_user_id: number; target_username: string; created_at: string;
+  expires_at: string; redeemed_at: string | null; revoked_at: string | null;
+  status: 'pending' | 'redeemed' | 'revoked' | 'expired'
+}
+
 // Desktop sync management must reach the bundled loopback backend just like the
 // main application; relative URLs resolve against tauri.localhost and cannot
 // reach the local FastAPI service.
@@ -87,6 +94,13 @@ async function request<T>(path: string, token: string, options: RequestInit = {}
 export default function SyncDevices({ token, userId, isAdmin }: Props) {
   const [devices, setDevices] = useState<Device[]>([])
   const [proposals, setProposals] = useState<Proposal[]>([])
+  const [enrolmentUsers, setEnrolmentUsers] = useState<EnrolmentUser[]>([])
+  const [invitations, setInvitations] = useState<EnrolmentInvitation[]>([])
+  const [invitationUserId, setInvitationUserId] = useState('')
+  const [invitationExpiry, setInvitationExpiry] = useState('1440')
+  const [issuedInvitationToken, setIssuedInvitationToken] = useState('')
+  const [invitationBusy, setInvitationBusy] = useState(false)
+
   const [deviceId, setDeviceId] = useState('')
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -133,6 +147,17 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
         setProposals(proposalResult.proposals)
       } else {
         setProposals([])
+      }
+      if (isAdmin) {
+        const [invitationResult, userResult] = await Promise.all([
+          request<{ invitations: EnrolmentInvitation[] }>('enrolment/invitations', token),
+          request<EnrolmentUser[]>('auth/users', token),
+        ])
+        setInvitations(invitationResult.invitations)
+        setEnrolmentUsers(userResult.filter(user => user.active))
+      } else {
+        setInvitations([])
+        setEnrolmentUsers([])
       }
     } catch (err) {
       if (err instanceof ApiRequestError && err.status === 401) {
@@ -200,6 +225,38 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
     } finally {
       setBusy(false)
     }
+  }
+
+
+  async function createInvitation(event: React.FormEvent) {
+    event.preventDefault()
+    if (!invitationUserId) return
+    setInvitationBusy(true); setError(''); setMessage(''); setIssuedInvitationToken('')
+    try {
+      const result = await request<{ token: string; message: string }>('enrolment/invitations', token, {
+        method: 'POST',
+        body: JSON.stringify({ user_id: Number(invitationUserId), expires_in_minutes: Number(invitationExpiry) }),
+      })
+      setIssuedInvitationToken(result.token)
+      setMessage('One-time invitation created. Copy the token now; it will not be shown again.')
+      const refreshed = await request<{ invitations: EnrolmentInvitation[] }>('enrolment/invitations', token)
+      setInvitations(refreshed.invitations)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to create enrolment invitation.')
+    } finally { setInvitationBusy(false) }
+  }
+
+  async function revokeInvitation(id: number) {
+    if (!window.confirm('Revoke this unused invitation?')) return
+    setInvitationBusy(true); setError(''); setMessage('')
+    try {
+      await request('enrolment/invitations/' + id + '/revoke', token, { method: 'POST' })
+      setMessage('Invitation revoked.')
+      const refreshed = await request<{ invitations: EnrolmentInvitation[] }>('enrolment/invitations', token)
+      setInvitations(refreshed.invitations)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to revoke invitation.')
+    } finally { setInvitationBusy(false) }
   }
 
   async function resolveProposal(id: number, decision: 'discard' | 'rebase') {
@@ -337,6 +394,41 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
   return <section className="panel settings-panel sync-devices-panel">
     <div className="panel-heading"><div><h2>Registered devices</h2><p>Review the browsers and computers authorised to synchronise data for this account.</p></div><button className="secondary-button" type="button" onClick={() => void load()} disabled={loading || busy}>Refresh</button></div>
     <div className="form-hint">Registered devices can keep a short-lived encrypted copy of records currently authorised for this account. The server remains authoritative.</div>
+
+    {isAdmin && <section className="offline-record-tools enrolment-invitations">
+      <h3>Mobile device enrolment</h3>
+      <p className="form-hint">Issue a single-use invitation to an existing active staff or parent account. The invitation is tied to this school installation and the selected account.</p>
+      <form className="student-form" onSubmit={createInvitation}>
+        <div className="student-form-grid">
+          <label>Account
+            <select value={invitationUserId} onChange={event => setInvitationUserId(event.target.value)} required>
+              <option value="">Choose an active account</option>
+              {enrolmentUsers.map(user => <option key={user.id} value={user.id}>{user.username} · {user.role}</option>)}
+            </select>
+          </label>
+          <label>Expires after
+            <select value={invitationExpiry} onChange={event => setInvitationExpiry(event.target.value)}>
+              <option value="60">1 hour</option><option value="360">6 hours</option><option value="1440">24 hours</option><option value="10080">7 days</option>
+            </select>
+          </label>
+        </div>
+        <div className="form-actions"><button className="primary-button" disabled={invitationBusy || !invitationUserId}>{invitationBusy ? 'Creating…' : 'Create one-time invitation'}</button></div>
+      </form>
+      {issuedInvitationToken && <div className="form-hint" role="status">
+        <strong>Copy this token now — it is displayed only once.</strong>
+        <input readOnly value={issuedInvitationToken} onFocus={event => event.currentTarget.select()} aria-label="One-time enrolment token" />
+        <button className="secondary-button" type="button" onClick={() => { void navigator.clipboard?.writeText(issuedInvitationToken).then(() => setMessage('Invitation token copied.')).catch(() => setMessage('Select and copy the invitation token manually.')) }}>Copy token</button>
+      </div>}
+      <h4>Recent invitations</h4>
+      {invitations.length === 0 ? <p className="empty-state">No enrolment invitations have been issued.</p> : <div className="table-wrap"><table><thead><tr><th>Account</th><th>Expires</th><th>Status</th><th>Action</th></tr></thead><tbody>
+        {invitations.map(invitation => <tr key={invitation.id}>
+          <td>{invitation.target_username}</td>
+          <td>{new Date(invitation.expires_at + (invitation.expires_at.endsWith('Z') ? '' : 'Z')).toLocaleString()}</td>
+          <td>{invitation.status}</td>
+          <td>{invitation.status === 'pending' ? <button className="secondary-button" type="button" disabled={invitationBusy} onClick={() => void revokeInvitation(invitation.id)}>Revoke</button> : '—'}</td>
+        </tr>)}
+      </tbody></table></div>}
+    </section>}
     <div className="offline-record-tools">
       <h3>Encrypted offline records</h3>
       <p className="form-hint">Use a private passphrase of at least 12 characters. It is never stored. The encrypted copy expires after 24 hours and is cleared when changed permissions or records are detected after reconnecting.</p>
