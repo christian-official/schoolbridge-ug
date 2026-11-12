@@ -1,6 +1,6 @@
 from datetime import date, datetime
 from sqlalchemy import (
-    String, Integer, Date, DateTime, Text, ForeignKey, UniqueConstraint, Index
+    String, Integer, Date, DateTime, Text, ForeignKey, UniqueConstraint, Index, Boolean
 )
 from sqlalchemy.orm import Mapped, mapped_column
 from .database import Base
@@ -60,6 +60,32 @@ class Student(Base):
     study_mode: Mapped[str] = mapped_column(String(20), default="Day", server_default="Day", nullable=False)
     house: Mapped[str | None] = mapped_column(String(80), nullable=True)
     photo_data: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class StudentGuardianContact(Base):
+    __tablename__ = "student_guardian_contacts"
+    __table_args__ = (
+        UniqueConstraint(
+            "school_tenant_id", "student_id", "legacy_slot",
+            name="uq_student_guardian_legacy_slot",
+        ),
+    )
+
+    school_tenant_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1", index=True)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    student_id: Mapped[int] = mapped_column(ForeignKey("students.id"), index=True)
+    guardian_name: Mapped[str] = mapped_column(String(160))
+    relationship: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    legacy_slot: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    source: Mapped[str] = mapped_column(String(40), default="school_record", server_default="school_record")
+    verification_status: Mapped[str] = mapped_column(String(20), default="unverified", server_default="unverified")
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    verified_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    is_primary: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 class Attendance(Base):
@@ -192,6 +218,10 @@ class StaffMember(Base):
     position: Mapped[str | None] = mapped_column(String(100), nullable=True)
     department: Mapped[str | None] = mapped_column(String(100), nullable=True)
     phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    phone_source: Mapped[str] = mapped_column(String(40), default="legacy_staff_record", server_default="legacy_staff_record")
+    phone_verification_status: Mapped[str] = mapped_column(String(20), default="unverified", server_default="unverified")
+    phone_verified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    phone_verified_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
     email: Mapped[str | None] = mapped_column(String(150), nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="active")
     salary_amount: Mapped[int | None] = mapped_column(Integer, nullable=True)

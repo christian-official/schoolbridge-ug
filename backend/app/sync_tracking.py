@@ -7,6 +7,7 @@ from . import models
 _TRACKED_MODELS = (
     models.User, models.Student, models.SchoolClass, models.Subject, models.StaffMember,
     models.TeacherAssignment, models.ClassTeacherAssignment, models.ParentStudentLink,
+    models.StudentGuardianContact,
     models.Attendance, models.StaffAttendance, models.Exam, models.Mark,
     models.FeeCharge, models.FeePayment, models.ClassFee, models.SalaryPayment,
     models.OtherExpense, models.TimetableEntry,
@@ -58,6 +59,8 @@ def _scope_for_target(connection, target):
         except Exception: pass
     elif isinstance(target, models.ParentStudentLink):
         scope["parent_user_ids"].add(int(target.user_id)); add_student(target.student_id)
+    elif isinstance(target, models.StudentGuardianContact):
+        add_student(target.student_id)
     elif isinstance(target, models.TeacherAssignment):
         # An assignment transfer affects both sides: the incoming teacher gains
         # access, while the outgoing teacher must invalidate previously cached
