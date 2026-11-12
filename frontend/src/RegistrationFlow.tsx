@@ -146,7 +146,7 @@ export default function RegistrationFlow({
           {busy ? 'Verifying your details…' : 'Verify and open my dashboard'}
         </button>
       </form>
-      <button type="button" className="recovery-link" onClick={onBack}>Administrator / existing staff sign in</button>
+      <button type="button" className="recovery-link" onClick={onBack}>Administrator / non-teaching staff sign in</button>
     </section>
   </main>
 }
