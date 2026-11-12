@@ -1,82 +1,113 @@
-# SchoolBridge remote access decision and mobile acceptance
+# SchoolBridge hosted PWA, universal school access and mobile acceptance
 
-## Default deployment: school LAN
+## Hosting decision: one free hosted address for every school
 
-SchoolBridge remains local-first. For normal school use, keep the database and application on the school's host and use the opt-in LAN HTTPS listener for phones and staff devices on the trusted school network.
+SchoolBridge already has its hosted Render services:
 
-- Use the installation-specific LAN certificate and install only its public root certificate on authorised client devices.
-- Keep the LAN firewall rule restricted to the Private profile and LocalSubnet.
-- Generate the reusable school QR from the reachable HTTPS LAN address.
-- QR identifies the installation; it does not authenticate a user or grant permissions.
-- Each parent/staff member signs in with their own account and redeems their own single-use invitation.
-- Do not enable public internet access merely to make the PWA installable.
+- Frontend/PWA: https://schoolbridge-ug-1.onrender.com
+- Backend API: https://schoolbridge-ug.onrender.com
 
-This path supports mobile access while keeping student records inside the school's local network. PWA installation requires a secure browser context, which the configured LAN HTTPS listener provides after client trust is established.
+The frontend address is the shared SchoolBridge entry point. Every school must be able to reach the same hosted PWA address. A school must not have to buy a domain, create its own subdomain, configure a tunnel, install a LAN certificate, or be on the school's Wi-Fi just to open the PWA.
 
-## Public HTTPS hostname: decision
+The intended onboarding flow is:
 
-A stable public hostname is optional and must not be silently enabled by the installer or QR workflow. Public routing makes the school application reachable from outside the school network, so it requires an explicit school-authorised deployment decision and a separate security review.
+1. A school opens the shared SchoolBridge HTTPS address.
+2. The school creates or joins its own school workspace through the hosted onboarding flow.
+3. SchoolBridge assigns a unique, non-secret school identity within the platform.
+4. The school's authorised administrator creates staff/parent accounts and controls access.
+5. The administrator generates the school's reusable QR from the shared hosted address. The QR identifies that school workspace; it contains no credentials or invitation secret.
+6. Parents and staff scan the QR, confirm the school identity, sign in using their own account, and complete the account-bound device enrolment process.
+7. The PWA can be installed from the same shared HTTPS address on Android and iPhone.
 
-Current options and trade-offs:
+There is no per-school domain or subdomain requirement. Schools use the shared platform URL; the school identity is resolved inside SchoolBridge.
 
-- **School-controlled domain with a managed HTTPS reverse proxy/tunnel:** preferred for a school that has formally approved remote access. The school controls the hostname and account, and can define access, monitoring, retention and incident-response arrangements. This still requires a security review before production use.
-- **Tailscale Funnel:** provides a stable HTTPS *.ts.net hostname and is listed as available on all Tailscale plans. However, it publishes the selected local service to the public internet; anyone with the URL can reach the service's public login surface. It is suitable only for a controlled demonstration or evaluation until SchoolBridge's public-edge controls and the school's data-protection requirements have been reviewed. The school host must run the Tailscale client and remain online.
-- **Cloudflare Quick Tunnel:** creates a random *.trycloudflare.com address that changes when the process is restarted and is documented for testing/development, not production. Do not use it as the school's reusable QR destination.
-- **Cloudflare named Tunnel:** supports a persistent hostname, but publishing an application requires a Cloudflare account and a domain on Cloudflare. It is not a zero-cost hostname supplied automatically by SchoolBridge.
+## Important implementation and data-safety gate
 
-SchoolBridge therefore does not automatically create a public tunnel or claim that a free temporary URL is a permanent school address. Until a school explicitly selects and configures an approved public hostname, use the LAN HTTPS route described in DESKTOP_LAN_ACCESS.md.
+The current hosted backend still uses a single-school data model and the existing Render configuration points at SQLite. It is not yet safe to onboard unrelated schools into one shared hosted database. Do not solve this by allowing all schools to share one installation, user table or school records.
 
-References:
-- Tailscale Funnel: https://tailscale.com/docs/features/tailscale-funnel
-- Cloudflare Tunnel fundamentals: https://developers.cloudflare.com/tunnel/concepts/
-- Cloudflare Quick Tunnels: https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/
-- Cloudflare Tunnel setup prerequisites: https://developers.cloudflare.com/tunnel/get-started/
+Before public multi-school onboarding is enabled, implement and test:
+
+- a first-class school/tenant record and immutable tenant identifier;
+- tenant ownership on every school-owned record and relationship, including users, students, staff, finance, exams, attendance, settings, files, audit events, devices, invitations, sync journals and backups;
+- tenant-scoped authentication and authorisation on every API route, including background jobs, exports, reports, search, sync and backup/restore;
+- database constraints and indexes that prevent cross-school references and duplicate identifiers only within the appropriate school;
+- school-scoped file/object storage and backup/restore;
+- tenant isolation tests that attempt cross-school reads, writes, ID substitution, exports, device pairing and invitation redemption;
+- durable hosted database/storage configuration and recovery testing; do not rely on ephemeral application-container SQLite for school records.
+
+The hosted PWA can be developed and tested on the existing Render subdomain while this work proceeds, but public school-data onboarding must remain closed until the tenant-isolation and persistence gates pass. This is a product-readiness gate, not a condition requiring any school to buy a domain or pay for a separate hostname.
+
+## LAN and local-first operation remain supported
+
+The shared hosted PWA does not remove SchoolBridge's local-first deployment option. Schools that install SchoolBridge on their own Windows host can continue using their local database and optional LAN HTTPS listener. See DESKTOP_LAN_ACCESS.md.
+
+The LAN certificate is only needed for that local-network deployment path. It is not a requirement for schools using the shared hosted PWA. Do not make QR generation or PWA installation depend exclusively on a private LAN address.
+
+## QR and invitation security
+
+- The school QR is reusable and does not expire merely because it has been scanned.
+- It contains a school/workspace identifier and the shared HTTPS PWA address, never a password, session token or invitation secret.
+- Scanning the QR does not sign a person in or grant permissions.
+- Staff and parents authenticate with their own accounts.
+- Device invitations remain account-bound, single-use and revocable.
+- A QR for one school must never allow access to another school's data.
+- Every API request must derive and enforce the tenant from the authenticated, verified school context; never trust a tenant ID supplied only by the browser.
 
 ## Mobile acceptance checklist
 
-Run this checklist on the actual school host and representative phones before calling Task 1.10 production-ready. Use test accounts and synthetic student data only.
+Use test schools, test accounts and synthetic student data only.
 
 ### Android (Chrome)
 
-1. Connect the phone to the same trusted school Wi-Fi as the host.
-2. Open the school's LAN HTTPS address and confirm there is no browser certificate warning.
-3. Scan the reusable QR and confirm the displayed school name is the intended installation.
-4. Confirm a QR for another installation is rejected and does not allow sign-in.
-5. Sign in with a test parent/staff account.
-6. Redeem an invitation issued for that exact account; confirm the device appears in Device Management.
-7. Try the same invitation again; confirm replay is rejected.
-8. Install from the browser's install/Add to Home Screen prompt and launch the installed app.
-9. Update the web app in a test release; confirm the update prompt activates the new shell without leaving the app stuck on an old version.
-10. Revoke the test device; confirm it can no longer use protected device operations.
+1. Open https://schoolbridge-ug-1.onrender.com from a phone on an ordinary internet connection; no school Wi-Fi, private certificate or custom domain should be required for the hosted PWA.
+2. Complete the test-school onboarding flow and confirm the assigned school identity.
+3. Generate and scan that school's reusable QR; confirm the correct school is displayed.
+4. Confirm a QR for another test school resolves to that other school and cannot expose the first school's records.
+5. Sign in with a test parent/staff account and redeem an invitation issued for that exact account.
+6. Confirm replay of the same invitation is rejected.
+7. Install the PWA from the browser's install/Add to Home Screen prompt and launch it.
+8. Verify the update prompt activates a new app shell correctly.
+9. Revoke the test device and verify protected device operations are denied.
 
 ### iPhone/iPad (Safari)
 
-1. Connect the device to the same trusted school Wi-Fi.
-2. Open the LAN HTTPS address in Safari and confirm there is no certificate warning.
-3. Scan the reusable QR and verify the school identity.
-4. Sign in with a test account and redeem its invitation once.
-5. Use Share → Add to Home Screen, launch the installed app, and confirm login/navigation work.
-6. Repeat the update and device-revocation checks above.
+1. Open the same shared hosted HTTPS address using ordinary internet access; no custom domain, private CA or school LAN should be required.
+2. Complete test-school onboarding and verify the school identity.
+3. Scan the school's QR, sign in with a test account and redeem its invitation once.
+4. Use Share → Add to Home Screen, launch the installed PWA and confirm login/navigation.
+5. Repeat the update, invitation replay and device-revocation checks.
+
+### Tenant-isolation acceptance
+
+- Create at least two independent test schools.
+- Use similar usernames, admission numbers and record IDs in both schools where supported.
+- Attempt cross-school access by changing path IDs, query IDs, request bodies, exports, report filters, sync cursors, invitation identifiers and device identifiers.
+- Verify every attempt is denied or returns only data belonging to the authenticated school.
+- Verify one school's administrator cannot list, edit, export, revoke or restore another school's data.
+- Verify backup and restore operate within one school boundary.
+- Verify removing or disabling one school does not affect another school's records.
 
 ### Offline and recovery boundaries
 
-- Confirm the app shell can reopen while the host is temporarily unreachable.
+- Confirm the PWA shell can reopen while the network is unavailable.
 - Confirm protected API requests do not appear to succeed from stale cached responses.
-- Do not treat the current service-worker shell cache as offline access to school records. API responses and non-GET requests are deliberately not cached.
-- Confirm device revocation and invitation redemption are enforced again when the server is reachable.
-- Separately test backup/restore while the LAN listener is in use before production rollout.
+- Do not describe the shell cache as offline access to all school records. API responses and non-GET requests are deliberately not cached.
+- Verify synchronisation is tenant-scoped before enabling offline writes across hosted school workspaces.
+- Test backup/restore and recovery against the durable hosted database before production onboarding.
 
-Record device model, OS/browser version, test date, host address, certificate result, install result, invitation result, update result and revocation result. Do not record real student details or invitation tokens in the test report.
+Record device model, OS/browser version, test date, school test identifier, installation result, invitation result, update result and revocation result. Never put real student details, passwords or invitation tokens in test reports.
 
-## Completion gate
+## Completion gate for hosted multi-school PWA
 
-Task 1.10 is not complete until:
+Task 1.10 and hosted multi-school onboarding are not complete until:
 
-- all CI jobs pass on the final Task 1.10 commit;
-- Android and iOS acceptance checks are completed on real devices;
-- one-time invitation issue, redemption, replay rejection and revocation are verified end-to-end;
-- QR school-identity verification and mismatch rejection are verified end-to-end;
-- offline shell behaviour is verified without implying that all school records are offline-capable; and
-- the school has explicitly selected LAN-only or an approved public HTTPS hostname.
+- CI passes on the final implementation;
+- the shared hosted PWA works from Android and iPhone over ordinary internet access;
+- school creation and unique school identity are implemented;
+- two or more schools pass tenant-isolation tests across all API and data paths;
+- one-time invitation issue, redemption, replay rejection and revocation work end-to-end;
+- QR identity verification prevents cross-school access;
+- hosted persistence, backup and restore are proven durable;
+- PWA updates and current offline-shell boundaries are verified.
 
-No public tunnel, external hosting account, DNS record or school-data exposure is created by this documentation change.
+No school-specific domain, paid custom hostname, private LAN certificate or tunnel setup is a prerequisite for accessing the shared hosted PWA.
