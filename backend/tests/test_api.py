@@ -3691,3 +3691,32 @@ def test_public_school_selector_scopes_identity_login_and_school_records():
 
         unknown = client.get("/api/public/school?school=00000000-0000-4000-8000-000000000099")
         assert unknown.status_code == 404
+
+
+def test_staff_surname_is_not_a_login_identifier_but_staff_number_is():
+    reset_database()
+    with SessionLocal() as db:
+        staff = models.StaffMember(
+            staff_number="AUTH-ST-001", first_name="Sam", last_name="Surname",
+            category="Teaching", school_tenant_id=1,
+        )
+        db.add(staff)
+        db.flush()
+        db.add(models.User(
+            username="sam.teacher", email="sam.teacher@example.invalid",
+            hashed_password=password_hash.hash("StaffPassword123!"),
+            role="teacher", staff_id=staff.id, school_tenant_id=1,
+        ))
+        db.commit()
+
+    with TestClient(app) as client:
+        surname_login = client.post("/api/auth/login", data={
+            "username": "Surname", "password": "StaffPassword123!",
+        })
+        assert surname_login.status_code == 401
+
+        staff_number_login = client.post("/api/auth/login", data={
+            "username": "AUTH-ST-001", "password": "StaffPassword123!",
+        })
+        assert staff_number_login.status_code == 200, staff_number_login.text
+        assert staff_number_login.json()["username"] == "sam.teacher"

@@ -2371,22 +2371,17 @@ def login(
         models.User.school_tenant_id == tenant_id,
     ).first()
     if user is None:
-        surname_matches = db.query(models.User).join(
+        # Staff may use their registered staff number, but surnames are not
+        # login credentials because they are neither unique nor secret.
+        user = db.query(models.User).join(
             models.StaffMember,
             (models.User.staff_id == models.StaffMember.id)
             & (models.User.school_tenant_id == models.StaffMember.school_tenant_id),
         ).filter(
             models.User.school_tenant_id == tenant_id,
             models.StaffMember.school_tenant_id == tenant_id,
-            or_(
-                func.lower(models.StaffMember.last_name) == login_name.lower(),
-                func.lower(models.StaffMember.staff_number) == login_name.lower(),
-            ),
-        ).all()
-        if len(surname_matches) == 1:
-            user = surname_matches[0]
-        elif len(surname_matches) > 1:
-            raise HTTPException(401, "More than one staff member has that surname. Please sign in using your staff number.")
+            func.lower(models.StaffMember.staff_number) == login_name.lower(),
+        ).first()
 
     if not user or not user.is_active:
         raise HTTPException(401, "Incorrect username or password.")
