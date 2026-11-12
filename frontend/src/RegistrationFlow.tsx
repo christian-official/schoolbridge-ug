@@ -45,7 +45,7 @@ export default function RegistrationFlow({ schoolId, schoolName, onBack }: { sch
         : { school_id: schoolId, ...teacher, first_name: teacher.first_name.trim(), last_name: teacher.last_name.trim(),
             staff_number: teacher.staff_number.trim() || null, position: teacher.position.trim() || null,
             department: teacher.department.trim() || null }
-      const result = await request('public/registration/' + kind, payload)
+      const result = await request(kind === 'parent' ? 'public/registration/parent' : 'public/registration/teacher', payload)
       setReference(result.claim_reference)
       setStatus(result.status)
       setMaskedPhone(result.phone_masked || '')
