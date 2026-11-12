@@ -111,6 +111,33 @@ def _registration_name_key(value: str | None) -> str:
     return " ".join((value or "").strip().casefold().split())
 
 
+def _check_qr_registration_rate_limit(db: Session, request: Request) -> None:
+    """Rate-limit public QR verification without creating registration claims or review tasks."""
+    tenant_id = get_current_tenant_id(db)
+    client_host = request.client.host if request.client else "unknown"
+    requester_hash = hashlib.sha256(client_host.encode("utf-8")).hexdigest()
+    since = datetime.utcnow() - timedelta(hours=1)
+    recent_attempts = db.query(models.AuditLog.id).filter(
+        models.AuditLog.school_tenant_id == tenant_id,
+        models.AuditLog.action == "qr_registration_attempt",
+        models.AuditLog.entity_type == "qr_registration",
+        models.AuditLog.details == requester_hash,
+        models.AuditLog.created_at >= since,
+    ).count()
+    if recent_attempts >= 60:
+        raise HTTPException(429, "Too many registration attempts from this connection. Please wait and try again.")
+    db.add(models.AuditLog(
+        school_tenant_id=tenant_id,
+        actor_id=None,
+        actor_username="public-qr",
+        action="qr_registration_attempt",
+        entity_type="qr_registration",
+        entity_id=0,
+        details=requester_hash,
+    ))
+    db.commit()
+
+
 def _match_parent_registration(db: Session, data: "ParentSelfRegistrationRequest") -> list[int]:
     """Match a parent directly to active student and guardian records in the QR-selected school."""
     tenant_id = get_current_tenant_id(db)
@@ -2778,8 +2805,9 @@ def current_account(user=Depends(get_current_user)):
 
 
 @app.post("/api/public/registration/parent", tags=["Parent & Teacher Registration"])
-def submit_parent_registration(data: ParentSelfRegistrationRequest, db: Session = Depends(get_db)):
+def submit_parent_registration(data: ParentSelfRegistrationRequest, request: Request, db: Session = Depends(get_db)):
     resolve_school_tenant(db, str(data.school_id))
+    _check_qr_registration_rate_limit(db, request)
     student_ids = _match_parent_registration(db, data)
     identity_material = "|".join([
         str(get_current_tenant_id(db)),
@@ -2799,8 +2827,9 @@ def submit_parent_registration(data: ParentSelfRegistrationRequest, db: Session 
 
 
 @app.post("/api/public/registration/teacher", tags=["Parent & Teacher Registration"])
-def submit_teacher_registration(data: TeacherSelfRegistrationRequest, db: Session = Depends(get_db)):
+def submit_teacher_registration(data: TeacherSelfRegistrationRequest, request: Request, db: Session = Depends(get_db)):
     resolve_school_tenant(db, str(data.school_id))
+    _check_qr_registration_rate_limit(db, request)
     staff = _match_teacher_registration(db, data)
     teacher_slug = re.sub(r"[^a-z0-9]+", "-", _registration_name_key(f"{staff.first_name} {staff.last_name}")).strip("-")[:32] or "teacher"
     session = _create_qr_registration_session(
