@@ -406,11 +406,21 @@ def test_existing_student_table_migrates_to_optional_admission_number(tmp_path):
 
 
 def test_all_school_owned_tables_receive_tenant_ownership_keys(migrated_database):
-    from app.migrations.versions import _0032_school_tenant_ownership as ownership
+    tenant_tables = (
+        "classes", "subjects", "students", "attendance", "exams", "marks",
+        "grade_bands", "users", "teacher_assignments", "class_teacher_assignments",
+        "school_settings", "staff_members", "fee_charges", "fee_payments",
+        "class_fees", "salary_payments", "other_expenses", "audit_logs",
+        "school_profile", "parent_student_links", "school_announcements",
+        "prefect_assignments", "teacher_duties", "staff_attendance",
+        "timetable_entries", "parent_liaison_threads", "parent_liaison_messages",
+        "sync_devices", "enrolment_invitations", "sync_change_proposals",
+        "sync_changes", "school_setup_state", "school_identity_corrections",
+    )
 
     engine = create_engine(migrated_database)
     inspector = inspect(engine)
-    for table in ownership.TENANT_TABLES:
+    for table in tenant_tables:
         columns = {item["name"] for item in inspector.get_columns(table)}
         assert "school_tenant_id" in columns, table
         indexes = {item["name"] for item in inspector.get_indexes(table)}
@@ -422,7 +432,7 @@ def test_all_school_owned_tables_receive_tenant_ownership_keys(migrated_database
         ).scalars().all()
         assert len(tenant_ids) == 1
         tenant_id = tenant_ids[0]
-        for table in ownership.TENANT_TABLES:
+        for table in tenant_tables:
             count = connection.exec_driver_sql(
                 f'SELECT COUNT(*) FROM "{table}" WHERE school_tenant_id != ?',
                 (tenant_id,),
