@@ -2046,16 +2046,22 @@ async def protect_school_data(request: Request, call_next):
                 auth[7:], JWT_SECRET, algorithms=[JWT_ALGORITHM]
             )
             user_id = int(payload["sub"])
+            tenant_id = int(payload["tenant"])
+            from .database import set_tenant_context
+            set_tenant_context(db, tenant_id)
         except (InvalidTokenError, ValueError, KeyError, TypeError):
             return JSONResponse(
                 {"detail": "Invalid or expired login token."},
                 status_code=401,
             )
 
-        # Always load the current account from the database. Never trust a
-        # role stored in a token: account deactivation and role changes must
-        # take effect immediately, even for tokens issued earlier.
-        user = db.get(models.User, user_id)
+        # Always load the current account from the token's school tenant.
+        # Never trust a role stored in a token: account deactivation and role
+        # changes must take effect immediately, even for tokens issued earlier.
+        user = db.query(models.User).filter(
+            models.User.id == user_id,
+            models.User.school_tenant_id == tenant_id,
+        ).first()
         if not user or not user.is_active:
             return JSONResponse(
                 {"detail": "Account is unavailable."}, status_code=401
