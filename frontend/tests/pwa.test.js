@@ -13,8 +13,10 @@ test('web app manifest has installable standalone metadata and valid icons', asy
   assert.equal(manifest.short_name, 'SchoolBridge')
   assert.equal(manifest.display, 'standalone')
   assert.equal(manifest.start_url, '/')
+  assert.ok(manifest.icons.some(icon => icon.src === '/icons/schoolbridge-app-icon.png' && icon.sizes === '192x192' && icon.type === 'image/png'))
   assert.ok(manifest.icons.some(icon => icon.src === '/app-icon.svg' && icon.sizes === 'any' && icon.type === 'image/svg+xml'))
   assert.match(await readFile(new URL('../public/app-icon.svg', import.meta.url), 'utf8'), /fill="#173b63"/)
+  assert.match(html, /rel="apple-touch-icon" sizes="192x192" href="\/icons\/schoolbridge-app-icon\.png"/)
   assert.match(await readFile(new URL('../public/app-icon.svg', import.meta.url), 'utf8'), /fill="#fff"/)
   for (const icon of manifest.icons) {
     await access(new URL(icon.src.replace(/^\//, ''), publicDir))
