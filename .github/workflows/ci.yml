@@ -221,6 +221,8 @@ jobs:
   frontend-build:
     name: frontend / lint-tests-build-browser
     runs-on: ubuntu-24.04
+    env:
+      VITE_API_BASE_URL: https://schoolbridge-api.example
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
