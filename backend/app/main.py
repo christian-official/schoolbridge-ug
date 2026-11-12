@@ -2461,14 +2461,13 @@ def school_access_qr(
     if not state or not state.setup_completed_at:
         raise HTTPException(409, "Complete school setup before creating an access QR code.")
     parsed = urlsplit(origin)
-    request_host = request.url.hostname
+    request_origin = request.headers.get("origin") or f"{request.url.scheme}://{request.url.netloc}"
+    parsed_origin = f"{parsed.scheme}://{parsed.netloc}"
     if (
         parsed.scheme not in {"http", "https"}
-        or parsed.scheme != request.url.scheme
+        or parsed_origin.lower() != request_origin.rstrip("/").lower()
         or not parsed.hostname
         or parsed.username or parsed.password
-        or parsed.hostname.lower() != (request_host or "").lower()
-        or parsed.netloc.lower() != request.url.netloc.lower()
         or parsed.query or parsed.fragment or parsed.path not in {"", "/"}
     ):
         raise HTTPException(400, "The QR destination must be this SchoolBridge installation's current web origin.")
