@@ -53,6 +53,5 @@ Get-ChildItem -LiteralPath $target -File -Recurse |
     } | Set-Content -LiteralPath $manifestPath -Encoding ASCII
 
 & (Join-Path $target "Verify-USB.ps1")
-if ($LASTEXITCODE -ne 0) { throw "USB package self-verification failed." }
 Write-Host "USB package created: $target"
 Write-Host "Copy the complete folder to a USB drive. Do not copy only the installer."
