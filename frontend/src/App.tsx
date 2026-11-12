@@ -148,8 +148,7 @@ function isPrivateLanAddress(hostname: string): boolean {
 }
 const isSchoolBridgeLanClient = typeof window !== 'undefined' &&
   window.location.protocol === 'https:' && isPrivateLanAddress(window.location.hostname)
-// Keep the deployed static site connected to its dedicated API even if a Render
-// build is triggered without the VITE_API_BASE_URL build-time variable.
+// Hosted deployments set VITE_API_BASE_URL at build time; local and LAN installs use same-origin APIs.
 declare global {
   interface Window {
     __TAURI__?: { core?: { invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> } }
@@ -185,11 +184,7 @@ async function clearStoredSessionToken(): Promise<void> {
   sessionStorage.removeItem('sb_token')
 }
 
-const API_BASE_URL = desktopApiBaseUrl || (isSchoolBridgeLanClient ? '' : configuredApiBaseUrl) || (
-  typeof window !== 'undefined' && window.location.hostname === 'schoolbridge-ug-1.onrender.com'
-    ? 'https://schoolbridge-ug.onrender.com'
-    : ''
-)
+const API_BASE_URL = desktopApiBaseUrl || (isSchoolBridgeLanClient ? '' : configuredApiBaseUrl)
 
 async function api<T>(path: string, token: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_BASE_URL}/api/${path}`, {
@@ -1498,7 +1493,7 @@ function App() {
           <div className="brand-mark"><GraduationCap size={30} /></div>
           <div className="brand-name">School<span>Bridge</span></div>
           <p className="login-subtitle">Your school's operations, connected.</p>
-          {showRecovery ? <PasswordRecovery schoolId={selectedSchoolId} onBack={()=>setShowRecovery(false)}/> : showRegistration && selectedSchoolId && qrSchoolName && !qrSchoolError ? <RegistrationFlow schoolId={selectedSchoolId} schoolName={qrSchoolName} onBack={()=>setShowRegistration(false)}/> : <>
+          {showRecovery ? <PasswordRecovery schoolId={selectedSchoolId} onBack={()=>setShowRecovery(false)}/> : showRegistration && selectedSchoolId && qrSchoolName && !qrSchoolError ? <RegistrationFlow schoolId={selectedSchoolId} schoolName={qrSchoolName} apiBaseUrl={API_BASE_URL} onBack={()=>setShowRegistration(false)}/> : <>
             <h1>Welcome back</h1>
             <p className="muted">Sign in to your school workspace.</p>
             {qrSchoolName && <p className="form-hint">School: <strong>{qrSchoolName}</strong></p>}

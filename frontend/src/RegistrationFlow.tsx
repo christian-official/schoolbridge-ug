@@ -3,7 +3,7 @@ import { useState } from 'react'
 type ChildDetails = { first_name: string; last_name: string; admission_number: string; date_of_birth: string; class_name: string }
 type ClaimStatus = 'pending_review' | 'verification_pending' | 'verified' | 'approved' | 'rejected' | 'expired' | 'completed'
 
-export default function RegistrationFlow({ schoolId, schoolName, onBack }: { schoolId: string; schoolName: string; onBack: () => void }) {
+export default function RegistrationFlow({ schoolId, schoolName, apiBaseUrl, onBack }: { schoolId: string; schoolName: string; apiBaseUrl: string; onBack: () => void }) {
   const [kind, setKind] = useState<'parent' | 'teacher'>('parent')
   const [stage, setStage] = useState<'details' | 'claim' | 'account' | 'done'>('details')
   const [parentName, setParentName] = useState('')
@@ -22,7 +22,7 @@ export default function RegistrationFlow({ schoolId, schoolName, onBack }: { sch
   const [message, setMessage] = useState('')
 
   async function request(path: string, body?: unknown) {
-    const response = await fetch('/api/' + path, {
+    const response = await fetch(apiBaseUrl + '/api/' + path, {
       method: body === undefined ? 'GET' : 'POST',
       headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),

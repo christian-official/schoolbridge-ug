@@ -30,3 +30,12 @@ test('account completion sends only school, chosen username and password', () =>
   assert.match(flow, /username: username\.trim\(\), password/)
   assert.match(flow, /school_id: schoolId/)
 })
+
+
+test('hosted registration requests use the configured shared API origin', () => {
+  assert.match(flow, /apiBaseUrl: string/)
+  assert.match(flow, /fetch\(apiBaseUrl \+ '\/api\/' \+ path/)
+  assert.match(app, /apiBaseUrl=\{API_BASE_URL\}/)
+  assert.doesNotMatch(app, /onrender\.com/i)
+  assert.match(app, /const API_BASE_URL = desktopApiBaseUrl \|\| \(isSchoolBridgeLanClient \? '' : configuredApiBaseUrl\)/)
+})
