@@ -112,6 +112,8 @@ test('QR access opens the correct school registration flow on a mobile viewport 
     await page.goto(baseUrl + '/?school=' + schoolId)
     await page.getByRole('heading', { name: 'Join your school' }).waitFor()
     await page.getByText('Mobile QR Test School').waitFor()
+    await page.getByRole('button', { name: 'Parent', exact: true }).click()
+    await page.getByRole('dialog', { name: 'Parent details' }).waitFor()
     const registrationWidth = await page.evaluate(() => ({ viewport: innerWidth, document: document.documentElement.scrollWidth }))
     assert.ok(registrationWidth.document <= registrationWidth.viewport, `QR registration must fit a phone viewport: ${JSON.stringify(registrationWidth)}`)
 
