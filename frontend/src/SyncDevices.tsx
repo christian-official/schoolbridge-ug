@@ -100,6 +100,8 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
   const [invitationExpiry, setInvitationExpiry] = useState('1440')
   const [issuedInvitationToken, setIssuedInvitationToken] = useState('')
   const [invitationBusy, setInvitationBusy] = useState(false)
+  const [schoolQrUrl, setSchoolQrUrl] = useState('')
+  const [schoolAccessUrl, setSchoolAccessUrl] = useState('')
 
   const [deviceId, setDeviceId] = useState('')
   const [loading, setLoading] = useState(true)
@@ -110,6 +112,34 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
   const [offlineStatus, setOfflineStatus] = useState('')
   const [offlineBusy, setOfflineBusy] = useState(false)
   const [offlineSnapshot, setOfflineSnapshot] = useState<any>(null)
+
+  useEffect(() => {
+    if (!isAdmin) return
+    let objectUrl = ''
+    const controller = new AbortController()
+    const destination = window.location.origin + '/?school='
+    fetch(API_BASE_URL + '/api/enrolment/school-qr.svg?origin=' + encodeURIComponent(window.location.origin), {
+      headers: { Authorization: 'Bearer ' + token },
+      cache: 'no-store',
+      signal: controller.signal,
+    }).then(async response => {
+      if (!response.ok) throw new Error('Unable to create the school access QR code.')
+      return response.blob()
+    }).then(blob => {
+      objectUrl = URL.createObjectURL(blob)
+      setSchoolQrUrl(objectUrl)
+    }).catch(error => {
+      if (error.name !== 'AbortError') setError(error instanceof Error ? error.message : 'Unable to create the school access QR code.')
+    })
+    fetch(API_BASE_URL + '/api/public/school', { cache: 'no-store', signal: controller.signal })
+      .then(response => response.ok ? response.json() : Promise.reject(new Error('School identity is unavailable.')))
+      .then(identity => setSchoolAccessUrl(destination + encodeURIComponent(identity.installation_id)))
+      .catch(error => { if (error.name !== 'AbortError') setError(error instanceof Error ? error.message : 'Unable to load school identity.') })
+    return () => {
+      controller.abort()
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [isAdmin, token])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -395,6 +425,21 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
     <div className="panel-heading"><div><h2>Registered devices</h2><p>Review the browsers and computers authorised to synchronise data for this account.</p></div><button className="secondary-button" type="button" onClick={() => void load()} disabled={loading || busy}>Refresh</button></div>
     <div className="form-hint">Registered devices can keep a short-lived encrypted copy of records currently authorised for this account. The server remains authoritative.</div>
 
+    {isAdmin && <section className="offline-record-tools school-access-qr">
+      <h3>School mobile access QR</h3>
+      <p className="form-hint">This reusable QR code opens this school's SchoolBridge sign-in page. It identifies the school installation only; it does not sign anyone in or grant permissions. Staff and parents must still use their own accounts.</p>
+      {schoolQrUrl ? <div className="school-access-qr-content">
+        <img src={schoolQrUrl} alt="Reusable SchoolBridge school access QR code" width="240" height="240" />
+        <div>
+          <strong>School access link</strong>
+          <input readOnly value={schoolAccessUrl} onFocus={event => event.currentTarget.select()} aria-label="School access link" />
+          <div className="proposal-review-actions">
+            <button className="secondary-button" type="button" onClick={() => { void navigator.clipboard?.writeText(schoolAccessUrl).then(() => setMessage('School access link copied.')).catch(() => setMessage('Select and copy the school access link manually.')) }}>Copy access link</button>
+            <button className="secondary-button" type="button" onClick={() => window.print()}>Print QR</button>
+          </div>
+        </div>
+      </div> : <p className="form-hint">Preparing the school QR code…</p>}
+    </section>}
     {isAdmin && <section className="offline-record-tools enrolment-invitations">
       <h3>Mobile device enrolment</h3>
       <p className="form-hint">Issue a single-use invitation to an existing active staff or parent account. The invitation is tied to this school installation and the selected account.</p>
