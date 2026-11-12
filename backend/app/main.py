@@ -182,7 +182,7 @@ def _create_registration_claim(
     return reference, claim
 
 
-def _match_parent_registration(db: Session, data: ParentSelfRegistrationRequest):
+def _match_parent_registration(db: Session, data: "ParentSelfRegistrationRequest"):
     student_ids: list[int] = []
     contact_ids: list[int] = []
     phones: list[str] = []
@@ -243,7 +243,7 @@ def _match_parent_registration(db: Session, data: ParentSelfRegistrationRequest)
     return student_ids, contact_ids, trusted_phone
 
 
-def _match_teacher_registration(db: Session, data: TeacherSelfRegistrationRequest):
+def _match_teacher_registration(db: Session, data: "TeacherSelfRegistrationRequest"):
     query = db.query(models.StaffMember).filter(
         models.StaffMember.status == "active",
         func.lower(models.StaffMember.category).in_(["teaching", "teacher"]),
