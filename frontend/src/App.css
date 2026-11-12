@@ -2392,3 +2392,15 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .first-setup-confirmation p{margin:0;color:#64748b;font-size:12px;line-height:1.5}
 .first-setup-confirmation label{display:flex;align-items:flex-start;gap:9px;font-size:12px;line-height:1.5}
 .first-setup-confirmation input{width:auto;min-width:16px;margin:2px 0 0}
+
+/* Sidebar account control: profile/settings actions stay at the bottom of navigation. */
+.sidebar-account-control{position:relative;margin-top:10px}
+.sidebar-account-trigger{display:flex;align-items:center;gap:11px;width:100%;padding:10px 12px;border:1px solid var(--border,#e4eaf2);border-radius:12px;background:var(--surface,#fff);color:inherit;text-align:left;cursor:pointer}
+.sidebar-account-trigger .avatar{display:grid;place-items:center;flex:0 0 34px;width:34px;height:34px;border-radius:50%;background:var(--primary-soft,#eaf0ff);color:var(--primary,#315ee8);font-weight:800}
+.sidebar-account-trigger .profile-info{display:grid;gap:2px;min-width:0;flex:1}
+.sidebar-account-trigger .profile-info strong{font-size:12px}
+.sidebar-account-trigger .profile-info small{font-size:10px;color:var(--muted,#77849b);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.account-menu-indicator{font-size:18px;color:var(--muted,#77849b)}
+.sidebar-account-menu{position:absolute;left:0;right:0;bottom:calc(100% + 8px);z-index:60;padding:6px;border:1px solid var(--border,#e4eaf2);border-radius:12px;background:var(--surface,#fff);box-shadow:0 12px 30px #142b4b20}
+.sidebar-account-menu button{display:flex;align-items:center;gap:10px;width:100%;padding:10px;border:0;border-radius:8px;background:transparent;color:inherit;text-align:left;font-size:12px;cursor:pointer}
+.sidebar-account-menu button:hover{background:var(--surface-muted,#f2f5fa)}
