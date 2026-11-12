@@ -1,55 +1,58 @@
-# Existing Docker/WSL2 USB prototype — not the final desktop installer
+# SchoolBridge USB installation package — Task 1.12
 
-## Status and boundary
+## Purpose and release boundary
 
-This document describes the existing Docker Desktop + WSL2 prototype only. It is **not** the agreed final SchoolBridge installer: it requires a modern Windows host, launches the frontend in a separately opened browser, and does not meet the Windows 8 starting-compatibility requirement. Do not present this route as the completed USB deliverable. The final USB must carry the complete desktop application and runtime, install and launch it without internet, and support Windows 8 first, then Windows 8.1 and newer releases.
+The USB is a delivery medium for the **standalone SchoolBridge Windows desktop installer** from Task 1.11. It is not a Docker/WSL2 deployment and must not require a separate browser, Docker Desktop, WSL2, internet access, or a school network.
 
-## Agreed architecture and installation boundary
+The USB package contains:
+- `SchoolBridge-Setup.exe`: the standalone NSIS desktop installer, including the packaged backend/runtime and offline WebView2 installer;
+- `Verify-USB.ps1`: checks every packaged file against the SHA-256 manifest and rejects missing, modified, duplicate, unsafe-path or unmanifested files;
+- `SHA256SUMS.txt`: file-integrity manifest;
+- this installation guide.
 
-SchoolBridge is local-first. Each school has its own local database and runs the frontend and backend on its own computer. Render is a preview/development service only. Internet is not required for local installation, login or ordinary school operations. A LAN/router is optional and is needed only when additional devices must connect to the host; one-computer operation requires no network equipment.
+The older Docker/WSL2 package remains a prototype only. Do not use `scripts/prepare-usb.ps1` as the Task 1.12 release path.
 
-When installed locally, the frontend, API and database run together. The service-worker cache is only a fallback app shell; it does not provide all school records or editing workflows when the local server is stopped.
+## Prepare the USB package
 
-**Offline USB status:** the preparation computer downloads the Docker Desktop installer from Docker's official Windows distribution endpoint and resolves the latest stable x64 WSL MSI from Microsoft's official WSL releases. It verifies both Authenticode signatures before packaging. The school computer receives these installers, prebuilt SchoolBridge/PostgreSQL images, installation guides and a SHA-256 file-integrity manifest on USB; it does not download them. Docker setup remains interactive for licence acceptance and Windows may require a restart. A clean Windows computer with internet disconnected must still pass the acceptance test below before this installer can be certified for school-wide release.
+Build the standalone installer using the Task 1.11 desktop build process on a trusted preparation computer. Then, from the repository root, run:
 
-## 1. Prepare the USB package
+```powershell
+.\scripts\prepare-desktop-usb.ps1 -InstallerPath ".\frontend\src-tauri\target\release\bundle\nsis\SchoolBridge_*.exe"
+```
 
-On a preparation computer with Docker Engine/Desktop, Compose v2, PowerShell and internet for the initial build, run from the repository root:
+Replace the example path with the exact installer file produced by the build. The script creates `dist\SchoolBridge-USB`, copies the installer and guide, generates SHA-256 hashes, and runs the verifier against the finished package. It deliberately starts with a clean output folder so stale files cannot conceal an incomplete package.
 
-    .\scripts\prepare-usb.ps1
+Copy the **entire** `dist\SchoolBridge-USB` folder to a USB drive formatted as NTFS or exFAT. Keep a protected release copy and do not edit files after generating the manifest.
 
-The script downloads the official Docker and WSL runtime installers if they are not already present, verifies their Microsoft/Docker signatures, builds the frontend and backend images, pulls PostgreSQL on the preparation computer, exports all three images, copies the runtime installers and guides, and creates SHA256SUMS.txt. It starts with a clean output folder so stale files cannot make an incomplete package appear valid. Copy the complete dist\SchoolBridge-USB folder to an exFAT or NTFS USB drive.
+## Verify the USB at the school
 
-Never put the owner's private signing key or passphrase on the USB. Only the public verification key belongs in the school's local .env.
+Before installation, open PowerShell in the USB package folder and run:
 
-## 2. Prototype installation on one computer without LAN or internet
+```powershell
+.\Verify-USB.ps1
+```
 
-1. On the school computer, open an elevated PowerShell window in the USB package folder and run prepare-school-host.ps1. Complete the interactive Docker Desktop setup and licence acceptance. Restart Windows if requested, start Docker Desktop and wait for its engine.
-2. Run check-school-host.ps1 and confirm every check passes.
-3. Copy the complete package folder to a local folder, such as C:\SchoolBridge. Do not run the database from the USB itself.
-4. Open PowerShell in that local folder and run install-schoolbridge.ps1.
-5. The installer verifies required package files and their SHA-256 hashes, rechecks host readiness, creates a local .env with fresh random database/application secrets, asks for the owner's Base64 public verification key, validates it, imports the saved images, and asks you to type START before starting services.
-6. Open http://localhost:8080 on the same computer in a separate browser (this is a prototype limitation, not the required desktop experience). Complete owner activation using the unique installation ID and signed CHRISTIAN: code generated on the trusted owner computer, then complete the school's first-time setup.
-7. Restart the computer and confirm records remain available. Complete a backup and restore test before handover.
+Proceed only when it reports that package integrity is verified. If any file is missing or changed, recreate or recopy the package from the trusted preparation computer.
 
-No router, LAN, Wi-Fi or internet is required for the intended single-computer mode once the supported local runtime is installed.
+## Install SchoolBridge
 
-## 3. Optional multi-device access
+1. Copy `SchoolBridge-Setup.exe` from the USB to a local folder on the school computer. Do not run the application or database from the USB drive.
+2. Run the installer and follow its prompts.
+3. Launch SchoolBridge from the installed application shortcut.
+4. Complete owner activation and first-school setup using the approved school onboarding process.
+5. Confirm the school can sign in and that its data is stored on the computer, not on the USB.
 
-If teachers need other devices, connect them to a local Wi-Fi router, hotspot or wired network and open http://HOST-IP:8080. Internet is still not required. This optional local connection is not an installation prerequisite.
+The desktop installer is designed to carry its application runtime and offline WebView2 payload. The school computer should not need Docker, WSL2, a separately installed browser, or an internet download for installation.
 
-## 4. Daily operation and backups
+## Data protection and acceptance
 
-- Start: docker compose up -d
-- Stop: docker compose down
-- Status: docker compose ps
-- Backend logs: docker compose logs -f backend
-- Manual PostgreSQL backup: docker compose exec backend python backup_postgres.py
+- Never store the owner's private signing key, passphrase, school administrator password, or real student records on the USB.
+- The public verification key may be packaged with the application; it does not grant signing authority.
+- Keep school data on the host computer and maintain a separate protected backup.
+- Test first installation, launch while disconnected from the internet, owner activation, first-school setup, record persistence after restart, upgrade/data preservation, repair, uninstall behaviour, and backup/restore before school handover.
+- Do not claim Windows 8 or Windows 8.1 compatibility. Those systems remain blocked pending the separate Task 1.13 compatibility decision and real-device evidence.
+- Do not treat a CI-generated test-key installer as a production release. Production owner-key provisioning and release approval remain separate gates.
 
-Database and backups use persistent Docker volumes. Never run docker compose down -v unless intentionally deleting those volumes. Keep a second encrypted backup on a separate drive and test recovery.
+## Scope boundary
 
-## 5. Phase 5 acceptance gate
-
-On a clean supported Windows computer with internet disconnected and no LAN/router, verify the USB SHA-256 manifest, runtime installation, image import, startup, owner activation, school setup, login, record creation, restart persistence and backup restore. Then test optional local multi-device access.
-
-Also test the supported offline synchronisation workflows: encrypted authorised read-only snapshots, teacher marks drafts/submission and class-attendance drafts/submission; verify expiry, revoked-device handling and conflict protection. Other modules do not yet support unrestricted offline writes. Do not describe the product as fully offline across every module until that separate scope is implemented and tested.
+Task 1.12 packages and verifies the standalone installer for USB delivery. It does not certify a Windows version, complete the clean-machine acceptance tests, or replace the remaining Task 1.11 production-key and desktop acceptance gates.
