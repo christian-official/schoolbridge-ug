@@ -2452,8 +2452,8 @@ def public_school_identity(db: Session = Depends(get_db)):
 
 @app.get("/api/enrolment/school-qr.svg", tags=["Mobile Enrolment"])
 def school_access_qr(
+    request: Request,
     origin: str = Query(..., min_length=8, max_length=300),
-    request: Request = None,
     db: Session = Depends(get_db),
     admin=Depends(require_admin),
 ):
@@ -2461,7 +2461,7 @@ def school_access_qr(
     if not state or not state.setup_completed_at:
         raise HTTPException(409, "Complete school setup before creating an access QR code.")
     parsed = urlsplit(origin)
-    request_host = request.url.hostname if request else None
+    request_host = request.url.hostname
     if (
         parsed.scheme not in {"http", "https"}
         or not parsed.hostname
