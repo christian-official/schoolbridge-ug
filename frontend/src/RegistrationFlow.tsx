@@ -23,6 +23,7 @@ export default function RegistrationFlow({
   onAuthenticated: (token: string) => Promise<void> | void
 }) {
   const [kind, setKind] = useState<'parent' | 'teacher'>('parent')
+  const [formOpen, setFormOpen] = useState(false)
   const [parentName, setParentName] = useState('')
   const [relationship, setRelationship] = useState('')
   const [children, setChildren] = useState<ChildDetails[]>([
@@ -103,15 +104,23 @@ export default function RegistrationFlow({
       <p className="form-hint">
         Enter the details already held in this school's records. SchoolBridge verifies them automatically and opens the correct dashboard. No password, phone code or administrator approval is required.
       </p>
-      {error && <p className="error" role="alert">{error}</p>}
-      {message && <p className="form-hint" role="status">{message}</p>}
-
       <div className="registration-kind">
-        <button type="button" className={kind === 'parent' ? 'primary-button' : 'secondary-button'} onClick={() => { setKind('parent'); setError(''); setMessage('') }}>Parent</button>
-        <button type="button" className={kind === 'teacher' ? 'primary-button' : 'secondary-button'} onClick={() => { setKind('teacher'); setError(''); setMessage('') }}>Teacher</button>
+        <button type="button" className="primary-button" onClick={() => { setKind('parent'); setError(''); setMessage(''); setFormOpen(true) }}>Parent</button>
+        <button type="button" className="primary-button" onClick={() => { setKind('teacher'); setError(''); setMessage(''); setFormOpen(true) }}>Teacher</button>
       </div>
 
-      <form onSubmit={submitDetails}>
+      {formOpen && <div className="registration-modal-backdrop" role="presentation">
+        <section className="registration-modal" role="dialog" aria-modal="true" aria-labelledby="registration-modal-title">
+          <header className="registration-modal-header">
+            <div>
+              <h2 id="registration-modal-title">{kind === 'parent' ? 'Parent details' : 'Teacher details'}</h2>
+              <p>Enter the details already held in the school's records.</p>
+            </div>
+            <button type="button" className="registration-modal-close" aria-label="Close form" onClick={() => setFormOpen(false)}>×</button>
+          </header>
+          {error && <p className="error" role="alert">{error}</p>}
+          {message && <p className="form-hint" role="status">{message}</p>}
+          <form onSubmit={submitDetails}>
         {kind === 'parent' ? <>
           <label htmlFor="reg-parent-name">Your full name as recorded by the school</label>
           <input id="reg-parent-name" value={parentName} onChange={e => setParentName(e.target.value)} required minLength={2} maxLength={160} autoComplete="name"/>
@@ -142,10 +151,12 @@ export default function RegistrationFlow({
           <input id="reg-department" value={teacher.department} onChange={e => setTeacher({ ...teacher, department: e.target.value })} maxLength={100}/>
         </>}
 
-        <button className="primary-button login-button" disabled={busy}>
-          {busy ? 'Verifying your details…' : 'Verify and open my dashboard'}
-        </button>
-      </form>
+            <button className="primary-button login-button" disabled={busy}>
+              {busy ? 'Verifying your details…' : 'Verify and open my dashboard'}
+            </button>
+          </form>
+        </section>
+      </div>}
       <button type="button" className="recovery-link" onClick={onBack}>Administrator / non-teaching staff sign in</button>
     </section>
   </main>
