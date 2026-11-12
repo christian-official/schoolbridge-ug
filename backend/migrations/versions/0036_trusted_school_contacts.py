@@ -31,9 +31,16 @@ def upgrade():
         for name, column_type, default in additions:
             if name in columns:
                 continue
-            column = sa.Column(name, column_type, nullable=default is None)
-            if default is not None:
-                column.server_default = default
+            # Build a real SQLAlchemy DefaultClause. Assigning a plain string
+            # to Column.server_default after construction does not reliably
+            # compile into PostgreSQL's ALTER TABLE ADD COLUMN statement.
+            server_default = sa.text(f"'{default}'") if default is not None else None
+            column = sa.Column(
+                name,
+                column_type,
+                nullable=default is None,
+                server_default=server_default,
+            )
             op.add_column("staff_members", column)
 
     if "student_guardian_contacts" not in tables:
