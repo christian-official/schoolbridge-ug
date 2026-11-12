@@ -1,5 +1,5 @@
 import { fetchSchoolBridge } from './offlineNetwork'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 type Device = {
   device_id: string; device_name: string; created_at: string; last_seen_at: string
@@ -44,7 +44,7 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
   const [schoolAccessUrl, setSchoolAccessUrl] = useState('')
   const [qrUnavailableReason, setQrUnavailableReason] = useState('')
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true); setError('')
     try {
       const storedId = localStorage.getItem(deviceStorageKey(userId)) || ''
@@ -53,8 +53,8 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
       setDevices(result.devices)
     } catch (err) { setError(err instanceof Error ? err.message : 'Unable to load registered devices.') }
     finally { setLoading(false) }
-  }
-  useEffect(() => { void load() }, [token, userId])
+  }, [token, userId])
+  useEffect(() => { void load() }, [load])
 
   useEffect(() => {
     if (!isAdmin || isTauriDesktop) return
