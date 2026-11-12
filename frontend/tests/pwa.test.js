@@ -60,3 +60,13 @@ test('API workspaces replace raw offline network failures with consistent guidan
     assert.match(source, /fetchSchoolBridge/, module + ' should use the shared offline-aware request helper')
   }
 })
+
+
+test('connection indicator responds immediately to browser offline and online events', async () => {
+  const app = await readFile(new URL('../src/App.tsx', import.meta.url), 'utf8')
+  assert.match(app, /window\.addEventListener\('offline', handleOffline\)/)
+  assert.match(app, /window\.addEventListener\('online', handleOnline\)/)
+  assert.match(app, /Offline — reconnect to refresh live records/)
+  assert.match(app, /window\.removeEventListener\('offline', handleOffline\)/)
+  assert.match(app, /window\.removeEventListener\('online', handleOnline\)/)
+})

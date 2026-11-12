@@ -1378,9 +1378,19 @@ function App() {
         window.clearTimeout(timeout)
       }
     }
-    void checkServerConnection()
-    const interval = window.setInterval(() => { void checkServerConnection() }, 15000)
-    return () => { cancelled = true; window.clearInterval(interval) }
+    const handleOffline = () => { if (!cancelled) setServerConnection('disconnected') }
+    const handleOnline = () => { if (!cancelled) void checkServerConnection() }
+    window.addEventListener('offline', handleOffline)
+    window.addEventListener('online', handleOnline)
+    if (!navigator.onLine) handleOffline()
+    else void checkServerConnection()
+    const interval = window.setInterval(() => { if (navigator.onLine) void checkServerConnection() }, 15000)
+    return () => {
+      cancelled = true
+      window.clearInterval(interval)
+      window.removeEventListener('offline', handleOffline)
+      window.removeEventListener('online', handleOnline)
+    }
   }, [token])
 
   // Keep the encrypted, read-only offline copy aligned with the server change journal.
@@ -1590,7 +1600,7 @@ function App() {
           <div className="top-actions">
             <span className={`connection-indicator connection-${serverConnection}`} role="status" aria-live="polite">
               {serverConnection === 'connected' ? <CheckCircle2 size={15}/> : serverConnection === 'disconnected' ? <WifiOff size={15}/> : <Wifi size={15}/>}
-              <span>{serverConnection === 'connected' ? (isTauriDesktop ? 'Local SchoolBridge service ready' : 'School server connected') : serverConnection === 'disconnected' ? (isTauriDesktop ? 'Local SchoolBridge service unavailable' : 'School server unavailable') : (isTauriDesktop ? 'Checking local service' : 'Checking connection')}</span>
+              <span>{serverConnection === 'connected' ? (isTauriDesktop ? 'Local SchoolBridge service ready' : 'School server connected') : serverConnection === 'disconnected' ? (!navigator.onLine ? 'Offline — reconnect to refresh live records' : isTauriDesktop ? 'Local SchoolBridge service unavailable' : 'School server unavailable') : (isTauriDesktop ? 'Checking local service' : 'Checking connection')}</span>
             </span>
             <button className="secondary-button refresh-button" type="button" onClick={() => setActive('Device Management')} aria-label="Manage registered devices">Devices</button>
             <button className="secondary-button refresh-button" type="button" onClick={() => void refreshWorkspace()} disabled={isRefreshing} aria-live="polite">
