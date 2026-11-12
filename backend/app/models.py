@@ -29,6 +29,7 @@ class Subject(Base):
 
 class Student(Base):
     __tablename__ = "students"
+    __table_args__ = (UniqueConstraint("school_tenant_id", "admission_number", name="uq_students_tenant_admission_number"),)
 
     school_tenant_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1", index=True)
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -176,6 +177,7 @@ class SchoolSettings(Base):
 
 class StaffMember(Base):
     __tablename__ = "staff_members"
+    __table_args__ = (UniqueConstraint("school_tenant_id", "staff_number", name="uq_staff_members_tenant_staff_number"),)
     school_tenant_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1", index=True)
     id: Mapped[int] = mapped_column(primary_key=True)
     staff_number: Mapped[str] = mapped_column(String(40))
@@ -206,6 +208,7 @@ class FeeCharge(Base):
 
 class FeePayment(Base):
     __tablename__ = "fee_payments"
+    __table_args__ = (UniqueConstraint("school_tenant_id", "receipt_number", name="uq_fee_payments_tenant_receipt_number"),)
     school_tenant_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1", index=True)
     id: Mapped[int] = mapped_column(primary_key=True)
     charge_id: Mapped[int] = mapped_column(ForeignKey("fee_charges.id"), index=True)
@@ -390,7 +393,7 @@ class ParentLiaisonMessage(Base):
 class SyncDevice(Base):
     __tablename__ = "sync_devices"
     __table_args__ = (
-        UniqueConstraint("school_tenant_id", "user_id", "device_id", name="uq_sync_devices_tenant_user_device"),
+        UniqueConstraint("school_tenant_id", "user_id", "device_id", name="uq_sync_devices_user_device"),
     )
 
     school_tenant_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1", index=True)

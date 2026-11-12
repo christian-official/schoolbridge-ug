@@ -116,7 +116,7 @@ def test_fresh_database_includes_user_scoped_sync_device_registry(migrated_datab
     }.issubset(columns)
     unique_constraints = inspector.get_unique_constraints("sync_devices")
     assert any(
-        set(item["column_names"]) == {"user_id", "device_id"}
+        set(item["column_names"]) == {"school_tenant_id", "user_id", "device_id"}
         for item in unique_constraints
     )
     engine.dispose()
@@ -337,7 +337,7 @@ def test_partial_school_setup_state_table_gets_missing_activation_columns(tmp_pa
     assert "activation_locked_until" in columns
     assert attempts == 0
     assert installation_id == "existing-installation-id"
-    assert revision == "0032_school_tenant_ownership"
+    assert revision == "0033_tenant_scoped_uniqueness"
 
 
 def test_user_session_version_column_is_migrated(migrated_database):
