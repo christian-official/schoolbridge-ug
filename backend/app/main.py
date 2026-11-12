@@ -5154,7 +5154,7 @@ def create_staff(data: StaffCreate, db: Session = Depends(get_db), admin=Depends
             "login": None,
             "access_method": "school_qr" if data.category == "Teaching" else "no_login",
             "message": (
-                "Teacher profile saved. Share the staff number and school QR code; the teacher registers and opens their dashboard directly after verification."
+                f"Teacher profile saved. Staff number: {staff_number}. Share this number and the school QR code; the teacher registers and opens their dashboard directly after verification."
                 if data.category == "Teaching"
                 else "Staff profile saved. No password login account was created."
             ),
