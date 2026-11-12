@@ -4,6 +4,16 @@ import './index.css'
 import App from './App.tsx'
 import PWAInstallPrompt from './PWAInstallPrompt'
 
+// Persist the school identity immediately when a user opens the official QR URL.
+// The installed PWA starts at '/', so it must be able to recover this school context.
+if (typeof window !== 'undefined') {
+  const schoolFromQr = new URLSearchParams(window.location.search).get('school')
+  if (schoolFromQr) {
+    try { localStorage.setItem('schoolbridge-selected-school-id', schoolFromQr) }
+    catch { /* QR query remains available for this browser session. */ }
+  }
+}
+
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/service-worker.js').then(registration => {

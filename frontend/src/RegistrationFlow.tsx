@@ -95,7 +95,7 @@ export default function RegistrationFlow({
     setChildren(current => current.map((child, i) => i === index ? { ...child, [field]: value } : child))
   }
 
-  return <main className="login-page">
+  return <main className="login-page registration-page">
     <section className="login-card registration-card">
       <div className="brand-name">School<span>Bridge</span></div>
       <h1>Join your school</h1>
