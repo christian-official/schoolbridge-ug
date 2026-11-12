@@ -6,7 +6,6 @@ export async function clearLocalSyncData(userId: number, deviceId: string) {
       const deletion = indexedDB.deleteDatabase('schoolbridge-offline-' + userId + '-' + deviceId)
       deletion.onsuccess = () => resolve()
       deletion.onerror = () => reject(new Error('Unable to clear legacy local data.'))
-      deletion.onblocked = () => reject(new Error('Close other SchoolBridge tabs to finish clearing legacy local data.'))
     })
   }
   const prefix = 'schoolbridge-offline-' + userId + '-' + deviceId + '-'
