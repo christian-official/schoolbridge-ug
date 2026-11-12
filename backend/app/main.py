@@ -4540,7 +4540,6 @@ def upgrade_existing_database():
             if "day_amount" not in class_fee_columns: connection.execute(text("ALTER TABLE class_fees ADD COLUMN day_amount INTEGER"))
         if "fee_payments" in inspector.get_table_names() and "receipt_number" not in payment_columns:
             connection.execute(text("ALTER TABLE fee_payments ADD COLUMN receipt_number VARCHAR(50)"))
-        if "fee_payments" in inspector.get_table_names():
         if "school_profile" in inspector.get_table_names():
             profile_columns = {c["name"] for c in inspector.get_columns("school_profile")}
             profile_additions = {"school_type": "VARCHAR(20) NOT NULL DEFAULT 'Secondary'", "a_level_combinations": "TEXT", "o_level_optional_subjects": "TEXT", "a_level_subsidiary_subjects": "TEXT", "house_names": "TEXT"}
