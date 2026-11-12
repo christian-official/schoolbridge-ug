@@ -924,7 +924,7 @@ function App() {
   const [loginError, setLoginError] = useState('')
   const [offlineWorkspace, setOfflineWorkspace] = useState<OfflineWorkspaceSnapshot | null>(null)
   const [showRecovery, setShowRecovery] = useState(false)
-  const [showRegistration, setShowRegistration] = useState(false)
+  const [showRegistration, setShowRegistration] = useState(() => Boolean(new URLSearchParams(window.location.search).get('school')))
   const [loading, setLoading] = useState(false)
   const [sessionRestoring, setSessionRestoring] = useState(true)
   const [sessionError, setSessionError] = useState('')
@@ -1581,7 +1581,7 @@ function App() {
           <div className="brand-mark"><GraduationCap size={30} /></div>
           <div className="brand-name">School<span>Bridge</span></div>
           <p className="login-subtitle">Your school's operations, connected.</p>
-          {showRecovery ? <PasswordRecovery schoolId={selectedSchoolId} onBack={()=>setShowRecovery(false)}/> : showRegistration && selectedSchoolId && qrSchoolName && !qrSchoolError ? <RegistrationFlow schoolId={selectedSchoolId} schoolName={qrSchoolName} apiBaseUrl={API_BASE_URL} onBack={()=>setShowRegistration(false)}/> : <>
+          {showRecovery ? <PasswordRecovery schoolId={selectedSchoolId} onBack={()=>setShowRecovery(false)}/> : showRegistration && selectedSchoolId && qrSchoolName && !qrSchoolError ? <RegistrationFlow schoolId={selectedSchoolId} schoolName={qrSchoolName} apiBaseUrl={API_BASE_URL} onBack={()=>setShowRegistration(false)} onAuthenticated={async accessToken=>{await storeSessionToken(accessToken);setToken(accessToken);setPassword('');setLoginError('')}}/> : <>
             <h1>Welcome back</h1>
             <p className="muted">Sign in to your school workspace.</p>
             {qrSchoolName && <p className="form-hint">School: <strong>{qrSchoolName}</strong></p>}
