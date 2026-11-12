@@ -67,7 +67,7 @@ register_url_convertor("frontend", FrontendPathConvertor())
 password_hash = PasswordHash.recommended()
 JWT_SECRET = os.environ["SCHOOLBRIDGE_SECRET_KEY"]
 JWT_ALGORITHM = "HS256"
-TOKEN_HOURS = 8
+TOKEN_HOURS = 24 * 30  # Keep trusted-device PWA sessions active for 30 days.
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 def get_current_tenant_id(db: Session) -> int:
