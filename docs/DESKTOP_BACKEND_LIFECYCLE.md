@@ -12,7 +12,7 @@ The packaged resource layout is:
 - `backend/app/`, `backend/migrations/`, and `backend/app/static/`
 
 Mutable files are stored separately under the current Windows user's
-`%LOCALAPPDATA%\\SchoolBridge` directory:
+`%LOCALAPPDATA%\SchoolBridge` directory:
 
 - `config/.env` — persistent application configuration and generated secret
 - `data/schoolbridge.sqlite3` — local school database
@@ -61,8 +61,8 @@ issued for the school's network):
 SCHOOLBRIDGE_LAN_ENABLED=true
 SCHOOLBRIDGE_LAN_BIND_IP=192.168.1.20
 SCHOOLBRIDGE_LAN_PORT=8443
-SCHOOLBRIDGE_LAN_CERT_FILE=C:\\Users\\SchoolAdmin\\AppData\\Local\\SchoolBridge\\certs\\lan-cert.pem
-SCHOOLBRIDGE_LAN_KEY_FILE=C:\\Users\\SchoolAdmin\\AppData\\Local\\SchoolBridge\\certs\\lan-key.pem
+SCHOOLBRIDGE_LAN_CERT_FILE=C:\Users\SchoolAdmin\AppData\Local\SchoolBridge\certs\lan-cert.pem
+SCHOOLBRIDGE_LAN_KEY_FILE=C:\Users\SchoolAdmin\AppData\Local\SchoolBridge\certs\lan-key.pem
 ```
 
 The bind address must be a private, non-loopback IPv4 address. Certificate and
