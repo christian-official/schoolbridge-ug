@@ -29,7 +29,7 @@ from dotenv import load_dotenv
 
 # Load the installed configuration before importing database.py, which captures
 # SCHOOLBRIDGE_DATABASE_URL when its SQLAlchemy engine is created.
-load_dotenv()
+load_dotenv(os.getenv("SCHOOLBRIDGE_CONFIG_FILE") or None)
 
 # Desktop builds provide a per-user data directory. Resolve its SQLite file before
 # database.py creates the SQLAlchemy engine; this deliberately overrides any
