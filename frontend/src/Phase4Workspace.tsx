@@ -85,7 +85,7 @@ export default function Phase4Workspace({ token, role, active, permissions }: { 
       const childCount = Array.isArray(JSON.parse(claim.details_json || '{}').children) ? JSON.parse(claim.details_json || '{}').children.length : 0
       const studentIds = claimSelectedStudentIds[claim.id] || (candidateIds.length === childCount ? candidateIds : [])
       const staffId = claimSelectedStaffIds[claim.id] || claim.candidate_staff_id || null
-      if (claim.claim_type === 'parent' && (studentIds.length !== childCount || new Set(studentIds).size !== childCount)) {
+      if (claim.claim_type === 'parent' && (studentIds.length !== childCount || studentIds.some(id => !Number.isInteger(id) || id <= 0) || new Set(studentIds).size !== childCount)) {
         setError('Match one distinct registered learner record for every child before approving this request.')
         return
       }
@@ -282,7 +282,7 @@ export default function Phase4Workspace({ token, role, active, permissions }: { 
             const matchedStudents = (() => { try { return JSON.parse(claim.candidate_student_ids_json || '[]') as number[] } catch { return [] } })()
             const selectedIds = claimSelectedStudentIds[claim.id] || (matchedStudents.length === children.length && children.length > 0 ? matchedStudents : [])
             const selectedStaffId = claimSelectedStaffIds[claim.id] || claim.candidate_staff_id || null
-            const canApprove = claim.status !== 'completed' && claim.status !== 'rejected' && (claim.claim_type === 'parent' ? selectedIds.length === children.length && children.length > 0 && new Set(selectedIds).size === children.length : !!selectedStaffId)
+            const canApprove = claim.status !== 'completed' && claim.status !== 'rejected' && (claim.claim_type === 'parent' ? selectedIds.length === children.length && children.length > 0 && selectedIds.every(id => Number.isInteger(id) && id > 0) && new Set(selectedIds).size === children.length : !!selectedStaffId)
             return <tr key={claim.id}>
               <td><strong>{claim.submitted_name}</strong><small>Request #{claim.id} · {new Date(claim.created_at).toLocaleString('en-UG')}</small></td>
               <td>
@@ -295,7 +295,7 @@ export default function Phase4Workspace({ token, role, active, permissions }: { 
                     <input aria-label={'Search school records for child ' + (index + 1)} value={claimStudentSearch[key] || ''} onChange={e => setClaimStudentSearch(current => ({ ...current, [key]: e.target.value }))} placeholder="Name or admission number"/>
                     <button type="button" className="secondary-button" onClick={() => void searchRegistrationStudents(claim.id, index)}>Search learners</button>
                     {claimStudentOptions[key]?.map(student => <button type="button" key={student.id} className={selected === student.id ? 'phase4-student-option active' : 'phase4-student-option'} onClick={() => setClaimSelectedStudentIds(current => {
-                      const next = [...(current[claim.id] || (matchedStudents.length === children.length ? matchedStudents : []))]
+                      const next = current[claim.id] ? [...current[claim.id]] : (matchedStudents.length === children.length ? [...matchedStudents] : Array(children.length).fill(0))
                       if (next.some((id, slot) => slot !== index && id === student.id)) return current
                       next[index] = student.id
                       return { ...current, [claim.id]: next }
