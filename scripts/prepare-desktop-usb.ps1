@@ -23,10 +23,41 @@ foreach ($required in @($verifySource, $guideSource)) {
 }
 
 $target = [IO.Path]::GetFullPath($OutputDirectory)
-$repoFull = [IO.Path]::GetFullPath($RepoRoot).TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
-$targetFull = $target.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+$trimChars = [char[]]@([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+$repoFull = [IO.Path]::GetFullPath($RepoRoot).TrimEnd($trimChars)
+$targetFull = $target.TrimEnd($trimChars)
 $targetPrefix = $targetFull + [IO.Path]::DirectorySeparatorChar
-if ($targetFull.Equals($repoFull, [StringComparison]::OrdinalIgnoreCase) -or
+if ($targetFull -match '^[A-Za-z]:
+    $repoFull.StartsWith($targetPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+    throw "OutputDirectory cannot be the repository root or one of its parent directories."
+}
+$sourceFull = [IO.Path]::GetFullPath($source)
+if ($sourceFull.StartsWith($targetPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+    throw "InstallerPath cannot point inside OutputDirectory because that folder is rebuilt from scratch."
+}
+if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Recurse -Force }
+New-Item -ItemType Directory -Path $target -Force | Out-Null
+
+Copy-Item -LiteralPath $source -Destination (Join-Path $target "SchoolBridge-Setup.exe")
+Copy-Item -LiteralPath $verifySource -Destination (Join-Path $target "Verify-USB.ps1")
+Copy-Item -LiteralPath $guideSource -Destination (Join-Path $target "USB-INSTALLATION.md")
+
+$manifestPath = Join-Path $target "SHA256SUMS.txt"
+$rootPrefix = $target.TrimEnd($trimChars) + [IO.Path]::DirectorySeparatorChar
+Get-ChildItem -LiteralPath $target -File -Recurse |
+    Where-Object { $_.FullName -ne $manifestPath } |
+    Sort-Object { $_.FullName } |
+    ForEach-Object {
+        $hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToUpperInvariant()
+        $relative = $_.FullName.Substring($rootPrefix.Length)
+        "$hash  $relative"
+    } | Set-Content -LiteralPath $manifestPath -Encoding ASCII
+
+& (Join-Path $target "Verify-USB.ps1")
+Write-Host "USB package created: $target"
+Write-Host "Copy the complete folder to a USB drive. Do not copy only the installer."
+ -or
+    $targetFull.Equals($repoFull, [StringComparison]::OrdinalIgnoreCase) -or
     $repoFull.StartsWith($targetPrefix, [StringComparison]::OrdinalIgnoreCase)) {
     throw "OutputDirectory cannot be the repository root or one of its parent directories."
 }
