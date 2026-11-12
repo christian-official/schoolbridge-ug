@@ -187,14 +187,22 @@ async function clearStoredSessionToken(): Promise<void> {
 const API_BASE_URL = desktopApiBaseUrl || (isSchoolBridgeLanClient ? '' : configuredApiBaseUrl)
 
 async function api<T>(path: string, token: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}/api/${path}`, {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-      ...options.headers,
-    },
-  })
+  let response: Response
+  try {
+    response = await fetch(`${API_BASE_URL}/api/${path}`, {
+      ...options,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+        ...options.headers,
+      },
+    })
+  } catch (error) {
+    if (error instanceof TypeError || !navigator.onLine) {
+      throw new TypeError('SchoolBridge cannot reach the server right now. Your prepared offline workspace remains available; reconnect to refresh live records.')
+    }
+    throw error
+  }
   const result = await response.json().catch(() => ({}))
   if (!response.ok) {
     if (response.status >= 500) throw new TypeError('SchoolBridge server is temporarily unavailable.')

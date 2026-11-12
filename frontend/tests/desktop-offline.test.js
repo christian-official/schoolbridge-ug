@@ -57,3 +57,9 @@ test('offline session startup suppresses network errors and preserves the saved 
   assert.match(app, /if \(!connectionUnavailable\) void clearStoredSessionToken\(\)/)
   assert.match(app, /setLoginError\(connectionUnavailable \? ''/)
 })
+
+
+test('API connection failures use SchoolBridge offline guidance instead of browser network errors', () => {
+  assert.match(app, /SchoolBridge cannot reach the server right now\. Your prepared offline workspace remains available/)
+  assert.match(app, /if \(error instanceof TypeError \|\| !navigator\.onLine\)/)
+})
