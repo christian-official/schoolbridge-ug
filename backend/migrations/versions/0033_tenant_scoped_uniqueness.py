@@ -24,6 +24,22 @@ def _unique_columns(inspector, table):
     ]
 
 
+def _independent_unique_indexes(inspector, table, columns):
+    """Return unique indexes not already owned by a unique constraint.
+
+    PostgreSQL exposes a unique constraint's backing index through both
+    get_unique_constraints() and get_indexes(). Dropping both representations
+    would drop the backing index twice and abort the migration.
+    """
+    columns = tuple(columns)
+    return [
+        item for item in inspector.get_indexes(table)
+        if item.get("unique")
+        and tuple(item.get("column_names") or ()) == columns
+        and not item.get("duplicates_constraint")
+    ]
+
+
 def _replace_unique(table, old_columns, new_columns, new_name):
     bind = op.get_bind()
     inspector = inspect(bind)
@@ -36,11 +52,7 @@ def _replace_unique(table, old_columns, new_columns, new_name):
         item for item in inspector.get_unique_constraints(table)
         if tuple(item.get("column_names") or ()) == old_columns
     ]
-    indexes = [
-        item for item in inspector.get_indexes(table)
-        if item.get("unique")
-        and tuple(item.get("column_names") or ()) == old_columns
-    ]
+    indexes = _independent_unique_indexes(inspector, table, old_columns)
     new_already_exists = new_columns in _unique_columns(inspector, table)
     if not constraints and not indexes and new_already_exists:
         return
