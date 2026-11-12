@@ -2273,9 +2273,18 @@ def test_teacher_offline_marks_are_automatically_applied_and_idempotent():
         assert applied.status_code == 200, applied.text
         assert applied.json()["status"] == "applied"
         assert applied.json()["applied"] is True and applied.json()["saved"] == 1
+        # Simulate the client losing the first successful response: retrying
+        # the exact request must return the original result, not insert marks twice.
         repeated = client.post("/api/sync/teacher-mark-proposals", headers=th, json=body)
         assert repeated.status_code == 200
         assert repeated.json()["duplicate"] is True and repeated.json()["applied"] is True
+        # Reusing that key for different content must never overwrite the
+        # already-accepted batch or be mistaken for a successful retry.
+        collision = client.post(
+            "/api/sync/teacher-mark-proposals", headers=th,
+            json={**body, "records": [{"student_id": student_id, "score": 88}]},
+        )
+        assert collision.status_code == 409
         mine = client.get("/api/sync/teacher-mark-proposals/mine", headers=th)
         assert mine.status_code == 200
         assert mine.json()["proposals"][0]["status"] == "applied"
