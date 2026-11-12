@@ -4011,387 +4011,209 @@ def test_staff_phone_trust_is_admin_verified_and_resets_when_phone_changes():
         assert changed.json()["staff"]["phone_verified_at"] is None
 
 
-def test_parent_self_registration_uses_school_verified_numbers_and_links_multiple_children(monkeypatch):
+def test_parent_qr_registration_matches_school_records_and_opens_dashboard_without_password_or_sms(monkeypatch):
     reset_database()
-    admin = create_admin()
     school_id = "00000000-0000-4000-8000-000000000001"
     with SessionLocal() as db:
         students = [
             models.Student(
-                school_tenant_id=1, first_name="Amina", last_name="One",
-                date_of_birth=date(2012, 1, 1), guardian_name="Parent One",
+                school_tenant_id=1, admission_number="P-001",
+                first_name="Amina", last_name="One",
+                date_of_birth=date(2012, 1, 1),
+                guardian_name="Parent One", guardian_relationship="Mother",
             ),
             models.Student(
-                school_tenant_id=1, first_name="Brian", last_name="One",
-                date_of_birth=date(2014, 2, 2), guardian_name="Parent One",
+                school_tenant_id=1, admission_number="P-002",
+                first_name="Brian", last_name="One",
+                date_of_birth=date(2014, 2, 2),
+                guardian_name="Parent One", guardian_relationship="Mother",
             ),
         ]
         db.add_all(students)
-        db.flush()
-        for student in students:
-            db.add(models.StudentGuardianContact(
-                school_tenant_id=1, student_id=student.id,
-                guardian_name="Parent One", relationship="Mother",
-                phone="+256701234567", source="admin_verified_school_record",
-                verification_status="school_verified", verified_by=admin.id,
-                verified_at=datetime.utcnow(), active=True,
-            ))
         db.commit()
         student_ids = [student.id for student in students]
 
-    sent_messages = []
     monkeypatch.setattr(
         main_module, "send_schoolbridge_sms",
-        lambda phone, message: sent_messages.append((phone, message)) or True,
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("QR registration must not send SMS")),
     )
+    payload = {
+        "school_id": school_id,
+        "parent_name": "Parent One",
+        "relationship": "Mother",
+        "children": [
+            {"first_name": "Amina", "last_name": "One", "admission_number": "P-001"},
+            {"first_name": "Brian", "last_name": "One", "date_of_birth": "2014-02-02"},
+        ],
+    }
     with TestClient(app) as client:
-        payload = {
-            "school_id": school_id,
-            "parent_name": "Parent One",
-            "relationship": "Mother",
-            "children": [
-                {"first_name": "Amina", "last_name": "One", "date_of_birth": "2012-01-01"},
-                {"first_name": "Brian", "last_name": "One", "date_of_birth": "2014-02-02"},
-            ],
-        }
-        supplied_phone = client.post(
-            "/api/public/registration/parent",
-            json={**payload, "phone": "+256701234567"},
-        )
-        assert supplied_phone.status_code == 422
-
         submitted = client.post("/api/public/registration/parent", json=payload)
         assert submitted.status_code == 200, submitted.text
-        assert submitted.json()["status"] == "verification_pending"
-        assert submitted.json()["phone_masked"]
-        assert "+256701234567" not in submitted.text
-        assert sent_messages[0][0] == "+256701234567"
-        code = sent_messages[0][1].split("code is ", 1)[1][:6]
+        result = submitted.json()
+        assert result["role"] == "parent"
+        assert result["access_token"]
+        assert "dashboard" in result["message"].lower()
 
-        reference = submitted.json()["claim_reference"]
-        verified = client.post(
-            f"/api/public/registration/claims/{reference}/verify",
-            json={"school_id": school_id, "code": code},
-        )
-        assert verified.status_code == 200, verified.text
-
-        completed = client.post(
-            f"/api/public/registration/claims/{reference}/complete",
-            json={
-                "school_id": school_id,
-                "username": "parent.one",
-                "password": "ParentAccountPassword123!",
-            },
-        )
-        assert completed.status_code == 200, completed.text
-
-        duplicate_completion = client.post(
-            f"/api/public/registration/claims/{reference}/complete",
-            json={
-                "school_id": school_id,
-                "username": "parent.one.second",
-                "password": "ParentAccountPassword123!",
-            },
-        )
-        assert duplicate_completion.status_code == 409, duplicate_completion.text
-
-        login = client.post("/api/auth/login", data={
-            "username": "parent.one",
-            "password": "ParentAccountPassword123!",
-            "school_id": school_id,
-        })
-        assert login.status_code == 200, login.text
-        headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+        headers = {"Authorization": f"Bearer {result['access_token']}"}
         account = client.get("/api/auth/me", headers=headers)
-        assert account.status_code == 200
+        assert account.status_code == 200, account.text
         assert account.json()["role"] == "parent"
+
+        repeated = client.post("/api/public/registration/parent", json=payload)
+        assert repeated.status_code == 200, repeated.text
+        repeated_account = client.get(
+            "/api/auth/me",
+            headers={"Authorization": f"Bearer {repeated.json()['access_token']}"},
+        )
+        assert repeated_account.json()["id"] == account.json()["id"]
+
+        missing_child_identifier = client.post(
+            "/api/public/registration/parent",
+            json={
+                "school_id": school_id,
+                "parent_name": "Parent One",
+                "relationship": "Mother",
+                "children": [{"first_name": "Amina", "last_name": "One"}],
+            },
+        )
+        assert missing_child_identifier.status_code == 422
 
     with SessionLocal() as db:
         links = db.query(models.ParentStudentLink).filter(
             models.ParentStudentLink.user_id == account.json()["id"]
         ).all()
         assert {link.student_id for link in links} == set(student_ids)
+        assert db.query(models.RegistrationClaim).count() == 0
 
 
-def test_parent_registration_matches_only_the_school_selected_by_its_qr(monkeypatch):
+def test_parent_qr_registration_rejects_details_that_do_not_match_guardian_records():
+    reset_database()
+    school_id = "00000000-0000-4000-8000-000000000001"
+    with SessionLocal() as db:
+        db.add(models.Student(
+            school_tenant_id=1, admission_number="P-003",
+            first_name="Daniel", last_name="Two",
+            date_of_birth=date(2011, 3, 4),
+            guardian_name="Recorded Guardian", guardian_relationship="Father",
+        ))
+        db.commit()
+
+    with TestClient(app) as client:
+        response = client.post("/api/public/registration/parent", json={
+            "school_id": school_id,
+            "parent_name": "Different Person",
+            "relationship": "Mother",
+            "children": [{
+                "first_name": "Daniel", "last_name": "Two",
+                "admission_number": "P-003",
+            }],
+        })
+        assert response.status_code == 403, response.text
+
+    with SessionLocal() as db:
+        assert db.query(models.User).filter(models.User.role == "parent").count() == 0
+
+
+def test_parent_qr_registration_is_isolated_to_the_school_selected_by_the_qr():
     reset_database()
     school_two_id = "00000000-0000-4000-8000-000000000002"
     with SessionLocal() as db:
         db.add(models.SchoolTenant(
-            id=2, public_id=school_two_id, installation_id="registration-school-two",
+            id=2, public_id=school_two_id, installation_id="qr-registration-school-two",
             name="Second School", status="active",
         ))
-        admin_two = models.User(
-            school_tenant_id=2, username="school-two-admin",
-            hashed_password=password_hash.hash("SchoolTwoAdminPassword123!"),
-            role="admin", is_active=True,
-        )
-        db.add(admin_two)
-        db.flush()
-        school_one_student = models.Student(
-            school_tenant_id=1, first_name="Amina", last_name="Nsubuga",
+        db.add(models.Student(
+            school_tenant_id=1, admission_number="P-004",
+            first_name="Amina", last_name="Nsubuga",
             date_of_birth=date(2012, 1, 1),
-        )
-        school_two_student = models.Student(
-            school_tenant_id=2, first_name="Amina", last_name="Nsubuga",
-            date_of_birth=date(2012, 1, 1),
-        )
-        db.add_all([school_one_student, school_two_student])
-        db.flush()
-        db.add_all([
-            models.StudentGuardianContact(
-                school_tenant_id=1, student_id=school_one_student.id,
-                guardian_name="Parent One", relationship="Mother",
-                phone="+256700111222", source="admin_verified_school_record",
-                verification_status="school_verified", active=True,
-            ),
-            models.StudentGuardianContact(
-                school_tenant_id=2, student_id=school_two_student.id,
-                guardian_name="Parent One", relationship="Mother",
-                phone="+256700333444", source="admin_verified_school_record",
-                verification_status="school_verified", verified_by=admin_two.id,
-                verified_at=datetime.utcnow(), active=True,
-            ),
-        ])
-        db.commit()
-        school_two_student_id = school_two_student.id
-
-    sent_messages = []
-    monkeypatch.setattr(
-        main_module, "send_schoolbridge_sms",
-        lambda phone, message: sent_messages.append((phone, message)) or True,
-    )
-    payload = {
-        "school_id": school_two_id,
-        "parent_name": "Parent One",
-        "relationship": "Mother",
-        "children": [{
-            "first_name": "Amina", "last_name": "Nsubuga",
-            "date_of_birth": "2012-01-01",
-        }],
-    }
-    with TestClient(app) as client:
-        submitted = client.post("/api/public/registration/parent", json=payload)
-        assert submitted.status_code == 200, submitted.text
-        assert submitted.json()["status"] == "verification_pending"
-        assert sent_messages[0][0] == "+256700333444"
-        reference = submitted.json()["claim_reference"]
-
-        # The claim reference is not portable between schools, even with the
-        # same student identity and a valid QR for the other school.
-        wrong_school = client.get(
-            f"/api/public/registration/claims/{reference}",
-            params={"school_id": "00000000-0000-4000-8000-000000000001"},
-        )
-        assert wrong_school.status_code == 404
-
-    with SessionLocal() as db:
-        set_tenant_context(db, 2)
-        claim = db.query(models.RegistrationClaim).filter_by(
-            reference_hash=main_module._registration_reference_hash(reference),
-        ).one()
-        assert json.loads(claim.candidate_student_ids_json) == [school_two_student_id]
-
-
-def test_parent_registration_without_school_verified_phone_goes_to_admin_review():
-    reset_database()
-    admin = create_admin()
-    school_id = "00000000-0000-4000-8000-000000000001"
-    with SessionLocal() as db:
-        student = models.Student(
-            school_tenant_id=1, first_name="Daniel", last_name="Two",
-            guardian_name="Parent Two",
-        )
-        db.add(student)
-        db.flush()
-        db.add(models.StudentGuardianContact(
-            school_tenant_id=1, student_id=student.id,
-            guardian_name="Parent Two", relationship="Father",
-            phone="+256701111222", source="legacy_student_fields",
-            verification_status="unverified", active=True,
+            guardian_name="Parent One", guardian_relationship="Mother",
         ))
         db.commit()
-        student_id = student.id
 
-    token = create_access_token(admin)
-    headers = {"Authorization": f"Bearer {token}"}
     with TestClient(app) as client:
-        submitted = client.post("/api/public/registration/parent", json={
-            "school_id": school_id,
-            "parent_name": "Parent Two",
-            "relationship": "Father",
-            "children": [{"first_name": "Daniel", "last_name": "Two"}],
+        response = client.post("/api/public/registration/parent", json={
+            "school_id": school_two_id,
+            "parent_name": "Parent One",
+            "relationship": "Mother",
+            "children": [{
+                "first_name": "Amina", "last_name": "Nsubuga",
+                "admission_number": "P-004",
+            }],
         })
-        assert submitted.status_code == 200, submitted.text
-        assert submitted.json()["status"] == "pending_review"
-
-        decision = client.post(
-            "/api/admin/registration-claims/1/decision",
-            headers=headers,
-            json={"status": "approved", "student_ids": [student_id], "note": "Matched paper record"},
-        )
-        assert decision.status_code == 200, decision.text
-        reference = submitted.json()["claim_reference"]
-        completed = client.post(
-            f"/api/public/registration/claims/{reference}/complete",
-            json={
-                "school_id": school_id,
-                "username": "parent.two",
-                "password": "ParentAccountPassword123!",
-            },
-        )
-        assert completed.status_code == 200, completed.text
+        assert response.status_code == 403, response.text
 
 
-def test_teacher_self_registration_uses_staff_record_and_assigns_teacher_role(monkeypatch):
+def test_teacher_qr_registration_matches_staff_number_and_opens_dashboard_without_password_or_sms(monkeypatch):
     reset_database()
     school_id = "00000000-0000-4000-8000-000000000001"
     with SessionLocal() as db:
         staff = models.StaffMember(
             school_tenant_id=1, staff_number="TEACH-REG-01",
             first_name="Grace", last_name="Teacher", category="Teaching",
-            position="Teacher", department="Sciences", phone="+256702222333",
-            phone_verification_status="school_verified",
-            phone_source="admin_verified_school_record",
-            phone_verified_at=datetime.utcnow(),
+            position="Teacher", department="Sciences", status="active",
         )
         db.add(staff)
         db.commit()
         staff_id = staff.id
 
-    sent_messages = []
     monkeypatch.setattr(
         main_module, "send_schoolbridge_sms",
-        lambda phone, message: sent_messages.append((phone, message)) or True,
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("QR registration must not send SMS")),
     )
+    payload = {
+        "school_id": school_id,
+        "first_name": "Grace",
+        "last_name": "Teacher",
+        "staff_number": "TEACH-REG-01",
+        "position": "Teacher",
+        "department": "Sciences",
+    }
     with TestClient(app) as client:
-        payload = {
-            "school_id": school_id,
-            "first_name": "Grace",
-            "last_name": "Teacher",
-            "staff_number": "TEACH-REG-01",
-            "position": "Teacher",
-            "department": "Sciences",
-        }
-        invalid_role = client.post(
+        missing_staff_number = client.post(
             "/api/public/registration/teacher",
-            json={**payload, "role": "admin"},
+            json={key: value for key, value in payload.items() if key != "staff_number"},
         )
-        assert invalid_role.status_code == 422
+        assert missing_staff_number.status_code == 422
 
         submitted = client.post("/api/public/registration/teacher", json=payload)
         assert submitted.status_code == 200, submitted.text
-        assert submitted.json()["status"] == "verification_pending"
-        assert sent_messages[0][0] == "+256702222333"
-        code = sent_messages[0][1].split("code is ", 1)[1][:6]
-        reference = submitted.json()["claim_reference"]
-        verified = client.post(
-            f"/api/public/registration/claims/{reference}/verify",
-            json={"school_id": school_id, "code": code},
+        result = submitted.json()
+        assert result["role"] == "teacher"
+        assert result["access_token"]
+        account = client.get(
+            "/api/auth/me",
+            headers={"Authorization": f"Bearer {result['access_token']}"},
         )
-        assert verified.status_code == 200, verified.text
-        completed = client.post(
-            f"/api/public/registration/claims/{reference}/complete",
-            json={
-                "school_id": school_id,
-                "username": "grace.teacher",
-                "password": "TeacherAccountPassword123!",
-            },
-        )
-        assert completed.status_code == 200, completed.text
-        login = client.post("/api/auth/login", data={
-            "username": "grace.teacher",
-            "password": "TeacherAccountPassword123!",
-            "school_id": school_id,
-        })
-        assert login.status_code == 200, login.text
-        headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
-        account = client.get("/api/auth/me", headers=headers)
-        assert account.status_code == 200
+        assert account.status_code == 200, account.text
         assert account.json()["role"] == "teacher"
 
+        repeated = client.post("/api/public/registration/teacher", json=payload)
+        assert repeated.status_code == 200, repeated.text
+        repeated_account = client.get(
+            "/api/auth/me",
+            headers={"Authorization": f"Bearer {repeated.json()['access_token']}"},
+        )
+        assert repeated_account.json()["id"] == account.json()["id"]
+
+        invalid = client.post(
+            "/api/public/registration/teacher",
+            json={**payload, "last_name": "Someone Else"},
+        )
+        assert invalid.status_code == 403, invalid.text
+
     with SessionLocal() as db:
-        linked_user = db.query(models.User).filter_by(username="grace.teacher").first()
+        linked_user = db.query(models.User).filter_by(id=account.json()["id"]).first()
         assert linked_user is not None
         assert linked_user.staff_id == staff_id
+        assert db.query(models.RegistrationClaim).count() == 0
 
-def test_registration_claim_review_is_isolated_to_the_admin_school():
+
+def test_legacy_registration_claim_and_administrator_review_routes_are_not_available():
     reset_database()
-    admin = create_admin()
-    school_two_id = "00000000-0000-4000-8000-000000000002"
-    with SessionLocal() as db:
-        db.add(models.SchoolTenant(
-            id=2, public_id=school_two_id, installation_id="registration-review-school-two",
-            name="Second School", status="active",
-        ))
-        db.commit()
-        set_tenant_context(db, 2)
-        claim = models.RegistrationClaim(
-            school_tenant_id=2,
-            reference_hash="b" * 64,
-            claim_type="parent",
-            status="pending_review",
-            submitted_name="Second School Parent",
-            details_json=json.dumps({"children": [{"first_name": "Amina", "last_name": "Two"}]}),
-            candidate_student_ids_json="[]",
-            expires_at=datetime.utcnow(),
-        )
-        db.add(claim)
-        db.commit()
-        claim_id = claim.id
-
-    headers = {"Authorization": f"Bearer {create_access_token(admin)}"}
     with TestClient(app) as client:
-        listed = client.get("/api/admin/registration-claims?status=pending_review", headers=headers)
-        assert listed.status_code == 200, listed.text
-        assert all(row["id"] != claim_id for row in listed.json())
-        decision = client.post(
-            f"/api/admin/registration-claims/{claim_id}/decision",
-            headers=headers,
-            json={"status": "rejected", "note": "Cross-school access must be denied."},
-        )
-        assert decision.status_code == 404, decision.text
-
-    with SessionLocal() as db:
-        set_tenant_context(db, 2)
-        persisted = db.query(models.RegistrationClaim).filter_by(id=claim_id).one()
-        assert persisted.status == "pending_review"
-
-def test_registration_review_cannot_approve_inactive_student_records():
-    reset_database()
-    admin = create_admin()
-    with SessionLocal() as db:
-        inactive = models.Student(
-            school_tenant_id=1, first_name="Inactive", last_name="Learner",
-            status="inactive",
-        )
-        db.add(inactive)
-        db.flush()
-        claim = models.RegistrationClaim(
-            school_tenant_id=1,
-            reference_hash="c" * 64,
-            claim_type="parent",
-            status="pending_review",
-            submitted_name="Parent Applicant",
-            details_json=json.dumps({"children": [{"first_name": "Inactive", "last_name": "Learner"}]}),
-            candidate_student_ids_json="[]",
-            expires_at=datetime.utcnow(),
-        )
-        db.add(claim)
-        db.commit()
-        claim_id = claim.id
-        student_id = inactive.id
-
-    headers = {"Authorization": f"Bearer {create_access_token(admin)}"}
-    with TestClient(app) as client:
-        response = client.post(
-            f"/api/admin/registration-claims/{claim_id}/decision",
-            headers=headers,
-            json={"status": "approved", "student_ids": [student_id], "note": "Must not link inactive learner."},
-        )
-        assert response.status_code == 422, response.text
-
-    with SessionLocal() as db:
-        claim = db.query(models.RegistrationClaim).filter_by(id=claim_id).one()
-        assert claim.status == "pending_review"
+        assert client.get("/api/admin/registration-claims").status_code == 404
+        assert client.get(
+            "/api/public/registration/claims/not-a-valid-claim",
+            params={"school_id": "00000000-0000-4000-8000-000000000001"},
+        ).status_code == 404
 
