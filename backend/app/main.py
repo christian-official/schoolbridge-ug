@@ -125,6 +125,26 @@ def _mask_registration_phone(value: str) -> str:
     return ("•" * max(3, len(digits) - 3)) + digits[-3:]
 
 
+def _registration_requester_ip_hash(request: Request) -> str | None:
+    client_host = request.client.host if request.client else None
+    if not client_host:
+        return None
+    return hashlib.sha256(f"{JWT_SECRET}:{client_host}".encode("utf-8")).hexdigest()
+
+
+def _check_registration_rate_limit(db: Session, request: Request) -> str | None:
+    ip_hash = _registration_requester_ip_hash(request)
+    if not ip_hash:
+        return None
+    recent_count = db.query(models.RegistrationClaim).filter(
+        models.RegistrationClaim.requester_ip_hash == ip_hash,
+        models.RegistrationClaim.created_at >= datetime.utcnow() - timedelta(hours=1),
+    ).count()
+    if recent_count >= 30:
+        raise HTTPException(429, "Too many registration requests from this connection. Try again later.")
+    return ip_hash
+
+
 def _registration_reference_hash(reference: str) -> str:
     return hashlib.sha256(reference.encode("utf-8")).hexdigest()
 
@@ -143,6 +163,7 @@ def _create_registration_claim(
     candidate_contact_ids: list[int] | None = None,
     candidate_staff_id: int | None = None,
     trusted_phone: str | None = None,
+    requester_ip_hash: str | None = None,
 ):
     reference = secrets.token_urlsafe(32)
     claim = models.RegistrationClaim(
@@ -156,6 +177,7 @@ def _create_registration_claim(
         candidate_contact_ids_json=json.dumps(candidate_contact_ids or []),
         candidate_staff_id=candidate_staff_id,
         phone_masked=_mask_registration_phone(trusted_phone) if trusted_phone else None,
+        requester_ip_hash=requester_ip_hash,
         expires_at=datetime.utcnow() + timedelta(days=7),
     )
     db.add(claim)
@@ -2798,8 +2820,9 @@ def current_account(user=Depends(get_current_user)):
 
 
 @app.post("/api/public/registration/parent", tags=["Parent & Teacher Registration"])
-def submit_parent_registration(data: ParentSelfRegistrationRequest, db: Session = Depends(get_db)):
+def submit_parent_registration(data: ParentSelfRegistrationRequest, request: Request, db: Session = Depends(get_db)):
     resolve_school_tenant(db, str(data.school_id))
+    requester_ip_hash = _check_registration_rate_limit(db, request)
     student_ids, contact_ids, trusted_phone = _match_parent_registration(db, data)
     reference, claim = _create_registration_claim(
         db, "parent", data.parent_name.strip(),
@@ -2809,6 +2832,7 @@ def submit_parent_registration(data: ParentSelfRegistrationRequest, db: Session 
             "children": [child.model_dump(mode="json") for child in data.children],
         },
         student_ids, contact_ids, trusted_phone=trusted_phone,
+        requester_ip_hash=requester_ip_hash,
     )
     message = (
         f"A verification code was sent to the number on your school's record: {claim.phone_masked}."
@@ -2819,8 +2843,9 @@ def submit_parent_registration(data: ParentSelfRegistrationRequest, db: Session 
 
 
 @app.post("/api/public/registration/teacher", tags=["Parent & Teacher Registration"])
-def submit_teacher_registration(data: TeacherSelfRegistrationRequest, db: Session = Depends(get_db)):
+def submit_teacher_registration(data: TeacherSelfRegistrationRequest, request: Request, db: Session = Depends(get_db)):
     resolve_school_tenant(db, str(data.school_id))
+    requester_ip_hash = _check_registration_rate_limit(db, request)
     staff_id, trusted_phone = _match_teacher_registration(db, data)
     reference, claim = _create_registration_claim(
         db, "teacher", f"{data.first_name.strip()} {data.last_name.strip()}",
@@ -2832,6 +2857,7 @@ def submit_teacher_registration(data: TeacherSelfRegistrationRequest, db: Sessio
             "department": data.department,
         },
         candidate_staff_id=staff_id, trusted_phone=trusted_phone,
+        requester_ip_hash=requester_ip_hash,
     )
     message = (
         f"A verification code was sent to the number on your school's record: {claim.phone_masked}."
@@ -2879,6 +2905,12 @@ def verify_public_registration_claim(reference: str, data: RegistrationClaimVeri
         raise HTTPException(429, "Too many incorrect codes. Your request has been sent to the school for review.")
     claim.verification_attempts += 1
     if not hmac.compare_digest(_registration_code_hash(claim, data.code), claim.verification_code_hash):
+        if claim.verification_attempts >= 5:
+            claim.status = "pending_review"
+            claim.verification_code_hash = None
+            claim.verification_expires_at = None
+            db.commit()
+            raise HTTPException(429, "Too many incorrect codes. Your request has been sent to the school for review.")
         db.commit()
         raise HTTPException(400, "The verification code is incorrect.")
     claim.status = "verified"
