@@ -84,12 +84,21 @@ def get_current_user(
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         user_id = int(payload["sub"])
+        tenant_id = int(payload["tenant"])
     except (InvalidTokenError, ValueError, KeyError, TypeError):
         raise HTTPException(401, "Invalid or expired login token.")
-    user = db.get(models.User, user_id)
+    user = db.query(models.User).filter(
+        models.User.id == user_id,
+        models.User.school_tenant_id == tenant_id,
+    ).first()
     if not user or not user.is_active:
         raise HTTPException(401, "Account is unavailable.")
     if not token_version_matches(payload, user):
+        raise HTTPException(401, "Invalid or expired login token.")
+    try:
+        from .database import set_tenant_context
+        set_tenant_context(db, tenant_id)
+    except ValueError:
         raise HTTPException(401, "Invalid or expired login token.")
     return user
 
@@ -1509,6 +1518,7 @@ def create_access_token(user):
     expires = datetime.now(timezone.utc) + timedelta(hours=TOKEN_HOURS)
     payload = {
         "sub": str(user.id),
+        "tenant": int(getattr(user, "school_tenant_id", 1) or 1),
         "role": user.role,
         "ver": int(getattr(user, "token_version", 0) or 0),
         "exp": expires,
@@ -2283,16 +2293,24 @@ def login(
     if not state or not state.setup_completed_at:
         raise HTTPException(403, "SchoolBridge first-time setup must be completed before signing in.")
     login_name = data.username.strip()
+    tenant_id = int(getattr(state, "school_tenant_id", 1) or 1)
     user = db.query(models.User).filter(
-        models.User.username == login_name
+        models.User.username == login_name,
+        models.User.school_tenant_id == tenant_id,
     ).first()
     if user is None:
         surname_matches = db.query(models.User).join(
-            models.StaffMember, models.User.staff_id == models.StaffMember.id
-        ).filter(or_(
-            func.lower(models.StaffMember.last_name) == login_name.lower(),
-            func.lower(models.StaffMember.staff_number) == login_name.lower(),
-        )).all()
+            models.StaffMember,
+            (models.User.staff_id == models.StaffMember.id)
+            & (models.User.school_tenant_id == models.StaffMember.school_tenant_id),
+        ).filter(
+            models.User.school_tenant_id == tenant_id,
+            models.StaffMember.school_tenant_id == tenant_id,
+            or_(
+                func.lower(models.StaffMember.last_name) == login_name.lower(),
+                func.lower(models.StaffMember.staff_number) == login_name.lower(),
+            ),
+        ).all()
         if len(surname_matches) == 1:
             user = surname_matches[0]
         elif len(surname_matches) > 1:

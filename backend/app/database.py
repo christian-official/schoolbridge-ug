@@ -86,6 +86,54 @@ if DATABASE_URL.startswith("sqlite"):
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 
+def set_tenant_context(db, tenant_id: int) -> None:
+    """Bind this request's ORM session to one school tenant."""
+    tenant_id = int(tenant_id)
+    current = db.info.get("school_tenant_id")
+    if current is not None and current != tenant_id:
+        raise ValueError("A database session cannot change school tenant.")
+    db.info["school_tenant_id"] = tenant_id
+
+
+@event.listens_for(SessionLocal.class_, "do_orm_execute")
+def _scope_orm_statements_to_school(execute_state):
+    tenant_id = execute_state.session.info.get("school_tenant_id")
+    if tenant_id is None:
+        return
+
+    # Apply a tenant predicate to every mapped school-owned entity, including
+    # aliases and relationship loads. This central guard complements explicit
+    # route filters and prevents forgotten ORM filters from leaking records.
+    from sqlalchemy.orm import with_loader_criteria
+
+    options = []
+    for mapper in Base.registry.mappers:
+        model = mapper.class_
+        if hasattr(model, "school_tenant_id"):
+            options.append(with_loader_criteria(
+                model,
+                lambda entity, tenant_id=tenant_id: entity.school_tenant_id == tenant_id,
+                include_aliases=True,
+            ))
+    if options:
+        execute_state.statement = execute_state.statement.options(*options)
+
+
+@event.listens_for(SessionLocal.class_, "before_flush")
+def _enforce_school_tenant_on_writes(session, _flush_context, _instances):
+    tenant_id = session.info.get("school_tenant_id")
+    if tenant_id is None:
+        return
+    for instance in session.new.union(session.dirty).union(session.deleted):
+        if not hasattr(instance, "school_tenant_id"):
+            continue
+        record_tenant_id = getattr(instance, "school_tenant_id", None)
+        if record_tenant_id is None:
+            instance.school_tenant_id = tenant_id
+        elif int(record_tenant_id) != int(tenant_id):
+            raise ValueError("A school-scoped session cannot modify another school's record.")
+
+
 class Base(DeclarativeBase):
     pass
 

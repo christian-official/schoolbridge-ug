@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from types import SimpleNamespace
 from sqlalchemy import func
 
-from app.database import Base, engine, SessionLocal
+from app.database import Base, engine, SessionLocal, set_tenant_context
 from app.main import app, create_access_token, password_hash
 from app import main as main_module
 from app import models
@@ -3484,3 +3484,37 @@ def test_student_can_be_registered_without_an_admission_number():
     assert first.json()["admission_number"] is None
     assert second.json()["admission_number"] is None
     assert generated.json()["admission_number"].startswith("SB-")
+
+
+def test_orm_sessions_are_scoped_to_one_school_and_reject_cross_tenant_writes():
+    reset_database()
+    with SessionLocal() as db:
+        db.add_all([
+            models.Student(first_name="School", last_name="One", school_tenant_id=1),
+            models.Student(first_name="School", last_name="Two", school_tenant_id=2),
+        ])
+        db.commit()
+
+    with SessionLocal() as db:
+        set_tenant_context(db, 1)
+        visible = db.query(models.Student).all()
+        assert [student.last_name for student in visible] == ["One"]
+
+        db.add(models.Student(first_name="New", last_name="Tenant One"))
+        db.commit()
+        created = db.query(models.Student).filter(
+            models.Student.last_name == "Tenant One"
+        ).one()
+        assert created.school_tenant_id == 1
+
+        db.add(models.Student(
+            first_name="Invalid", last_name="Cross Tenant", school_tenant_id=2
+        ))
+        with pytest.raises(ValueError, match="another school's record"):
+            db.commit()
+        db.rollback()
+
+    with SessionLocal() as db:
+        set_tenant_context(db, 2)
+        visible = db.query(models.Student).all()
+        assert [student.last_name for student in visible] == ["Two"]
