@@ -124,7 +124,7 @@ test('QR access opens the correct school registration flow on a mobile viewport 
 
     await page.getByRole('button', { name: 'Verify and open my dashboard' }).click()
     await page.getByRole('heading', { name: 'My children', exact: true }).waitFor()
-    await page.getByText('Test Learner').waitFor()
+    await page.getByRole('heading', { name: 'Test Learner', exact: true }).waitFor()
     assert.deepEqual(submittedPayload, {
       school_id: schoolId,
       parent_name: 'Test Parent',
