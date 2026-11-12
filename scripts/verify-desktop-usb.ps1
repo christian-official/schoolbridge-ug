@@ -3,8 +3,9 @@ $PackageDir = [IO.Path]::GetFullPath($PSScriptRoot)
 $Manifest = Join-Path $PackageDir "SHA256SUMS.txt"
 if (-not (Test-Path $Manifest -PathType Leaf)) { throw "USB integrity manifest is missing." }
 
-$rootPrefix = $PackageDir.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
-$listed = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+$trimChars = [char[]]@([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+$rootPrefix = $PackageDir.TrimEnd($trimChars) + [IO.Path]::DirectorySeparatorChar
+$listed = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
 foreach ($entry in Get-Content -LiteralPath $Manifest) {
     if ([string]::IsNullOrWhiteSpace($entry)) { continue }
     if ($entry -notmatch '^([A-Fa-f0-9]{64})  (.+)$') { throw "Invalid SHA-256 manifest entry." }
