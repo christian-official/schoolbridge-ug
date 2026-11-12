@@ -5,7 +5,7 @@ import { saveEncryptedOfflineDraft, loadEncryptedOfflineDraft, deleteEncryptedOf
 type SchoolClass = { id: number; name?: string; section?: string }
 type Subject = { id: number; name: string; code?: string | null }
 type Student = { id: number; first_name: string; middle_name?: string | null; last_name: string; admission_number: string; class_id?: number | null; academic_level?: string | null; combination?: string | null; optional_subjects?: string | null; subsidiary_subjects?: string | null }
-type Exam = { id: number; name: string; exam_type: string; term: string; year: number; class_id: number | null }
+type Exam = { id: number; name: string; exam_type: string; term: string; year: number; class_id: number | null; status: 'draft' | 'closed' | 'published'; closed_at?: string | null; published_at?: string | null }
 type Mark = { id: number; student_id: number; subject_id: number; exam_id: number; score: number; verified: boolean }
 type GradeBand = { id?: number; grade: string; min_score: number; max_score: number; remark: string }
 type SchoolProfile = { name?: string; address?: string | null; phone?: string | null; email?: string | null; motto?: string | null; school_type?: string; a_level_combinations?: string | null; o_level_optional_subjects?: string | null; a_level_subsidiary_subjects?: string | null; report_logo?: string | null; report_template?: string | null }
@@ -92,7 +92,7 @@ async function fetchClassStudents(token: string, classId: number | null): Promis
   return [first, ...remaining].flatMap(page => page.items)
 }
 
-export default function AcademicManagement({ token, classes, canVerify = false, userId, isTeacher = false }: { token: string; classes: SchoolClass[]; canVerify?: boolean; userId: number; isTeacher?: boolean }) {
+export default function AcademicManagement({ token, classes, canVerify = false, userId, isTeacher = false, isAdmin = false }: { token: string; classes: SchoolClass[]; canVerify?: boolean; userId: number; isTeacher?: boolean; isAdmin?: boolean }) {
   const [exams, setExams] = useState<Exam[]>([])
   const [subjects, setSubjects] = useState<Subject[]>([])
   const [students, setStudents] = useState<Student[]>([])
@@ -324,7 +324,24 @@ export default function AcademicManagement({ token, classes, canVerify = false, 
     }
   }
 
+  async function changeExamLifecycle(action: 'close' | 'publish') {
+    if (!selectedExam || !isAdmin) return
+    const prompt = action === 'close'
+      ? 'Close this examination? All existing results must be verified, and marks will become read-only.'
+      : 'Publish this examination? Linked parents will be able to view its verified results.'
+    if (!window.confirm(prompt)) return
+    setSaving(true); setError(''); setMessage('')
+    try {
+      const updated = await request<{id:number;status:'closed'|'published';closed_at?:string;published_at?:string}>('exams/' + selectedExam.id + '/' + action, token, { method: 'POST' })
+      setExams(current => current.map(exam => exam.id === updated.id ? { ...exam, status: updated.status, closed_at: updated.closed_at ?? exam.closed_at, published_at: updated.published_at ?? exam.published_at } : exam))
+      setMessage(action === 'close' ? 'Examination closed. Results are locked and remain hidden from parents until publication.' : 'Examination results published. Linked parents can now view the verified results.')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to update examination status.')
+    } finally { setSaving(false) }
+  }
+
   async function saveClassMarks() {
+    if (selectedExam && selectedExam.status !== 'draft') { setError('This examination is closed. Marks are read-only.'); return }
     if (!selectedExam || !eligibleStudents.length || !selectedSubjectId) {
       setError('Select a subject before entering marks.')
       return
@@ -368,6 +385,7 @@ export default function AcademicManagement({ token, classes, canVerify = false, 
 
   async function setSubjectVerification(subjectId: number, verified: boolean) {
     if (!selectedExam) { setError('Choose an examination first.'); return }
+    if (selectedExam.status !== 'draft') { setError('This examination is closed. Result verification can no longer be changed.'); return }
     const subject = subjects.find(row => row.id === subjectId)
     const action = verified ? 'verify and lock' : 'unlock for correction'
     if (!window.confirm(`Are you sure you want to ${action} every recorded ${subject?.name || 'subject'} score for this examination?`)) return
@@ -385,6 +403,7 @@ export default function AcademicManagement({ token, classes, canVerify = false, 
 
   async function verifyAllExamResults() {
     if (!selectedExam) { setError('Choose an examination first.'); return }
+    if (selectedExam.status !== 'draft') { setError('This examination is closed. Result verification can no longer be changed.'); return }
     const pending = marks.filter(mark => !mark.verified).length
     if (!pending) { setMessage('There are no submitted results awaiting verification.'); return }
     if (!window.confirm(`Verify and lock all ${pending} submitted scores for ${selectedExam.name}?`)) return
@@ -546,7 +565,8 @@ export default function AcademicManagement({ token, classes, canVerify = false, 
 
     {selectedExam && <>
       <section className="panel">
-        <div className="panel-heading"><div><h2>{selectedExam.exam_type || selectedExam.name}</h2><p>{selectedClass?.name || 'Class'}{selectedClass?.section ? ' — ' + selectedClass.section : ''} · {selectedExam.term} {selectedExam.year}</p></div></div>
+        <div className="panel-heading"><div><h2>{selectedExam.exam_type || selectedExam.name}</h2><p>{selectedClass?.name || 'Class'}{selectedClass?.section ? ' — ' + selectedClass.section : ''} · {selectedExam.term} {selectedExam.year}</p><span className={'exam-lifecycle-status exam-lifecycle-' + selectedExam.status}>Status: {selectedExam.status === 'draft' ? 'Open for entry' : selectedExam.status === 'closed' ? 'Closed · Locked' : 'Published to parents'}</span></div><div className="dashboard-heading-actions">{isAdmin && selectedExam.status === 'draft' && <button type="button" className="secondary-button" disabled={saving} onClick={() => void changeExamLifecycle('close')}>Close & finalise</button>}{isAdmin && selectedExam.status === 'closed' && <button type="button" className="primary-button" disabled={saving} onClick={() => void changeExamLifecycle('publish')}>Publish results to parents</button>}</div></div>
+        {selectedExam.status !== 'draft' && <p className="form-hint" role="status">{selectedExam.status === 'closed' ? 'This examination is closed. Results are locked and are not yet visible to parents.' : 'This examination is published. Linked parents can view verified results; marks remain locked.'}</p>}
         <div className="stats-grid finance-stats">
           <div className="stat-card"><span>Students in class</span><strong className="stat-value">{students.length}</strong></div>
           <div className="stat-card"><span>Marks recorded</span><strong className="stat-value">{marks.length}</strong></div>
@@ -565,7 +585,7 @@ export default function AcademicManagement({ token, classes, canVerify = false, 
         <div className="subject-marks-toolbar">
           <div className="academic-exam-select"><strong>Subject to enter</strong><div className="exam-pill-options subject-choice-options">{subjects.map(subject => <button type="button" key={subject.id} className={String(subject.id) === selectedSubjectId ? 'exam-pill active' : 'exam-pill'} onClick={() => setSelectedSubjectId(String(subject.id))}>{subject.name}</button>)}</div></div>
           <div className="subject-marks-count"><strong>{selectedSubjectId ? eligibleStudents.length : students.length}</strong><span>{selectedSubjectId ? 'students offering this subject' : 'students in this class'}</span></div>
-          <button type="button" className="primary-button" onClick={() => void saveClassMarks()} disabled={saving || !eligibleStudents.length || !selectedSubjectId}><Save size={15}/>{saving ? 'Submitting…' : 'Submit class results'}</button>
+          <button type="button" className="primary-button" onClick={() => void saveClassMarks()} disabled={saving || !eligibleStudents.length || !selectedSubjectId || selectedExam.status !== 'draft'}><Save size={15}/>{saving ? 'Submitting…' : 'Submit class results'}</button>
         </div>
         {!students.length && <p className="form-hint">No students are registered in this class yet.</p>}
         {!subjects.length && <p className="form-hint">No subjects are configured for this school type.</p>}
@@ -580,11 +600,11 @@ export default function AcademicManagement({ token, classes, canVerify = false, 
             return <div className="student-score-row" key={student.id}>
               <div className="student-score-name"><span className="student-score-number">{index + 1}</span><strong>{studentName(student)}</strong></div>
               <span className="student-score-admission">{student.admission_number}</span>
-              <input className="student-score-input" aria-label={studentName(student) + ' score'} type="number" min="0" max="100" step="1" inputMode="numeric" placeholder="Enter score" value={markDrafts[key] ?? ''} disabled={!!mark?.verified || saving} onChange={event => setMarkDrafts(current => ({ ...current, [key]: event.target.value }))}/>
+              <input className="student-score-input" aria-label={studentName(student) + ' score'} type="number" min="0" max="100" step="1" inputMode="numeric" placeholder="Enter score" value={markDrafts[key] ?? ''} disabled={!!mark?.verified || saving || selectedExam.status !== 'draft'} onChange={event => setMarkDrafts(current => ({ ...current, [key]: event.target.value }))}/>
               <span className={mark?.verified ? 'student-score-status verified' : mark ? 'student-score-status recorded' : 'student-score-status pending'}>{mark?.verified ? 'Verified' : mark ? 'Submitted · Not verified' : 'Not submitted'}</span>
             </div>
           })}
-          <div className="student-score-footer"><span>Blank scores are submitted as No score (0). Scores must be between 0 and 100.</span><button type="button" className="primary-button" onClick={() => void saveClassMarks()} disabled={saving || !eligibleStudents.length}><Save size={15}/>{saving ? 'Submitting…' : 'Submit class results'}</button></div>
+          <div className="student-score-footer"><span>Blank scores are submitted as No score (0). Scores must be between 0 and 100.</span><button type="button" className="primary-button" onClick={() => void saveClassMarks()} disabled={saving || !eligibleStudents.length || selectedExam.status !== 'draft'}><Save size={15}/>{saving ? 'Submitting…' : 'Submit class results'}</button></div>
         </div>}
         <details className="recorded-marks-details"><summary>Recorded scores · by subject and verification status</summary>
           <div className="recorded-marks-filters"><div><strong>Subject</strong><div className="exam-pill-options">{['all', ...subjects.map(subject => String(subject.id))].map(id => <button type="button" key={id} className={recordedSubjectFilter === id ? 'exam-pill active' : 'exam-pill'} onClick={() => setRecordedSubjectFilter(id)}>{id === 'all' ? 'All subjects' : subjects.find(subject => String(subject.id) === id)?.name}</button>)}</div></div><div><strong>Verification status</strong><div className="exam-pill-options">{(['all','verified','unverified'] as const).map(status => <button type="button" key={status} className={recordedStatusFilter === status ? 'exam-pill active' : 'exam-pill'} onClick={() => setRecordedStatusFilter(status)}>{status === 'all' ? 'All statuses' : status === 'verified' ? 'Verified' : 'Submitted · Not verified'}</button>)}</div></div></div>
