@@ -881,7 +881,7 @@ function OfflineWorkspace({snapshot,onExit}:{snapshot:OfflineWorkspaceSnapshot;o
 }
 
 function App() {
-  const selectedSchoolId = typeof window !== 'undefined' ? (new URLSearchParams(window.location.search).get('school') || '') : ''
+  const selectedSchoolId = typeof window !== 'undefined' ? (new URLSearchParams(window.location.search).get('school') || localStorage.getItem('schoolbridge-selected-school-id') || '') : ''
   const [token, setToken] = useState('')
   const [user, setUser] = useState<User | null>(null)
   const [username, setUsername] = useState('')
@@ -897,6 +897,12 @@ function App() {
   const [setupStatus,setSetupStatus] = useState<FirstSetupStatus>({loading:true,setup_completed:false,activated:false,installation_id:'',school_id:selectedSchoolId,identity_locked:false,error:''})
   const [qrSchoolName,setQrSchoolName] = useState('')
   const [qrSchoolError,setQrSchoolError] = useState('')
+  useEffect(() => {
+    const querySchoolId = new URLSearchParams(window.location.search).get('school')
+    if (!querySchoolId) return
+    try { localStorage.setItem('schoolbridge-selected-school-id', querySchoolId) }
+    catch { /* The QR query remains available for this browser session. */ }
+  }, [selectedSchoolId])
   useEffect(() => {
     let cancelled = false
     loadStoredSessionToken().then(savedToken => {
