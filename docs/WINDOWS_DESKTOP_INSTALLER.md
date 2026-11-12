@@ -12,9 +12,9 @@ This is the D2 packaging implementation. It is not yet the final school acceptan
 
 - The desktop executable and immutable backend/Python resources are installed by Tauri under the selected Windows application installation directory.
 - Tauri resolves the bundled resources through its resource directory; the application does not assume that the executable's parent directory is also the resource directory.
-- Per-user configuration is stored at `%LOCALAPPDATA%\\SchoolBridge\\config\\.env`.
-- The SQLite database is stored at `%LOCALAPPDATA%\\SchoolBridge\\data\\schoolbridge.sqlite3`.
-- Backend diagnostics are stored at `%LOCALAPPDATA%\\SchoolBridge\\logs`.
+- Per-user configuration is stored at `%LOCALAPPDATA%\SchoolBridge\config\.env`.
+- The SQLite database is stored at `%LOCALAPPDATA%\SchoolBridge\data\schoolbridge.sqlite3`.
+- Backend diagnostics are stored at `%LOCALAPPDATA%\SchoolBridge\logs`.
 - The generated application secret is created once by the bundled Python runtime and saved in the per-user configuration. It is not written into Program Files or the installer resources.
 - Reinstalling or upgrading application files must not remove or overwrite the per-user configuration, database, or logs.
 
@@ -22,7 +22,7 @@ The backend receives `SCHOOLBRIDGE_CONFIG_FILE` explicitly, loads that configura
 
 ## First-run activation configuration
 
-The initial desktop configuration is generated with a new application secret and an empty `SCHOOLBRIDGE_LICENSE_PUBLIC_KEY`. Before owner activation can be completed, the school's approved public verification key must be configured in `%LOCALAPPDATA%\\SchoolBridge\\config\\.env`. The private signing key must never be placed on the school computer or in the installer.
+The initial desktop configuration is generated with a new application secret and an empty `SCHOOLBRIDGE_LICENSE_PUBLIC_KEY`. Before owner activation can be completed, the school's approved public verification key must be configured in `%LOCALAPPDATA%\SchoolBridge\config\.env`. The private signing key must never be placed on the school computer or in the installer.
 
 A guided, administrator-friendly first-run public-key configuration flow is still outstanding. Do not treat a healthy backend startup as proof that owner activation and school setup are complete.
 
