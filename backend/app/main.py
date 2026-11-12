@@ -237,6 +237,16 @@ def _create_qr_registration_session(
             ).all()
             if {row[0] for row in existing_links} != set(student_ids or []):
                 raise HTTPException(409, "This parent account is already linked to a different set of student records.")
+        if role in {"teacher", "parent"} and (user.must_change_password or user.reset_code_hash):
+            user.hashed_password = password_hash.hash(secrets.token_urlsafe(48))
+            user.must_change_password = False
+            user.reset_code_hash = None
+            user.reset_expires_at = None
+            user.reset_requested_at = None
+            user.reset_attempts = 0
+            user.token_version = int(user.token_version or 0) + 1
+            db.commit()
+            db.refresh(user)
     else:
         user = models.User(
             school_tenant_id=tenant_id,
