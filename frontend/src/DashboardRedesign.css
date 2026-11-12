@@ -558,3 +558,115 @@
     z-index:29!important;
   }
 }
+
+
+/* Mobile navigation: use the entire visual viewport, not a narrow floating drawer. */
+@media (max-width: 760px) {
+  .redesigned-app-shell {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+  .redesigned-app-shell > .sidebar {
+    position: fixed !important;
+    inset: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    max-height: 100vh !important;
+    max-height: 100dvh !important;
+    flex: 0 0 100% !important;
+    box-sizing: border-box !important;
+    padding-top: max(18px, env(safe-area-inset-top, 0px)) !important;
+    padding-right: max(16px, env(safe-area-inset-right, 0px)) !important;
+    padding-bottom: max(14px, env(safe-area-inset-bottom, 0px)) !important;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)) !important;
+    overflow: hidden !important;
+    transition: transform .24s ease !important;
+  }
+  .redesigned-app-shell > .sidebar:not(.sidebar-open) {
+    transform: translateX(-101%) !important;
+  }
+  .redesigned-app-shell > .sidebar.sidebar-open {
+    transform: translateX(0) !important;
+  }
+  .redesigned-app-shell > .sidebar > nav {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding-bottom: 12px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .redesigned-app-shell > .sidebar > .sidebar-bottom {
+    flex: 0 0 auto !important;
+    margin-top: 8px !important;
+    padding-bottom: 0 !important;
+  }
+  .redesigned-app-shell > .sidebar .sidebar-account-trigger {
+    min-height: 66px;
+  }
+  .redesigned-app-shell > .main-area {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+  .redesigned-app-shell > .main-area > .content {
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* The account row is a direct profile shortcut, visually integrated with the sidebar. */
+.redesigned-app-shell > .sidebar .sidebar-account-control {
+  margin-top: 12px !important;
+}
+.redesigned-app-shell > .sidebar .sidebar-account-trigger {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  width: 100% !important;
+  min-height: 62px !important;
+  padding: 11px 13px !important;
+  border: 1px solid #ffffff38 !important;
+  border-radius: 14px !important;
+  background: #ffffff12 !important;
+  color: #fff !important;
+  text-align: left !important;
+  box-shadow: none !important;
+  transition: background .18s ease, border-color .18s ease !important;
+}
+.redesigned-app-shell > .sidebar .sidebar-account-trigger:hover,
+.redesigned-app-shell > .sidebar .sidebar-account-trigger:focus-visible {
+  background: #ffffff20 !important;
+  border-color: #ffffff70 !important;
+}
+.redesigned-app-shell > .sidebar .sidebar-account-trigger .avatar {
+  flex: 0 0 38px !important;
+  width: 38px !important;
+  height: 38px !important;
+  background: #ffffffeb !important;
+  color: var(--role-deep, #123b42) !important;
+  font-size: 15px !important;
+}
+.redesigned-app-shell > .sidebar .sidebar-account-trigger .profile-info strong {
+  color: #fff !important;
+  font-size: 13px !important;
+}
+.redesigned-app-shell > .sidebar .sidebar-account-trigger .profile-info small {
+  color: #ffffffb8 !important;
+  font-size: 11px !important;
+}
+.redesigned-app-shell > .sidebar .sidebar-account-trigger .account-profile-icon {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: #ffffffc9;
+}
