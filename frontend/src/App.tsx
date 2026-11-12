@@ -1410,6 +1410,18 @@ function App() {
       try {
         const meta = JSON.parse(rawMeta) as { fingerprint: string; sequence: number }
         if (!Number.isSafeInteger(meta.sequence) || meta.sequence < 0) throw new Error('Invalid offline sync cursor.')
+        const registeredDevices = await api<{ devices: { device_id: string; active: boolean }[] }>('sync/devices', token)
+        if (cancelled) return
+        const currentDevice = registeredDevices.devices.find(device => device.device_id === deviceId)
+        if (!currentDevice?.active) {
+          await deleteEncryptedOfflineSnapshot(user.id, deviceId)
+          localStorage.removeItem(metaKey)
+          const offlineIndex = readOfflineLoginIndex()
+          if (offlineIndex?.userId === user.id && offlineIndex.deviceId === deviceId) {
+            localStorage.removeItem('schoolbridge-offline-login-index')
+          }
+          return
+        }
         const account = await api<{ role: string; permissions: Record<string, string[]> }>('auth/me', token)
         if (cancelled) return
         const fingerprint = JSON.stringify({ role: account.role, permissions: Object.fromEntries(Object.entries(account.permissions || {}).sort(([a], [b]) => a.localeCompare(b))) })
