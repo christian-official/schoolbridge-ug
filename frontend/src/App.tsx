@@ -204,7 +204,7 @@ async function api<T>(path: string, token: string, options: RequestInit = {}): P
   return result as T
 }
 
-function PasswordRecovery({onBack}:{onBack:()=>void}) {
+function PasswordRecovery({onBack,schoolId}:{onBack:()=>void;schoolId:string}) {
   const [stage,setStage]=useState<'request'|'confirm'>('request')
   const [identifier,setIdentifier]=useState('')
   const [code,setCode]=useState('')
@@ -216,7 +216,7 @@ function PasswordRecovery({onBack}:{onBack:()=>void}) {
   async function requestCode(e:React.FormEvent){
     e.preventDefault();setBusy(true);setError('');setMessage('')
     try {
-      const response=await fetch(`${API_BASE_URL}/api/auth/password-reset/request`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({identifier})})
+      const response=await fetch(`${API_BASE_URL}/api/auth/password-reset/request`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({identifier,school_id:schoolId||undefined})})
       const data=await response.json().catch(()=>({}))
       if(!response.ok)throw new Error(data.detail||'Unable to request a recovery code.')
       setMessage(data.message||'If the account has a registered email, a code will be sent. Check your inbox and spam folder.')
@@ -229,7 +229,7 @@ function PasswordRecovery({onBack}:{onBack:()=>void}) {
     if(newPassword!==confirmPassword){setError('The new passwords do not match.');return}
     setBusy(true)
     try {
-      const response=await fetch(`${API_BASE_URL}/api/auth/password-reset/confirm`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({identifier,code,new_password:newPassword})})
+      const response=await fetch(`${API_BASE_URL}/api/auth/password-reset/confirm`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({identifier,school_id:schoolId||undefined,code,new_password:newPassword})})
       const data=await response.json().catch(()=>({}))
       if(!response.ok)throw new Error(data.detail||'Password reset failed.')
       setMessage(data.message||'Password reset successfully. You can now sign in.')
@@ -659,6 +659,7 @@ type FirstSetupStatus = {
   setup_completed: boolean
   activated: boolean
   installation_id: string
+  school_id?: string
   identity_locked: boolean
   error: string
 }
@@ -732,7 +733,7 @@ function FirstTimeSetupWizard({status,onStatusChange}:{status:FirstSetupStatus;o
     try {
       const response=await fetch(`${API_BASE_URL}/api/setup/activate`,{
         method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({license}),
+        body:JSON.stringify({license,school_id:status.school_id||undefined}),
       })
       const result=await response.json().catch(()=>({}))
       if(!response.ok)throw new Error(result.detail||'Installation activation failed.')
@@ -746,7 +747,7 @@ function FirstTimeSetupWizard({status,onStatusChange}:{status:FirstSetupStatus;o
     try {
       const response=await fetch(`${API_BASE_URL}/api/setup/complete`,{
         method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({...school,activation_license:license}),
+        body:JSON.stringify({...school,school_id:status.school_id||undefined,activation_license:license}),
       })
       const result=await response.json().catch(()=>({}))
       if(!response.ok)throw new Error(result.detail||'School setup could not be completed.')
@@ -880,6 +881,7 @@ function OfflineWorkspace({snapshot,onExit}:{snapshot:OfflineWorkspaceSnapshot;o
 }
 
 function App() {
+  const selectedSchoolId = typeof window !== 'undefined' ? (new URLSearchParams(window.location.search).get('school') || '') : ''
   const [token, setToken] = useState('')
   const [user, setUser] = useState<User | null>(null)
   const [username, setUsername] = useState('')
@@ -892,7 +894,7 @@ function App() {
   const [overviewShortcuts, setOverviewShortcuts] = useState<string[]>([])
   const [serverConnection, setServerConnection] = useState<'checking' | 'connected' | 'disconnected'>('checking')
   const [syncDeviceRevoked, setSyncDeviceRevoked] = useState(false)
-  const [setupStatus,setSetupStatus] = useState<FirstSetupStatus>({loading:true,setup_completed:false,activated:false,installation_id:'',identity_locked:false,error:''})
+  const [setupStatus,setSetupStatus] = useState<FirstSetupStatus>({loading:true,setup_completed:false,activated:false,installation_id:'',school_id:selectedSchoolId,identity_locked:false,error:''})
   const [qrSchoolName,setQrSchoolName] = useState('')
   const [qrSchoolError,setQrSchoolError] = useState('')
   useEffect(() => {
@@ -906,7 +908,7 @@ function App() {
   }, [])
   useEffect(()=>{
     let cancelled=false
-    fetch(`${API_BASE_URL}/api/setup/status`).then(async response=>{
+    fetch(API_BASE_URL + '/api/setup/status' + (selectedSchoolId ? '?school=' + encodeURIComponent(selectedSchoolId) : '')).then(async response=>{
       const result=await response.json().catch(()=>({}))
       if(!response.ok)throw new Error(result.detail||'Unable to check installation setup.')
       if(!cancelled) {
@@ -914,29 +916,29 @@ function App() {
           if(result.setup_completed && result.activated && result.installation_id) localStorage.setItem('schoolbridge-installation-id', result.installation_id)
           else localStorage.removeItem('schoolbridge-installation-id')
         } catch { /* Ignore unavailable browser storage. */ }
-        setSetupStatus({loading:false,setup_completed:Boolean(result.setup_completed),activated:Boolean(result.activated),installation_id:result.installation_id||'',identity_locked:Boolean(result.identity_locked),error:''})
+        setSetupStatus({loading:false,setup_completed:Boolean(result.setup_completed),activated:Boolean(result.activated),installation_id:result.installation_id||'',school_id:result.school_id||'',identity_locked:Boolean(result.identity_locked),error:''})
       }
-    }).catch(e=>{if(!cancelled)setSetupStatus({loading:false,setup_completed:false,activated:false,installation_id:'',identity_locked:false,error:e instanceof Error?e.message:'Unable to check installation setup.'})})
+    }).catch(e=>{if(!cancelled)setSetupStatus({loading:false,setup_completed:false,activated:false,installation_id:'',school_id:selectedSchoolId,identity_locked:false,error:e instanceof Error?e.message:'Unable to check installation setup.'})})
     return ()=>{cancelled=true}
-  },[])
+  },[selectedSchoolId])
   useEffect(() => {
-    const expectedInstallation = new URLSearchParams(window.location.search).get('school')
-    if (!expectedInstallation || setupStatus.loading) return
-    if (!setupStatus.setup_completed || expectedInstallation !== setupStatus.installation_id) {
+    const expectedSchoolId = selectedSchoolId
+    if (!expectedSchoolId || setupStatus.loading) return
+    if (!setupStatus.setup_completed || expectedSchoolId !== setupStatus.school_id) {
       setQrSchoolError('This QR code belongs to a different SchoolBridge installation. Ask your school for its current access QR code.')
       return
     }
     let cancelled = false
-    fetch(API_BASE_URL + '/api/public/school', { cache: 'no-store' })
+    fetch(API_BASE_URL + '/api/public/school?school=' + encodeURIComponent(expectedSchoolId), { cache: 'no-store' })
       .then(async response => {
         const identity = await response.json().catch(() => ({}))
         if (!response.ok) throw new Error(identity.detail || 'Unable to verify the school identity.')
-        if (identity.installation_id !== expectedInstallation) throw new Error('The QR code does not match this school installation.')
+        if (identity.school_id !== expectedSchoolId) throw new Error('The QR code does not match this school.')
         if (!cancelled) setQrSchoolName(identity.school_name)
       })
       .catch(error => { if (!cancelled) setQrSchoolError(error instanceof Error ? error.message : 'Unable to verify the school identity.') })
     return () => { cancelled = true }
-  }, [setupStatus.loading, setupStatus.setup_completed, setupStatus.installation_id])
+  }, [selectedSchoolId, setupStatus.loading, setupStatus.setup_completed, setupStatus.school_id])
 
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressTriggered = useRef(false)
@@ -1397,6 +1399,7 @@ function App() {
       const body = new URLSearchParams()
       body.set('username', username)
       body.set('password', password)
+      if (selectedSchoolId) body.set('school_id', selectedSchoolId)
       const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -1454,7 +1457,7 @@ function App() {
   if (!token || !user) {
     if(setupStatus.loading) return <main className="login-page"><section className="login-card"><div className="brand-name">School<span>Bridge</span></div><p className="muted">Checking school installation...</p></section></main>
     const offlineLoginIndex = setupStatus.error ? readOfflineLoginIndex() : null
-    if(setupStatus.error && !offlineLoginIndex) return <main className="login-page"><section className="login-card"><div className="brand-name">School<span>Bridge</span></div><h1>Unable to check setup</h1><p className="error" role="alert">{setupStatus.error}</p><button className="primary-button login-button" onClick={()=>window.location.reload()}>Try again</button></section></main>
+    if(setupStatus.error && !offlineLoginIndex) return <main className="login-page"><section className="login-card"><div className="brand-name">School<span>Bridge</span></div><h1>{setupStatus.error.includes("Select your school") ? "School selection required" : "Unable to check setup"}</h1><p className="error" role="alert">{setupStatus.error}</p><p className="form-hint">For shared SchoolBridge access, open the official QR code provided by your school. It identifies the school but does not sign you in.</p><button className="secondary-button" onClick={()=>window.location.reload()}>Try again</button></section></main>
     // A cached offline identity is accepted only when the setup service is unavailable.
     // A reachable, unconfigured database must always complete first-time setup.
     if(!setupStatus.setup_completed && !offlineLoginIndex) return <FirstTimeSetupWizard status={setupStatus} onStatusChange={setSetupStatus}/>
@@ -1464,17 +1467,19 @@ function App() {
           <div className="brand-mark"><GraduationCap size={30} /></div>
           <div className="brand-name">School<span>Bridge</span></div>
           <p className="login-subtitle">Your school's operations, connected.</p>
-          {showRecovery ? <PasswordRecovery onBack={()=>setShowRecovery(false)}/> : <>
+          {showRecovery ? <PasswordRecovery schoolId={selectedSchoolId} onBack={()=>setShowRecovery(false)}/> : <>
             <h1>Welcome back</h1>
             <p className="muted">Sign in to your school workspace.</p>
+            {qrSchoolName && <p className="form-hint">School: <strong>{qrSchoolName}</strong></p>}
+            {!selectedSchoolId && <p className="form-hint">If your school uses shared online access, open its official SchoolBridge QR code first.</p>}
             <form onSubmit={login}>
               <label htmlFor="username">Username</label>
-              <input id="username" value={username} onChange={e => setUsername(e.target.value)} placeholder="Enter staff number or surname" required />
+              <input id="username" value={username} onChange={e => setUsername(e.target.value)} placeholder="Enter your username" required />
               <label htmlFor="password">Password / offline passphrase</label>
               <input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter your password or offline passphrase" required />
               <p className="form-hint">Offline sign-in works only after you register this browser and save an encrypted offline copy under Settings → Registered devices. Use that offline passphrase when disconnected.</p>
               {loginError && <p className="error">{loginError}</p>}
-              <button className="primary-button login-button" disabled={loading || Boolean(qrSchoolError) || (new URLSearchParams(window.location.search).has('school') && !qrSchoolName)}>
+              <button className="primary-button login-button" disabled={loading || Boolean(qrSchoolError) || (Boolean(selectedSchoolId) && !qrSchoolName)}>
                 {loading ? <><LoaderCircle className="spin" size={18} /> Signing in...</> : 'Sign in'}
               </button>
             </form>
