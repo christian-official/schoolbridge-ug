@@ -9,14 +9,6 @@ type ChildDetails = {
   class_name: string
 }
 
-type RegistrationSession = {
-  access_token: string
-  token_type: string
-  role: 'parent' | 'teacher'
-  username: string
-  message: string
-}
-
 export default function RegistrationFlow({
   schoolId,
   schoolName,
