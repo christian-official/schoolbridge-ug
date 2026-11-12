@@ -22,6 +22,7 @@ import './DashboardRedesign.css'
 
 type User = {
   id: number
+  school_id?: string | null
   username: string
   email: string
   role: string
@@ -1344,6 +1345,14 @@ function App() {
     setSessionError('')
     try {
       const profile = await api<User>('auth/me', authToken)
+      if (selectedSchoolId && profile.school_id && profile.school_id !== selectedSchoolId) {
+        await clearStoredSessionToken().catch(() => {})
+        setToken('')
+        setUser(null)
+        setSessionError('')
+        setLoginError('This saved account belongs to a different school. Use this school\'s QR code to register or sign in.')
+        return
+      }
       setUser(profile)
       setLoginError('')
       if(profile.role==='teacher') setActive('My Classes')
