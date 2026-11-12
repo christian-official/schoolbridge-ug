@@ -79,6 +79,27 @@ jobs:
           }
           Write-Host "Verified executable: $executable"
           Write-Host "Verified offline installer: $($installers[0].FullName) ($($installers[0].Length) bytes)"
+      - name: Assemble and verify standalone desktop USB package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $installer = Get-ChildItem "src-tauri/target/release/bundle/nsis" -Filter "*.exe" -File
+          if ($installer.Count -ne 1) { throw "Expected exactly one NSIS installer for USB packaging." }
+          ../scripts/prepare-desktop-usb.ps1 -InstallerPath $installer[0].FullName
+          $package = Join-Path $env:GITHUB_WORKSPACE "dist/SchoolBridge-USB"
+          $tamperCopy = Join-Path $env:RUNNER_TEMP "SchoolBridge-USB-tamper-test"
+          Copy-Item $package $tamperCopy -Recurse
+          Add-Content (Join-Path $tamperCopy "SchoolBridge-Setup.exe") "tamper"
+          $verifyOutput = & (Join-Path $tamperCopy "Verify-USB.ps1") 2>&1
+          if ($LASTEXITCODE -eq 0) { throw "USB verifier accepted a modified installer." }
+          Write-Host "USB tamper detection passed."
+      - name: Publish CI test-key desktop USB package (not for production)
+        uses: actions/upload-artifact@v4
+        with:
+          name: SchoolBridge-Desktop-USB-CI-TEST-ONLY
+          path: dist/SchoolBridge-USB/
+          if-no-files-found: error
+          retention-days: 7
       - name: Publish offline Windows installer
         uses: actions/upload-artifact@v4
         with:
@@ -282,7 +303,7 @@ jobs:
         run: npm run test:offline:browser
 
   local-deployment-package:
-    name: deployment / compose-build-and-usb-validation
+    name: prototype / docker-wsl2-compose-validation
     runs-on: ubuntu-24.04
     env:
       POSTGRES_DB: schoolbridge
@@ -438,7 +459,7 @@ jobs:
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: SchoolBridge-USB-package
+          name: SchoolBridge-Docker-WSL2-Prototype-Only
           path: /tmp/SchoolBridge-USB.zip
           if-no-files-found: error
 
@@ -455,6 +476,8 @@ jobs:
           $ErrorActionPreference = "Stop"
           $files = @(
             "scripts/prepare-usb.ps1",
+            "scripts/prepare-desktop-usb.ps1",
+            "scripts/verify-desktop-usb.ps1",
             "scripts/install-schoolbridge.ps1",
             "scripts/check-school-host.ps1",
             "scripts/prepare-school-host.ps1",
