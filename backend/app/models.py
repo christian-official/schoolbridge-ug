@@ -29,7 +29,7 @@ class Student(Base):
     __tablename__ = "students"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    admission_number: Mapped[str] = mapped_column(String(40), unique=True, index=True)
+    admission_number: Mapped[str | None] = mapped_column(String(40), unique=True, index=True, nullable=True)
     first_name: Mapped[str] = mapped_column(String(80))
     last_name: Mapped[str] = mapped_column(String(80))
     gender: Mapped[str | None] = mapped_column(String(20), nullable=True)
