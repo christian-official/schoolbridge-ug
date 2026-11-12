@@ -99,9 +99,6 @@ export default function RegistrationFlow({
       <div className="brand-name">School<span>Bridge</span></div>
       <h1>Join your school</h1>
       <p className="muted">School: <strong>{schoolName}</strong></p>
-      <p className="form-hint">
-        Enter the details already held in this school's records. SchoolBridge verifies them automatically and opens the correct dashboard. No password, phone code or administrator approval is required.
-      </p>
       <div className="registration-kind">
         <button type="button" className="primary-button" onClick={() => { setKind('parent'); setError(''); setMessage(''); setFormOpen(true) }}>Parent</button>
         <button type="button" className="primary-button" onClick={() => { setKind('teacher'); setError(''); setMessage(''); setFormOpen(true) }}>Teacher</button>
@@ -112,7 +109,6 @@ export default function RegistrationFlow({
           <header className="registration-modal-header">
             <div>
               <h2 id="registration-modal-title">{kind === 'parent' ? 'Parent details' : 'Teacher details'}</h2>
-              <p>Enter the details already held in the school's records.</p>
             </div>
             <button type="button" className="registration-modal-close" aria-label="Close form" onClick={() => setFormOpen(false)}>×</button>
           </header>
