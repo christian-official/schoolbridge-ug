@@ -1,86 +1,96 @@
-# SchoolBridge self-registration and low-connectivity approval design
+# SchoolBridge QR self-registration and automatic access
 
-## Product decision
+## Agreed product decision
 
-Parents and teachers must create their own SchoolBridge accounts by matching information they provide against trusted school records. Schools must not have to print, distribute, or repeatedly retrieve usernames, surnames, temporary passwords, or passcodes for ordinary sign-in.
+Parents and teachers register themselves by scanning their school's reusable QR code. SchoolBridge verifies the details they submit against that school's existing records and, when there is one unambiguous match, creates or resumes the appropriate account and opens the correct dashboard automatically.
 
-A school must not need to be online at the moment a parent or teacher registers. Routine registration must be decided from school records already synchronised to the hosted platform. School staff approval is an exception path for ambiguous or unverifiable records, not a dependency for every registration.
+There is no administrator-initiated parent or teacher account creation, no administrator approval queue, no SMS verification code, and no password creation for parents or teachers. The process is designed for schools whose source records may still be paper-based: the school enters its roster and guardian/staff details into SchoolBridge once; families and teachers then register themselves.
 
-Admission numbers are optional. They must never be required to identify a student, link a parent, or complete registration.
+Passwords are reserved for administrator accounts and explicitly selected essential non-teaching staff accounts.
 
 ## Parent journey
 
-1. A parent scans the school's reusable QR code from anywhere with internet access. The QR identifies the school workspace; it is not an authentication credential.
-2. The parent confirms the displayed school and chooses **Create parent account**.
-3. The parent enters their own details and the details requested to identify their relationship to one or more enrolled children. The form must support schools whose paper records do not contain admission numbers.
-4. The platform compares the submitted information only against records belonging to that school.
-5. The applicant must not type in, edit, or nominate the phone number used for verification. SchoolBridge retrieves the phone number from the matched, trusted school record and displays only a masked version (for example, `+256 7XX XXX 482`) so the parent can recognise it without exposing the full number.
-6. The parent confirms whether they can access that displayed number. SchoolBridge sends a one-time verification code only to that existing recorded number. The applicant cannot substitute a different number during this step.
-7. After successful code verification, the parent can create their own password and claim the matched children. If the recorded number is missing, untrusted, inaccessible, or the match is not sufficiently reliable, route the claim to school review instead of allowing the applicant to supply a replacement number.
-8. One parent account can link to multiple children at the same school. The process must not create separate accounts for siblings.
-9. If the match is ambiguous, the submitted details conflict, or no trusted contact channel exists, create a pending claim for review. Do not guess, expose a list of students, or grant access while pending.
-10. Once verified, the parent sees only their linked children and permitted parent features.
+1. A parent scans the school's QR code.
+2. The QR opens the school's registration page directly and displays the verified school identity.
+3. The parent enters their full name and relationship to the child or children.
+4. For each child, the parent enters the child's first and last names and either the admission number or date of birth. Class is an optional additional check. A parent can submit up to ten children in one registration.
+5. SchoolBridge searches only active student and guardian records belonging to the QR-selected school. The parent's name and relationship must match the recorded guardian information, and each child must resolve to exactly one active student record.
+6. If every submitted relationship is verified, SchoolBridge creates or resumes the parent's account, links the verified children, issues a secure session and opens the parent dashboard.
+7. The parent does not create a username or password, enter a phone number, wait for a text message, visit the school, or wait for an administrator to approve the registration.
+
+If a child's identity is ambiguous, the student record is not found, or the guardian details do not match, access is denied with a generic correction message. The request is not placed in an administrator review queue and no student record is exposed to the applicant. The school may correct its underlying roster/guardian records through its normal authorised data-entry process; the parent can then retry.
 
 ## Teacher journey
 
-1. A teacher scans the school's QR code or opens the shared SchoolBridge address and confirms the school.
-2. The teacher chooses **Create teacher account** and supplies the requested identity and employment details.
-3. The platform matches the submission against an active staff record for that school.
-4. A unique match plus verification of a trusted contact channel permits account creation and the role/permissions associated with that staff record.
-5. Ambiguous matches, missing trusted contact details, or conflicts enter the pending review path. A teacher must never be able to choose their own role, permissions, classes, or staff identity.
+1. A teacher scans the school's QR code and reaches the same school-specific registration entry point.
+2. The teacher selects **Teacher** and enters their first name, last name and staff number. Position and department can be supplied as additional checks.
+3. SchoolBridge matches those details against exactly one active teaching staff record belonging to the selected school.
+4. On a unique match, SchoolBridge creates or resumes the teacher account, associates it with the verified staff record, issues a secure session and opens the teacher dashboard.
+5. The teacher does not receive a temporary password or need an administrator to create or approve a login.
 
-## Low-connectivity approval model
+A teacher profile is entered into the Staff directory without creating a login. The directory generates the staff number, which the school shares with the teacher together with the reusable school QR code. The teacher activates access independently by matching those details.
 
-- School administrators enter or import paper records while working in the school's local SchoolBridge installation.
-- The local installation stores a durable, auditable queue of approved roster and guardian/staff relationship changes.
-- When connectivity is available, the school synchronises those changes to the hosted platform. The school does not need a continuous connection.
-- The hosted platform can complete routine registrations against the latest successfully synchronised trusted records; the school does not need to be online at that moment.
-- Claims that cannot be safely resolved automatically remain pending. A school administrator can review them in the local installation; the decision synchronises when connectivity returns.
-- Pending claims must not grant access before the approval decision reaches the authoritative hosted service.
-- The user-facing status must explain that a claim is awaiting school review; it must not imply that the school is currently online.
+## Password and account rules
 
-## Identity matching and safety rules
+- **Administrators:** password-protected accounts.
+- **Essential non-teaching staff:** password-protected accounts only when the administrator explicitly selects the account-creation option for that staff profile.
+- **Teachers:** QR-verified registration and direct dashboard sessions; no password login or password reset.
+- **Parents:** QR-verified registration and direct dashboard sessions; no password login or password reset.
+- The Staff directory may create a staff profile without an account. Teaching profiles never receive a password account.
+- Parent Access is a directory for reviewing or removing existing parent access. It does not create accounts or approve registrations.
+- Device invitations are a separate optional feature for encrypted offline synchronisation. They are not required for QR registration or normal online dashboard access.
 
-- Match within an immutable school/workspace boundary; never search across schools.
-- Admission number is optional and may be absent, duplicated in source documents, or not used by a school.
-- Use the available combination of student identity, guardian identity/relationship, trusted contact details, class/year and other recorded attributes. Do not treat a name-only match as proof.
-- A single parent may be linked to multiple students when the trusted records support those relationships.
-- Multiple possible matches, conflicting details, or no adequate verification evidence must enter review.
-- Never reveal candidate student records to an unauthenticated registrant.
-- Apply rate limits, generic failure messages, audit events, and abuse monitoring to registration attempts.
-- For parent registration, the verification phone number must come from the matched trusted school record; the applicant must never provide or change it in the verification flow.
-- Display only a masked version of the recorded number before verification. Do not reveal the full number to an unauthenticated applicant.
-- Ask the parent to confirm access to the displayed number, then send a short-lived, single-use verification code only to that recorded number. Rate-limit code requests and attempts, invalidate used/expired codes, and audit verification events.
-- Do not send a verification code to a newly supplied, untrusted number and treat that as proof of identity. If the recorded number is missing, untrusted, or inaccessible, use the asynchronous school-review path; any contact-number correction must be verified and recorded by the school through an authorised process.
-- Where no trusted contact channel exists, use the asynchronous school-review path. Do not force schools to invent phone numbers or admission numbers.
-- Parent account creation and student linking must be atomic. A failed or pending claim must not leave a partially privileged account.
-- Revoke sessions and remove access promptly when a guardian relationship or staff employment record is withdrawn.
+## QR identity and school isolation
 
-## Existing implementation that must be replaced
+- The reusable QR contains the shared SchoolBridge web address and the school's public, non-secret identity. It contains no password, session token, student details or invitation secret.
+- Scanning the QR is not itself authentication. The submitted parent or teacher details must pass server-side matching before a session is issued.
+- The selected school is resolved and verified before registration. Student, guardian, staff and account queries are scoped to that tenant.
+- Authenticated sessions report their school identity. If a saved session belongs to a different school than the QR currently being opened, SchoolBridge clears that session rather than showing the wrong school's dashboard.
+- The QR code must not be treated as a security boundary or permission grant.
 
-The current single-school backend still creates parent accounts through an administrator-selected student list and generates a temporary password. Teacher accounts are currently created by an administrator with a username and password. Login still accepts username/password and includes a staff surname/staff-number lookup fallback.
+## Verification and abuse controls
 
-These are legacy flows. They must not be carried into the new public self-registration experience. Keep existing local installations working during migration, but do not enable the new hosted onboarding until tenant isolation, migration/backfill, trusted-record matching, and cross-school tests are complete.
+- Parent matching uses the child's exact first and last names plus an admission number or date of birth, and the parent's exact recorded name and relationship.
+- Teacher matching uses the exact recorded first and last names and staff number, and requires an active teaching staff record.
+- Multiple possible student or staff matches fail closed. SchoolBridge never guesses which record to link.
+- Matching never searches another school or returns candidate student/staff records to an unauthenticated applicant.
+- Registration attempts are rate-limited per school and client connection. Attempt identifiers are HMAC-hashed in the audit log.
+- Account creation and parent-child linking occur in one database transaction. Repeating the same verified registration resumes the existing account rather than creating a duplicate for the same identity and child set.
+- Existing teacher accounts are resumed by their linked staff record; legacy forced-password-change state is cleared when the teacher successfully activates through QR.
+- Parent/teacher password login and password recovery are blocked. Admin password recovery and designated non-teaching staff password management remain available.
 
-The current `ParentStudentLink` model already supports multiple student links per parent account. Preserve that capability while making each relationship school-scoped and verifiable.
+## Current implementation status
 
-## Implementation sequence
+The following are implemented on the existing feature branch:
 
-1. **Tenant foundation:** create immutable school identity and safely backfill the existing single-school installation; scope users, students, staff, guardian links, claims, and every school-owned record/query to the tenant.
-2. **Trusted identity records:** define explicit guardian relationship/contact records and staff identity records, including source, verification status, and audit history. Keep admission number nullable/optional throughout schemas, imports, validation, and UI.
-3. **Offline roster synchronisation:** synchronise approved roster/relationship changes with idempotency, conflict handling, and audit history. Never overwrite a newer hosted decision silently.
-4. **Claim workflow:** add parent and teacher registration requests, safe unique-match evaluation, pending review, approve/reject, expiry, rate limits, and atomic account creation.
-5. **Authentication:** users choose their own password after successful verification; remove surname-as-login and school-issued temporary credentials from the new flow. Preserve secure password recovery.
-6. **Acceptance tests:** cover multiple children per parent, missing admission numbers, duplicate names, absent/untrusted phone numbers, stale offline school data, school offline during registration, delayed approval synchronisation, revoked relationships, and cross-school ID substitution.
+1. School QR generation and school identity resolution.
+2. QR query routing directly into the parent/teacher registration page.
+3. Separate parent and teacher detail forms.
+4. Automatic school-scoped matching against student/guardian and active teaching staff records.
+5. Direct role-based account creation/resumption and secure dashboard session issuance.
+6. Removal of active registration-claim, SMS-verification and administrator-review endpoints and screens.
+7. Removal of administrator-created parent accounts and teacher password-account creation.
+8. Teacher profile creation without a login; optional password accounts for selected essential non-teaching staff.
+9. School-identity checks for restored sessions and rate-limited audit logging.
+10. Backend and browser tests for QR registration, invalid matches, repeat registration, school isolation and direct dashboard access.
 
-## Release gates
+The latest GitHub Actions run is still queued behind earlier Windows installer jobs. Do not mark this flow accepted until the current backend, frontend/browser, Windows SQLite and deployment CI jobs complete successfully.
 
-Do not expose hosted self-registration until:
-- tenant isolation covers every API, relationship, background job, report/export, sync operation, and backup/restore path;
-- no registration path can grant access from an ambiguous match;
-- parent multi-child linking and optional admission numbers pass backend and frontend tests;
-- school approval can be queued and synchronised without requiring the school to be continuously online;
-- cross-school isolation and offline/conflict tests pass;
-- existing local installations and their data remain safely migratable.
+## Hosted access and Windows desktop boundary
 
-This design does not select a hosting provider and does not change the agreed shared free HTTPS subdomain direction.
+The public school QR is generated from the hosted HTTPS SchoolBridge web workspace. The standalone Windows desktop backend binds locally and is not reachable by parents at home. The desktop QR panel remains unavailable by design. Remote parent access therefore requires the school's records and account services to be available through the shared hosted HTTPS deployment (or a separately validated network-accessible server architecture).
+
+Task 1.11 (Windows installer) is paused at its existing packaging checkpoint while this QR registration work is completed. Installer activation-key configuration and clean-machine installation/upgrade validation remain separate outstanding work.
+
+## Release acceptance
+
+Do not declare QR onboarding complete until:
+
+- all current CI jobs pass on the final branch commit;
+- a parent can scan the QR, match one or more children and land directly in the parent dashboard;
+- a teacher can scan the QR, match an active staff record and land directly in the teacher dashboard;
+- invalid, ambiguous and cross-school details are rejected without exposing records;
+- repeat registration resumes the correct account;
+- teacher/parent password sign-in, password recovery, manual administrator creation and administrator approval remain unavailable;
+- administrator and selected essential non-teaching password accounts continue to work;
+- the end-to-end journey is verified on the hosted HTTPS deployment from an ordinary mobile internet connection.
