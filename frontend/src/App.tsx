@@ -1204,7 +1204,7 @@ function App() {
   }
 
   async function openStudentProfile(id:number) {
-    try { const [result,contacts]=await Promise.all([api<any>('students/'+id+'/profile',token),api<any[]>('students/'+id+'/guardian-contacts',token)]); setStudentProfile({...result,guardian_contacts:contacts}); setProfileMessage('') }
+    try { const result=await api<any>('students/'+id+'/profile',token); const contacts=user.role==='admin'?await api<any[]>('students/'+id+'/guardian-contacts',token):[]; setStudentProfile({...result,guardian_contacts:contacts}); setProfileMessage('') }
     catch(error) { setDataError(error instanceof Error?error.message:'Unable to open student profile.') }
   }
 
@@ -1686,7 +1686,7 @@ function App() {
 
 
 
-          <StaffFinance token={token} active={active} classes={classes} refreshKey={refreshKey} initialTab={financeTabRequest} canAddStaff={user.role === 'admin' || (user.permissions?.['Staff'] || []).includes('add')} />
+          <StaffFinance token={token} active={active} classes={classes} refreshKey={refreshKey} initialTab={financeTabRequest} canAddStaff={user.role === 'admin' || (user.permissions?.['Staff'] || []).includes('add')} canVerifyStaffContacts={user.role === 'admin'} />
           {studentProfile && (
             <div className="modal-backdrop" onClick={()=>setStudentProfile(null)}>
               <section className="panel student-profile-modal" onClick={e=>e.stopPropagation()}>
@@ -1716,7 +1716,7 @@ function App() {
                     <div><small>Relationship</small><strong>{studentProfile.student.guardian_relationship||'—'}</strong></div>
                     <div><small>Guardian phone</small><strong>{studentProfile.student.guardian_phone||'—'}</strong></div><div><small>Second guardian</small><strong>{studentProfile.student.guardian2_name||'—'}</strong></div><div><small>Second guardian relationship</small><strong>{studentProfile.student.guardian2_relationship||'—'}</strong></div><div><small>Second guardian phone</small><strong>{studentProfile.student.guardian2_phone||'—'}</strong></div><div><small>Study mode</small><strong>{studentProfile.student.study_mode||'Day'}</strong></div><div><small>House</small><strong>{studentProfile.student.house||'—'}</strong></div>
                   </div>
-                  <div className="panel-heading"><div><h3>Trusted guardian contacts</h3><p>Only numbers confirmed by the school can be used for parent identity verification.</p></div></div>
+                  {user.role === 'admin' && <><div className="panel-heading"><div><h3>Trusted guardian contacts</h3><p>Only numbers confirmed by the school can be used for parent identity verification.</p></div></div>
                   <div className="table-wrap"><table><thead><tr><th>Guardian</th><th>Relationship</th><th>Recorded phone</th><th>School verification</th><th>Action</th></tr></thead><tbody>
                     {(studentProfile.guardian_contacts||[]).map((contact:any)=><tr key={contact.id}>
                       <td>{contact.guardian_name}</td><td>{contact.relationship||'—'}</td><td>{contact.phone||'Not recorded'}</td>
@@ -1725,6 +1725,7 @@ function App() {
                     </tr>)}
                     {!(studentProfile.guardian_contacts||[]).length&&<tr><td colSpan={5}>No guardian contacts are recorded.</td></tr>}
                   </tbody></table></div>
+                  </>}
                   <div className="panel-heading"><div><h3>Previous education</h3></div></div>
                   <div className="student-form-grid">
                     <div><small>Previous school</small><strong>{studentProfile.student.previous_school||'—'}</strong></div>

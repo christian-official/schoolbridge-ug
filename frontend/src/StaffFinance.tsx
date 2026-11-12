@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Users, Plus, Search, Wallet, ReceiptText, RefreshCw, Building2, CloudUpload, LockKeyhole } from 'lucide-react'
 import { saveEncryptedFinanceQueue, loadEncryptedFinanceQueue } from './syncStorage'
 
-type Staff = { id:number; staff_number:string; first_name:string; last_name:string; category:string; position?:string; department?:string; subjects?:string|null; phone?:string; email?:string; house?:string|null; salary_amount?:number|null; salary_frequency?:string; status?:string }
+type Staff = { id:number; staff_number:string; first_name:string; last_name:string; category:string; position?:string; department?:string; subjects?:string|null; phone?:string; phone_verification_status?:string; email?:string; house?:string|null; salary_amount?:number|null; salary_frequency?:string; status?:string }
 type Page<T> = { items:T[]; total:number; page:number; pages:number }
 type Summary = { fees_expected:number; fees_collected:number; outstanding:number; salary_expenses?:number; other_expenses?:number; total_expenses?:number; net_cash_position?:number }
 type Charge = { id:number; student_id:number; student_name:string; admission_number:string; class_id?:number|null; class_name?:string; stream?:string; term:string; year:number; amount:number; paid:number; balance:number }
@@ -18,7 +18,7 @@ async function request<T>(path:string, token:string, options:RequestInit={}):Pro
   return data as T
 }
 
-export default function StaffFinance({token,active,classes=[],refreshKey=0,initialTab='overview',canAddStaff=false}:{token:string;active:string;classes?:{id:number;name?:string;section?:string}[];refreshKey?:number;initialTab?:'overview'|'payments'|'balances';canAddStaff?:boolean}) {
+export default function StaffFinance({token,active,classes=[],refreshKey=0,initialTab='overview',canAddStaff=false,canVerifyStaffContacts=false}:{token:string;active:string;classes?:{id:number;name?:string;section?:string}[];refreshKey?:number;initialTab?:'overview'|'payments'|'balances';canAddStaff?:boolean;canVerifyStaffContacts?:boolean}) {
   const [staff,setStaff]=useState<Staff[]>([])
   const [subjectOptions,setSubjectOptions]=useState<{id:number;name:string;code?:string}[]>([])
   const [staffTotal,setStaffTotal]=useState(0)
@@ -157,6 +157,18 @@ export default function StaffFinance({token,active,classes=[],refreshKey=0,initi
     catch(e){setMessage(e instanceof Error?e.message:'Unable to save staff member.')}
     finally{setSavingStaff(false)}
   }
+  async function verifyStaffPhone(id:number,status:'school_verified'|'unverified'|'rejected') {
+    try {
+      const result=await request<{staff:Staff}>('staff/'+id+'/phone-verification',token,{
+        method:'PATCH',body:JSON.stringify({status}),
+      })
+      setStaff(current=>current.map(item=>item.id===id?result.staff:item))
+      setMessage(status==='school_verified'?'Staff phone marked as school-verified.':'Staff phone verification updated.')
+    } catch(error) {
+      setMessage(error instanceof Error?error.message:'Unable to update staff phone verification.')
+    }
+  }
+
   async function archiveStaff(id:number){
     if(!window.confirm('Archive this staff member? Their records and salary history will be retained.')) return
     try {await request('staff/'+id+'/archive',token,{method:'POST'});setMessage('Staff member archived.');const p=new URLSearchParams({search,page:'1',page_size:'5'});if(category)p.set('category',category);const r=await request<Page<Staff>>('staff?'+p.toString(),token);setStaff(r.items);setStaffTotal(r.total)}
@@ -294,7 +306,7 @@ export default function StaffFinance({token,active,classes=[],refreshKey=0,initi
     </form>}
     <div className="table-tools student-tools"><div className="search-box"><Search size={17}/><input placeholder="Search name or staff number..." value={search} onChange={e=>setSearch(e.target.value)}/></div><div className="staff-category-options" role="group" aria-label="Filter staff category">{[{label:'All staff',value:''},{label:'Teaching',value:'Teaching'},{label:'Non-teaching',value:'Non-teaching'}].map(option=><button key={option.value||'all'} type="button" className={category===option.value?'staff-category-option active':'staff-category-option'} onClick={()=>setCategory(option.value)}>{option.label}</button>)}</div></div>
     <p className="staff-list-count">Showing {staff.length} of {staffTotal} staff members{search.trim()?' matching your search':'. Search to find other staff members.'}</p>
-    <div className="table-wrap"><table><thead><tr><th>Staff member</th><th>Staff number</th><th>Category</th><th>Position</th><th>Department</th><th>House</th><th>Phone</th><th>Salary (UGX)</th><th>Status</th><th>Actions</th></tr></thead><tbody>{staff.map(s=><tr key={s.id}><td>{s.first_name} {s.last_name}</td><td>{s.staff_number}</td><td>{s.category}</td><td>{s.position||'—'}{s.subjects?' · '+s.subjects:''}</td><td>{s.department||'—'}</td><td>{s.house||'—'}</td><td>{s.phone||'—'}</td><td>{s.salary_amount?.toLocaleString()||'—'} {s.salary_frequency||''}</td><td>{s.status||'active'}</td><td><button type="button" className="secondary-button" onClick={()=>{setEditingStaff(s.id);setForm({full_name:[s.first_name,s.last_name].filter(Boolean).join(' '),category:s.category,position:s.position||'',department:s.department||'',subjects:s.subjects||'',phone:s.phone||'',email:s.email||'',salary_amount:s.salary_amount==null?'':String(s.salary_amount),salary_frequency:s.salary_frequency||'Monthly',house:s.house||''});setShowForm(true)}}>Edit</button>{s.status!=='archived'&&<button type="button" className="secondary-button" onClick={()=>void archiveStaff(s.id)}>Archive</button>}</td></tr>)}</tbody></table></div>
+    <div className="table-wrap"><table><thead><tr><th>Staff member</th><th>Staff number</th><th>Category</th><th>Position</th><th>Department</th><th>House</th><th>Phone</th><th>Phone trust</th><th>Salary (UGX)</th><th>Status</th><th>Actions</th></tr></thead><tbody>{staff.map(s=><tr key={s.id}><td>{s.first_name} {s.last_name}</td><td>{s.staff_number}</td><td>{s.category}</td><td>{s.position||'—'}{s.subjects?' · '+s.subjects:''}</td><td>{s.department||'—'}</td><td>{s.house||'—'}</td><td>{s.phone||'—'}</td><td>{s.phone_verification_status==='school_verified'?'School verified':s.phone_verification_status==='rejected'?'Rejected':'Unverified'}</td><td>{s.salary_amount?.toLocaleString()||'—'} {s.salary_frequency||''}</td><td>{s.status||'active'}</td><td>{canVerifyStaffContacts&&<button type="button" className="secondary-button" disabled={!s.phone} onClick={()=>void verifyStaffPhone(s.id,s.phone_verification_status==='school_verified'?'unverified':'school_verified')}>{s.phone_verification_status==='school_verified'?'Revoke phone trust':'Verify phone'}</button>}<button type="button" className="secondary-button" onClick={()=>{setEditingStaff(s.id);setForm({full_name:[s.first_name,s.last_name].filter(Boolean).join(' '),category:s.category,position:s.position||'',department:s.department||'',subjects:s.subjects||'',phone:s.phone||'',email:s.email||'',salary_amount:s.salary_amount==null?'':String(s.salary_amount),salary_frequency:s.salary_frequency||'Monthly',house:s.house||''});setShowForm(true)}}>Edit</button>{s.status!=='archived'&&<button type="button" className="secondary-button" onClick={()=>void archiveStaff(s.id)}>Archive</button>}</td></tr>)}</tbody></table></div>
     {!staff.length&&<div className="empty-state"><Users size={30}/><p>No staff members match this search.</p></div>}
   </section>
 
