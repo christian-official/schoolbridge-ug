@@ -1003,7 +1003,7 @@ function App() {
   const [studentError, setStudentError] = useState('')
   const [studentSuccess, setStudentSuccess] = useState('')
   const [studentForm, setStudentForm] = useState({
-    first_name: '', middle_name: '', last_name: '', full_name: '', a_level_stream: '', gender: '', date_of_birth: '', class_id: '',
+    first_name: '', middle_name: '', last_name: '', full_name: '', a_level_stream: '', generate_admission_number: true, gender: '', date_of_birth: '', class_id: '',
     religion: '', nationality: '', phone: '', address: '', guardian_name: '', guardian_relationship: '', guardian_phone: '', guardian2_name: '', guardian2_relationship: '', guardian2_phone: '', study_mode: 'Day', house: '', previous_school: '',
     admission_date: new Date().toISOString().slice(0, 10), fee_amount: '', academic_level: '', combination: '', optional_subjects: '', subsidiary_subjects: '',
   })
@@ -1151,9 +1151,9 @@ function App() {
           subsidiary_subjects: selectedAcademicLevel==='A-Level' ? studentForm.subsidiary_subjects || null : null,
         }),
       })
-      setStudentForm({ first_name: '', middle_name: '', last_name: '', full_name: '', a_level_stream: '', gender: '', date_of_birth: '', class_id: '', religion: '', nationality: '', phone: '', address: '', guardian_name: '', guardian_relationship: '', guardian_phone: '', guardian2_name: '', guardian2_relationship: '', guardian2_phone: '', study_mode: 'Day', house: '', previous_school: '', admission_date: new Date().toISOString().slice(0, 10), fee_amount: '', academic_level: '', combination: '', optional_subjects: '', subsidiary_subjects: '' })
+      setStudentForm({ first_name: '', middle_name: '', last_name: '', full_name: '', a_level_stream: '', generate_admission_number: true, gender: '', date_of_birth: '', class_id: '', religion: '', nationality: '', phone: '', address: '', guardian_name: '', guardian_relationship: '', guardian_phone: '', guardian2_name: '', guardian2_relationship: '', guardian2_phone: '', study_mode: 'Day', house: '', previous_school: '', admission_date: new Date().toISOString().slice(0, 10), fee_amount: '', academic_level: '', combination: '', optional_subjects: '', subsidiary_subjects: '' })
       setShowStudentForm(false)
-      setStudentSuccess(`Student registered successfully. Admission number: ${createdStudent.admission_number}`)
+      setStudentSuccess(createdStudent.admission_number ? `Student registered successfully. Admission number: ${createdStudent.admission_number}` : 'Student registered successfully. This school does not use admission numbers for this record.')
       await loadSchoolData(token)
     } catch (error) {
       setStudentError(error instanceof Error ? error.message : 'Unable to register student.')
@@ -1590,7 +1590,8 @@ function App() {
                   <section className="form-section">
                     <div className="form-section-heading"><span className="form-section-number">01</span><div><h4>Admission details</h4><p>Choose the class and confirm when the student is joining.</p></div></div>
                     <div className="student-form-grid">
-                      <div className="generated-admission"><strong>Admission number</strong><span>Generated automatically when you save</span><b>{[admissionSettings.admission_prefix.trim(), ...(admissionSettings.include_year ? [String(new Date().getFullYear())] : []), String(admissionSettings.next_admission_number).padStart(admissionSettings.admission_padding, '0')].filter(Boolean).join(admissionSettings.admission_separator)}</b></div>
+                      <label className="checkbox-field"><input type="checkbox" checked={studentForm.generate_admission_number} onChange={e => setStudentForm({ ...studentForm, generate_admission_number: e.target.checked })} /><span><strong>Generate an admission number</strong><small>Leave unchecked if this school does not use admission numbers.</small></span></label>
+                      {studentForm.generate_admission_number && <div className="generated-admission"><strong>Admission number preview</strong><span>Generated when you save</span><b>{[admissionSettings.admission_prefix.trim(), ...(admissionSettings.include_year ? [String(new Date().getFullYear())] : []), String(admissionSettings.next_admission_number).padStart(admissionSettings.admission_padding, '0')].filter(Boolean).join(admissionSettings.admission_separator)}</b></div>}
                       <label>Class *<select required value={studentForm.class_id} onChange={e => setStudentForm({ ...studentForm, class_id: e.target.value, a_level_stream: '', combination: '', optional_subjects: '', subsidiary_subjects: '' })}><option value="">Choose the student's class</option>{classes.map(item => <option key={item.id} value={item.id}>{item.name}{item.section ? ` — ${item.section}` : ''}</option>)}</select></label>
                       <label>Student type *<select required value={studentForm.study_mode} onChange={e=>setStudentForm({...studentForm,study_mode:e.target.value})}><option value="Day">Day scholar</option><option value="Boarding">Boarding</option></select></label>
                       <label>House<select value={studentForm.house} onChange={e=>setStudentForm({...studentForm,house:e.target.value})}><option value="">Select house (optional)</option>{(schoolConfig.house_names||'').split(/\r?\n/).map((h:string)=>h.trim()).filter(Boolean).map((h:string)=><option key={h}>{h}</option>)}</select></label>
