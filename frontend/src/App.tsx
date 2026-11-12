@@ -196,7 +196,10 @@ async function api<T>(path: string, token: string, options: RequestInit = {}): P
     },
   })
   const result = await response.json().catch(() => ({}))
-  if (!response.ok) throw new Error(result.detail || `Request failed: ${response.status}`)
+  if (!response.ok) {
+    if (response.status >= 500) throw new TypeError('SchoolBridge server is temporarily unavailable.')
+    throw new Error(result.detail || `Request failed: ${response.status}`)
+  }
   return result as T
 }
 
@@ -1312,10 +1315,14 @@ function App() {
         await loadSchoolData(authToken,profile)
       }
     } catch (error) {
-      void clearStoredSessionToken().catch(() => {})
+      const connectionUnavailable = error instanceof TypeError || !navigator.onLine
+      // Keep the saved token during an outage so the user can reconnect without
+      // being signed out permanently. Offline access still requires the separate
+      // encrypted snapshot and its offline passphrase.
+      if (!connectionUnavailable) void clearStoredSessionToken().catch(() => {})
       setToken('')
       setUser(null)
-      setLoginError(error instanceof Error ? `Sign-in succeeded, but account verification failed: ${error.message}` : 'Sign-in succeeded, but account verification failed.')
+      setLoginError(connectionUnavailable ? '' : error instanceof Error ? `Sign-in succeeded, but account verification failed: ${error.message}` : 'Sign-in succeeded, but account verification failed.')
     }
   }
 

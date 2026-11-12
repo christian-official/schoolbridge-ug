@@ -49,3 +49,11 @@ test('desktop primary operation uses only its loopback backend and local data di
   assert.match(app, /Local SchoolBridge service ready/)
   assert.match(app, /Local SchoolBridge service unavailable/)
 })
+
+
+test('offline session startup suppresses network errors and preserves the saved token', () => {
+  assert.match(app, /if \(response\.status >= 500\) throw new TypeError\('SchoolBridge server is temporarily unavailable\.'\)/)
+  assert.match(app, /const connectionUnavailable = error instanceof TypeError \|\| !navigator\.onLine/)
+  assert.match(app, /if \(!connectionUnavailable\) void clearStoredSessionToken\(\)/)
+  assert.match(app, /setLoginError\(connectionUnavailable \? ''/)
+})
