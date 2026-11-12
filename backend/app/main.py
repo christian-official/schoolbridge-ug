@@ -2820,7 +2820,7 @@ def submit_parent_registration(data: ParentSelfRegistrationRequest, request: Req
     identity_key = hashlib.sha256(identity_material.encode("utf-8")).hexdigest()[:24]
     parent_slug = re.sub(r"[^a-z0-9]+", "-", _registration_name_key(data.parent_name)).strip("-")[:32] or "guardian"
     session = _create_qr_registration_session(
-        db, "parent", f"parent-{parent_slug}-{identity_key[:6]}", student_ids=student_ids,
+        db, "parent", f"parent-{parent_slug}-{identity_key[:12]}", student_ids=student_ids,
     )
     return {
         **session,
