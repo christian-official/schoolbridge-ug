@@ -2357,7 +2357,7 @@ def complete_first_school_setup(data: FirstSchoolSetupRequest, db: Session = Dep
 @app.post("/api/auth/login", tags=["Authentication"])
 def login(
     data: OAuth2PasswordRequestForm = Depends(),
-    school_id: str | None = Form(default=None),
+    school_id: str | None = Form(default=None, min_length=36, max_length=36),
     db: Session = Depends(get_db)
 ):
     resolve_school_tenant(db, school_id)
@@ -2464,7 +2464,6 @@ def send_password_recovery_email(user, code: str) -> bool:
 def request_password_reset(data: PasswordResetRequest, db: Session = Depends(get_db)):
     # Always return the same response so account names and email addresses cannot be enumerated.
     resolve_school_tenant(db, data.school_id)
-    resolve_school_tenant(db, data.school_id)
     user = find_password_recovery_account(db, data.identifier)
     now = datetime.utcnow()
     if user and user.is_active and user.email and not user.email.endswith(".schoolbridge.local"):
@@ -2488,6 +2487,7 @@ def request_password_reset(data: PasswordResetRequest, db: Session = Depends(get
 
 @app.post("/api/auth/password-reset/confirm", tags=["Authentication"])
 def confirm_password_reset(data: PasswordResetConfirm, db: Session = Depends(get_db)):
+    resolve_school_tenant(db, data.school_id)
     user = find_password_recovery_account(db, data.identifier)
     now = datetime.utcnow()
     if not user or not user.is_active or not user.reset_code_hash or not user.reset_expires_at or user.reset_expires_at < now or user.reset_attempts >= 5:
