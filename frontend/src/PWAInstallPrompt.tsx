@@ -12,6 +12,30 @@ export default function PWAInstallPrompt() {
   const [isAppleMobile, setIsAppleMobile] = useState(false)
   const [showAppleSteps, setShowAppleSteps] = useState(false)
   const [dismissed, setDismissed] = useState(false)
+  const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null)
+  const [applyingUpdate, setApplyingUpdate] = useState(false)
+
+  useEffect(() => {
+    const handleUpdate = (event: Event) => {
+      const worker = (event as CustomEvent<ServiceWorker>).detail
+      if (worker) setWaitingWorker(worker)
+    }
+    const handleControllerChange = () => {
+      if (applyingUpdate) window.location.reload()
+    }
+    window.addEventListener('schoolbridge:pwa-update', handleUpdate)
+    navigator.serviceWorker?.addEventListener('controllerchange', handleControllerChange)
+    return () => {
+      window.removeEventListener('schoolbridge:pwa-update', handleUpdate)
+      navigator.serviceWorker?.removeEventListener('controllerchange', handleControllerChange)
+    }
+  }, [applyingUpdate])
+
+  function applyUpdate() {
+    if (!waitingWorker) return
+    setApplyingUpdate(true)
+    waitingWorker.postMessage({ type: 'SCHOOLBRIDGE_SKIP_WAITING' })
+  }
 
   useEffect(() => {
     const standalone = window.matchMedia('(display-mode: standalone)').matches ||
@@ -47,19 +71,20 @@ export default function PWAInstallPrompt() {
     if (choice.outcome === 'accepted') setDismissed(true)
   }
 
-  if (dismissed || (!installEvent && !isAppleMobile)) return null
+  if (dismissed || (!installEvent && !isAppleMobile && !waitingWorker)) return null
 
   return (
     <aside className="pwa-install-card" aria-label="Install SchoolBridge">
       <div className="pwa-install-icon"><Download size={19} /></div>
       <div className="pwa-install-copy">
-        <strong>Use SchoolBridge like an app</strong>
-        <span>{isAppleMobile ? 'Add a SchoolBridge icon to your iPhone or iPad.' : 'Install SchoolBridge on this device for quick access.'}</span>
+        {waitingWorker ? <><strong>SchoolBridge update ready</strong><span>Refresh the app to use the latest version.</span></> : <><strong>Use SchoolBridge like an app</strong><span>{isAppleMobile ? 'Add a SchoolBridge icon to your iPhone or iPad.' : 'Install SchoolBridge on this device for quick access.'}</span></>}
         {showAppleSteps && isAppleMobile && (
           <span className="pwa-apple-steps">In Safari, tap <Share size={14} aria-label="Share" /> Share, then choose <strong>Add to Home Screen</strong>.</span>
         )}
       </div>
-      {installEvent ? (
+      {waitingWorker ? (
+        <button type="button" className="pwa-install-action" onClick={applyUpdate} disabled={applyingUpdate}>{applyingUpdate ? 'Updating…' : 'Update now'}</button>
+      ) : installEvent ? (
         <button type="button" className="pwa-install-action" onClick={() => void install()}>Install</button>
       ) : (
         <button type="button" className="pwa-install-action" onClick={() => setShowAppleSteps(value => !value)}>
