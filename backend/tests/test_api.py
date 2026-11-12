@@ -3586,6 +3586,59 @@ def test_orm_sessions_are_scoped_to_one_school_and_reject_cross_tenant_writes():
         assert [student.last_name for student in visible] == ["Two"]
 
 
+def test_tenant_scoped_bulk_updates_and_deletes_cannot_touch_other_schools():
+    reset_database()
+    with SessionLocal() as db:
+        db.add_all([
+            models.Student(
+                first_name="BulkUpdate", last_name="Original",
+                school_tenant_id=1,
+            ),
+            models.Student(
+                first_name="BulkUpdate", last_name="Original",
+                school_tenant_id=2,
+            ),
+            models.Student(
+                first_name="BulkDelete", last_name="Target",
+                school_tenant_id=1,
+            ),
+            models.Student(
+                first_name="BulkDelete", last_name="Target",
+                school_tenant_id=2,
+            ),
+        ])
+        db.commit()
+
+    with SessionLocal() as db:
+        set_tenant_context(db, 1)
+        updated = db.query(models.Student).filter(
+            models.Student.first_name == "BulkUpdate"
+        ).update(
+            {models.Student.last_name: "Changed"},
+            synchronize_session=False,
+        )
+        deleted = db.query(models.Student).filter(
+            models.Student.first_name == "BulkDelete"
+        ).delete(synchronize_session=False)
+        assert updated == 1
+        assert deleted == 1
+        db.commit()
+
+    with SessionLocal() as db:
+        rows = db.query(models.Student).order_by(
+            models.Student.school_tenant_id, models.Student.first_name
+        ).all()
+        tenant_one = [row for row in rows if row.school_tenant_id == 1]
+        tenant_two = [row for row in rows if row.school_tenant_id == 2]
+        assert [(row.first_name, row.last_name) for row in tenant_one] == [
+            ("BulkUpdate", "Changed")
+        ]
+        assert [(row.first_name, row.last_name) for row in tenant_two] == [
+            ("BulkDelete", "Target"),
+            ("BulkUpdate", "Original"),
+        ]
+
+
 def test_school_business_identifiers_are_unique_within_each_tenant():
     reset_database()
     with SessionLocal() as db:
