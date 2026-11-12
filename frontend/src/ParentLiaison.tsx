@@ -1,9 +1,10 @@
+import { fetchSchoolBridge } from './offlineNetwork'
 import { useEffect, useState } from 'react'
 import { MessageSquareText, Send, PlusCircle, GraduationCap, CheckCheck, LockKeyhole, Unlock } from 'lucide-react'
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 async function api<T>(path: string, token: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}/api/${path}`, {
+  const response = await fetchSchoolBridge(`${API_BASE_URL}/api/${path}`, {
     ...options,
     headers: { Authorization: `Bearer ${token}`, ...(options.body ? { 'Content-Type': 'application/json' } : {}), ...options.headers },
   })

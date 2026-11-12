@@ -1,3 +1,4 @@
+import { fetchSchoolBridge } from './offlineNetwork'
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { BookOpen, Plus, RefreshCw, Save, Printer, LockKeyhole, Download, Upload } from 'lucide-react'
 import { saveEncryptedOfflineDraft, loadEncryptedOfflineDraft, deleteEncryptedOfflineDraft } from './syncStorage'
@@ -19,7 +20,7 @@ function examGroupKey(exam: Exam) { return [exam.exam_type || 'Other', exam.term
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 
 async function request<T>(path: string, token: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}/api/${path}`, {
+  const response = await fetchSchoolBridge(`${API_BASE_URL}/api/${path}`, {
     ...options,
     headers: {
       Authorization: 'Bearer ' + token,

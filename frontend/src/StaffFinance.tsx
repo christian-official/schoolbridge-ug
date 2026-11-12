@@ -1,3 +1,4 @@
+import { fetchSchoolBridge } from './offlineNetwork'
 import { useEffect, useState, type FormEvent } from 'react'
 import { Users, Plus, Search, Wallet, ReceiptText, RefreshCw, Building2, CloudUpload, LockKeyhole } from 'lucide-react'
 import { saveEncryptedFinanceQueue, loadEncryptedFinanceQueue } from './syncStorage'
@@ -12,7 +13,7 @@ type OfflineFinancePayment = { idempotency_key:string; charge_id:number; amount:
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 
 async function request<T>(path:string, token:string, options:RequestInit={}):Promise<T> {
-  const response = await fetch(`${API_BASE_URL}/api/${path}`, { ...options, headers:{ Authorization:'Bearer '+token, ...(options.body?{'Content-Type':'application/json'}:{}), ...options.headers } })
+  const response = await fetchSchoolBridge(`${API_BASE_URL}/api/${path}`, { ...options, headers:{ Authorization:'Bearer '+token, ...(options.body?{'Content-Type':'application/json'}:{}), ...options.headers } })
   const data = await response.json().catch(()=>({}))
   if(!response.ok) throw new Error(`${data.detail || 'Request failed'} (HTTP ${response.status})`)
   return data as T

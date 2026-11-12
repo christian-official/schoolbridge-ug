@@ -1,3 +1,4 @@
+import { fetchSchoolBridge } from './offlineNetwork'
 import { useEffect, useState } from 'react'
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
@@ -8,7 +9,7 @@ type Profile = {
   category: string; username: string; photo_data?:string|null
 }
 async function request<T>(path: string, token: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}/api/${path}`, {
+  const response = await fetchSchoolBridge(`${API_BASE_URL}/api/${path}`, {
     ...options,
     headers: { Authorization: `Bearer ${token}`, ...(options.body ? { 'Content-Type': 'application/json' } : {}), ...options.headers },
   })

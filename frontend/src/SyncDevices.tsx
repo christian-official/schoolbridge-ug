@@ -1,3 +1,4 @@
+import { fetchSchoolBridge } from './offlineNetwork'
 import { useCallback, useEffect, useState } from 'react'
 import { clearLocalSyncData, saveEncryptedOfflineSnapshot, loadEncryptedOfflineSnapshot, deleteEncryptedOfflineSnapshot } from './syncStorage'
 
@@ -77,7 +78,7 @@ class ApiRequestError extends Error {
 }
 
 async function request<T>(path: string, token: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(API_BASE_URL + '/api/' + path, {
+  const response = await fetchSchoolBridge(API_BASE_URL + '/api/' + path, {
     ...options,
     headers: {
       Authorization: 'Bearer ' + token,
@@ -125,7 +126,7 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
     let objectUrl = ''
     const controller = new AbortController()
     const destination = window.location.origin + '/?school='
-    fetch(API_BASE_URL + '/api/enrolment/school-qr.svg?origin=' + encodeURIComponent(window.location.origin), {
+    fetchSchoolBridge(API_BASE_URL + '/api/enrolment/school-qr.svg?origin=' + encodeURIComponent(window.location.origin), {
       headers: { Authorization: 'Bearer ' + token },
       cache: 'no-store',
       signal: controller.signal,
@@ -138,7 +139,7 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
     }).catch(error => {
       if (error.name !== 'AbortError') setError(error instanceof Error ? error.message : 'Unable to create the school access QR code.')
     })
-    fetch(API_BASE_URL + '/api/public/school', { cache: 'no-store', signal: controller.signal })
+    fetchSchoolBridge(API_BASE_URL + '/api/public/school', { cache: 'no-store', signal: controller.signal })
       .then(response => response.ok ? response.json() : Promise.reject(new Error('School identity is unavailable.')))
       .then(identity => setSchoolAccessUrl(destination + encodeURIComponent(identity.school_id)))
       .catch(error => { if (error.name !== 'AbortError') setError(error instanceof Error ? error.message : 'Unable to load school identity.') })

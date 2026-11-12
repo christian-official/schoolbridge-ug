@@ -1,3 +1,4 @@
+import { fetchSchoolBridge } from './offlineNetwork'
 import { useEffect, useRef, useState } from 'react'
 import {
   LayoutDashboard, Users, GraduationCap, BookOpen,
@@ -189,7 +190,7 @@ const API_BASE_URL = desktopApiBaseUrl || (isSchoolBridgeLanClient ? '' : config
 async function api<T>(path: string, token: string, options: RequestInit = {}): Promise<T> {
   let response: Response
   try {
-    response = await fetch(`${API_BASE_URL}/api/${path}`, {
+    response = await fetchSchoolBridge(`${API_BASE_URL}/api/${path}`, {
       ...options,
       headers: {
         Authorization: `Bearer ${token}`,
@@ -223,7 +224,7 @@ function PasswordRecovery({onBack,schoolId}:{onBack:()=>void;schoolId:string}) {
   async function requestCode(e:React.FormEvent){
     e.preventDefault();setBusy(true);setError('');setMessage('')
     try {
-      const response=await fetch(`${API_BASE_URL}/api/auth/password-reset/request`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({identifier,school_id:schoolId||undefined})})
+      const response=await fetchSchoolBridge(`${API_BASE_URL}/api/auth/password-reset/request`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({identifier,school_id:schoolId||undefined})})
       const data=await response.json().catch(()=>({}))
       if(!response.ok)throw new Error(data.detail||'Unable to request a recovery code.')
       setMessage(data.message||'If the account has a registered email, a code will be sent. Check your inbox and spam folder.')
@@ -236,7 +237,7 @@ function PasswordRecovery({onBack,schoolId}:{onBack:()=>void;schoolId:string}) {
     if(newPassword!==confirmPassword){setError('The new passwords do not match.');return}
     setBusy(true)
     try {
-      const response=await fetch(`${API_BASE_URL}/api/auth/password-reset/confirm`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({identifier,school_id:schoolId||undefined,code,new_password:newPassword})})
+      const response=await fetchSchoolBridge(`${API_BASE_URL}/api/auth/password-reset/confirm`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({identifier,school_id:schoolId||undefined,code,new_password:newPassword})})
       const data=await response.json().catch(()=>({}))
       if(!response.ok)throw new Error(data.detail||'Password reset failed.')
       setMessage(data.message||'Password reset successfully. You can now sign in.')
@@ -738,7 +739,7 @@ function FirstTimeSetupWizard({status,onStatusChange}:{status:FirstSetupStatus;o
   async function activate(event:React.FormEvent<HTMLFormElement>) {
     event.preventDefault();setBusy(true);setError('')
     try {
-      const response=await fetch(`${API_BASE_URL}/api/setup/activate`,{
+      const response=await fetchSchoolBridge(`${API_BASE_URL}/api/setup/activate`,{
         method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({license,school_id:status.school_id||undefined}),
       })
@@ -752,7 +753,7 @@ function FirstTimeSetupWizard({status,onStatusChange}:{status:FirstSetupStatus;o
   async function completeSetup(event:React.FormEvent<HTMLFormElement>) {
     event.preventDefault();setBusy(true);setError('')
     try {
-      const response=await fetch(`${API_BASE_URL}/api/setup/complete`,{
+      const response=await fetchSchoolBridge(`${API_BASE_URL}/api/setup/complete`,{
         method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({...school,school_id:status.school_id||undefined,activation_license:license}),
       })
@@ -932,7 +933,7 @@ function App() {
   }, [])
   useEffect(()=>{
     let cancelled=false
-    fetch(API_BASE_URL + '/api/setup/status' + (selectedSchoolId ? '?school=' + encodeURIComponent(selectedSchoolId) : '')).then(async response=>{
+    fetchSchoolBridge(API_BASE_URL + '/api/setup/status' + (selectedSchoolId ? '?school=' + encodeURIComponent(selectedSchoolId) : '')).then(async response=>{
       const result=await response.json().catch(()=>({}))
       if(!response.ok)throw new Error(result.detail||'Unable to check installation setup.')
       if(!cancelled) {
@@ -959,7 +960,7 @@ function App() {
       return
     }
     let cancelled = false
-    fetch(API_BASE_URL + '/api/public/school?school=' + encodeURIComponent(expectedSchoolId), { cache: 'no-store' })
+    fetchSchoolBridge(API_BASE_URL + '/api/public/school?school=' + encodeURIComponent(expectedSchoolId), { cache: 'no-store' })
       .then(async response => {
         const identity = await response.json().catch(() => ({}))
         if (!response.ok) throw new Error(identity.detail || 'Unable to verify the school identity.')
@@ -1364,7 +1365,7 @@ function App() {
       const controller = new AbortController()
       const timeout = window.setTimeout(() => controller.abort(), 5000)
       try {
-        const response = await fetch(`${API_BASE_URL}/api/health`, {
+        const response = await fetchSchoolBridge(`${API_BASE_URL}/api/health`, {
           method: 'GET',
           cache: 'no-store',
           signal: controller.signal,
@@ -1450,7 +1451,7 @@ function App() {
       body.set('username', username)
       body.set('password', password)
       if (selectedSchoolId) body.set('school_id', selectedSchoolId)
-      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+      const response = await fetchSchoolBridge(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body,
@@ -2660,7 +2661,7 @@ function BackupSettings({token}:{token:string}) {
   async function createBackup(){
     setBusy(true);setError('');setMessage('')
     try {
-      const response=await fetch(`${API_BASE_URL}/api/backups/create`,{method:'POST',headers:{Authorization:'Bearer '+token}})
+      const response=await fetchSchoolBridge(`${API_BASE_URL}/api/backups/create`,{method:'POST',headers:{Authorization:'Bearer '+token}})
       if(!response.ok){const data=await response.json().catch(()=>({}));throw new Error(data.detail||'Backup failed')}
       const blob=await response.blob()
       const url=URL.createObjectURL(blob)
@@ -2676,7 +2677,7 @@ function BackupSettings({token}:{token:string}) {
     setBusy(true);setError('');setMessage('')
     try {
       const body=new FormData();body.append('file',file)
-      const response=await fetch(`${API_BASE_URL}/api/backups/restore`,{method:'POST',headers:{Authorization:'Bearer '+token},body})
+      const response=await fetchSchoolBridge(`${API_BASE_URL}/api/backups/restore`,{method:'POST',headers:{Authorization:'Bearer '+token},body})
       const data=await response.json().catch(()=>({}))
       if(!response.ok)throw new Error(data.detail||'Restore failed')
       setMessage(data.message||'Restore staged. Restart the backend to complete it.')

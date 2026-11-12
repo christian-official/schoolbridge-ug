@@ -1,3 +1,4 @@
+import { fetchSchoolBridge } from './offlineNetwork'
 import { useState } from 'react'
 
 type ChildDetails = { first_name: string; last_name: string; admission_number: string; date_of_birth: string; class_name: string }
@@ -22,7 +23,7 @@ export default function RegistrationFlow({ schoolId, schoolName, apiBaseUrl, onB
   const [message, setMessage] = useState('')
 
   async function request(path: string, body?: unknown) {
-    const response = await fetch(apiBaseUrl + '/api/' + path, {
+    const response = await fetchSchoolBridge(apiBaseUrl + '/api/' + path, {
       method: body === undefined ? 'GET' : 'POST',
       headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),
