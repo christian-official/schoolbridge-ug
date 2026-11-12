@@ -27,6 +27,21 @@
     }
   },
   "bundle": {
-    "active": false
+    "active": true,
+    "targets": [
+      "nsis"
+    ],
+    "resources": {
+      "../desktop-resources/backend/": "backend/",
+      "../desktop-resources/runtime/": "runtime/"
+    },
+    "windows": {
+      "webviewInstallMode": {
+        "type": "offlineInstaller"
+      },
+      "nsis": {
+        "installMode": "perMachine"
+      }
+    }
   }
 }
