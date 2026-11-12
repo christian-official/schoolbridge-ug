@@ -395,8 +395,13 @@ fn desktop_config_file(python: &Path) -> Result<PathBuf, String> {
             "SCHOOLBRIDGE_SECRET_KEY={secret}\nSCHOOLBRIDGE_LICENSE_PUBLIC_KEY=\nSCHOOLBRIDGE_PORT={DEFAULT_BACKEND_PORT}\nSCHOOLBRIDGE_LAN_ENABLED=false\nSCHOOLBRIDGE_LAN_PORT=8443\n"
         );
         match OpenOptions::new().write(true).create_new(true).open(&env_file) {
-            Ok(mut file) => file.write_all(contents.as_bytes())
-                .map_err(|error| format!("Could not save the initial SchoolBridge configuration: {error}"))?,
+            Ok(mut file) => {
+                if let Err(error) = file.write_all(contents.as_bytes()) {
+                    drop(file);
+                    let _ = fs::remove_file(&env_file);
+                    return Err(format!("Could not save the initial SchoolBridge configuration: {error}"));
+                }
+            }
             Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {},
             Err(error) => return Err(format!("Could not create the initial SchoolBridge configuration: {error}")),
         }
