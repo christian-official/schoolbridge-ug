@@ -1414,7 +1414,8 @@ function App() {
         if (cancelled) return
         const currentDevice = registeredDevices.devices.find(device => device.device_id === deviceId)
         if (!currentDevice?.active) {
-          await deleteEncryptedOfflineSnapshot(user.id, deviceId)
+          // A revoked device must lose every local offline record and pending draft.
+          await clearLocalSyncData(user.id, deviceId)
           localStorage.removeItem(metaKey)
           const offlineIndex = readOfflineLoginIndex()
           if (offlineIndex?.userId === user.id && offlineIndex.deviceId === deviceId) {
@@ -1426,9 +1427,13 @@ function App() {
         if (cancelled) return
         const fingerprint = JSON.stringify({ role: account.role, permissions: Object.fromEntries(Object.entries(account.permissions || {}).sort(([a], [b]) => a.localeCompare(b))) })
         if (meta.fingerprint !== fingerprint) {
-          await deleteEncryptedOfflineSnapshot(user.id, deviceId)
+          // Permission/role changes invalidate both cached records and offline drafts.
+          await clearLocalSyncData(user.id, deviceId)
           localStorage.removeItem(metaKey)
-          localStorage.removeItem('schoolbridge-offline-login-index')
+          const offlineIndex = readOfflineLoginIndex()
+          if (offlineIndex?.userId === user.id && offlineIndex.deviceId === deviceId) {
+            localStorage.removeItem('schoolbridge-offline-login-index')
+          }
           return
         }
         let cursor = meta.sequence

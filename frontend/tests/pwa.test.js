@@ -79,3 +79,9 @@ test('reconnect invalidates encrypted offline access when the registered device 
   assert.match(app, /deleteEncryptedOfflineSnapshot\(user\.id, deviceId\)/)
   assert.match(app, /localStorage\.removeItem\('schoolbridge-offline-login-index'\)/)
 })
+
+test('role or permission changes clear the full local offline database and pending drafts', async () => {
+  const app = await readFile(new URL('../src/App.tsx', import.meta.url), 'utf8')
+  assert.match(app, /if \(meta\.fingerprint !== fingerprint\)[\s\S]*?clearLocalSyncData\(user\.id, deviceId\)/)
+  assert.match(app, /Permission\/role changes invalidate both cached records and offline drafts/)
+})
