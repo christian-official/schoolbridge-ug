@@ -67,7 +67,6 @@ export default function Phase4Workspace({ token, role, active, permissions }: { 
     }
     setReviewingClaimId(claim.id); setError(''); setMessage('')
     try {
-      const details = JSON.parse(claim.details_json || '{}') as Record<string, unknown>
       const note = status === 'approved' ? 'Approved after reviewing the submitted details and matched school records.' : 'Rejected after school review.'
       await api('admin/registration-claims/' + claim.id + '/decision', token, {
         method: 'POST',
