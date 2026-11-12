@@ -42,7 +42,6 @@ from .migrations import upgrade_database
 from . import models
 from .sync_tracking import register_sync_tracking
 from .school_setup import verify_activation_license, license_fingerprint
-from .sms import send_schoolbridge_sms
 
 import jwt
 from datetime import timedelta, timezone
@@ -110,98 +109,6 @@ def resolve_school_tenant(db: Session, school_id: str | None = None):
 
 def _registration_name_key(value: str | None) -> str:
     return " ".join((value or "").strip().casefold().split())
-
-
-def _registration_phone_key(value: str | None) -> str:
-    return re.sub(r"\D", "", value or "")
-
-
-def _mask_registration_phone(value: str) -> str:
-    digits = _registration_phone_key(value)
-    if len(digits) < 4:
-        return "••••"
-    if digits.startswith("256"):
-        return "+256 " + ("•" * max(3, len(digits) - 6)) + " " + digits[-3:]
-    return ("•" * max(3, len(digits) - 3)) + digits[-3:]
-
-
-def _registration_requester_ip_hash(request: Request) -> str | None:
-    client_host = request.client.host if request.client else None
-    if not client_host:
-        return None
-    return hashlib.sha256(f"{JWT_SECRET}:{client_host}".encode("utf-8")).hexdigest()
-
-
-def _check_registration_rate_limit(db: Session, request: Request) -> str | None:
-    ip_hash = _registration_requester_ip_hash(request)
-    if not ip_hash:
-        return None
-    recent_count = db.query(models.RegistrationClaim).filter(
-        models.RegistrationClaim.requester_ip_hash == ip_hash,
-        models.RegistrationClaim.created_at >= datetime.utcnow() - timedelta(hours=1),
-    ).count()
-    if recent_count >= 30:
-        raise HTTPException(429, "Too many registration requests from this connection. Try again later.")
-    return ip_hash
-
-
-def _registration_reference_hash(reference: str) -> str:
-    return hashlib.sha256(reference.encode("utf-8")).hexdigest()
-
-
-def _registration_code_hash(claim: models.RegistrationClaim, code: str) -> str:
-    material = f"{claim.reference_hash}:{code}:{JWT_SECRET}".encode("utf-8")
-    return hashlib.sha256(material).hexdigest()
-
-
-def _create_registration_claim(
-    db: Session,
-    claim_type: str,
-    submitted_name: str,
-    details: dict,
-    candidate_student_ids: list[int] | None = None,
-    candidate_contact_ids: list[int] | None = None,
-    candidate_staff_id: int | None = None,
-    trusted_phone: str | None = None,
-    requester_ip_hash: str | None = None,
-):
-    reference = secrets.token_urlsafe(32)
-    claim = models.RegistrationClaim(
-        school_tenant_id=get_current_tenant_id(db),
-        reference_hash=_registration_reference_hash(reference),
-        claim_type=claim_type,
-        status="pending_review",
-        submitted_name=submitted_name,
-        details_json=json.dumps(details, sort_keys=True),
-        candidate_student_ids_json=json.dumps(candidate_student_ids or []),
-        candidate_contact_ids_json=json.dumps(candidate_contact_ids or []),
-        candidate_staff_id=candidate_staff_id,
-        phone_masked=_mask_registration_phone(trusted_phone) if trusted_phone else None,
-        requester_ip_hash=requester_ip_hash,
-        expires_at=datetime.utcnow() + timedelta(days=7),
-    )
-    db.add(claim)
-    db.flush()
-
-    if trusted_phone:
-        code = f"{secrets.randbelow(1_000_000):06d}"
-        claim.verification_code_hash = _registration_code_hash(claim, code)
-        claim.verification_expires_at = datetime.utcnow() + timedelta(minutes=10)
-        claim.status = "verification_pending"
-        db.commit()
-        delivered = send_schoolbridge_sms(
-            trusted_phone,
-            f"Your SchoolBridge verification code is {code}. It expires in 10 minutes. Do not share it.",
-        )
-        if not delivered:
-            claim.status = "pending_review"
-            claim.verification_code_hash = None
-            claim.verification_expires_at = None
-            db.commit()
-    else:
-        db.commit()
-    db.refresh(claim)
-    return reference, claim
 
 
 def _match_parent_registration(db: Session, data: "ParentSelfRegistrationRequest") -> list[int]:
