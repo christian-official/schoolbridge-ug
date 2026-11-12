@@ -4115,4 +4115,8 @@ def test_teacher_self_registration_uses_staff_record_and_assigns_teacher_role(mo
         account = client.get("/api/auth/me", headers=headers)
         assert account.status_code == 200
         assert account.json()["role"] == "teacher"
-        assert account.json()["staff_id"] == staff_id
+
+    with SessionLocal() as db:
+        linked_user = db.query(models.User).filter_by(username="grace.teacher").first()
+        assert linked_user is not None
+        assert linked_user.staff_id == staff_id
