@@ -3754,3 +3754,28 @@ def test_sync_change_journal_writes_and_scopes_events_to_the_target_tenant():
         scope = json.loads(student_change.scope_json)
         assert scope["student_ids"] == [student.id]
         assert scope["class_ids"] == [school_class.id]
+
+
+def test_shared_multi_school_database_blocks_whole_database_backup_and_restore():
+    reset_database()
+    admin = create_admin()
+    token = create_access_token(admin)
+    headers = {"Authorization": f"Bearer {token}"}
+    with SessionLocal() as db:
+        db.add(models.SchoolTenant(
+            id=2, public_id="00000000-0000-4000-8000-000000000002",
+            installation_id="second-school-backup-test",
+            name="Second School", status="active",
+        ))
+        db.commit()
+
+    with TestClient(app) as client:
+        backup = client.post("/api/backups/create", headers=headers)
+        restore = client.post(
+            "/api/backups/restore",
+            headers=headers,
+            files={"file": ("backup.sqlite3", b"not-a-database", "application/vnd.sqlite3")},
+        )
+    assert backup.status_code == 403
+    assert restore.status_code == 403
+    assert "shared multi-school mode" in backup.json()["detail"]

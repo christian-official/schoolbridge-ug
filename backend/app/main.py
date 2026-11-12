@@ -5659,8 +5659,19 @@ def save_school_profile(data: SchoolProfileUpdate, db: Session = Depends(get_db)
     return {"message": "School profile saved.", "profile": profile}
 
 
+def require_single_tenant_database_for_backup(db: Session):
+    tenant_count = db.query(models.SchoolTenant.id).count()
+    if tenant_count > 1:
+        raise HTTPException(
+            403,
+            "Whole-database backup and restore are disabled in shared multi-school mode. "
+            "Use a school-scoped backup once that feature is available.",
+        )
+
+
 @app.post("/api/backups/create", tags=["Backups"])
-def create_database_backup(admin=Depends(require_admin)):
+def create_database_backup(db: Session = Depends(get_db), admin=Depends(require_admin)):
+    require_single_tenant_database_for_backup(db)
     import os, sqlite3, tempfile
     if engine.dialect.name != "sqlite":
         raise HTTPException(501, "Direct file backups are currently supported for the local SQLite installation.")
@@ -5683,7 +5694,8 @@ def create_database_backup(admin=Depends(require_admin)):
 
 
 @app.post("/api/backups/restore", tags=["Backups"])
-async def restore_database_backup(file: UploadFile = File(...), admin=Depends(require_admin)):
+async def restore_database_backup(file: UploadFile = File(...), db: Session = Depends(get_db), admin=Depends(require_admin)):
+    require_single_tenant_database_for_backup(db)
     import os, sqlite3, tempfile
     if engine.dialect.name != "sqlite":
         raise HTTPException(501, "Direct file restore is currently supported for the local SQLite installation.")
