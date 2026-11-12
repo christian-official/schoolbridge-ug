@@ -41,7 +41,6 @@ def upgrade():
         sa.Column("active", sa.Boolean(), nullable=False, server_default=sa.text("1")),
         sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.func.now()),
         sa.Column("updated_at", sa.DateTime(), nullable=False, server_default=sa.func.now()),
-        sa.ForeignKeyConstraint(["school_tenant_id"], ["school_tenants.id"]),
         sa.UniqueConstraint("school_tenant_id", "student_id", "legacy_slot", name="uq_student_guardian_legacy_slot"),
     )
     op.create_index("ix_student_guardian_contacts_school_tenant_id", "student_guardian_contacts", ["school_tenant_id"])
