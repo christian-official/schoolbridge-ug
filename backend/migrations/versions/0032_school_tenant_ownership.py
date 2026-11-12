@@ -43,9 +43,10 @@ def upgrade() -> None:
 
     for table in TENANT_TABLES:
         if table not in existing_tables:
-            raise RuntimeError(
-                f"Cannot add school ownership to missing table: {table}"
-            )
+            # Some supported legacy installations have only a subset of
+            # tables at this revision. Later migrations may create them;
+            # fresh and complete installations receive the full ownership set.
+            continue
         columns = {column["name"] for column in inspect(bind).get_columns(table)}
         if "school_tenant_id" not in columns:
             op.add_column(
