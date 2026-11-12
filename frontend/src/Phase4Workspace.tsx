@@ -121,7 +121,6 @@ export default function Phase4Workspace({ token, role, active, permissions }: { 
         <div><span>Active accounts</span><strong>{parents.filter(parent => parent.active).length}</strong></div>
         <div><span>Linked students</span><strong>{parents.reduce((total, parent) => total + (parent.children?.length || 0), 0)}</strong></div>
         <div><span>Accounts needing links</span><strong>{parents.filter(parent => !parent.children?.length).length}</strong></div>
-        <p className="attendance-help">Parents and teachers register themselves by scanning the school's QR code. SchoolBridge verifies their details against existing school records and opens the correct dashboard automatically. Administrators do not create or approve these registrations here.</p>
         <div className="form-actions"><button type="button" className="primary-button" onClick={() => setParentTab('manage')}>Open parent directory</button></div>
       </div>}
       {parentTab === 'manage' && <div>
