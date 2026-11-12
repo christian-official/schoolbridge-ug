@@ -23,6 +23,18 @@ function createWorker({ fetchImpl = async () => ({ ok: true }), cacheMatch = asy
   return listeners
 }
 
+test('service worker accepts an explicit user request to activate a waiting update', () => {
+  const listeners = createWorker()
+  let skipped = false
+  const self = { skipWaiting: async () => { skipped = true } }
+  // The worker message handler is registered on the worker global.
+  const messageSource = serviceWorkerSource.match(/self\.addEventListener\('message',[\\s\\S]*?\\n\\})/)
+  assert.ok(messageSource)
+  vm.runInNewContext(messageSource[0], { self })
+  listeners.message({ data: { type: 'SCHOOLBRIDGE_SKIP_WAITING' } })
+  assert.equal(skipped, true)
+})
+
 test('service worker never intercepts API reads or writes', () => {
   const listeners = createWorker()
   for (const request of [
