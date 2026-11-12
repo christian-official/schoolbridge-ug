@@ -2419,3 +2419,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   .school-community-workspace .student-avatar{display:none!important}
   @page{size:A4 portrait;margin:12mm}
 }
+
+.registration-match-picker{display:grid;gap:6px;min-width:220px;margin:8px 0;padding:9px;border:1px solid #e2e8f0;border-radius:9px;background:#f8fafc}
+.registration-match-picker input{min-width:0;width:100%;padding:7px 9px;border:1px solid #d5deea;border-radius:7px;font:inherit;font-size:11px}
+.registration-match-picker>.phase4-student-option{display:flex;align-items:center;justify-content:flex-start;gap:5px;flex-wrap:wrap;padding:7px;border:1px solid #dbe4ef;border-radius:7px;background:#fff;color:#334155;text-align:left;font-size:11px}
+.registration-match-picker>.phase4-student-option.active{border-color:#79a8d4;background:#eef6ff}
+.registration-match-picker>small{font-size:10px;color:#64748b}

@@ -16,6 +16,7 @@ async function api<T>(path: string, token: string, options: RequestInit = {}): P
 type StudentOption = { id: number; first_name: string; middle_name?: string | null; last_name: string; admission_number: string; class_id?: number | null; guardian_name?: string | null; guardian_relationship?: string | null; guardian_phone?: string | null; guardian2_name?: string | null; guardian2_relationship?: string | null; guardian2_phone?: string | null }
 type ParentChild = { id: number; name: string; admission_number: string; status: string; class_name: string; stream: string; fees_charged: number; fees_paid: number; balance: number }
 type Announcement = { id: number; title: string; message: string; audience: string; published: boolean; created_at: string }
+type RegistrationStaffOption = { id: number; first_name: string; last_name: string; staff_number?: string | null; category: string; status: string }
 type RegistrationClaim = { id: number; claim_type: 'parent' | 'teacher'; status: string; submitted_name: string; details_json: string; candidate_student_ids_json: string; candidate_staff_id?: number | null; phone_masked?: string | null; created_at: string; review_note?: string | null }
 type ChildResult = { exam: string; term: string; year: number; subject: string; score: number }
 type ChildAttendance = { date: string; status: string }
@@ -28,6 +29,12 @@ export default function Phase4Workspace({ token, role, active, permissions }: { 
   const [registrationClaims, setRegistrationClaims] = useState<RegistrationClaim[]>([])
   const [claimFilter, setClaimFilter] = useState('pending_review')
   const [reviewingClaimId, setReviewingClaimId] = useState<number | null>(null)
+  const [claimStudentSearch, setClaimStudentSearch] = useState<Record<string, string>>({})
+  const [claimStudentOptions, setClaimStudentOptions] = useState<Record<string, StudentOption[]>>({})
+  const [claimSelectedStudentIds, setClaimSelectedStudentIds] = useState<Record<number, number[]>>({})
+  const [claimStaffSearch, setClaimStaffSearch] = useState<Record<number, string>>({})
+  const [claimStaffOptions, setClaimStaffOptions] = useState<Record<number, RegistrationStaffOption[]>>({})
+  const [claimSelectedStaffIds, setClaimSelectedStaffIds] = useState<Record<number, number>>({})
   const [selectedStudentIds, setSelectedStudentIds] = useState<number[]>([])
   const [studentSearch, setStudentSearch] = useState('')
   const [account, setAccount] = useState({ username: '', email: '' })
@@ -53,15 +60,37 @@ export default function Phase4Workspace({ token, role, active, permissions }: { 
     setRegistrationClaims(rows)
   }
 
+  async function searchRegistrationStudents(claimId: number, childIndex: number) {
+    const key = claimId + ':' + childIndex
+    const query = (claimStudentSearch[key] || '').trim()
+    if (!query) { setError('Enter a learner name or admission number to search.'); return }
+    try {
+      const result = await api<{ items: StudentOption[] }>('students/search?page=1&page_size=10&search=' + encodeURIComponent(query), token)
+      setClaimStudentOptions(current => ({ ...current, [key]: result.items || [] }))
+    } catch (e) { setError(e instanceof Error ? e.message : 'Unable to search learner records.') }
+  }
+
+  async function searchRegistrationStaff(claimId: number) {
+    const query = (claimStaffSearch[claimId] || '').trim()
+    if (!query) { setError('Enter a staff name or staff number to search.'); return }
+    try {
+      const result = await api<{ items: RegistrationStaffOption[] }>('staff?page=1&page_size=50&search=' + encodeURIComponent(query), token)
+      setClaimStaffOptions(current => ({ ...current, [claimId]: (result.items || []).filter(row => row.status === 'active' && ['teaching', 'teacher'].includes(row.category.toLowerCase())) }))
+    } catch (e) { setError(e instanceof Error ? e.message : 'Unable to search teaching staff records.') }
+  }
+
   async function decideRegistrationClaim(claim: RegistrationClaim, status: 'approved' | 'rejected') {
     if (status === 'approved') {
-      const studentIds = JSON.parse(claim.candidate_student_ids_json || '[]') as number[]
-      if (claim.claim_type === 'parent' && !studentIds.length) {
-        setError('This request has no safe automatic student match. Review the school records before approving it.')
+      const candidateIds = JSON.parse(claim.candidate_student_ids_json || '[]') as number[]
+      const childCount = Array.isArray(JSON.parse(claim.details_json || '{}').children) ? JSON.parse(claim.details_json || '{}').children.length : 0
+      const studentIds = claimSelectedStudentIds[claim.id] || (candidateIds.length === childCount ? candidateIds : [])
+      const staffId = claimSelectedStaffIds[claim.id] || claim.candidate_staff_id || null
+      if (claim.claim_type === 'parent' && (studentIds.length !== childCount || new Set(studentIds).size !== childCount)) {
+        setError('Match one distinct registered learner record for every child before approving this request.')
         return
       }
-      if (claim.claim_type === 'teacher' && !claim.candidate_staff_id) {
-        setError('This request has no safe automatic teaching-staff match. Review the staff records before approving it.')
+      if (claim.claim_type === 'teacher' && !staffId) {
+        setError('Select the active teaching staff record before approving this request.')
         return
       }
     }
@@ -70,7 +99,7 @@ export default function Phase4Workspace({ token, role, active, permissions }: { 
       const note = status === 'approved' ? 'Approved after reviewing the submitted details and matched school records.' : 'Rejected after school review.'
       await api('admin/registration-claims/' + claim.id + '/decision', token, {
         method: 'POST',
-        body: JSON.stringify({ status, note }),
+        body: JSON.stringify({ status, note, ...(status === 'approved' && claim.claim_type === 'parent' ? { student_ids: studentIds } : {}), ...(status === 'approved' && claim.claim_type === 'teacher' ? { staff_id: staffId } : {}) }),
       })
       await loadRegistrationClaims()
       setMessage('Registration request ' + status + '.')
@@ -251,15 +280,41 @@ export default function Phase4Workspace({ token, role, active, permissions }: { 
             const details = (() => { try { return JSON.parse(claim.details_json || '{}') as Record<string, any> } catch { return {} } })()
             const children = Array.isArray(details.children) ? details.children : []
             const matchedStudents = (() => { try { return JSON.parse(claim.candidate_student_ids_json || '[]') as number[] } catch { return [] } })()
-            const canApprove = claim.status !== 'completed' && claim.status !== 'rejected' && (claim.claim_type === 'parent' ? matchedStudents.length === children.length && children.length > 0 : !!claim.candidate_staff_id)
+            const selectedIds = claimSelectedStudentIds[claim.id] || (matchedStudents.length === children.length && children.length > 0 ? matchedStudents : [])
+            const selectedStaffId = claimSelectedStaffIds[claim.id] || claim.candidate_staff_id || null
+            const canApprove = claim.status !== 'completed' && claim.status !== 'rejected' && (claim.claim_type === 'parent' ? selectedIds.length === children.length && children.length > 0 && new Set(selectedIds).size === children.length : !!selectedStaffId)
             return <tr key={claim.id}>
               <td><strong>{claim.submitted_name}</strong><small>Request #{claim.id} · {new Date(claim.created_at).toLocaleString('en-UG')}</small></td>
-              <td><strong>{claim.claim_type === 'parent' ? 'Parent' : 'Teacher'}</strong><small>{claim.claim_type === 'parent' ? children.map((child: any) => [child.first_name, child.last_name].filter(Boolean).join(' ')).join(', ') : [details.first_name, details.last_name, details.staff_number].filter(Boolean).join(' · ')}</small><small>{claim.claim_type === 'parent' ? matchedStudents.length + ' matched learner record(s)' : claim.candidate_staff_id ? 'Matched active teaching staff record' : 'No automatic staff match'}</small></td>
+              <td>
+                <strong>{claim.claim_type === 'parent' ? 'Parent' : 'Teacher'}</strong>
+                {claim.claim_type === 'parent' ? children.map((child: any, index: number) => {
+                  const key = claim.id + ':' + index
+                  const selected = selectedIds[index]
+                  return <div className="registration-match-picker" key={key}>
+                    <small>Child {index + 1}: {[child.first_name, child.last_name].filter(Boolean).join(' ')}</small>
+                    <input aria-label={'Search school records for child ' + (index + 1)} value={claimStudentSearch[key] || ''} onChange={e => setClaimStudentSearch(current => ({ ...current, [key]: e.target.value }))} placeholder="Name or admission number"/>
+                    <button type="button" className="secondary-button" onClick={() => void searchRegistrationStudents(claim.id, index)}>Search learners</button>
+                    {claimStudentOptions[key]?.map(student => <button type="button" key={student.id} className={selected === student.id ? 'phase4-student-option active' : 'phase4-student-option'} onClick={() => setClaimSelectedStudentIds(current => {
+                      const next = [...(current[claim.id] || (matchedStudents.length === children.length ? matchedStudents : []))]
+                      if (next.some((id, slot) => slot !== index && id === student.id)) return current
+                      next[index] = student.id
+                      return { ...current, [claim.id]: next }
+                    })}><strong>{student.first_name} {student.last_name}</strong> · {student.admission_number}</button>)}
+                    {selected ? <small>Selected learner record ID: {selected}</small> : <small>No learner selected for this child.</small>}
+                  </div>
+                }) : <div className="registration-match-picker">
+                  <small>{[details.first_name, details.last_name, details.staff_number].filter(Boolean).join(' · ')}</small>
+                  <input aria-label="Search teaching staff records" value={claimStaffSearch[claim.id] || ''} onChange={e => setClaimStaffSearch(current => ({ ...current, [claim.id]: e.target.value }))} placeholder="Staff name or staff number"/>
+                  <button type="button" className="secondary-button" onClick={() => void searchRegistrationStaff(claim.id)}>Search teaching staff</button>
+                  {claimStaffOptions[claim.id]?.map(staff => <button type="button" key={staff.id} className={selectedStaffId === staff.id ? 'phase4-student-option active' : 'phase4-student-option'} onClick={() => setClaimSelectedStaffIds(current => ({ ...current, [claim.id]: staff.id }))}><strong>{staff.first_name} {staff.last_name}</strong> · {staff.staff_number || 'No staff number'} <small>{staff.category}</small></button>)}
+                  <small>{selectedStaffId ? 'Teaching staff record selected.' : 'No staff record selected.'}</small>
+                </div>}
+              </td>
               <td>{claim.phone_masked || 'No trusted phone — manual review'}</td>
               <td><span className="attendance-status-pill">{claim.status.replaceAll('_', ' ')}</span></td>
               <td><div className="proposal-review-actions">
                 {claim.status !== 'completed' && claim.status !== 'rejected' && <><button type="button" className="primary-button" disabled={!canApprove || reviewingClaimId === claim.id} onClick={() => void decideRegistrationClaim(claim, 'approved')}>{reviewingClaimId === claim.id ? 'Saving…' : 'Approve'}</button><button type="button" className="danger-button" disabled={reviewingClaimId === claim.id} onClick={() => void decideRegistrationClaim(claim, 'rejected')}>Reject</button></>}
-                {!canApprove && claim.status !== 'completed' && claim.status !== 'rejected' && <small>Needs manual record matching; approval is disabled.</small>}
+                {!canApprove && claim.status !== 'completed' && claim.status !== 'rejected' && <small>Select the correct school record(s) to enable approval.</small>}
               </div></td>
             </tr>
           })}
