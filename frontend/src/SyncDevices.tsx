@@ -108,7 +108,7 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
   const currentRevoked = Boolean(currentDevice && !currentDevice.active)
   return <section className="panel settings-panel sync-devices-panel">
     <div className="panel-heading"><div><h2>Registered devices</h2><p>Review browsers and computers registered to your SchoolBridge account.</p></div><button className="secondary-button" type="button" onClick={() => void load()} disabled={loading || busy}>Refresh</button></div>
-    <p className="form-hint">Manage the devices associated with your account. SchoolBridge records and dashboards are accessed online; no offline passphrase or local records copy is used.</p>
+    <p className="form-hint">Manage the devices associated with your account. School records and dashboards are retrieved directly from the school server.</p>
     {isAdmin && !isTauriDesktop && <section className="offline-record-tools school-access-qr">
       <h3>School mobile access QR</h3>
       <p className="form-hint">This reusable QR code opens this school's SchoolBridge registration page. Parents and teachers enter their details, which are checked automatically against the school's existing records. Successful verification opens the correct dashboard; the QR code itself does not expose student records or grant access.</p>
