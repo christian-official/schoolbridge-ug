@@ -4204,7 +4204,7 @@ def test_parent_qr_registration_is_isolated_to_the_school_selected_by_the_qr():
         assert response.status_code == 403, response.text
 
 
-def test_teacher_qr_registration_matches_staff_number_and_opens_dashboard_without_password_or_sms():
+def test_teacher_qr_registration_matches_staff_number_and_opens_dashboard_without_password_or_sms(monkeypatch):
     reset_database()
     school_id = "00000000-0000-4000-8000-000000000001"
     with SessionLocal() as db:
