@@ -938,29 +938,10 @@ def create_student(data: StudentCreate, db: Session = Depends(get_db), admin=Dep
         student_data["subsidiary_subjects"] = None
     if student_academic_level != "O-Level":
         student_data["optional_subjects"] = None
-    supplied_number = (student_data.pop("admission_number") or "").strip()
-    settings = get_or_create_school_settings(db)
-    item = models.Student(
-        **student_data,
-        admission_number=supplied_number or f"PENDING-{uuid4().hex}",
-    )
+    supplied_number = (student_data.pop("admission_number") or "").strip() or None
+    item = models.Student(**student_data, admission_number=supplied_number)
     db.add(item)
     try:
-        db.flush()
-        if not supplied_number:
-            next_value = db.execute(
-                update(models.SchoolSettings)
-                .where(models.SchoolSettings.id == 1)
-                .values(next_admission_number=models.SchoolSettings.next_admission_number + 1)
-                .returning(models.SchoolSettings.next_admission_number)
-            ).scalar_one() - 1
-            parts = []
-            if settings.admission_prefix.strip():
-                parts.append(settings.admission_prefix.strip())
-            if settings.include_year:
-                parts.append(str(date.today().year))
-            parts.append(str(next_value).zfill(settings.admission_padding))
-            item.admission_number = settings.admission_separator.join(parts)
         db.flush()
         if item.class_id is not None:
             school_settings = get_or_create_school_settings(db)
