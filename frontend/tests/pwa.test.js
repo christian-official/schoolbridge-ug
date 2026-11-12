@@ -52,9 +52,9 @@ test('production build injects every generated JS, CSS and imported asset into t
 
 test('API workspaces replace raw offline network failures with consistent guidance', async () => {
   const helper = await readFile(new URL('../src/offlineNetwork.ts', import.meta.url), 'utf8')
-  assert.match(helper, /SchoolBridge cannot reach its server right now/)
+  assert.match(helper, /SchoolBridge could not complete this server request/)
   assert.match(helper, /server is temporarily unavailable/)
-  assert.match(helper, /502, 503, 504/)
+  assert.match(helper, /\[502, 503, 504\]/)
   for (const module of ['App.tsx', 'AcademicManagement.tsx', 'AttendanceManagement.tsx', 'MyStaffProfile.tsx', 'OperationsManagement.tsx', 'ParentLiaison.tsx', 'Phase4Workspace.tsx', 'RegistrationFlow.tsx', 'StaffFinance.tsx', 'SyncDevices.tsx']) {
     const source = await readFile(new URL('../src/' + module, import.meta.url), 'utf8')
     assert.match(source, /fetchSchoolBridge/, module + ' should use the shared offline-aware request helper')
