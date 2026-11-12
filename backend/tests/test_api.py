@@ -3443,3 +3443,38 @@ def test_enrolment_invitation_is_account_bound_single_use_and_registers_device()
         assert [item["device_id"] for item in devices.json()["devices"]] == [
             "00000000-0000-4000-8000-000000000098"
         ]
+
+
+
+def test_student_can_be_registered_without_an_admission_number():
+    reset_database()
+    admin = create_admin()
+    headers = {"Authorization": f"Bearer {create_access_token(admin)}"}
+    db = SessionLocal()
+    try:
+        school_class = models.SchoolClass(name="Primary 4", section="A")
+        db.add(school_class)
+        db.commit()
+        class_id = school_class.id
+    finally:
+        db.close()
+
+    payload = {
+        "first_name": "Amina",
+        "last_name": "Learner",
+        "gender": "Female",
+        "guardian_name": "Parent One",
+        "guardian_phone": "0700000001",
+        "class_id": class_id,
+    }
+    with TestClient(app) as client:
+        first = client.post("/api/students", headers=headers, json=payload)
+        second = client.post("/api/students", headers=headers, json={
+            **payload, "first_name": "Brian", "guardian_name": "Parent Two",
+            "guardian_phone": "0700000002",
+        })
+
+    assert first.status_code == 200, first.text
+    assert second.status_code == 200, second.text
+    assert first.json()["admission_number"] is None
+    assert second.json()["admission_number"] is None
