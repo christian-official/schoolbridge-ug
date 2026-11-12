@@ -2791,9 +2791,11 @@ def logout(user=Depends(get_current_user), db: Session = Depends(get_db)):
 
 
 @app.get("/api/auth/me", tags=["Authentication"])
-def current_account(user=Depends(get_current_user)):
+def current_account(user=Depends(get_current_user), db: Session = Depends(get_db)):
+    tenant = db.query(models.SchoolTenant).filter_by(id=user.school_tenant_id).first()
     return {
         "id": user.id,
+        "school_id": str(tenant.public_id) if tenant else None,
         "username": user.username,
         "email": user.email,
         "role": user.role,
