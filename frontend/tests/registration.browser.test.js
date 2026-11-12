@@ -140,6 +140,8 @@ test('QR access opens the correct school registration flow on a mobile viewport 
     await page.getByRole('button', { name: 'Sign out' }).click()
     await page.getByRole('heading', { name: 'Join your school' }).waitFor()
     assert.equal(await page.getByLabel('Password').count(), 0, 'a signed-out parent must return to passwordless QR verification')
+    await page.getByRole('button', { name: 'Parent', exact: true }).click()
+    await page.getByRole('dialog', { name: 'Parent details' }).waitFor()
     assert.equal(await page.getByRole('button', { name: 'Verify and open my dashboard' }).count(), 1, 'the existing parent must be able to verify again without creating a password account')
 
     await context.close()
