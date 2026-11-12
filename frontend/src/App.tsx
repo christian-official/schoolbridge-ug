@@ -162,7 +162,18 @@ async function loadStoredSessionToken(): Promise<string> {
     if (!invoke) throw new Error('Secure desktop credential storage is unavailable.')
     return (await invoke<string | null>('load_auth_token')) || ''
   }
-  return sessionStorage.getItem('sb_token') || ''
+  try {
+    const persistentToken = localStorage.getItem('sb_token')
+    if (persistentToken) return persistentToken
+    const legacyToken = sessionStorage.getItem('sb_token') || ''
+    if (legacyToken) {
+      localStorage.setItem('sb_token', legacyToken)
+      sessionStorage.removeItem('sb_token')
+    }
+    return legacyToken
+  } catch {
+    return sessionStorage.getItem('sb_token') || ''
+  }
 }
 
 async function storeSessionToken(token: string): Promise<void> {
@@ -172,7 +183,12 @@ async function storeSessionToken(token: string): Promise<void> {
     await invoke<void>('store_auth_token', { token })
     return
   }
-  sessionStorage.setItem('sb_token', token)
+  try {
+    localStorage.setItem('sb_token', token)
+    sessionStorage.removeItem('sb_token')
+  } catch {
+    sessionStorage.setItem('sb_token', token)
+  }
 }
 
 async function clearStoredSessionToken(): Promise<void> {
@@ -182,6 +198,7 @@ async function clearStoredSessionToken(): Promise<void> {
     await invoke<void>('clear_auth_token')
     return
   }
+  try { localStorage.removeItem('sb_token') } catch { /* Storage may be unavailable. */ }
   sessionStorage.removeItem('sb_token')
 }
 
