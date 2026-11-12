@@ -1,4 +1,8 @@
 import sqlite3
+from pathlib import Path
+
+from alembic import command
+from alembic.config import Config
 
 from app.migrations import upgrade_database
 
@@ -48,14 +52,10 @@ def test_tenant_registry_backfills_legacy_school_identity(tmp_path):
     finally:
         connection.close()
 
-    # The migration is already current, so exercise the backfill behavior on
-    # a pre-tenant schema by downgrading only the new registry revision.
-    from alembic import command
-    from alembic.config import Config
-    from pathlib import Path
-    from app.migrations import _alembic_config
-
-    config = _alembic_config(database_url)
+    # Re-run the new revision against a pre-registry database to verify that
+    # existing installation and school identity are preserved.
+    config = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
+    config.set_main_option("sqlalchemy.url", database_url)
     command.downgrade(config, "0030_optional_admission_no")
     command.upgrade(config, "head")
 
