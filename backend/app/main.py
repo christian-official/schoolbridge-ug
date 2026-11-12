@@ -2936,8 +2936,8 @@ def decide_registration_claim(claim_id: int, data: RegistrationClaimDecisionRequ
     claim = db.get(models.RegistrationClaim, claim_id)
     if not claim:
         raise HTTPException(404, "Registration request not found.")
-    if claim.status in {"completed", "rejected"}:
-        raise HTTPException(409, "This registration request is already closed.")
+    if claim.status in {"completed", "rejected", "completing"}:
+        raise HTTPException(409, "This registration request is already closed or being completed.")
     if data.status == "approved":
         if claim.claim_type == "parent":
             student_ids = list(dict.fromkeys(data.student_ids or json.loads(claim.candidate_student_ids_json or "[]")))
@@ -2987,6 +2987,22 @@ def complete_public_registration_claim(reference: str, data: RegistrationClaimCo
         raise HTTPException(410, "This registration request has expired.")
     if db.query(models.User).filter(func.lower(models.User.username) == data.username.strip().lower()).first():
         raise HTTPException(409, "That username is already in use at this school.")
+
+    # Claim completion is a single-use transition. The conditional UPDATE is
+    # atomic on PostgreSQL and prevents a second request from creating another
+    # account from the same verified/approved claim.
+    claimed = db.execute(
+        update(models.RegistrationClaim)
+        .where(
+            models.RegistrationClaim.id == claim.id,
+            models.RegistrationClaim.school_tenant_id == get_current_tenant_id(db),
+            models.RegistrationClaim.status.in_(("verified", "approved")),
+        )
+        .values(status="completing")
+    )
+    if claimed.rowcount != 1:
+        raise HTTPException(409, "This registration request has already been used or is being completed.")
+
     if claim.claim_type == "parent":
         student_ids = list(dict.fromkeys(json.loads(claim.candidate_student_ids_json or "[]")))
         students = db.query(models.Student).filter(models.Student.id.in_(student_ids)).all()

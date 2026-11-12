@@ -4068,6 +4068,17 @@ def test_parent_self_registration_uses_school_verified_numbers_and_links_multipl
             },
         )
         assert completed.status_code == 200, completed.text
+
+        duplicate_completion = client.post(
+            f"/api/public/registration/claims/{reference}/complete",
+            json={
+                "school_id": school_id,
+                "username": "parent.one.second",
+                "password": "ParentAccountPassword123!",
+            },
+        )
+        assert duplicate_completion.status_code == 409, duplicate_completion.text
+
         login = client.post("/api/auth/login", data={
             "username": "parent.one",
             "password": "ParentAccountPassword123!",
