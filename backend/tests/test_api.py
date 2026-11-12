@@ -4119,6 +4119,11 @@ def test_parent_qr_registration_matches_school_records_and_opens_dashboard_witho
         )
         assert repeated_account.json()["id"] == account.json()["id"]
 
+        password_login = client.post("/api/auth/login", data={
+            "username": result["username"], "password": "not-a-parent-password",
+        })
+        assert password_login.status_code == 403
+
         missing_child_identifier = client.post(
             "/api/public/registration/parent",
             json={
@@ -4270,4 +4275,12 @@ def test_legacy_registration_claim_and_administrator_review_routes_are_not_avail
             "/api/public/registration/claims/not-a-valid-claim",
             params={"school_id": "00000000-0000-4000-8000-000000000001"},
         ).status_code == 404
+        assert client.post("/api/parent-accounts", headers=headers, json={
+            "username": "old-manual-parent", "email": "old-parent@example.invalid",
+            "student_ids": [1],
+        }).status_code == 405
+        assert client.post("/api/auth/teachers", headers=headers, json={
+            "staff_id": 1, "username": "old-teacher", "email": "old-teacher@example.invalid",
+            "password": "LongTestPassword123!",
+        }).status_code == 404
 
