@@ -1124,6 +1124,7 @@ function App() {
       const createdStudent = await api<RecordItem>('students', token, {
         method: 'POST',
         body: JSON.stringify({
+          generate_admission_number: studentForm.generate_admission_number,
           first_name: studentForm.full_name.trim().split(/\s+/)[0] || '',
           middle_name: null,
           last_name: studentForm.full_name.trim().split(/\s+/).slice(1).join(' '),
