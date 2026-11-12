@@ -697,3 +697,70 @@
     outline-offset: 2px !important;
   }
 }
+
+
+/* iPhone PWA viewport: keep the header below the status bar and let the
+   workspace content scroll inside the available screen instead of clipping. */
+@media (max-width: 760px) {
+  html, body, #root {
+    width: 100%;
+    min-width: 320px;
+    height: 100%;
+    min-height: 100%;
+    margin: 0;
+    overflow: hidden;
+  }
+  .redesigned-app-shell {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+  .redesigned-app-shell > .main-area {
+    display: flex !important;
+    flex: 1 1 auto !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+  .redesigned-app-shell > .main-area > .topbar {
+    flex: 0 0 auto !important;
+    height: calc(62px + env(safe-area-inset-top, 0px)) !important;
+    min-height: calc(62px + env(safe-area-inset-top, 0px)) !important;
+    padding: max(8px, env(safe-area-inset-top, 0px)) 12px 8px !important;
+    padding-left: max(12px, env(safe-area-inset-left, 0px)) !important;
+    padding-right: max(12px, env(safe-area-inset-right, 0px)) !important;
+    gap: 8px !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+  }
+  .redesigned-app-shell > .main-area > .topbar .breadcrumb {
+    min-width: 0 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    font-size: 10px !important;
+  }
+  .redesigned-app-shell > .main-area > .topbar .top-actions {
+    flex: 0 0 auto !important;
+    gap: 7px !important;
+  }
+  .redesigned-app-shell > .main-area > .content {
+    flex: 1 1 auto !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 15px 13px calc(18px + env(safe-area-inset-bottom, 0px)) !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+}
