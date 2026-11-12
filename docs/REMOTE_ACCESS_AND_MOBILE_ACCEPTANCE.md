@@ -2,12 +2,9 @@
 
 ## Hosting decision: one free hosted address for every school
 
-SchoolBridge already has its hosted Render services:
+SchoolBridge's planned public deployment uses a free hosting provider that supplies a free subdomain and HTTPS. Render is not the selected hosting platform. The exact provider-issued hostname is to be recorded when the planned hosting account is configured; do not substitute a different provider or publish placeholder URLs.
 
-- Frontend/PWA: https://schoolbridge-ug-1.onrender.com
-- Backend API: https://schoolbridge-ug.onrender.com
-
-The frontend address is the shared SchoolBridge entry point. Every school must be able to reach the same hosted PWA address. A school must not have to buy a domain, create its own subdomain, configure a tunnel, install a LAN certificate, or be on the school's Wi-Fi just to open the PWA.
+That one provider-issued HTTPS address is the shared SchoolBridge entry point for every school. A school must not have to buy a domain, obtain its own subdomain, configure a tunnel, install a LAN certificate, or be on the school's Wi-Fi just to open the PWA.
 
 The intended onboarding flow is:
 
@@ -23,7 +20,7 @@ There is no per-school domain or subdomain requirement. Schools use the shared p
 
 ## Important implementation and data-safety gate
 
-The current hosted backend still uses a single-school data model and the existing Render configuration points at SQLite. It is not yet safe to onboard unrelated schools into one shared hosted database. Do not solve this by allowing all schools to share one installation, user table or school records.
+The current backend still uses a single-school data model and its default database configuration is SQLite. It is not yet safe to onboard unrelated schools into one shared hosted database. Do not solve this by allowing all schools to share one installation, user table or school records.
 
 Before public multi-school onboarding is enabled, implement and test:
 
@@ -35,7 +32,7 @@ Before public multi-school onboarding is enabled, implement and test:
 - tenant isolation tests that attempt cross-school reads, writes, ID substitution, exports, device pairing and invitation redemption;
 - durable hosted database/storage configuration and recovery testing; do not rely on ephemeral application-container SQLite for school records.
 
-The hosted PWA can be developed and tested on the existing Render subdomain while this work proceeds, but public school-data onboarding must remain closed until the tenant-isolation and persistence gates pass. This is a product-readiness gate, not a condition requiring any school to buy a domain or pay for a separate hostname.
+The shared hosted PWA can be developed against the selected free hosting setup while this work proceeds, but public school-data onboarding must remain closed until the tenant-isolation and persistence gates pass. This is a product-readiness gate, not a condition requiring any school to buy a domain or pay for a separate hostname.
 
 ## LAN and local-first operation remain supported
 
@@ -59,7 +56,7 @@ Use test schools, test accounts and synthetic student data only.
 
 ### Android (Chrome)
 
-1. Open https://schoolbridge-ug-1.onrender.com from a phone on an ordinary internet connection; no school Wi-Fi, private certificate or custom domain should be required for the hosted PWA.
+1. Open the configured shared SchoolBridge HTTPS subdomain from a phone on an ordinary internet connection; no school Wi-Fi, private certificate or paid custom domain should be required.
 2. Complete the test-school onboarding flow and confirm the assigned school identity.
 3. Generate and scan that school's reusable QR; confirm the correct school is displayed.
 4. Confirm a QR for another test school resolves to that other school and cannot expose the first school's records.
@@ -71,7 +68,7 @@ Use test schools, test accounts and synthetic student data only.
 
 ### iPhone/iPad (Safari)
 
-1. Open the same shared hosted HTTPS address using ordinary internet access; no custom domain, private CA or school LAN should be required.
+1. Open the configured shared SchoolBridge HTTPS subdomain using ordinary internet access; no paid custom domain, private CA or school LAN should be required.
 2. Complete test-school onboarding and verify the school identity.
 3. Scan the school's QR, sign in with a test account and redeem its invitation once.
 4. Use Share → Add to Home Screen, launch the installed PWA and confirm login/navigation.
