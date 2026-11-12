@@ -8,7 +8,7 @@ const backend = await readFile(new URL('../../backend/app/main.py', import.meta.
 const syncDevices = await readFile(new URL('../src/SyncDevices.tsx', import.meta.url), 'utf8')
 
 test('scanning a school QR opens that school registration page directly', () => {
-  assert.match(app, /useState\(\(\) => Boolean\(new URLSearchParams\(window\.location\.search\)\.get\('school'\)\)\)/)
+  assert.match(app, /useState\(\(\) => Boolean\(selectedSchoolId\)\)/)
   assert.match(app, /<RegistrationFlow schoolId=\{selectedSchoolId\}/)
   assert.match(app, /\/api\/public\/school\?school=/)
   assert.match(syncDevices, /SchoolBridge registration page/)
