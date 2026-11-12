@@ -378,6 +378,21 @@ class SyncDevice(Base):
 
 
 
+class EnrolmentInvitation(Base):
+    """Single-use, account-bound device enrolment authorisation."""
+    __tablename__ = "enrolment_invitations"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    installation_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    target_user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_by: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    redeemed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
 class SyncChangeProposal(Base):
     """Audited offline proposal; never applied directly to live records."""
     __tablename__ = "sync_change_proposals"
