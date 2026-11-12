@@ -3,6 +3,7 @@ import json
 import re
 import secrets
 import hashlib
+import hmac
 from io import BytesIO
 from urllib.parse import urlsplit
 import qrcode
@@ -41,6 +42,7 @@ from .migrations import upgrade_database
 from . import models
 from .sync_tracking import register_sync_tracking
 from .school_setup import verify_activation_license, license_fingerprint
+from .sms import send_schoolbridge_sms
 
 import jwt
 from datetime import timedelta, timezone
@@ -104,6 +106,171 @@ def resolve_school_tenant(db: Session, school_id: str | None = None):
 
     set_tenant_context(db, tenant.id if tenant else 1)
     return tenant
+
+
+def _registration_name_key(value: str | None) -> str:
+    return " ".join((value or "").strip().casefold().split())
+
+
+def _registration_phone_key(value: str | None) -> str:
+    return re.sub(r"\D", "", value or "")
+
+
+def _mask_registration_phone(value: str) -> str:
+    digits = _registration_phone_key(value)
+    if len(digits) < 4:
+        return "••••"
+    if digits.startswith("256"):
+        return "+256 " + ("•" * max(3, len(digits) - 6)) + " " + digits[-3:]
+    return ("•" * max(3, len(digits) - 3)) + digits[-3:]
+
+
+def _registration_reference_hash(reference: str) -> str:
+    return hashlib.sha256(reference.encode("utf-8")).hexdigest()
+
+
+def _registration_code_hash(claim: models.RegistrationClaim, code: str) -> str:
+    material = f"{claim.reference_hash}:{code}:{JWT_SECRET}".encode("utf-8")
+    return hashlib.sha256(material).hexdigest()
+
+
+def _create_registration_claim(
+    db: Session,
+    claim_type: str,
+    submitted_name: str,
+    details: dict,
+    candidate_student_ids: list[int] | None = None,
+    candidate_contact_ids: list[int] | None = None,
+    candidate_staff_id: int | None = None,
+    trusted_phone: str | None = None,
+):
+    reference = secrets.token_urlsafe(32)
+    claim = models.RegistrationClaim(
+        school_tenant_id=get_current_tenant_id(db),
+        reference_hash=_registration_reference_hash(reference),
+        claim_type=claim_type,
+        status="pending_review",
+        submitted_name=submitted_name,
+        details_json=json.dumps(details, sort_keys=True),
+        candidate_student_ids_json=json.dumps(candidate_student_ids or []),
+        candidate_contact_ids_json=json.dumps(candidate_contact_ids or []),
+        candidate_staff_id=candidate_staff_id,
+        phone_masked=_mask_registration_phone(trusted_phone) if trusted_phone else None,
+        expires_at=datetime.utcnow() + timedelta(days=7),
+    )
+    db.add(claim)
+    db.flush()
+
+    if trusted_phone:
+        code = f"{secrets.randbelow(1_000_000):06d}"
+        claim.verification_code_hash = _registration_code_hash(claim, code)
+        claim.verification_expires_at = datetime.utcnow() + timedelta(minutes=10)
+        claim.status = "verification_pending"
+        db.commit()
+        delivered = send_schoolbridge_sms(
+            trusted_phone,
+            f"Your SchoolBridge verification code is {code}. It expires in 10 minutes. Do not share it.",
+        )
+        if not delivered:
+            claim.status = "pending_review"
+            claim.verification_code_hash = None
+            claim.verification_expires_at = None
+            db.commit()
+    else:
+        db.commit()
+    db.refresh(claim)
+    return reference, claim
+
+
+def _match_parent_registration(db: Session, data: ParentSelfRegistrationRequest):
+    student_ids: list[int] = []
+    contact_ids: list[int] = []
+    phones: list[str] = []
+    automatic_match = True
+    for child in data.children:
+        query = db.query(models.Student).filter(
+            models.Student.status == "active",
+            func.lower(models.Student.first_name) == child.first_name.strip().lower(),
+            func.lower(models.Student.last_name) == child.last_name.strip().lower(),
+        )
+        if child.admission_number:
+            query = query.filter(
+                func.lower(models.Student.admission_number) == child.admission_number.strip().lower()
+            )
+        if child.date_of_birth:
+            query = query.filter(models.Student.date_of_birth == child.date_of_birth)
+        if child.class_name:
+            query = query.join(
+                models.SchoolClass,
+                models.Student.class_id == models.SchoolClass.id,
+            ).filter(func.lower(models.SchoolClass.name) == child.class_name.strip().lower())
+        matches = query.all()
+        if len(matches) != 1:
+            automatic_match = False
+            continue
+        student = matches[0]
+        student_ids.append(student.id)
+        contacts = db.query(models.StudentGuardianContact).filter(
+            models.StudentGuardianContact.student_id == student.id,
+            models.StudentGuardianContact.active.is_(True),
+            models.StudentGuardianContact.verification_status == "school_verified",
+            models.StudentGuardianContact.phone.isnot(None),
+        ).all()
+        matching_contacts = [
+            contact for contact in contacts
+            if _registration_name_key(contact.guardian_name) == _registration_name_key(data.parent_name)
+            and (
+                not data.relationship
+                or _registration_name_key(contact.relationship) == _registration_name_key(data.relationship)
+            )
+        ]
+        if len(matching_contacts) != 1:
+            automatic_match = False
+            continue
+        contact = matching_contacts[0]
+        contact_ids.append(contact.id)
+        phones.append(contact.phone or "")
+
+    normalized_phones = {_registration_phone_key(phone) for phone in phones if phone}
+    trusted_phone = None
+    if (
+        automatic_match
+        and len(student_ids) == len(data.children)
+        and len(contact_ids) == len(data.children)
+        and len(normalized_phones) == 1
+    ):
+        trusted_phone = phones[0]
+    return student_ids, contact_ids, trusted_phone
+
+
+def _match_teacher_registration(db: Session, data: TeacherSelfRegistrationRequest):
+    query = db.query(models.StaffMember).filter(
+        models.StaffMember.status == "active",
+        func.lower(models.StaffMember.category).in_(["teaching", "teacher"]),
+    )
+    if data.staff_number:
+        query = query.filter(
+            func.lower(models.StaffMember.staff_number) == data.staff_number.strip().lower()
+        )
+    else:
+        query = query.filter(
+            func.lower(models.StaffMember.first_name) == data.first_name.strip().lower(),
+            func.lower(models.StaffMember.last_name) == data.last_name.strip().lower(),
+        )
+        if data.position:
+            query = query.filter(func.lower(models.StaffMember.position) == data.position.strip().lower())
+        if data.department:
+            query = query.filter(func.lower(models.StaffMember.department) == data.department.strip().lower())
+    matches = query.all()
+    if len(matches) != 1:
+        return None, None
+    staff = matches[0]
+    trusted_phone = (
+        staff.phone
+        if staff.phone and staff.phone_verification_status == "school_verified"
+        else None
+    )
+    return staff.id, trusted_phone
 
 
 def sync_legacy_guardian_contacts(db: Session, student: models.Student) -> None:
@@ -652,6 +819,52 @@ class StudentCreate(BaseModel):
     optional_subjects: str | None = None
     subsidiary_subjects: str | None = None
     photo_data: str | None = Field(default=None, max_length=1_800_000)
+
+
+class ParentRegistrationChild(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    first_name: str = Field(min_length=1, max_length=80)
+    last_name: str = Field(min_length=1, max_length=80)
+    admission_number: str | None = Field(default=None, max_length=40)
+    date_of_birth: date | None = None
+    class_name: str | None = Field(default=None, max_length=80)
+
+
+class ParentSelfRegistrationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    school_id: UUID
+    parent_name: str = Field(min_length=2, max_length=160)
+    relationship: str | None = Field(default=None, max_length=60)
+    children: list[ParentRegistrationChild] = Field(min_length=1, max_length=10)
+
+
+class TeacherSelfRegistrationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    school_id: UUID
+    first_name: str = Field(min_length=1, max_length=80)
+    last_name: str = Field(min_length=1, max_length=80)
+    staff_number: str | None = Field(default=None, max_length=40)
+    position: str | None = Field(default=None, max_length=100)
+    department: str | None = Field(default=None, max_length=100)
+
+
+class RegistrationClaimVerifyRequest(BaseModel):
+    school_id: UUID
+    code: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
+
+
+class RegistrationClaimCompleteRequest(BaseModel):
+    school_id: UUID
+    username: str = Field(min_length=3, max_length=80, pattern=r"^[A-Za-z0-9._-]+$")
+    password: str = Field(min_length=8, max_length=128)
+    email: str | None = Field(default=None, max_length=150)
+
+
+class RegistrationClaimDecisionRequest(BaseModel):
+    status: str = Field(pattern="^(approved|rejected)$")
+    student_ids: list[int] = Field(default_factory=list, max_length=10)
+    staff_id: int | None = None
+    note: str | None = Field(default=None, max_length=1000)
 
 
 class GuardianContactCreate(BaseModel):
@@ -2087,13 +2300,13 @@ def delete_timetable_entry(
 @app.middleware("http")
 async def protect_school_data(request: Request, call_next):
     path = request.url.path
-    public_paths = {"/api/health", "/api/auth/login", "/api/setup/status", "/api/setup/activate", "/api/setup/complete", "/api/public/school"}
+    public_paths = {"/api/health", "/api/auth/login", "/api/setup/status", "/api/setup/activate", "/api/setup/complete", "/api/public/school", "/api/public/registration"}
 
     # Browser CORS preflight requests must reach CORSMiddleware without auth.
     if request.method == "OPTIONS":
         return await call_next(request)
 
-    if not path.startswith("/api/") or path in public_paths or path in {"/api/auth/password-reset/request", "/api/auth/password-reset/confirm"}:
+    if not path.startswith("/api/") or path in public_paths or path.startswith("/api/public/registration/") or path in {"/api/auth/password-reset/request", "/api/auth/password-reset/confirm"}:
         return await call_next(request)
 
     from starlette.responses import JSONResponse
@@ -2582,6 +2795,213 @@ def current_account(user=Depends(get_current_user)):
         "active": user.is_active,
         "must_change_password": bool(user.must_change_password),
     }
+
+
+@app.post("/api/public/registration/parent", tags=["Parent & Teacher Registration"])
+def submit_parent_registration(data: ParentSelfRegistrationRequest, db: Session = Depends(get_db)):
+    resolve_school_tenant(db, str(data.school_id))
+    student_ids, contact_ids, trusted_phone = _match_parent_registration(db, data)
+    reference, claim = _create_registration_claim(
+        db, "parent", data.parent_name.strip(),
+        {
+            "parent_name": data.parent_name.strip(),
+            "relationship": data.relationship,
+            "children": [child.model_dump(mode="json") for child in data.children],
+        },
+        student_ids, contact_ids, trusted_phone=trusted_phone,
+    )
+    message = (
+        f"A verification code was sent to the number on your school's record: {claim.phone_masked}."
+        if claim.status == "verification_pending"
+        else "Your request has been sent to the school for review. The school will use its existing records; you do not need to enter a phone number."
+    )
+    return {"claim_reference": reference, "status": claim.status, "phone_masked": claim.phone_masked, "message": message}
+
+
+@app.post("/api/public/registration/teacher", tags=["Parent & Teacher Registration"])
+def submit_teacher_registration(data: TeacherSelfRegistrationRequest, db: Session = Depends(get_db)):
+    resolve_school_tenant(db, str(data.school_id))
+    staff_id, trusted_phone = _match_teacher_registration(db, data)
+    reference, claim = _create_registration_claim(
+        db, "teacher", f"{data.first_name.strip()} {data.last_name.strip()}",
+        {
+            "first_name": data.first_name.strip(),
+            "last_name": data.last_name.strip(),
+            "staff_number": data.staff_number,
+            "position": data.position,
+            "department": data.department,
+        },
+        candidate_staff_id=staff_id, trusted_phone=trusted_phone,
+    )
+    message = (
+        f"A verification code was sent to the number on your school's record: {claim.phone_masked}."
+        if claim.status == "verification_pending"
+        else "Your request has been sent to the school for review. The school will use its existing records; you do not need to enter a phone number."
+    )
+    return {"claim_reference": reference, "status": claim.status, "phone_masked": claim.phone_masked, "message": message}
+
+
+@app.get("/api/public/registration/claims/{reference}", tags=["Parent & Teacher Registration"])
+def get_public_registration_claim(reference: str, school_id: UUID = Query(...), db: Session = Depends(get_db)):
+    resolve_school_tenant(db, str(school_id))
+    claim = db.query(models.RegistrationClaim).filter_by(
+        school_tenant_id=get_current_tenant_id(db),
+        reference_hash=_registration_reference_hash(reference),
+    ).first()
+    if not claim:
+        raise HTTPException(404, "Registration request not found.")
+    return {"status": claim.status, "phone_masked": claim.phone_masked, "expires_at": claim.expires_at}
+
+
+@app.post("/api/public/registration/claims/{reference}/verify", tags=["Parent & Teacher Registration"])
+def verify_public_registration_claim(reference: str, data: RegistrationClaimVerifyRequest, db: Session = Depends(get_db)):
+    resolve_school_tenant(db, str(data.school_id))
+    claim = db.query(models.RegistrationClaim).filter_by(
+        school_tenant_id=get_current_tenant_id(db),
+        reference_hash=_registration_reference_hash(reference),
+    ).first()
+    if not claim:
+        raise HTTPException(404, "Registration request not found.")
+    now = datetime.utcnow()
+    if claim.status != "verification_pending" or not claim.verification_code_hash:
+        raise HTTPException(409, "This request is not waiting for phone verification.")
+    if not claim.verification_expires_at or claim.verification_expires_at < now:
+        claim.status = "pending_review"
+        claim.verification_code_hash = None
+        claim.verification_expires_at = None
+        db.commit()
+        raise HTTPException(410, "The verification code expired. Your request has been sent to the school for review.")
+    if claim.verification_attempts >= 5:
+        claim.status = "pending_review"
+        claim.verification_code_hash = None
+        claim.verification_expires_at = None
+        db.commit()
+        raise HTTPException(429, "Too many incorrect codes. Your request has been sent to the school for review.")
+    claim.verification_attempts += 1
+    if not hmac.compare_digest(_registration_code_hash(claim, data.code), claim.verification_code_hash):
+        db.commit()
+        raise HTTPException(400, "The verification code is incorrect.")
+    claim.status = "verified"
+    claim.verification_code_hash = None
+    claim.verification_expires_at = None
+    db.commit()
+    return {"status": "verified", "message": "Phone access verified. You can now complete your account setup."}
+
+
+@app.get("/api/admin/registration-claims", tags=["Parent & Teacher Registration"])
+def list_registration_claims(status: str = "pending_review", db: Session = Depends(get_db), admin=Depends(require_admin)):
+    if status not in {"pending_review", "verification_pending", "verified", "approved", "rejected", "completed"}:
+        raise HTTPException(422, "Invalid registration claim status.")
+    return db.query(models.RegistrationClaim).filter_by(status=status).order_by(
+        models.RegistrationClaim.created_at.asc()
+    ).limit(200).all()
+
+
+@app.post("/api/admin/registration-claims/{claim_id}/decision", tags=["Parent & Teacher Registration"])
+def decide_registration_claim(claim_id: int, data: RegistrationClaimDecisionRequest, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    claim = db.get(models.RegistrationClaim, claim_id)
+    if not claim:
+        raise HTTPException(404, "Registration request not found.")
+    if claim.status in {"completed", "rejected"}:
+        raise HTTPException(409, "This registration request is already closed.")
+    if data.status == "approved":
+        if claim.claim_type == "parent":
+            student_ids = list(dict.fromkeys(data.student_ids or json.loads(claim.candidate_student_ids_json or "[]")))
+            expected_count = len(json.loads(claim.details_json or "{}").get("children", []))
+            students = db.query(models.Student).filter(models.Student.id.in_(student_ids)).all()
+            if not student_ids or len(student_ids) != expected_count or len(students) != len(student_ids):
+                raise HTTPException(422, "Select one valid student record for every child before approving the parent request.")
+            claim.candidate_student_ids_json = json.dumps(student_ids)
+        elif claim.claim_type == "teacher":
+            staff_id = data.staff_id or claim.candidate_staff_id
+            staff = db.get(models.StaffMember, staff_id) if staff_id else None
+            if not staff or staff.status != "active" or staff.category.lower() not in {"teaching", "teacher"}:
+                raise HTTPException(422, "Select an active teaching staff record before approving the teacher request.")
+            claim.candidate_staff_id = staff.id
+        else:
+            raise HTTPException(409, "Unsupported registration request type.")
+        claim.status = "approved"
+    else:
+        claim.status = "rejected"
+    claim.reviewed_by = admin.id
+    claim.reviewed_at = datetime.utcnow()
+    claim.review_note = data.note
+    write_audit(db, admin, "registration_claim_reviewed", "registration_claim", claim.id,
+                f"type={claim.claim_type}; status={claim.status}")
+    db.commit()
+    db.refresh(claim)
+    return {"message": "Registration request decision saved.", "claim": claim}
+
+
+@app.post("/api/public/registration/claims/{reference}/complete", tags=["Parent & Teacher Registration"])
+def complete_public_registration_claim(reference: str, data: RegistrationClaimCompleteRequest, db: Session = Depends(get_db)):
+    resolve_school_tenant(db, str(data.school_id))
+    claim = db.query(models.RegistrationClaim).filter_by(
+        school_tenant_id=get_current_tenant_id(db),
+        reference_hash=_registration_reference_hash(reference),
+    ).first()
+    if not claim:
+        raise HTTPException(404, "Registration request not found.")
+    if claim.status not in {"verified", "approved"}:
+        raise HTTPException(409, "The school or phone verification must approve this request before account setup.")
+    if claim.expires_at < datetime.utcnow():
+        claim.status = "expired"
+        db.commit()
+        raise HTTPException(410, "This registration request has expired.")
+    if db.query(models.User).filter(func.lower(models.User.username) == data.username.strip().lower()).first():
+        raise HTTPException(409, "That username is already in use at this school.")
+    email = data.email.strip().lower() if data.email and data.email.strip() else None
+    if email and db.query(models.User).filter(func.lower(models.User.email) == email).first():
+        raise HTTPException(409, "That email address is already in use at this school.")
+
+    if claim.claim_type == "parent":
+        student_ids = list(dict.fromkeys(json.loads(claim.candidate_student_ids_json or "[]")))
+        students = db.query(models.Student).filter(models.Student.id.in_(student_ids)).all()
+        if not student_ids or len(students) != len(student_ids):
+            raise HTTPException(409, "The linked student records are no longer available. Ask the school to review the request again.")
+        already_linked = db.query(models.ParentStudentLink).filter(
+            models.ParentStudentLink.student_id.in_(student_ids)
+        ).first()
+        if already_linked:
+            raise HTTPException(409, "A parent account is already linked to at least one selected student. Ask the school to review the request.")
+        user = models.User(
+            school_tenant_id=get_current_tenant_id(db),
+            username=data.username.strip(), email=email,
+            hashed_password=password_hash.hash(data.password),
+            role="parent", is_active=True,
+        )
+        db.add(user)
+        db.flush()
+        db.add_all([
+            models.ParentStudentLink(
+                school_tenant_id=get_current_tenant_id(db),
+                user_id=user.id, student_id=student_id,
+            )
+            for student_id in student_ids
+        ])
+    elif claim.claim_type == "teacher":
+        staff = db.get(models.StaffMember, claim.candidate_staff_id) if claim.candidate_staff_id else None
+        if not staff or staff.status != "active" or staff.category.lower() not in {"teaching", "teacher"}:
+            raise HTTPException(409, "The linked teaching staff record is no longer available.")
+        if db.query(models.User).filter(models.User.staff_id == staff.id).first():
+            raise HTTPException(409, "An account is already linked to this staff record.")
+        user = models.User(
+            school_tenant_id=get_current_tenant_id(db),
+            username=data.username.strip(),
+            email=email or (staff.email.strip().lower() if staff.email and staff.email.strip() else None),
+            hashed_password=password_hash.hash(data.password),
+            role="teacher", staff_id=staff.id, is_active=True,
+        )
+        db.add(user)
+        db.flush()
+    else:
+        raise HTTPException(409, "Unsupported registration request type.")
+
+    claim.status = "completed"
+    write_audit(db, user, "self_registration_completed", "user", user.id,
+                f"claim_id={claim.id}; type={claim.claim_type}")
+    db.commit()
+    return {"message": "Your SchoolBridge account has been created. Sign in using your selected school.", "username": user.username}
 
 
 @app.get("/api/public/school", tags=["Public School Identity"])
