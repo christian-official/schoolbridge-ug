@@ -117,7 +117,7 @@ export default function RegistrationFlow({
           <input id="reg-parent-name" value={parentName} onChange={e => setParentName(e.target.value)} required minLength={2} maxLength={160} autoComplete="name"/>
 
           <label htmlFor="reg-relationship">Relationship to the child(ren)</label>
-          <input id="reg-relationship" value={relationship} onChange={e => setRelationship(e.target.value)} maxLength={60} placeholder="e.g. Mother, Father, Guardian"/>
+          <input id="reg-relationship" value={relationship} onChange={e => setRelationship(e.target.value)} required minLength={2} maxLength={60} placeholder="e.g. Mother, Father, Guardian"/>
 
           {children.map((child, index) => <fieldset className="registration-child" key={index}>
             <legend>Child {index + 1}</legend>
