@@ -55,7 +55,7 @@ test('offline session startup suppresses network errors and preserves the saved 
   assert.match(app, /if \(response\.status >= 500\) throw new TypeError\('SchoolBridge server is temporarily unavailable\.'\)/)
   assert.match(app, /const connectionUnavailable = error instanceof TypeError \|\| !navigator\.onLine/)
   assert.match(app, /if \(connectionUnavailable\) \{[\s\S]*?setSessionError\(/)
-  assert.match(app, /setLoginError\(connectionUnavailable \? ''/)
+  assert.match(app, /Your saved sign-in is retained; reconnect and retry/)
 })
 
 
