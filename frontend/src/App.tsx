@@ -5,7 +5,7 @@ import {
   FileText, Settings,
   Search, Plus, Menu, X, ArrowUpRight, UserPlus,
   CalendarDays, TrendingUp, ShieldCheck, LoaderCircle, RefreshCw,
-  Contact, Megaphone, Briefcase, Clock, FolderOpen, CalendarCheck, CheckCircle2, UserX, MessageSquareText, Wifi, WifiOff,
+  Contact, LogOut, Megaphone, Briefcase, Clock, FolderOpen, CalendarCheck, CheckCircle2, UserX, MessageSquareText, Wifi, WifiOff,
 } from 'lucide-react'
 import StaffFinance from './StaffFinance'
 import AcademicManagement from './AcademicManagement'
@@ -927,6 +927,15 @@ function App() {
   const [showRegistration, setShowRegistration] = useState(false)
   const [loading, setLoading] = useState(false)
   const [active, setActive] = useState('Overview')
+
+  async function signOut() {
+    await clearStoredSessionToken()
+    setToken('')
+    setUser(null)
+    setActive('Overview')
+    setMobileMenu(false)
+    setLoginError('')
+  }
   const [overviewShortcuts, setOverviewShortcuts] = useState<string[]>([])
   const [serverConnection, setServerConnection] = useState<'checking' | 'connected' | 'disconnected'>('checking')
   const [syncDeviceRevoked, setSyncDeviceRevoked] = useState(false)
@@ -1613,6 +1622,10 @@ function App() {
               <span className="avatar">{user.username.slice(0, 1).toUpperCase()}</span>
               <span className="profile-info"><strong>{user.role === 'admin' ? 'School settings' : user.role === 'parent' ? 'My children' : 'My profile'}</strong><small>{user.role_label || user.role}</small></span>
               <Contact className="account-profile-icon" size={19} aria-hidden="true" />
+            </button>
+            <button type="button" className="sidebar-signout-button" onClick={() => void signOut()}>
+              <LogOut size={16} aria-hidden="true" />
+              <span>Sign out</span>
             </button>
           </div>
         </div>
