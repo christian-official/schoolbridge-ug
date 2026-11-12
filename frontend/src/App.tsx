@@ -89,6 +89,7 @@ const parentMenu = [
   { label: 'My Children', icon: GraduationCap },
   { label: 'Announcements', icon: FileText },
   { label: 'Parent Liaison', icon: MessageSquareText },
+  { label: 'Device Management', icon: Wifi },
 ]
 
 function isFinanceAccount(user:User) {
