@@ -473,7 +473,7 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
     </section>}
     {isAdmin && <section className="offline-record-tools enrolment-invitations">
       <h3>Mobile device enrolment</h3>
-      <p className="form-hint">Issue a single-use invitation to an existing active staff or parent account. The invitation is tied to this school installation and the selected account.</p>
+      <p className="form-hint">Optional device enrolment for encrypted offline synchronisation only. It does not create an account and is not required for QR registration or normal online dashboard access.</p>
       <form className="student-form" onSubmit={createInvitation}>
         <div className="student-form-grid">
           <label>Account
@@ -507,7 +507,7 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
     </section>}
     <section className="offline-record-tools mobile-enrolment-redemption">
       <h3>Join this school on this device</h3>
-      <p className="form-hint">After signing in with your own school account, enter the one-time invitation supplied by your school administrator. Invitations are tied to your account and this school, and can only be used once.</p>
+      <p className="form-hint">This is only for optional encrypted offline synchronisation after you have joined through the school QR code and signed in. It is not required to register or open your online dashboard.</p>
       <form className="student-form" onSubmit={redeemInvitation}>
         <label>One-time enrolment invitation
           <input value={redeemToken} onChange={event => setRedeemToken(event.target.value)} autoComplete="off" spellCheck={false} placeholder="Paste invitation token" required />
