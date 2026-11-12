@@ -84,7 +84,6 @@ const teacherMenu = [
   { label: 'My Results', icon: FileText },
   { label: 'Timetable', icon: CalendarDays },
   { label: 'Announcements', icon: FileText },
-  { label: 'My Profile', icon: Users },
 ]
 const parentMenu = [
   { label: 'My Children', icon: GraduationCap },
@@ -106,14 +105,13 @@ function getStaffNavigation(user:User) {
   const allItems = [...menu, ...teacherMenu.filter(item => !menu.some(base => base.label === item.label))]
   const visible = allItems.filter(item =>
     item.label === 'Overview' ||
-    item.label === 'My Profile' ||
     item.label === 'My Attendance' ||
     (user.permissions?.[item.label] || []).includes('view') ||
     (item.label === 'Attendance' && (user.permissions?.['Staff Attendance'] || []).includes('view'))
   )
   const role = (user.role_label || '').toLowerCase()
   const priority = /school administrator|system administrator|^administrator$/.test(role)
-    ? ['Overview','Students','Staff','Examinations','Attendance','Fees & Finance','Timetable','Leadership & Duty','Parent Access','Parent Liaison','Announcements','Reports','My Attendance','My Profile']
+    ? ['Overview','Students','Staff','Examinations','Attendance','Fees & Finance','Timetable','Leadership & Duty','Parent Access','Parent Liaison','Announcements','Reports','My Attendance']
     : /teacher|head\s?teacher/.test(role)
     ? ['Overview','My Classes','My Results','Timetable','Attendance','My Attendance','Parent Liaison','Announcements','My Profile']
     : /secretary|office administrator/.test(role)
@@ -988,6 +986,7 @@ function App() {
     admission_date: new Date().toISOString().slice(0, 10), fee_amount: '', academic_level: '', combination: '', optional_subjects: '', subsidiary_subjects: '',
   })
   const [mobileMenu, setMobileMenu] = useState(false)
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false)
   const [admissionSettings, setAdmissionSettings] = useState<AdmissionSettings>({
     admission_prefix: 'SB', include_year: true, admission_separator: '-',
     admission_padding: 4, next_admission_number: 1,
@@ -1476,7 +1475,7 @@ function App() {
         </div>
         <div className="school-label">SCHOOL MANAGEMENT</div>
         <nav>
-          {(user.role === 'parent' ? parentMenu : user.role === 'admin' ? menu : isFinanceAccount(user) ? getStaffNavigation(user).filter(item => ['Overview','Fees & Finance','My Attendance','My Profile'].includes(item.label)) : getStaffNavigation(user)).map(item => {
+          {(user.role === 'parent' ? parentMenu : user.role === 'admin' ? menu : isFinanceAccount(user) ? getStaffNavigation(user).filter(item => ['Overview','Fees & Finance','My Attendance'].includes(item.label)) : getStaffNavigation(user)).map(item => {
             const Icon = item.icon
             return (
               <button key={item.label} className={`nav-item ${active === item.label ? 'active' : ''}`} title="Hold for 5 seconds to add this page to your Overview shortcuts" onPointerDown={() => beginShortcutHold(item.label)} onPointerUp={cancelShortcutHold} onPointerLeave={cancelShortcutHold} onPointerCancel={cancelShortcutHold} onContextMenu={event => event.preventDefault()} onClick={() => { if (longPressTriggered.current) { longPressTriggered.current = false; return } if (active !== item.label) setActive(item.label); setMobileMenu(false) }}>
@@ -1488,10 +1487,17 @@ function App() {
         </nav>
         <div className="sidebar-bottom">
           {user.role === 'admin' && <button className="nav-item" onClick={() => { if (active !== 'Settings') setActive('Settings') }}><Settings size={19} /> Settings</button>}
-          <div className="profile-card">
-            <div className="avatar">{user.username.slice(0, 1).toUpperCase()}</div>
-            <div className="profile-info"><strong>{user.username}</strong><small>{user.role}</small></div>
-            <button className="logout-button" title="Sign out" onClick={logout}><LogOut size={18} /></button>
+          <div className="sidebar-account-control">
+            {profileMenuOpen && <div className="sidebar-account-menu" role="menu">
+              {user.role !== 'parent' && user.role !== 'admin' && <button type="button" role="menuitem" onClick={() => { setActive('My Profile'); setProfileMenuOpen(false); setMobileMenu(false) }}><Contact size={17}/> My profile</button>}
+              {user.role === 'admin' && <button type="button" role="menuitem" onClick={() => { setActive('Settings'); setProfileMenuOpen(false); setMobileMenu(false) }}><Settings size={17}/> Settings</button>}
+              <button type="button" role="menuitem" onClick={() => { setProfileMenuOpen(false); logout() }}><LogOut size={17}/> Sign out</button>
+            </div>}
+            <button type="button" className="sidebar-account-trigger" aria-haspopup="menu" aria-expanded={profileMenuOpen} onClick={() => setProfileMenuOpen(value => !value)}>
+              <span className="avatar">{user.username.slice(0, 1).toUpperCase()}</span>
+              <span className="profile-info"><strong>Account</strong><small>{user.role_label || user.role}</small></span>
+              <span className="account-menu-indicator">{profileMenuOpen ? '−' : '+'}</span>
+            </button>
           </div>
         </div>
       </aside>
@@ -1512,8 +1518,6 @@ function App() {
               {isRefreshing ? <LoaderCircle className="spin" size={15} /> : <RefreshCw size={15} />}
               {isRefreshing ? 'Refreshing...' : 'Refresh'}
             </button>
-            <span className="top-user-name">{user.username}</span>
-            <div className="top-avatar">{user.username.slice(0, 1).toUpperCase()}</div>
           </div>
         </header>
 
