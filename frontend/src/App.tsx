@@ -1125,7 +1125,6 @@ function App() {
       !studentForm.class_id ? 'Class' : '',
       !studentForm.gender ? 'Gender' : '',
       !studentForm.guardian_name.trim() ? 'Parent / guardian name' : '',
-      !studentForm.guardian_phone.trim() ? 'Guardian phone number' : '',
       schoolConfig.school_type !== 'Primary' && selectedAcademicLevel === 'A-Level' && !studentForm.a_level_stream ? 'A-Level stream' : '',
       schoolConfig.school_type !== 'Primary' && selectedAcademicLevel === 'A-Level' && !studentForm.combination ? 'A-Level combination' : '',
     ].filter(Boolean)
@@ -1205,8 +1204,23 @@ function App() {
   }
 
   async function openStudentProfile(id:number) {
-    try { const result=await api<any>('students/'+id+'/profile',token); setStudentProfile(result); setProfileMessage('') }
+    try { const [result,contacts]=await Promise.all([api<any>('students/'+id+'/profile',token),api<any[]>('students/'+id+'/guardian-contacts',token)]); setStudentProfile({...result,guardian_contacts:contacts}); setProfileMessage('') }
     catch(error) { setDataError(error instanceof Error?error.message:'Unable to open student profile.') }
+  }
+
+  async function updateGuardianContactVerification(contactId:number,status:'school_verified'|'unverified'|'rejected') {
+    try {
+      const updated = await api<any>('guardian-contacts/'+contactId+'/verification',token,{
+        method:'PATCH',body:JSON.stringify({status}),
+      })
+      setStudentProfile((current:any)=>current?{
+        ...current,
+        guardian_contacts:(current.guardian_contacts||[]).map((contact:any)=>contact.id===contactId?updated:contact),
+      }:current)
+      setProfileMessage(status==='school_verified'?'Guardian phone marked as school-verified.':'Guardian phone verification updated.')
+    } catch(error) {
+      setProfileMessage(error instanceof Error?error.message:'Unable to update guardian verification.')
+    }
   }
 
   async function dismissStudent(id:number) {
@@ -1243,7 +1257,8 @@ function App() {
         guardian_phone:student.guardian_phone||null,guardian2_name:student.guardian2_name||null,guardian2_relationship:student.guardian2_relationship||null,guardian2_phone:student.guardian2_phone||null,study_mode:student.study_mode||'Day',house:student.house||null,previous_school:student.previous_school||null,
         admission_date:student.admission_date||null,class_id:student.class_id,photo_data:student.photo_data||null
       })})
-      setStudentProfile({...studentProfile,student:updated.student})
+      const contacts=await api<any[]>('students/'+student.id+'/guardian-contacts',token)
+      setStudentProfile({...studentProfile,student:updated.student,guardian_contacts:contacts})
       setProfileMessage('Student profile saved. Existing fee and academic records were retained.')
       await loadStudentPage(studentPage,search)
     } catch(error) {setProfileMessage(error instanceof Error?error.message:'Unable to save student profile.')}
@@ -1638,7 +1653,7 @@ function App() {
                     <div className="student-form-grid">
                       <label>Parent / guardian name *<input required autoComplete="name" value={studentForm.guardian_name} onChange={e => setStudentForm({ ...studentForm, guardian_name: e.target.value })} placeholder="Full name" /></label>
                       <label>Relationship<select value={studentForm.guardian_relationship} onChange={e => setStudentForm({ ...studentForm, guardian_relationship: e.target.value })}><option value="">Select relationship</option><option>Parent</option><option>Guardian</option><option>Other relative</option></select></label>
-                      <label>Guardian phone *<input required type="tel" autoComplete="tel" value={studentForm.guardian_phone} onChange={e => setStudentForm({ ...studentForm, guardian_phone: e.target.value })} placeholder="e.g. 07XX XXX XXX" /></label>
+                      <label>Guardian phone (if recorded)<input type="tel" autoComplete="tel" value={studentForm.guardian_phone} onChange={e => setStudentForm({ ...studentForm, guardian_phone: e.target.value })} placeholder="Optional — use the school record" /><small className="field-hint">Leave blank if the school has no verified number. Never invent one.</small></label>
                     </div>
                     <div className="form-section-heading" style={{marginTop:18}}><span className="form-section-number">+</span><div><h4>Additional parent / guardian</h4><p>Optional second guardian contact. Both guardians can share the single linked parent account.</p></div></div>
                     <div className="student-form-grid"><label>Second parent / guardian name<input value={studentForm.guardian2_name} onChange={e=>setStudentForm({...studentForm,guardian2_name:e.target.value})} placeholder="Full name"/></label><label>Relationship<select value={studentForm.guardian2_relationship} onChange={e=>setStudentForm({...studentForm,guardian2_relationship:e.target.value})}><option value="">Select relationship</option><option>Mother</option><option>Father</option><option>Guardian</option><option>Other relative</option></select></label><label>Phone number<input type="tel" value={studentForm.guardian2_phone} onChange={e=>setStudentForm({...studentForm,guardian2_phone:e.target.value})} placeholder="e.g. 07XX XXX XXX"/></label></div>
@@ -1701,6 +1716,15 @@ function App() {
                     <div><small>Relationship</small><strong>{studentProfile.student.guardian_relationship||'—'}</strong></div>
                     <div><small>Guardian phone</small><strong>{studentProfile.student.guardian_phone||'—'}</strong></div><div><small>Second guardian</small><strong>{studentProfile.student.guardian2_name||'—'}</strong></div><div><small>Second guardian relationship</small><strong>{studentProfile.student.guardian2_relationship||'—'}</strong></div><div><small>Second guardian phone</small><strong>{studentProfile.student.guardian2_phone||'—'}</strong></div><div><small>Study mode</small><strong>{studentProfile.student.study_mode||'Day'}</strong></div><div><small>House</small><strong>{studentProfile.student.house||'—'}</strong></div>
                   </div>
+                  <div className="panel-heading"><div><h3>Trusted guardian contacts</h3><p>Only numbers confirmed by the school can be used for parent identity verification.</p></div></div>
+                  <div className="table-wrap"><table><thead><tr><th>Guardian</th><th>Relationship</th><th>Recorded phone</th><th>School verification</th><th>Action</th></tr></thead><tbody>
+                    {(studentProfile.guardian_contacts||[]).map((contact:any)=><tr key={contact.id}>
+                      <td>{contact.guardian_name}</td><td>{contact.relationship||'—'}</td><td>{contact.phone||'Not recorded'}</td>
+                      <td><span className={contact.verification_status==='school_verified'?'status-pill success':'status-pill pending'}>{contact.verification_status==='school_verified'?'School verified':contact.verification_status==='rejected'?'Rejected':'Unverified'}</span></td>
+                      <td><button type="button" className="secondary-button" disabled={!contact.phone} onClick={()=>void updateGuardianContactVerification(contact.id,contact.verification_status==='school_verified'?'unverified':'school_verified')}>{contact.verification_status==='school_verified'?'Revoke verification':contact.phone?'Mark school-verified':'Phone missing'}</button></td>
+                    </tr>)}
+                    {!(studentProfile.guardian_contacts||[]).length&&<tr><td colSpan={5}>No guardian contacts are recorded.</td></tr>}
+                  </tbody></table></div>
                   <div className="panel-heading"><div><h3>Previous education</h3></div></div>
                   <div className="student-form-grid">
                     <div><small>Previous school</small><strong>{studentProfile.student.previous_school||'—'}</strong></div>
