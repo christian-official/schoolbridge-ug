@@ -366,7 +366,7 @@ PERMISSION_SECTIONS = {
 }
 PERMISSION_ACTIONS = {"view", "add", "edit", "delete", "approve", "print"}
 ADMIN_ONLY_PATHS = {
-    "/api/auth/users", "/api/auth/teachers", "/api/auth/permissions",
+    "/api/auth/users", "/api/auth/permissions",
     "/api/backups/restore",
 }
 
@@ -1734,13 +1734,6 @@ class LoginInput(BaseModel):
     password: str
 
 
-class TeacherCreate(BaseModel):
-    staff_id: int
-    username: str = Field(min_length=3, max_length=80)
-    email: str = Field(min_length=5, max_length=150)
-    password: str = Field(min_length=12)
-
-
 class AssignmentCreate(BaseModel):
     teacher_id: int
     class_id: int
@@ -2633,6 +2626,8 @@ def login(
 
     if not user or not user.is_active:
         raise HTTPException(401, "Incorrect username or password.")
+    if user.role in {"teacher", "parent"}:
+        raise HTTPException(403, "Teachers and parents access SchoolBridge by scanning their school's QR code.")
 
     if not password_hash.verify(data.password, user.hashed_password):
         raise HTTPException(401, "Incorrect username or password.")
@@ -2709,7 +2704,7 @@ def request_password_reset(data: PasswordResetRequest, db: Session = Depends(get
     resolve_school_tenant(db, data.school_id)
     user = find_password_recovery_account(db, data.identifier)
     now = datetime.utcnow()
-    if user and user.is_active and user.email and not user.email.endswith(".schoolbridge.local"):
+    if user and user.role in {"admin", "staff"} and user.is_active and user.email and not user.email.endswith(".schoolbridge.local"):
         if not user.reset_requested_at or (now - user.reset_requested_at).total_seconds() >= 60:
             code = f"{secrets.randbelow(1000000):06d}"
             user.reset_code_hash = password_hash.hash(code)
@@ -2733,7 +2728,7 @@ def confirm_password_reset(data: PasswordResetConfirm, db: Session = Depends(get
     resolve_school_tenant(db, data.school_id)
     user = find_password_recovery_account(db, data.identifier)
     now = datetime.utcnow()
-    if not user or not user.is_active or not user.reset_code_hash or not user.reset_expires_at or user.reset_expires_at < now or user.reset_attempts >= 5:
+    if not user or user.role not in {"admin", "staff"} or not user.is_active or not user.reset_code_hash or not user.reset_expires_at or user.reset_expires_at < now or user.reset_attempts >= 5:
         raise HTTPException(400, "The verification code is invalid or has expired. Request a new code.")
     if not password_hash.verify(data.code, user.reset_code_hash):
         user.reset_attempts += 1
@@ -3780,8 +3775,11 @@ def revoke_sync_device(
 @app.post("/api/auth/users/{user_id}/reset-password", tags=["User Management"])
 def admin_reset_user_password(user_id: int, db: Session = Depends(get_db), admin=Depends(require_admin)):
     target = db.get(models.User, user_id)
-    if not target or target.role not in {"teacher", "staff"}:
-        raise HTTPException(404, "Staff login account not found.")
+    if not target or target.role != "staff":
+        raise HTTPException(404, "Only designated non-teaching staff accounts use password resets.")
+    staff_profile = db.get(models.StaffMember, target.staff_id) if target.staff_id else None
+    if not staff_profile or staff_profile.category == "Teaching":
+        raise HTTPException(404, "Teaching staff use QR access and do not have password resets.")
     temporary_password = secrets.token_urlsafe(10)
     target.hashed_password = password_hash.hash(temporary_password)
     target.must_change_password = True
@@ -3792,45 +3790,6 @@ def admin_reset_user_password(user_id: int, db: Session = Depends(get_db), admin
     write_audit(db, admin, "staff_password_reset", "user", target.id, "Administrator issued a one-time temporary passcode.")
     db.commit()
     return {"message": "Temporary passcode generated. It is shown only once; the staff member must change it after signing in.", "username": target.username, "temporary_password": temporary_password}
-
-
-@app.post("/api/auth/teachers", tags=["User Management"])
-def create_teacher(
-    data: TeacherCreate,
-    db: Session = Depends(get_db),
-    admin=Depends(require_admin),
-):
-    staff = db.get(models.StaffMember, data.staff_id)
-    if not staff or staff.status != "active":
-        raise HTTPException(404, "Select an existing active staff member.")
-    if db.query(models.User).filter(models.User.staff_id == staff.id).first():
-        raise HTTPException(409, "This staff member already has a login account.")
-    role_type = "teacher" if staff.category == "Teaching" else "staff"
-    teacher = models.User(
-        username=data.username.strip(),
-        email=data.email.strip().lower(),
-        hashed_password=password_hash.hash(data.password),
-        role=role_type,
-        role_label=(staff.position or ("Teacher" if role_type == "teacher" else "Staff"))[:80],
-        staff_id=staff.id,
-    )
-    db.add(teacher)
-
-    try:
-        db.commit()
-        db.refresh(teacher)
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(
-            409, "Username or email is already registered."
-        )
-
-    return {
-        "id": teacher.id,
-        "username": teacher.username,
-        "email": teacher.email,
-        "role": teacher.role,
-    }
 
 
 class UserPermissionsUpdate(BaseModel):
@@ -3871,6 +3830,11 @@ def update_user_permissions(user_id: int, data: UserPermissionsUpdate, db: Sessi
             raise HTTPException(422, "Invalid permission action.")
         if actions:
             cleaned[section] = sorted(set(actions))
+    staff_profile = db.get(models.StaffMember, target.staff_id) if target.staff_id else None
+    if staff_profile:
+        expected_role = "teacher" if staff_profile.category == "Teaching" else "staff"
+        if data.role != expected_role:
+            raise HTTPException(422, "A staff account's login type must match its recorded teaching or non-teaching category.")
     if data.role == "teacher" and not any(k in cleaned for k in ("My Classes", "Attendance", "My Results")):
         raise HTTPException(422, "Teacher accounts must retain at least one teaching permission.")
     target.role = data.role
@@ -4699,6 +4663,7 @@ class StaffCreate(BaseModel):
     salary_amount: int | None = Field(default=None, ge=0)
     salary_frequency: str = Field(default="Monthly", pattern="^(Monthly|Termly|Weekly|Daily)$")
     house: str | None = None
+    create_login: bool = False
 
 def write_audit(db: Session, actor, action: str, entity_type: str, entity_id: int, details: str = ""):
     db.add(models.AuditLog(
@@ -5105,51 +5070,76 @@ def create_staff(data: StaffCreate, db: Session = Depends(get_db), admin=Depends
         raise HTTPException(422, "Enter the staff member's department.")
     if data.category == "Teaching" and (not data.subjects or not data.subjects.strip()):
         raise HTTPException(422, "Enter at least one subject taught by this teacher.")
-    # Generate a fresh staff number and login ID; never reject a new employee
-    # merely because their contact email is already used by another account.
+    if data.category == "Teaching" and data.create_login:
+        raise HTTPException(422, "Teachers use the school QR code; password accounts cannot be created for teaching staff.")
+
     staff_number = ""
     username = ""
     for _ in range(8):
         candidate = "STF-" + str(date.today().year) + "-" + uuid4().hex[:8].upper()
         candidate_username = candidate.lower()
-        if not db.query(models.StaffMember.id).filter_by(staff_number=candidate).first() and not db.query(models.User.id).filter_by(username=candidate_username).first():
-            staff_number, username = candidate, candidate_username
+        username_available = (
+            data.category == "Teaching"
+            or not data.create_login
+            or not db.query(models.User.id).filter_by(username=candidate_username).first()
+        )
+        if not db.query(models.StaffMember.id).filter_by(staff_number=candidate).first() and username_available:
+            staff_number = candidate
+            username = candidate_username
             break
     if not staff_number:
-        raise HTTPException(503, "A unique staff login could not be generated. Please try again.")
-    item = models.StaffMember(staff_number=staff_number, phone_source="school_record", **data.model_dump())
-    # Create the staff profile and login together so registration is one step.
+        raise HTTPException(503, "A unique staff number could not be generated. Please try again.")
+
+    item = models.StaffMember(
+        staff_number=staff_number,
+        phone_source="school_record",
+        **data.model_dump(exclude={"create_login"}),
+    )
+    db.add(item)
+
+    if data.category == "Teaching" or not data.create_login:
+        try:
+            db.commit()
+            db.refresh(item)
+        except IntegrityError:
+            db.rollback()
+            raise HTTPException(409, "The staff profile could not be saved because its staff number conflicts with an existing record.")
+        staff_data = {column.name: getattr(item, column.name) for column in item.__table__.columns}
+        return {
+            **staff_data,
+            "staff": staff_data,
+            "login": None,
+            "access_method": "school_qr" if data.category == "Teaching" else "no_login",
+            "message": (
+                "Teacher profile saved. Share the staff number and school QR code; the teacher registers and opens their dashboard directly after verification."
+                if data.category == "Teaching"
+                else "Staff profile saved. No password login account was created."
+            ),
+        }
+
+    # Only designated essential non-teaching staff receive password accounts.
     temporary_passcode = secrets.token_urlsafe(9)
-    account_role = "teacher" if data.category == "Teaching" else "staff"
     requested_email = (data.email or "").strip().lower()
     email_in_use = bool(requested_email and db.query(models.User.id).filter_by(email=requested_email).first())
     account_email = f"{username}@accounts.schoolbridge.local" if email_in_use or not requested_email else requested_email
-    if account_role == "teacher":
-        default_permissions = {
-            "Overview": ["view"], "My Classes": ["view"],
-            "My Attendance": ["view"], "My Results": ["view", "add", "edit"],
-            "Announcements": ["view"],
-        }
+    title = (data.position or "").strip().lower()
+    if "bursar" in title or "account" in title:
+        sections = ["Overview", "Fees & Finance"]
+    elif "secretary" in title or "admin" in title:
+        sections = ["Overview", "Students", "Staff", "Parent Access", "Announcements", "Reports"]
+    elif "head" in title or title == "dos" or "director of studies" in title:
+        sections = ["Overview", "Students", "Staff", "Examinations", "Attendance", "Timetable", "Leadership & Duty", "Announcements", "Reports"]
     else:
-        title = (data.position or "").strip().lower()
-        if "bursar" in title or "account" in title:
-            sections = ["Overview", "Fees & Finance"]
-        elif "secretary" in title or "admin" in title:
-            sections = ["Overview", "Students", "Staff", "Parent Access", "Announcements", "Reports"]
-        elif "head" in title or title == "dos" or "director of studies" in title:
-            sections = ["Overview", "Students", "Staff", "Examinations", "Attendance", "Timetable", "Leadership & Duty", "Announcements", "Reports"]
-        else:
-            sections = ["Overview"]
-        default_permissions = {section: ["view"] for section in sections}
+        sections = ["Overview"]
+    default_permissions = {section: ["view"] for section in sections}
     item_user = models.User(
         username=username,
         email=account_email,
         hashed_password=password_hash.hash(temporary_passcode),
-        role=account_role,
-        role_label=(data.position or ("Teacher" if account_role == "teacher" else "Staff"))[:80],
+        role="staff",
+        role_label=(data.position or "Staff")[:80],
         permissions_json=json.dumps(default_permissions),
     )
-    db.add(item)
     try:
         db.flush()
         item_user.staff_id = item.id
@@ -5159,8 +5149,7 @@ def create_staff(data: StaffCreate, db: Session = Depends(get_db), admin=Depends
     except IntegrityError:
         db.rollback()
         raise HTTPException(409, "The staff member was not saved because a unique staff number, username or login email conflicts with an existing account. The form is safe to retry; check whether this email is already assigned to another login.")
-    # Keep the original staff fields at the top level for existing API clients,
-    # while also returning the grouped staff/login objects used by the new UI.
+
     staff_data = {column.name: getattr(item, column.name) for column in item.__table__.columns}
     return {
         **staff_data,
@@ -5172,6 +5161,8 @@ def create_staff(data: StaffCreate, db: Session = Depends(get_db), admin=Depends
             "role": item_user.role,
             "role_label": item_user.role_label,
         },
+        "access_method": "password",
+        "message": "Essential non-teaching staff account created. Hand over the temporary passcode securely.",
     }
 
 
