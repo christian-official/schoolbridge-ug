@@ -134,6 +134,7 @@ test('QR access opens the correct school registration flow on a mobile viewport 
     assert.ok(apiRequests.length >= 3, 'setup, school identity and registration should call the API')
     assert.ok(apiRequests.every(request => request.origin === configuredApiOrigin), `every QR flow request must use the configured shared API origin: ${JSON.stringify(apiRequests)}`)
 
+    await page.getByRole('button', { name: 'Open navigation menu' }).click()
     await page.getByRole('button', { name: 'Sign out' }).click()
     await page.getByRole('heading', { name: 'Join your school' }).waitFor()
     assert.equal(await page.getByLabel('Password').count(), 0, 'a signed-out parent must return to passwordless QR verification')
