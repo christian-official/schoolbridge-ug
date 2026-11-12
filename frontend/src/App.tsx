@@ -1334,6 +1334,20 @@ function App() {
   }, [token, user, sessionError])
 
   useEffect(() => {
+    if (!token || !user) return
+    const deviceId = localStorage.getItem('schoolbridge-sync-device-' + user.id)
+    if (!deviceId) return
+    void clearLocalSyncData(user.id, deviceId).catch(() => {})
+    localStorage.removeItem('schoolbridge-offline-snapshot-meta-' + user.id + '-' + deviceId)
+    try {
+      const legacyIndex = JSON.parse(localStorage.getItem('schoolbridge-offline-login-index') || 'null')
+      if (legacyIndex?.userId === user.id && legacyIndex?.deviceId === deviceId) localStorage.removeItem('schoolbridge-offline-login-index')
+    } catch {
+      localStorage.removeItem('schoolbridge-offline-login-index')
+    }
+  }, [token, user?.id])
+
+  useEffect(() => {
     if (!token || !user || serverConnection !== 'connected') return
     const deviceId = localStorage.getItem('schoolbridge-sync-device-' + user.id)
     if (!deviceId) { setSyncDeviceRevoked(false); return }
