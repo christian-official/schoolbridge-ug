@@ -764,3 +764,34 @@
     -webkit-overflow-scrolling: touch;
   }
 }
+
+/* Keep sign-out inside the profile area, clearly separate from profile navigation. */
+.redesigned-app-shell > .sidebar .sidebar-signout-button {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  width: 100%;
+  min-height: 42px;
+  margin-top: 8px;
+  padding: 9px 14px;
+  border: 1px solid #ffffff30;
+  border-radius: 11px;
+  background: #ffffff0d;
+  color: #ffffffdf;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+  transition: background .18s ease, border-color .18s ease;
+}
+.redesigned-app-shell > .sidebar .sidebar-signout-button:hover,
+.redesigned-app-shell > .sidebar .sidebar-signout-button:focus-visible {
+  background: #ffffff20;
+  border-color: #ffffff70;
+}
+.redesigned-app-shell > .sidebar .sidebar-signout-button:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
