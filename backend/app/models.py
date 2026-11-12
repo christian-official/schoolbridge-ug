@@ -164,6 +164,7 @@ class ClassTeacherAssignment(Base):
 
 class SchoolSettings(Base):
     __tablename__ = "school_settings"
+    __table_args__ = (UniqueConstraint("school_tenant_id", name="uq_school_settings_tenant"),)
 
     school_tenant_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1", index=True)
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -270,6 +271,7 @@ class AuditLog(Base):
 
 class SchoolProfile(Base):
     __tablename__ = "school_profile"
+    __table_args__ = (UniqueConstraint("school_tenant_id", name="uq_school_profile_tenant"),)
     school_tenant_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1", index=True)
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(160), default="My School")
@@ -462,6 +464,7 @@ class SyncChange(Base):
 class SchoolSetupState(Base):
     """Persistent installation activation and first-time setup state."""
     __tablename__ = "school_setup_state"
+    __table_args__ = (UniqueConstraint("school_tenant_id", name="uq_school_setup_state_tenant"),)
 
     school_tenant_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1", index=True)
     id: Mapped[int] = mapped_column(primary_key=True)

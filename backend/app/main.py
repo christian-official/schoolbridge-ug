@@ -68,6 +68,23 @@ JWT_ALGORITHM = "HS256"
 TOKEN_HOURS = 8
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
+def get_current_tenant_id(db: Session) -> int:
+    """Return the tenant already selected for this database session.
+
+    Unauthenticated local-installation flows retain tenant 1 until the
+    explicit public school-selection flow is introduced.
+    """
+    return int(db.info.get("school_tenant_id", 1))
+
+
+def get_tenant_singleton(db: Session, model):
+    """Load a school's one-per-tenant profile, settings, or setup record."""
+    return db.query(model).filter(
+        model.school_tenant_id == get_current_tenant_id(db)
+    ).order_by(model.id).first()
+
+
+
 
 def token_version_matches(payload, user) -> bool:
     """Reject tokens issued before the account's most recent session revocation."""
@@ -260,9 +277,9 @@ def seed_demo_data_if_empty():
         return
     db = SessionLocal()
     try:
-        profile = db.get(models.SchoolProfile, 1)
+        profile = get_tenant_singleton(db, models.SchoolProfile)
         if profile is None:
-            profile = models.SchoolProfile(id=1, name="SchoolBridge Demo School", school_type="Secondary")
+            profile = models.SchoolProfile(school_tenant_id=get_current_tenant_id(db), name="SchoolBridge Demo School", school_type="Secondary")
             db.add(profile)
             db.flush()
         school_type = profile.school_type or "Secondary"
@@ -608,9 +625,9 @@ class AdmissionSettingsUpdate(BaseModel):
 
 
 def get_or_create_school_settings(db: Session):
-    settings = db.get(models.SchoolSettings, 1)
+    settings = get_tenant_singleton(db, models.SchoolSettings)
     if settings is None:
-        settings = models.SchoolSettings(id=1)
+        settings = models.SchoolSettings(school_tenant_id=get_current_tenant_id(db))
         db.add(settings)
         db.commit()
         db.refresh(settings)
@@ -869,7 +886,7 @@ def list_classes(db: Session = Depends(get_db)):
 
 @app.post("/api/subjects", response_model=SubjectOut, tags=["Subjects"])
 def create_subject(data: SubjectCreate, db: Session = Depends(get_db)):
-    profile = db.get(models.SchoolProfile, 1)
+    profile = get_tenant_singleton(db, models.SchoolProfile)
     school_type = profile.school_type if profile else "Secondary"
     if school_type == "Combined":
         if data.school_type not in {"Primary", "Secondary"}:
@@ -898,7 +915,7 @@ def create_subject(data: SubjectCreate, db: Session = Depends(get_db)):
 
 @app.get("/api/subjects", response_model=list[SubjectOut], tags=["Subjects"])
 def list_subjects(db: Session = Depends(get_db)):
-    profile = db.get(models.SchoolProfile, 1)
+    profile = get_tenant_singleton(db, models.SchoolProfile)
     school_type = profile.school_type if profile else "Secondary"
     allowed_types = ["Primary", "Secondary"] if school_type == "Combined" else [school_type]
     return db.query(models.Subject).filter(
@@ -923,7 +940,7 @@ def create_student(data: StudentCreate, db: Session = Depends(get_db), admin=Dep
     selected_class = db.get(models.SchoolClass, data.class_id)
     if not selected_class:
         raise HTTPException(404, "Choose a valid class.")
-    profile = db.get(models.SchoolProfile, 1)
+    profile = get_tenant_singleton(db, models.SchoolProfile)
     school_type = profile.school_type if profile else "Secondary"
     class_label = re.sub(r"[\s._-]+", "", selected_class.name.lower())
     level_match = re.search(r"(?:senior|s)?([1-6])$", class_label)
@@ -958,7 +975,7 @@ def create_student(data: StudentCreate, db: Session = Depends(get_db), admin=Dep
             settings = get_or_create_school_settings(db)
             next_value = db.execute(
                 update(models.SchoolSettings)
-                .where(models.SchoolSettings.id == 1)
+                .where(models.SchoolSettings.school_tenant_id == get_current_tenant_id(db))
                 .values(next_admission_number=models.SchoolSettings.next_admission_number + 1)
                 .returning(models.SchoolSettings.next_admission_number)
             ).scalar_one() - 1
@@ -1356,7 +1373,7 @@ def bootstrap_initial_admin():
     """Retain legacy environment bootstrap only for already-initialised installations."""
     setup_probe = SessionLocal()
     try:
-        setup_state = setup_probe.get(models.SchoolSetupState, 1)
+        setup_state = get_tenant_singleton(setup_probe, models.SchoolSetupState)
         if not setup_state or not setup_state.setup_completed_at:
             return
     finally:
@@ -1380,7 +1397,7 @@ def bootstrap_initial_admin():
 
     db = SessionLocal()
     try:
-        setup_state = db.get(models.SchoolSetupState, 1)
+        setup_state = get_tenant_singleton(db, models.SchoolSetupState)
         if not setup_state or not setup_state.setup_completed_at:
             return
         if db.query(models.User).count() == 0:
@@ -2001,7 +2018,7 @@ async def protect_school_data(request: Request, call_next):
 
     setup_db = SessionLocal()
     try:
-        setup_state = setup_db.get(models.SchoolSetupState, 1)
+        setup_state = setup_get_tenant_singleton(db, models.SchoolSetupState)
         if not setup_state or not setup_state.setup_completed_at:
             return JSONResponse({"detail": "Complete SchoolBridge first-time setup before accessing school records."}, status_code=403)
     finally:
@@ -2117,9 +2134,9 @@ class FirstSchoolSetupRequest(BaseModel):
 
 
 def get_or_create_setup_state(db: Session):
-    state = db.get(models.SchoolSetupState, 1)
+    state = get_tenant_singleton(db, models.SchoolSetupState)
     if state is None:
-        state = models.SchoolSetupState(id=1, installation_id=str(uuid4()))
+        state = models.SchoolSetupState(school_tenant_id=get_current_tenant_id(db), installation_id=str(uuid4()))
         db.add(state)
         db.commit()
         db.refresh(state)
@@ -2137,7 +2154,7 @@ def apply_school_identity_correction(
     db: Session = Depends(get_db),
     admin=Depends(require_admin),
 ):
-    state = db.get(models.SchoolSetupState, 1)
+    state = get_tenant_singleton(db, models.SchoolSetupState)
     if not state or not state.setup_completed_at or not state.original_identity_json:
         raise HTTPException(409, "There is no protected school identity to correct.")
     try:
@@ -2158,7 +2175,7 @@ def apply_school_identity_correction(
     school_structure = identity.get("school_structure")
     if not school_name or len(school_name) > 160 or school_type not in {"Primary", "Secondary", "Combined"} or not country or len(country) > 80 or school_structure not in {"Day", "Boarding", "Both"}:
         raise HTTPException(422, "The signed school identity details are incomplete or invalid.")
-    profile = db.get(models.SchoolProfile, 1)
+    profile = get_tenant_singleton(db, models.SchoolProfile)
     if not profile:
         raise HTTPException(404, "School profile not found.")
     old_identity = {
@@ -2229,6 +2246,7 @@ def activate_school_installation(data: SchoolActivationRequest, db: Session = De
     state.activation_attempts = 0
     state.activation_locked_until = None
     db.add(models.AuditLog(
+        school_tenant_id=state.school_tenant_id,
         actor_id=None, actor_username="SchoolBridge Owner",
         action="installation_activated", entity_type="school_setup",
         entity_id=state.id, details="Owner-signed activation license accepted.",
@@ -2246,7 +2264,7 @@ def complete_first_school_setup(data: FirstSchoolSetupRequest, db: Session = Dep
         raise HTTPException(403, "The owner activation license used for this installation is required to create the first administrator.")
     if state.setup_completed_at or db.query(models.User).count():
         raise HTTPException(409, "First-time setup has already been completed.")
-    if db.get(models.SchoolProfile, 1):
+    if get_tenant_singleton(db, models.SchoolProfile):
         raise HTTPException(409, "A school profile already exists. Contact the SchoolBridge owner for assistance.")
     if db.query(models.User).filter(
         or_(models.User.username == data.admin_username, models.User.email == data.admin_email)
@@ -2255,7 +2273,7 @@ def complete_first_school_setup(data: FirstSchoolSetupRequest, db: Session = Dep
     if data.report_logo and not re.fullmatch(r"data:image/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+", data.report_logo):
         raise HTTPException(422, "School logo must be a PNG, JPEG or WebP image uploaded through the setup form.")
     profile = models.SchoolProfile(
-        id=1, name=data.school_name.strip(), school_type=data.school_type,
+        school_tenant_id=get_current_tenant_id(db), name=data.school_name.strip(), school_type=data.school_type,
         country=data.country.strip(), school_structure=data.school_structure,
         address=data.address, phone=data.phone, email=data.email, motto=data.motto,
         report_logo=data.report_logo, house_names=data.house_names,
@@ -2289,7 +2307,7 @@ def login(
     data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
-    state = db.get(models.SchoolSetupState, 1)
+    state = get_tenant_singleton(db, models.SchoolSetupState)
     if not state or not state.setup_completed_at:
         raise HTTPException(403, "SchoolBridge first-time setup must be completed before signing in.")
     login_name = data.username.strip()
@@ -2455,8 +2473,8 @@ def current_account(user=Depends(get_current_user)):
 
 @app.get("/api/public/school", tags=["Public School Identity"])
 def public_school_identity(db: Session = Depends(get_db)):
-    state = db.get(models.SchoolSetupState, 1)
-    profile = db.get(models.SchoolProfile, 1)
+    state = get_tenant_singleton(db, models.SchoolSetupState)
+    profile = get_tenant_singleton(db, models.SchoolProfile)
     if not state or not state.setup_completed_at or not profile:
         raise HTTPException(404, "School identity is not available.")
     return {
@@ -2474,7 +2492,7 @@ def school_access_qr(
     db: Session = Depends(get_db),
     admin=Depends(require_admin),
 ):
-    state = db.get(models.SchoolSetupState, 1)
+    state = get_tenant_singleton(db, models.SchoolSetupState)
     if not state or not state.setup_completed_at:
         raise HTTPException(409, "Complete school setup before creating an access QR code.")
     parsed = urlsplit(origin)
@@ -2513,7 +2531,7 @@ def create_enrolment_invitation(
     db: Session = Depends(get_db),
     admin=Depends(require_admin),
 ):
-    state = db.get(models.SchoolSetupState, 1)
+    state = get_tenant_singleton(db, models.SchoolSetupState)
     if not state or not state.setup_completed_at:
         raise HTTPException(409, "Complete school setup before issuing device enrolment invitations.")
     target = db.get(models.User, data.user_id)
@@ -2599,7 +2617,7 @@ def redeem_enrolment_invitation(
         raise HTTPException(404, "The enrolment invitation is invalid or unavailable.")
     if invitation.target_user_id != user.id:
         raise HTTPException(403, "This invitation was issued for another account.")
-    state = db.get(models.SchoolSetupState, 1)
+    state = get_tenant_singleton(db, models.SchoolSetupState)
     if not state or invitation.installation_id != state.installation_id:
         raise HTTPException(403, "This invitation belongs to another school installation.")
     claimed = db.query(models.EnrolmentInvitation).filter(
@@ -4572,7 +4590,7 @@ def school_community(db: Session = Depends(get_db), user=Depends(get_current_use
         models.StaffMember.status == "active"
     ).order_by(models.StaffMember.first_name, models.StaffMember.last_name).all()
     house_names = []
-    profile = db.get(models.SchoolProfile, 1)
+    profile = get_tenant_singleton(db, models.SchoolProfile)
     if profile and profile.house_names:
         house_names = [name.strip() for name in profile.house_names.splitlines() if name.strip()]
     house_names = sorted(set(house_names) | {
@@ -5524,9 +5542,9 @@ class SchoolProfileUpdate(BaseModel):
 
 @app.get("/api/settings/school-profile", tags=["School Settings"])
 def get_school_profile(db: Session = Depends(get_db)):
-    profile = db.get(models.SchoolProfile, 1)
+    profile = get_tenant_singleton(db, models.SchoolProfile)
     if profile is None:
-        profile = models.SchoolProfile(id=1)
+        profile = models.SchoolProfile(school_tenant_id=get_current_tenant_id(db))
         db.add(profile)
         db.commit()
         db.refresh(profile)
@@ -5535,15 +5553,15 @@ def get_school_profile(db: Session = Depends(get_db)):
 
 @app.put("/api/settings/school-profile", tags=["School Settings"])
 def save_school_profile(data: SchoolProfileUpdate, db: Session = Depends(get_db), admin=Depends(require_admin)):
-    profile = db.get(models.SchoolProfile, 1)
+    profile = get_tenant_singleton(db, models.SchoolProfile)
     if profile is None:
-        profile = models.SchoolProfile(id=1)
+        profile = models.SchoolProfile(school_tenant_id=get_current_tenant_id(db))
         db.add(profile)
     updates = data.model_dump(exclude_unset=True)
     for optional_identity_field in ("country", "school_structure"):
         if optional_identity_field in updates and not updates[optional_identity_field]:
             updates[optional_identity_field] = None
-    state = db.get(models.SchoolSetupState, 1)
+    state = get_tenant_singleton(db, models.SchoolSetupState)
     if state and state.setup_completed_at and state.original_identity_json:
         # Protect the current registered identity, not the immutable first-install
         # snapshot. Owner-authorised corrections update the current profile while

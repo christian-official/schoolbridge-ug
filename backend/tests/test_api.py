@@ -3581,3 +3581,43 @@ def test_school_business_identifiers_are_unique_within_each_tenant():
         with pytest.raises(IntegrityError):
             db.commit()
         db.rollback()
+
+
+def test_school_profile_settings_and_setup_state_are_tenant_singletons():
+    reset_database()
+    with SessionLocal() as db:
+        set_tenant_context(db, 1)
+        first_state = main_module.get_or_create_setup_state(db)
+        first_settings = main_module.get_or_create_school_settings(db)
+        first_state_id, first_settings_id = first_state.id, first_settings.id
+        assert first_state.school_tenant_id == 1
+        assert first_settings.school_tenant_id == 1
+        assert main_module.get_tenant_singleton(db, models.SchoolProfile) is None
+
+    with SessionLocal() as db:
+        db.add(models.SchoolTenant(
+            public_id="00000000-0000-4000-8000-000000000777",
+            name="Second School", status="active",
+        ))
+        db.commit()
+        tenant_id = db.query(models.SchoolTenant.id).filter_by(
+            public_id="00000000-0000-4000-8000-000000000777"
+        ).scalar()
+        set_tenant_context(db, tenant_id)
+        second_state = main_module.get_or_create_setup_state(db)
+        second_settings = main_module.get_or_create_school_settings(db)
+        second_profile = models.SchoolProfile(
+            school_tenant_id=tenant_id, name="Second School",
+            school_type="Primary",
+        )
+        db.add(second_profile)
+        db.commit()
+        assert second_state.id != first_state_id
+        assert second_settings.id != first_settings_id
+        assert main_module.get_tenant_singleton(db, models.SchoolProfile).name == "Second School"
+
+    with SessionLocal() as db:
+        set_tenant_context(db, 1)
+        assert main_module.get_tenant_singleton(db, models.SchoolProfile) is None
+        assert main_module.get_tenant_singleton(db, models.SchoolSetupState).id == first_state_id
+        assert main_module.get_tenant_singleton(db, models.SchoolSettings).id == first_settings_id
