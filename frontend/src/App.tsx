@@ -2,7 +2,7 @@ import { fetchSchoolBridge } from './offlineNetwork'
 import { useEffect, useRef, useState } from 'react'
 import {
   LayoutDashboard, Users, GraduationCap, BookOpen,
-  FileText, Settings, LogOut,
+  FileText, Settings,
   Search, Plus, Menu, X, ArrowUpRight, UserPlus,
   CalendarDays, TrendingUp, ShieldCheck, LoaderCircle, RefreshCw,
   Contact, Megaphone, Briefcase, Clock, FolderOpen, CalendarCheck, CheckCircle2, UserX, MessageSquareText, Wifi, WifiOff,
