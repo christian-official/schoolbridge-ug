@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Download, Share, X } from 'lucide-react'
+import { Download, Share, WifiOff, X } from 'lucide-react'
 import './PWAInstallPrompt.css'
 
 type InstallPromptEvent = Event & {
@@ -9,12 +9,23 @@ type InstallPromptEvent = Event & {
 
 export default function PWAInstallPrompt() {
   const [installEvent, setInstallEvent] = useState<InstallPromptEvent | null>(null)
+  const [isOffline, setIsOffline] = useState(() => !navigator.onLine)
   const [isAppleMobile, setIsAppleMobile] = useState(false)
   const [showAppleSteps, setShowAppleSteps] = useState(false)
   const [dismissed, setDismissed] = useState(false)
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null)
   const [applyingUpdate, setApplyingUpdate] = useState(false)
   const applyingUpdateRef = useRef(false)
+
+  useEffect(() => {
+    const updateConnection = () => setIsOffline(!navigator.onLine)
+    window.addEventListener('online', updateConnection)
+    window.addEventListener('offline', updateConnection)
+    return () => {
+      window.removeEventListener('online', updateConnection)
+      window.removeEventListener('offline', updateConnection)
+    }
+  }, [])
 
   useEffect(() => {
     const handleUpdate = (event: Event) => {
@@ -73,10 +84,13 @@ export default function PWAInstallPrompt() {
     if (choice.outcome === 'accepted') setDismissed(true)
   }
 
-  if ((dismissed && !waitingWorker) || (!installEvent && !isAppleMobile && !waitingWorker)) return null
+  const hideInstallCard = (dismissed && !waitingWorker) || (!installEvent && !isAppleMobile && !waitingWorker)
+  if (hideInstallCard && !isOffline) return null
 
   return (
-    <aside className="pwa-install-card" aria-label="Install SchoolBridge">
+    <>
+      {isOffline && <div className="pwa-offline-banner" role="status" aria-live="polite"><WifiOff size={17} /><span><strong>You're offline.</strong> SchoolBridge's saved app shell is available. Use a prepared offline workspace for saved records; changes requiring the server need a connection.</span></div>}
+      {!hideInstallCard && <aside className="pwa-install-card" aria-label="Install SchoolBridge">
       <div className="pwa-install-icon"><Download size={19} /></div>
       <div className="pwa-install-copy">
         {waitingWorker ? <><strong>SchoolBridge update ready</strong><span>Refresh the app to use the latest version.</span></> : <><strong>Use SchoolBridge like an app</strong><span>{isAppleMobile ? 'Add a SchoolBridge icon to your iPhone or iPad.' : 'Install SchoolBridge on this device for quick access.'}</span></>}
@@ -94,6 +108,7 @@ export default function PWAInstallPrompt() {
         </button>
       )}
       <button type="button" className="pwa-dismiss" aria-label="Dismiss install suggestion" onClick={() => setDismissed(true)}><X size={17} /></button>
-    </aside>
+      </aside>}
+    </>
   )
 }

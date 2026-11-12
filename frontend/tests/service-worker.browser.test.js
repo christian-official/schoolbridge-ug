@@ -76,6 +76,8 @@ test('real Chromium verifies the offline service-worker boundary', async () => {
     await context.setOffline(true)
     await page.goto(new URL('/students', baseUrl).toString())
     assert.equal(await page.title(), 'SchoolBridge', 'offline navigation should fall back to the app shell')
+    await page.getByRole('status').filter({ hasText: "You're offline." }).waitFor()
+    assert.equal(await page.getByText('Unable to check setup').count(), 0, 'offline startup should show guidance instead of a network error')
     await page.waitForFunction(
       () => document.querySelector('#root')?.childElementCount > 0,
       { timeout: 5000 },
