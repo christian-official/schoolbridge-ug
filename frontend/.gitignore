@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Generated, fully populated Tauri backend/runtime resources
+desktop-resources/
