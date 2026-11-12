@@ -846,7 +846,26 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::{is_healthy_response, Ipv4Addr};
+    use super::{is_healthy_response, resolve_resource_root, Ipv4Addr};
+
+    #[test]
+    fn packaged_resources_resolve_only_when_runtime_backend_and_frontend_exist() {
+        let root = std::env::temp_dir().join(format!(
+            "schoolbridge-tauri-resource-test-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("runtime")).expect("create runtime directory");
+        std::fs::create_dir_all(root.join("backend/app/static")).expect("create backend directory");
+        std::fs::write(root.join("runtime/python.exe"), b"test runtime").expect("write runtime marker");
+        std::fs::write(root.join("backend/app/main.py"), b"# backend").expect("write backend marker");
+        std::fs::write(root.join("backend/app/static/index.html"), b"<!doctype html>").expect("write frontend marker");
+
+        let resolved = resolve_resource_root(&root).expect("complete packaged resources should resolve");
+        assert_eq!(resolved, root);
+
+        std::fs::remove_dir_all(&root).expect("remove temporary resources");
+    }
 
     #[cfg(windows)]
     #[test]
