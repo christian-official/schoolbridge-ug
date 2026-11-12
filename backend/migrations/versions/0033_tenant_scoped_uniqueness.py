@@ -87,6 +87,12 @@ CHANGES = [
 
 def upgrade():
     bind = op.get_bind()
+    inspector = inspect(bind)
+    if "fee_payments" in set(inspector.get_table_names()):
+        fee_payment_columns = {column["name"] for column in inspector.get_columns("fee_payments")}
+        if "receipt_number" not in fee_payment_columns:
+            from sqlalchemy import Column, String
+            op.add_column("fee_payments", Column("receipt_number", String(50), nullable=True))
     if bind.dialect.name == "sqlite":
         # Keep FK checks deferred while SQLite rebuilds tables that may be
         # referenced by other school-owned tables in the same migration.

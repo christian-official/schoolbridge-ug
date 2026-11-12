@@ -4541,7 +4541,6 @@ def upgrade_existing_database():
         if "fee_payments" in inspector.get_table_names() and "receipt_number" not in payment_columns:
             connection.execute(text("ALTER TABLE fee_payments ADD COLUMN receipt_number VARCHAR(50)"))
         if "fee_payments" in inspector.get_table_names():
-            connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_fee_payments_receipt_number ON fee_payments (receipt_number)"))
         if "school_profile" in inspector.get_table_names():
             profile_columns = {c["name"] for c in inspector.get_columns("school_profile")}
             profile_additions = {"school_type": "VARCHAR(20) NOT NULL DEFAULT 'Secondary'", "a_level_combinations": "TEXT", "o_level_optional_subjects": "TEXT", "a_level_subsidiary_subjects": "TEXT", "house_names": "TEXT"}
@@ -4564,6 +4563,13 @@ def upgrade_class_stream_uniqueness():
         return
     uniques = inspector.get_unique_constraints("classes")
     unique_indexes = [i for i in inspector.get_indexes("classes") if i.get("unique")]
+    class_columns = {column["name"] for column in inspector.get_columns("classes")}
+    if "school_tenant_id" not in class_columns:
+        raise RuntimeError("Class stream migration requires the school tenant migration to run first.")
+    tenant_unique_exists = (
+        any(u.get("column_names") == ["school_tenant_id", "name", "section"] for u in uniques)
+        or any(i.get("column_names") == ["school_tenant_id", "name", "section"] for i in unique_indexes)
+    )
     name_only = (any(u.get("column_names") == ["name"] for u in uniques)
                  or any(i.get("column_names") == ["name"] for i in unique_indexes))
     if not name_only:
@@ -4581,12 +4587,13 @@ def upgrade_class_stream_uniqueness():
             raw.execute("PRAGMA foreign_keys=OFF")
             raw.execute("BEGIN")
             raw.execute("""CREATE TABLE classes_new (
+                school_tenant_id INTEGER NOT NULL DEFAULT 1,
                 id INTEGER NOT NULL PRIMARY KEY,
                 name VARCHAR(80) NOT NULL,
                 section VARCHAR(40) NOT NULL DEFAULT 'General',
-                CONSTRAINT uq_classes_name_section UNIQUE (name, section)
+                CONSTRAINT uq_classes_tenant_name_section UNIQUE (school_tenant_id, name, section)
             )""")
-            raw.execute("INSERT INTO classes_new (id,name,section) SELECT id,name,COALESCE(section,'General') FROM classes")
+            raw.execute("INSERT INTO classes_new (school_tenant_id,id,name,section) SELECT school_tenant_id,id,name,COALESCE(section,'General') FROM classes")
             raw.execute("DROP TABLE classes")
             raw.execute("ALTER TABLE classes_new RENAME TO classes")
             raw.execute("CREATE INDEX ix_classes_name ON classes (name)")
@@ -4611,7 +4618,8 @@ def upgrade_class_stream_uniqueness():
                     connection.execute(text('DROP INDEX IF EXISTS "' + index["name"] + '"'))
             connection.execute(text("ALTER TABLE classes ALTER COLUMN section SET DEFAULT 'General'"))
             connection.execute(text("ALTER TABLE classes ALTER COLUMN section SET NOT NULL"))
-            connection.execute(text("ALTER TABLE classes ADD CONSTRAINT uq_classes_name_section UNIQUE (name, section)"))
+            if not tenant_unique_exists:
+                connection.execute(text("ALTER TABLE classes ADD CONSTRAINT uq_classes_tenant_name_section UNIQUE (school_tenant_id, name, section)"))
 
 upgrade_class_stream_uniqueness()
 
