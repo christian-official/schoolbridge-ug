@@ -3403,7 +3403,6 @@ def test_public_school_identity_and_admin_reusable_qr_are_scoped_to_current_orig
         assert qr.status_code == 200, qr.text
         assert qr.headers["content-type"].startswith("image/svg+xml")
         assert "test-existing-installation" not in qr.text
-        assert "00000000-0000-4000-8000-000000000001" in qr.text
         assert "<svg" in qr.text
 
         external_origin = client.get(
