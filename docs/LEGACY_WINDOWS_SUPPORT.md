@@ -79,6 +79,10 @@ These facts narrow the feasible deployment options and supersede any assumption 
 - Windows 8.1 can technically run a currently security-maintained CPython 3.12 runtime, but that does not make the Windows 8.1 operating system secure or supported. A native host prototype still requires an explicit risk decision and real-machine validation.
 - Microsoft Edge 109 was the final Edge release for Windows 8/8.1 and is no longer maintained. No external browser is accepted as the SchoolBridge desktop shell. The eventual desktop package must provide its own supported rendering/runtime layer (or a fully native UI) and prove compatibility on each target OS; an ordinary browser smoke test is not desktop acceptance.
 
+## D1 runtime feasibility decision
+
+See [Windows desktop runtime feasibility](WINDOWS_DESKTOP_RUNTIME_FEASIBILITY.md). The current Tauri 2/WebView2 stack is a no-go for Windows 8.0 and 8.1 because the available WebView2 runtime for those systems is frozen at version 109 and no longer receives security updates. Windows 8.0 also has no supported CPython 3.12 runtime. Keep both legacy OS targets blocked / not certified; do not bypass OS checks or ship obsolete browser/runtime components. Continue supported-Windows desktop packaging separately without treating it as completion of the legacy requirement.
+
 ## Confirmed product requirement: native installation on both legacy systems
 
 The product owner has explicitly confirmed that **Windows 8.0 and Windows 8.1 must each receive a directly installable SchoolBridge package**. Browser-only access through another computer is not an acceptable completion of this requirement.
