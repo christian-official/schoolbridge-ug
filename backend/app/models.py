@@ -82,8 +82,8 @@ class StudentGuardianContact(Base):
     verification_status: Mapped[str] = mapped_column(String(20), default="unverified", server_default="unverified")
     verified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     verified_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    is_primary: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
-    active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1")
+    is_primary: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
