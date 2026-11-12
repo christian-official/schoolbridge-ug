@@ -11,6 +11,7 @@ os.environ["SCHOOLBRIDGE_SECRET_KEY"] = "test-only-secret-key-that-is-not-used-i
 from fastapi.testclient import TestClient
 from types import SimpleNamespace
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 
 from app.database import Base, engine, SessionLocal, set_tenant_context
 from app.main import app, create_access_token, password_hash
@@ -3541,3 +3542,49 @@ def test_orm_sessions_are_scoped_to_one_school_and_reject_cross_tenant_writes():
         set_tenant_context(db, 2)
         visible = db.query(models.Student).all()
         assert [student.last_name for student in visible] == ["Two"]
+
+
+def test_school_business_identifiers_are_unique_within_each_tenant():
+    reset_database()
+    with SessionLocal() as db:
+        db.add_all([
+            models.SchoolClass(name="Primary 5", section="Blue", school_tenant_id=1),
+            models.SchoolClass(name="Primary 5", section="Blue", school_tenant_id=2),
+            models.Subject(name="Mathematics", school_type="Secondary", school_tenant_id=1),
+            models.Subject(name="Mathematics", school_type="Secondary", school_tenant_id=2),
+            models.Student(admission_number="ADM-001", first_name="Amina", last_name="One", school_tenant_id=1),
+            models.Student(admission_number="ADM-001", first_name="Brian", last_name="Two", school_tenant_id=2),
+            models.GradeBand(grade="A", min_score=80, max_score=100, school_tenant_id=1),
+            models.GradeBand(grade="A", min_score=80, max_score=100, school_tenant_id=2),
+            models.StaffMember(staff_number="ST-001", first_name="Alex", last_name="One", school_tenant_id=1),
+            models.StaffMember(staff_number="ST-001", first_name="Alex", last_name="Two", school_tenant_id=2),
+            models.FeePayment(charge_id=1, amount=100, receipt_number="RCPT-001", school_tenant_id=1),
+            models.FeePayment(charge_id=2, amount=100, receipt_number="RCPT-001", school_tenant_id=2),
+        ])
+        # FeePayment references real charges; create them before inserting payments.
+        db.rollback()
+        first_student = models.Student(admission_number="ADM-001", first_name="Amina", last_name="One", school_tenant_id=1)
+        second_student = models.Student(admission_number="ADM-001", first_name="Brian", last_name="Two", school_tenant_id=2)
+        db.add_all([first_student, second_student])
+        db.flush()
+        db.add_all([
+            models.FeeCharge(student_id=first_student.id, term="Term 1", year=2026, amount=100, school_tenant_id=1),
+            models.FeeCharge(student_id=second_student.id, term="Term 1", year=2026, amount=100, school_tenant_id=2),
+        ])
+        db.flush()
+        charges = db.query(models.FeeCharge).order_by(models.FeeCharge.school_tenant_id).all()
+        db.add_all([
+            models.FeePayment(charge_id=charges[0].id, amount=100, receipt_number="RCPT-001", school_tenant_id=1),
+            models.FeePayment(charge_id=charges[1].id, amount=100, receipt_number="RCPT-001", school_tenant_id=2),
+        ])
+        db.commit()
+
+    with SessionLocal() as db:
+        duplicate = models.Student(
+            admission_number="ADM-001", first_name="Duplicate", last_name="One",
+            school_tenant_id=1,
+        )
+        db.add(duplicate)
+        with pytest.raises(IntegrityError):
+            db.commit()
+        db.rollback()
