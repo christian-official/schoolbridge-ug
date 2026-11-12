@@ -2514,11 +2514,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 /* The QR print sheet is independent of the surrounding dashboard. */
 .school-access-qr-print{display:none}
 @media print{
-  body[data-schoolbridge-print="school-qr"] *{visibility:hidden!important}
-  body[data-schoolbridge-print="school-qr"] .school-access-qr-print,
-  body[data-schoolbridge-print="school-qr"] .school-access-qr-print *{visibility:visible!important}
-  body[data-schoolbridge-print="school-qr"] .school-access-qr-print{
-    display:flex!important;position:absolute!important;inset:0!important;width:100%!important;min-height:90vh!important;
+  html body[data-schoolbridge-print="school-qr"]{margin:0!important;padding:0!important;background:#fff!important}
+  html body[data-schoolbridge-print="school-qr"] > *{visibility:hidden!important}
+  html body[data-schoolbridge-print="school-qr"] > .school-access-qr-print,
+  html body[data-schoolbridge-print="school-qr"] > .school-access-qr-print *{visibility:visible!important}
+  html body[data-schoolbridge-print="school-qr"] > .school-access-qr-print{
+    display:flex!important;position:fixed!important;inset:0!important;width:100%!important;min-height:100vh!important;
     margin:0!important;padding:34px 20px!important;box-sizing:border-box!important;background:#fff!important;
     color:#172b43!important;align-items:center!important;justify-content:center!important;flex-direction:column!important;
     gap:14px!important;text-align:center!important;page-break-inside:avoid!important
