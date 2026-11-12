@@ -218,7 +218,7 @@ async function api<T>(path: string, token: string, options: RequestInit = {}): P
     })
   } catch (error) {
     if (error instanceof TypeError || !navigator.onLine) {
-      throw new TypeError('SchoolBridge cannot reach the server right now. Your prepared offline workspace remains available; reconnect to refresh live records.')
+      throw new TypeError('SchoolBridge cannot reach the server right now. Reconnect to refresh live records.')
     }
     throw error
   }
@@ -950,7 +950,6 @@ function App() {
 
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressTriggered = useRef(false)
-  const syncPollInFlight = useRef(false)
   useEffect(() => {
     if (!user) { setOverviewShortcuts([]); return }
     try {
@@ -1431,6 +1430,8 @@ function App() {
 
   if (!token || !user) {
     if(setupStatus.loading) return <main className="login-page"><section className="login-card"><div className="brand-name">School<span>Bridge</span></div><p className="muted">Checking school installation...</p></section></main>
+    if(setupStatus.error) return <main className="login-page"><section className="login-card"><div className="brand-name">School<span>Bridge</span></div><h1>{!navigator.onLine ? "You're offline" : setupStatus.error.includes("Select your school") ? "School selection required" : "Unable to check setup"}</h1><p className="error" role="alert">{setupStatus.error}</p><p className="form-hint">Connect to the school server and try again. For shared SchoolBridge access, open the official QR code provided by your school.</p><button className="secondary-button" onClick={()=>window.location.reload()}>Try again</button></section></main>
+    if(!setupStatus.setup_completed) return <FirstTimeSetupWizard status={setupStatus} onStatusChange={setSetupStatus}/>
     return (
       <main className="login-page">
         <section className="login-card">
