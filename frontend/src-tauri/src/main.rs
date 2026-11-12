@@ -387,7 +387,7 @@ fn desktop_config_file(python: &Path) -> Result<PathBuf, String> {
             .map_err(|_| "The generated SchoolBridge application secret was not valid UTF-8.".to_string())?
             .trim()
             .to_string();
-        if secret.len() < 48 || secret.chars().any(|character| matches!(character, '\\r' | '\\n' | '=')) {
+        if secret.len() < 48 || secret.chars().any(|character| character.is_control() || character == '=') {
             return Err("The bundled Python runtime returned an invalid application secret.".into());
         }
 
