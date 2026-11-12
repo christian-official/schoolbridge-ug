@@ -157,10 +157,6 @@ export default function RegistrationFlow({
           </form>
         </section>
       </div>}
-      <div className="registration-staff-access">
-        <p>Are you an essential non-teaching staff member or school administrator?</p>
-        <button type="button" className="recovery-link" onClick={onBack}>Essential Staff Access</button>
-      </div>
     </section>
   </main>
 }
