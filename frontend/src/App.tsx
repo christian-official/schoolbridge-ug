@@ -1042,7 +1042,6 @@ function App() {
     admission_date: new Date().toISOString().slice(0, 10), fee_amount: '', academic_level: '', combination: '', optional_subjects: '', subsidiary_subjects: '',
   })
   const [mobileMenu, setMobileMenu] = useState(false)
-  const [profileMenuOpen, setProfileMenuOpen] = useState(false)
   const [admissionSettings, setAdmissionSettings] = useState<AdmissionSettings>({
     admission_prefix: 'SB', include_year: true, admission_separator: '-',
     admission_padding: 4, next_admission_number: 1,
@@ -1594,15 +1593,18 @@ function App() {
         </nav>
         <div className="sidebar-bottom">
           <div className="sidebar-account-control">
-            {profileMenuOpen && <div className="sidebar-account-menu" role="menu">
-              {user.role !== 'parent' && user.role !== 'admin' && <button type="button" role="menuitem" onClick={() => { setActive('My Profile'); setProfileMenuOpen(false); setMobileMenu(false) }}><Contact size={17}/> My profile</button>}
-              {user.role === 'admin' && <button type="button" role="menuitem" onClick={() => { setActive('Settings'); setProfileMenuOpen(false); setMobileMenu(false) }}><Settings size={17}/> Settings</button>}
-              <button type="button" role="menuitem" onClick={() => { setProfileMenuOpen(false); logout() }}><LogOut size={17}/> Sign out</button>
-            </div>}
-            <button type="button" className="sidebar-account-trigger" aria-haspopup="menu" aria-expanded={profileMenuOpen} onClick={() => setProfileMenuOpen(value => !value)}>
+            <button
+              type="button"
+              className="sidebar-account-trigger"
+              aria-label={user.role === 'admin' ? 'Open school settings' : user.role === 'parent' ? 'Open my children' : 'Open my profile'}
+              onClick={() => {
+                setActive(user.role === 'admin' ? 'Settings' : user.role === 'parent' ? 'My Children' : 'My Profile')
+                setMobileMenu(false)
+              }}
+            >
               <span className="avatar">{user.username.slice(0, 1).toUpperCase()}</span>
-              <span className="profile-info"><strong>Account</strong><small>{user.role_label || user.role}</small></span>
-              <span className="account-menu-indicator">{profileMenuOpen ? '−' : '+'}</span>
+              <span className="profile-info"><strong>{user.role === 'admin' ? 'School settings' : user.role === 'parent' ? 'My children' : 'My profile'}</strong><small>{user.role_label || user.role}</small></span>
+              <Contact className="account-profile-icon" size={19} aria-hidden="true" />
             </button>
           </div>
         </div>
