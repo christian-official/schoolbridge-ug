@@ -350,6 +350,8 @@ jobs:
           curl --fail --silent http://127.0.0.1:18080/api/health >/dev/null
       - name: Assemble offline USB archive and verify checksum manifest
         shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           pkg="/tmp/SchoolBridge-USB"
@@ -364,7 +366,7 @@ jobs:
           SCHOOLBRIDGE_BACKUP_RETENTION_DAYS=30
           SCHOOLBRIDGE_BACKUP_INTERVAL_HOURS=24
           EOF
-          release_json="$(curl --fail --location --retry 3 https://api.github.com/repos/microsoft/WSL/releases/latest)"
+          release_json="$(curl --fail --location --retry 3 -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" https://api.github.com/repos/microsoft/WSL/releases/latest)"
           wsl_url="$(printf '%s' "$release_json" | python -c 'import json,sys; d=json.load(sys.stdin); a=[x["browser_download_url"] for x in d.get("assets",[]) if x["name"].lower().endswith(".x64.msi")]; assert len(a)==1; print(a[0])')"
           curl --fail --location --retry 3 "$wsl_url" -o "$pkg/runtime/wsl.msi"
           curl --fail --location --retry 3 "https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe" -o "$pkg/runtime/Docker Desktop Installer.exe"
@@ -413,6 +415,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Parse PowerShell scripts and verify official runtime signatures
         shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = "Stop"
           $files = @(
@@ -431,7 +435,7 @@ jobs:
           $dockerPath = Join-Path $runtime "Docker Desktop Installer.exe"
           $wslPath = Join-Path $runtime "wsl.msi"
           Invoke-WebRequest -Uri "https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe" -OutFile $dockerPath
-          $release = Invoke-RestMethod -Uri "https://api.github.com/repos/microsoft/WSL/releases/latest"
+          $release = Invoke-RestMethod -Uri "https://api.github.com/repos/microsoft/WSL/releases/latest" -Headers @{ Authorization = "Bearer $env:GITHUB_TOKEN"; Accept = "application/vnd.github+json" }
           $wslAssets = @($release.assets | Where-Object { $_.name.ToLowerInvariant().EndsWith(".x64.msi") })
           if ($wslAssets.Count -ne 1) { throw "Could not identify exactly one official stable x64 WSL MSI." }
           Invoke-WebRequest -Uri $wslAssets[0].browser_download_url -OutFile $wslPath
