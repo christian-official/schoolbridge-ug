@@ -2788,8 +2788,9 @@ def submit_parent_registration(data: ParentSelfRegistrationRequest, db: Session 
         ",".join(str(item) for item in sorted(student_ids)),
     ])
     identity_key = hashlib.sha256(identity_material.encode("utf-8")).hexdigest()[:24]
+    parent_slug = re.sub(r"[^a-z0-9]+", "-", _registration_name_key(data.parent_name)).strip("-")[:32] or "guardian"
     session = _create_qr_registration_session(
-        db, "parent", f"parent-{identity_key}", student_ids=student_ids,
+        db, "parent", f"parent-{parent_slug}-{identity_key[:6]}", student_ids=student_ids,
     )
     return {
         **session,
@@ -2801,8 +2802,9 @@ def submit_parent_registration(data: ParentSelfRegistrationRequest, db: Session 
 def submit_teacher_registration(data: TeacherSelfRegistrationRequest, db: Session = Depends(get_db)):
     resolve_school_tenant(db, str(data.school_id))
     staff = _match_teacher_registration(db, data)
+    teacher_slug = re.sub(r"[^a-z0-9]+", "-", _registration_name_key(f"{staff.first_name} {staff.last_name}")).strip("-")[:32] or "teacher"
     session = _create_qr_registration_session(
-        db, "teacher", f"teacher-{staff.id}", staff=staff,
+        db, "teacher", f"teacher-{teacher_slug}-{staff.id}", staff=staff,
     )
     return {
         **session,
