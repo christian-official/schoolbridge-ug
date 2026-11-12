@@ -1462,8 +1462,8 @@ function App() {
           <div className="brand-name">School<span>Bridge</span></div>
           <p className="login-subtitle">Your school's operations, connected.</p>
           {showRecovery ? <PasswordRecovery schoolId={selectedSchoolId} onBack={()=>setShowRecovery(false)}/> : showRegistration && selectedSchoolId ? qrSchoolError ? <><h1>School QR verification needed</h1><p className="error" role="alert">{qrSchoolError}</p><p className="form-hint">Scan your school's official SchoolBridge QR code again, then verify your existing details to reopen your account.</p><button type="button" className="secondary-button" onClick={()=>window.location.reload()}>Try again</button></> : qrSchoolName ? <RegistrationFlow schoolId={selectedSchoolId} schoolName={qrSchoolName} apiBaseUrl={API_BASE_URL} onBack={()=>setShowRegistration(false)} onAuthenticated={async accessToken=>{await storeSessionToken(accessToken);setToken(accessToken);setPassword('');setLoginError('')}}/> : <p className="muted">Verifying your school's QR access…</p> : <>
-            <h1>Welcome back</h1>
-            <p className="muted">Sign in to your school workspace.</p>
+            <h1>{selectedSchoolId && qrSchoolName ? 'Essential staff access' : 'Welcome back'}</h1>
+            <p className="muted">{selectedSchoolId && qrSchoolName ? 'For authorised non-teaching staff and administrators. Parents and teachers should use the school QR registration options.' : 'Sign in to your school workspace.'}</p>
             {qrSchoolName && <p className="form-hint">School: <strong>{qrSchoolName}</strong></p>}
             {!selectedSchoolId && <p className="form-hint">If your school uses shared online access, open its official SchoolBridge QR code first.</p>}
             <form onSubmit={login}>
@@ -1477,7 +1477,7 @@ function App() {
               </button>
             </form>
             <button type="button" className="recovery-link" onClick={()=>{setShowRecovery(true);setLoginError('')}}>Forgot your password?</button>
-            {selectedSchoolId && qrSchoolName && !qrSchoolError && <button type="button" className="recovery-link" onClick={()=>{setShowRegistration(true);setLoginError('')}}>Create a parent or teacher account</button>}
+
             <p className="login-foot"><ShieldCheck size={15} /> Secure school access</p>
           </>}
         </section>
