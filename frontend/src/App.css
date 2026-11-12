@@ -2510,3 +2510,24 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .registration-modal .registration-child{display:grid;gap:8px;margin:8px 0;padding:13px;border:1px solid #e2e8f0;border-radius:11px}
 .registration-modal .login-button{width:100%;min-height:48px;margin-top:8px}
 @media(max-width:520px){.registration-modal-backdrop{align-items:flex-end;padding:8px 8px max(8px,env(safe-area-inset-bottom))}.registration-modal{width:100%;max-height:94dvh;padding:18px 15px;border-radius:18px 18px 12px 12px}}
+
+/* The QR print sheet is independent of the surrounding dashboard. */
+.school-access-qr-print{display:none}
+@media print{
+  body[data-schoolbridge-print="school-qr"] *{visibility:hidden!important}
+  body[data-schoolbridge-print="school-qr"] .school-access-qr-print,
+  body[data-schoolbridge-print="school-qr"] .school-access-qr-print *{visibility:visible!important}
+  body[data-schoolbridge-print="school-qr"] .school-access-qr-print{
+    display:flex!important;position:absolute!important;inset:0!important;width:100%!important;min-height:90vh!important;
+    margin:0!important;padding:34px 20px!important;box-sizing:border-box!important;background:#fff!important;
+    color:#172b43!important;align-items:center!important;justify-content:center!important;flex-direction:column!important;
+    gap:14px!important;text-align:center!important;page-break-inside:avoid!important
+  }
+  body[data-schoolbridge-print="school-qr"] .school-access-qr-print-brand{font-size:17pt!important;font-weight:800!important;letter-spacing:.3px!important}
+  body[data-schoolbridge-print="school-qr"] .school-access-qr-print h2{margin:8px 0!important;font-size:20pt!important}
+  body[data-schoolbridge-print="school-qr"] .school-access-qr-print img{display:block!important;width:280px!important;height:280px!important;object-fit:contain!important}
+  body[data-schoolbridge-print="school-qr"] .school-access-qr-print strong{font-size:14pt!important}
+  body[data-schoolbridge-print="school-qr"] .school-access-qr-print p{margin:0!important;font-size:11pt!important}
+  body[data-schoolbridge-print="school-qr"] .school-access-qr-print small{max-width:90%!important;font-size:8pt!important;overflow-wrap:anywhere!important}
+  @page{size:A4 portrait;margin:12mm}
+}
