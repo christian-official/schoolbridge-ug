@@ -9,7 +9,13 @@ self.addEventListener('install', (event) => {
   )
 })
 
-self.addEventListener('activate', (event) => {
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SCHOOLBRIDGE_SKIP_WAITING') {
+    self.skipWaiting()
+  }
+})
+
+
   event.waitUntil(
     caches.keys()
       .then((keys) => Promise.all(
