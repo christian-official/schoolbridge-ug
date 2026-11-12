@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
+import { readFile } from 'node:fs/promises'
 import { setTimeout as delay } from 'node:timers/promises'
 import test from 'node:test'
 import { chromium } from 'playwright'
@@ -243,5 +244,19 @@ test('real Chromium completes the first-install owner activation and school setu
   } finally {
     if (browser) await browser.close()
     server.kill()
+  }
+})
+
+
+test('built service worker precaches every generated production bundle dependency', async () => {
+  const manifest = JSON.parse(await readFile(new URL('../dist/.vite/manifest.json', import.meta.url), 'utf8'))
+  const worker = await readFile(new URL('../dist/service-worker.js', import.meta.url), 'utf8')
+  const match = worker.match(/const PRECACHE_ASSETS = (\\[[^\\n]*\\])/)
+  assert.ok(match, 'production service worker should contain its generated precache list')
+  const precached = new Set(JSON.parse(match[1]))
+  for (const entry of Object.values(manifest)) {
+    for (const file of [entry.file, ...(entry.css ?? []), ...(entry.assets ?? [])]) {
+      assert.ok(precached.has('/' + file), `production asset must be precached: ${file}`)
+    }
   }
 })
