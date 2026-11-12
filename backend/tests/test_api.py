@@ -4234,3 +4234,46 @@ def test_teacher_self_registration_uses_staff_record_and_assigns_teacher_role(mo
         linked_user = db.query(models.User).filter_by(username="grace.teacher").first()
         assert linked_user is not None
         assert linked_user.staff_id == staff_id
+
+def test_registration_claim_review_is_isolated_to_the_admin_school():
+    reset_database()
+    admin = create_admin()
+    school_two_id = "00000000-0000-4000-8000-000000000002"
+    with SessionLocal() as db:
+        db.add(models.SchoolTenant(
+            id=2, public_id=school_two_id, installation_id="registration-review-school-two",
+            name="Second School", status="active",
+        ))
+        db.commit()
+        set_tenant_context(db, 2)
+        claim = models.RegistrationClaim(
+            school_tenant_id=2,
+            reference_hash="b" * 64,
+            claim_type="parent",
+            status="pending_review",
+            submitted_name="Second School Parent",
+            details_json=json.dumps({"children": [{"first_name": "Amina", "last_name": "Two"}]}),
+            candidate_student_ids_json="[]",
+            expires_at=datetime.utcnow(),
+        )
+        db.add(claim)
+        db.commit()
+        claim_id = claim.id
+
+    headers = {"Authorization": f"Bearer {create_access_token(admin)}"}
+    with TestClient(app) as client:
+        listed = client.get("/api/admin/registration-claims?status=pending_review", headers=headers)
+        assert listed.status_code == 200, listed.text
+        assert all(row["id"] != claim_id for row in listed.json())
+        decision = client.post(
+            f"/api/admin/registration-claims/{claim_id}/decision",
+            headers=headers,
+            json={"status": "rejected", "note": "Cross-school access must be denied."},
+        )
+        assert decision.status_code == 404, decision.text
+
+    with SessionLocal() as db:
+        set_tenant_context(db, 2)
+        persisted = db.query(models.RegistrationClaim).filter_by(id=claim_id).one()
+        assert persisted.status == "pending_review"
+
