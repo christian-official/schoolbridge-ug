@@ -1204,7 +1204,7 @@ function App() {
   }
 
   async function openStudentProfile(id:number) {
-    try { const result=await api<any>('students/'+id+'/profile',token); const contacts=user.role==='admin'?await api<any[]>('students/'+id+'/guardian-contacts',token):[]; setStudentProfile({...result,guardian_contacts:contacts}); setProfileMessage('') }
+    try { const result=await api<any>('students/'+id+'/profile',token); const contacts=user?.role==='admin'?await api<any[]>('students/'+id+'/guardian-contacts',token):[]; setStudentProfile({...result,guardian_contacts:contacts}); setProfileMessage('') }
     catch(error) { setDataError(error instanceof Error?error.message:'Unable to open student profile.') }
   }
 
