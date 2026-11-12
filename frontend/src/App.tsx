@@ -870,19 +870,27 @@ function App() {
   const [password, setPassword] = useState('')
   const [loginError, setLoginError] = useState('')
   const [showRecovery, setShowRecovery] = useState(false)
-  const [showRegistration, setShowRegistration] = useState(() => Boolean(new URLSearchParams(window.location.search).get('school')))
+  const [showRegistration, setShowRegistration] = useState(() => Boolean(selectedSchoolId))
   const [loading, setLoading] = useState(false)
   const [sessionRestoring, setSessionRestoring] = useState(true)
   const [sessionError, setSessionError] = useState('')
   const [active, setActive] = useState('Overview')
 
   async function signOut() {
+    const passwordlessRole = user?.role === 'parent' || user?.role === 'teacher'
+    const schoolIdForReturn = selectedSchoolId || user?.school_id || ''
+    if (passwordlessRole && schoolIdForReturn) {
+      try { localStorage.setItem('schoolbridge-selected-school-id', schoolIdForReturn) }
+      catch { /* The user can scan the school QR code again if browser storage is unavailable. */ }
+    }
     await clearStoredSessionToken()
     setToken('')
     setUser(null)
     setActive('Overview')
     setMobileMenu(false)
     setLoginError('')
+    setShowRecovery(false)
+    setShowRegistration(passwordlessRole ? Boolean(schoolIdForReturn) : Boolean(schoolIdForReturn))
   }
   const [overviewShortcuts, setOverviewShortcuts] = useState<string[]>([])
   const [serverConnection, setServerConnection] = useState<'checking' | 'connected' | 'disconnected'>('checking')
@@ -1453,7 +1461,7 @@ function App() {
           <div className="brand-mark"><GraduationCap size={30} /></div>
           <div className="brand-name">School<span>Bridge</span></div>
           <p className="login-subtitle">Your school's operations, connected.</p>
-          {showRecovery ? <PasswordRecovery schoolId={selectedSchoolId} onBack={()=>setShowRecovery(false)}/> : showRegistration && selectedSchoolId && qrSchoolName && !qrSchoolError ? <RegistrationFlow schoolId={selectedSchoolId} schoolName={qrSchoolName} apiBaseUrl={API_BASE_URL} onBack={()=>setShowRegistration(false)} onAuthenticated={async accessToken=>{await storeSessionToken(accessToken);setToken(accessToken);setPassword('');setLoginError('')}}/> : <>
+          {showRecovery ? <PasswordRecovery schoolId={selectedSchoolId} onBack={()=>setShowRecovery(false)}/> : showRegistration && selectedSchoolId ? qrSchoolError ? <><h1>School QR verification needed</h1><p className="error" role="alert">{qrSchoolError}</p><p className="form-hint">Scan your school's official SchoolBridge QR code again, then verify your existing details to reopen your account.</p><button type="button" className="secondary-button" onClick={()=>window.location.reload()}>Try again</button></> : qrSchoolName ? <RegistrationFlow schoolId={selectedSchoolId} schoolName={qrSchoolName} apiBaseUrl={API_BASE_URL} onBack={()=>setShowRegistration(false)} onAuthenticated={async accessToken=>{await storeSessionToken(accessToken);setToken(accessToken);setPassword('');setLoginError('')}}/> : <p className="muted">Verifying your school's QR access…</p> : <>
             <h1>Welcome back</h1>
             <p className="muted">Sign in to your school workspace.</p>
             {qrSchoolName && <p className="form-hint">School: <strong>{qrSchoolName}</strong></p>}
