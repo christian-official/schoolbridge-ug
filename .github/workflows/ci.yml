@@ -88,7 +88,8 @@ jobs:
           ./scripts/prepare-desktop-usb.ps1 -InstallerPath $installer[0].FullName
           $package = Join-Path $env:GITHUB_WORKSPACE "dist/SchoolBridge-USB"
           $tamperCopy = Join-Path $env:RUNNER_TEMP "SchoolBridge-USB-tamper-test"
-          Copy-Item $package $tamperCopy -Recurse
+          New-Item -ItemType Directory -Path $tamperCopy -Force | Out-Null
+          Copy-Item (Join-Path $package "*") $tamperCopy -Recurse -Force
           Add-Content (Join-Path $tamperCopy "SchoolBridge-Setup.exe") "tamper"
           & pwsh -NoProfile -File (Join-Path $tamperCopy "Verify-USB.ps1")
           if ($LASTEXITCODE -eq 0) { throw "USB verifier accepted a modified installer." }
