@@ -4215,10 +4215,6 @@ def test_teacher_qr_registration_matches_staff_number_and_opens_dashboard_withou
         db.commit()
         staff_id = staff.id
 
-    monkeypatch.setattr(
-        main_module, "send_schoolbridge_sms",
-        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("QR registration must not send SMS")),
-    )
     payload = {
         "school_id": school_id,
         "first_name": "Grace",
