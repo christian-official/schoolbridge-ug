@@ -115,7 +115,7 @@ def _check_qr_registration_rate_limit(db: Session, request: Request) -> None:
     """Rate-limit public QR verification without creating registration claims or review tasks."""
     tenant_id = get_current_tenant_id(db)
     client_host = request.client.host if request.client else "unknown"
-    requester_hash = hashlib.sha256(client_host.encode("utf-8")).hexdigest()
+    requester_hash = hmac.new(JWT_SECRET.encode("utf-8"), client_host.encode("utf-8"), hashlib.sha256).hexdigest()
     since = datetime.utcnow() - timedelta(hours=1)
     recent_attempts = db.query(models.AuditLog.id).filter(
         models.AuditLog.school_tenant_id == tenant_id,
