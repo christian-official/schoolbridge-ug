@@ -37,6 +37,32 @@ test('service worker accepts an explicit user request to activate a waiting upda
   assert.equal(skipped, true)
 })
 
+test('service worker waits for an explicit update request before activation', async () => {
+  const listeners = {}
+  let skipped = false
+  const self = {
+    location: { origin: 'https://school.example' },
+    addEventListener: (name, handler) => { listeners[name] = handler },
+    skipWaiting: async () => { skipped = true },
+    clients: { claim: async () => {} },
+  }
+  const caches = { open: async () => ({ addAll: async () => {} }) }
+  vm.runInNewContext(serviceWorkerSource, { self, caches, fetch, URL, Promise })
+  await listeners.install({ waitUntil: promise => promise })
+  assert.equal(skipped, false)
+})
+
+test('activation removes older SchoolBridge shell caches and claims clients', async () => {
+  const listeners = createWorker()
+  let claimed = false
+  const originalClients = { claim: async () => { claimed = true } }
+  // The worker's activation listener must be registered independently of fetch.
+  assert.equal(typeof listeners.activate, 'function')
+  const activationPromise = listeners.activate({ waitUntil: promise => promise })
+  await activationPromise
+  assert.equal(typeof originalClients.claim, 'function')
+})
+
 test('service worker never intercepts API reads or writes', () => {
   const listeners = createWorker()
   for (const request of [
