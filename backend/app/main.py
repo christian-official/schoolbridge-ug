@@ -2466,6 +2466,49 @@ def create_enrolment_invitation(
     }
 
 
+@app.get("/api/enrolment/invitations", tags=["Mobile Enrolment"])
+def list_enrolment_invitations(
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+):
+    invitations = db.query(models.EnrolmentInvitation).order_by(models.EnrolmentInvitation.created_at.desc()).limit(200).all()
+    users = {user.id: user for user in db.query(models.User).filter(
+        models.User.id.in_([item.target_user_id for item in invitations])
+    ).all()} if invitations else {}
+    now = datetime.utcnow()
+    return {"invitations": [
+        {
+            "id": item.id,
+            "target_user_id": item.target_user_id,
+            "target_username": users[item.target_user_id].username if item.target_user_id in users else "Unavailable account",
+            "created_at": item.created_at,
+            "expires_at": item.expires_at,
+            "redeemed_at": item.redeemed_at,
+            "revoked_at": item.revoked_at,
+            "status": "redeemed" if item.redeemed_at else "revoked" if item.revoked_at else "expired" if item.expires_at <= now else "pending",
+        }
+        for item in invitations
+    ]}
+
+
+@app.post("/api/enrolment/invitations/{invitation_id}/revoke", tags=["Mobile Enrolment"])
+def revoke_enrolment_invitation(
+    invitation_id: int,
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+):
+    invitation = db.get(models.EnrolmentInvitation, invitation_id)
+    if not invitation:
+        raise HTTPException(404, "The enrolment invitation was not found.")
+    if invitation.redeemed_at:
+        raise HTTPException(409, "A redeemed invitation cannot be revoked.")
+    if invitation.revoked_at:
+        return {"message": "Invitation is already revoked."}
+    invitation.revoked_at = datetime.utcnow()
+    db.commit()
+    return {"message": "Enrolment invitation revoked."}
+
+
 @app.post("/api/enrolment/redeem", tags=["Mobile Enrolment"])
 def redeem_enrolment_invitation(
     data: EnrolmentRedeemRequest,
