@@ -2573,7 +2573,7 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
       next['Examinations']=['view','add','edit','approve']
     }
     if(label==='Attendance Officer'){next['Attendance']=['view','add','edit'];next['Staff Attendance']=['view','add','edit']}
-    setRoleLabel(label);setRoleType(label==='Teacher'||label==='Class Teacher'?'teacher':'staff');setPermissions(next)
+    setRoleLabel(label);const selected=users.find((u:any)=>String(u.id)===selectedId);const person=staff.find((p:any)=>p.id===selected?.staff_id);setRoleType(person?.category==='Teaching'?'teacher':person?'staff':(label==='Teacher'||label==='Class Teacher'?'teacher':'staff'));setPermissions(next)
   }
   const permissionActions=['view','add','edit','delete','approve','print']
   function toggleSection(section:string) {
@@ -2604,7 +2604,12 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
     } catch(e) {setError(e instanceof Error?e.message:'Unable to save staff access settings.')}
     finally {setBusy(false)}
   }
-  async function resetSelectedPassword() { if(!selectedId)return; const account=users.find(u=>String(u.id)===selectedId); await resetAccountPassword(selectedId,account?.username||'staff account') }
+  async function resetSelectedPassword() {
+    if(!selectedId)return
+    const account=users.find(u=>String(u.id)===selectedId)
+    if(account?.role!=='staff'){setError('Teaching staff use the school QR code and do not have password resets.');return}
+    await resetAccountPassword(selectedId,account.username||'staff account')
+  }
   async function resetAccountPassword(id:string,username:string) {
     if(!window.confirm('Issue a new temporary password for '+username+'? The existing password will stop working immediately.'))return
     setBusy(true);setError('');setMessage('');setResetPasscode(null)
@@ -2659,9 +2664,9 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
   const visibleOtherLogins=otherLoginSearch.trim()?otherLoginMatches:otherLoginMatches.slice(0,8)
   const presetNames=Object.keys(catalog.presets||{})
   return <section className="panel settings-panel">
-    <div className="panel-heading"><div><h2>Staff accounts & access</h2><p>Staff login details are created automatically when you register a staff member in the Staff directory.</p></div><button type="button" className="secondary-button" onClick={()=>void load()} disabled={loading||busy}>{loading?'Loading...':'Refresh'}</button></div>
+    <div className="panel-heading"><div><h2>Staff accounts & access</h2><p>Teachers receive access through school QR registration. Password accounts are reserved for selected essential non-teaching staff.</p></div><button type="button" className="secondary-button" onClick={()=>void load()} disabled={loading||busy}>{loading?'Loading...':'Refresh'}</button></div>
     {error&&<div className="form-error" role="alert">{error}</div>}{message&&<div className="success-notice" role="status">{message}</div>}
-    <div className="form-hint">Register employees from the Staff directory. This workspace manages access, assignments and existing accounts.</div>
+    <div className="form-hint">Register all employee profiles in the Staff directory. Teachers activate their own accounts by QR; only selected essential non-teaching employees receive password logins.</div>
     <div className="account-management-tabs" role="tablist" aria-label="User and permission settings">
       <button type="button" role="tab" aria-selected={accountTab==="access"} className={accountTab==="access"?"active":""} onClick={()=>setAccountTab("access")}>Access & roles</button>
       <button type="button" role="tab" aria-selected={accountTab==="assignments"} className={accountTab==="assignments"?"active":""} onClick={()=>setAccountTab("assignments")}>Teacher assignments</button>
@@ -2675,7 +2680,7 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
         <label>Staff member *<select required value={selectedId} onChange={e=>{selectAccount(e.target.value);const account=users.find((u:any)=>String(u.id)===e.target.value);const person=staff.find((p:any)=>p.id===account?.staff_id);if(person){setRoleLabel(person.position||account.role_label||account.role);setRoleType(person.category==='Teaching'?'teacher':'staff')}}}><option value="">Choose staff account</option>{editableUsers.map(u=>{const person=staff.find((p:any)=>p.id===u.staff_id);return <option key={u.id} value={u.id}>{person?person.first_name+' '+person.last_name:u.username} — {u.username}</option>})}</select></label>
         <label>Access role *<select required value={presetNames.includes(roleLabel)?roleLabel:'Custom role'} onChange={e=>{if(e.target.value!=='Custom role')applyPreset(e.target.value)}}><option>Custom role</option>{presetNames.map((name:string)=><option key={name}>{name}</option>)}</select></label>
         <label>Job title / display role *<input required value={roleLabel} onChange={e=>setRoleLabel(e.target.value)} maxLength={80} placeholder="e.g. Bursar, Secretary, DOS"/></label>
-        <label>Staff category *<select required value={roleType} onChange={e=>setRoleType(e.target.value as 'teacher'|'staff')}><option value="teacher">Teaching staff</option><option value="staff">Non-teaching staff</option></select></label>
+        <label>Staff category *<select required value={roleType} disabled><option value="teacher">Teaching staff — QR access</option><option value="staff">Non-teaching staff — password access</option></select><small className="field-hint">Login type follows the employee's recorded staff category.</small></label>
       </div>
       {selectedId&&(()=>{const account=editableUsers.find((u:any)=>String(u.id)===selectedId);const person=staff.find((p:any)=>p.id===account?.staff_id);return <div className="selected-staff-summary"><strong>{person?[person.first_name,person.last_name].filter(Boolean).join(' '):account?.username}</strong><span>{person?.staff_number||'No staff number'} · {person?.category|| (roleType==='teacher'?'Teaching':'Non-teaching')} · {person?.department||'Department not set'}</span><small>Login: {account?.username} · Email: {account?.email||person?.email||'Not provided'} · Current role: {account?.role_label||account?.role}</small></div>})()}
       <details className="form-disclosure"><summary>Choose which areas this staff member can open</summary>
@@ -2683,7 +2688,9 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
         <div className="permission-choice-grid">{(catalog.sections||[]).map((section:string)=><div key={section} className={permissions[section]?.includes('view')?'permission-choice-wrap active':'permission-choice-wrap'}><button type="button" className={permissions[section]?.includes('view')?'permission-choice active':'permission-choice'} aria-pressed={Boolean(permissions[section]?.includes('view'))} onClick={()=>toggleSection(section)}><span>{section}</span><small>{permissions[section]?.includes('view')?'Enabled · full access by default':'Not enabled'}</small></button>{permissions[section]?.includes('view')&&<div className="permission-action-filters" aria-label={section+' permitted actions'}>{permissionActions.map(action=><label key={action}><input type="checkbox" checked={(permissions[section]||[]).includes(action)} disabled={action==='view'} onChange={()=>togglePermissionAction(section,action)}/>{action}</label>)}</div>}</div>)}</div>
       </details>
       <div className="form-actions"><button type="button" className="primary-button" onClick={()=>void savePermissions()} disabled={busy||!selectedId}>{busy?'Saving...':'Save staff access'}</button></div>
-      <div className="form-actions"><button type="button" className="secondary-button" onClick={()=>void resetSelectedPassword()} disabled={busy||!selectedId}>{busy?'Working...':'Reset login passcode'}</button></div>
+      {editableUsers.find(u=>String(u.id)===selectedId)?.role==='staff'
+        ? <div className="form-actions"><button type="button" className="secondary-button" onClick={()=>void resetSelectedPassword()} disabled={busy||!selectedId}>{busy?'Working...':'Reset login passcode'}</button></div>
+        : <p className="form-hint">Teaching staff sign in through verified school QR registration. They do not use passwords.</p>}
       {resetPasscode&&<div className="success-notice password-reset-result" role="status"><strong>Temporary passcode for {resetPasscode.username}</strong><code>{resetPasscode.password}</code><button type="button" className="secondary-button" onClick={()=>void navigator.clipboard.writeText('Username: '+resetPasscode.username+'\nTemporary passcode: '+resetPasscode.password)}>Copy login details</button><small>Shown once. Share it privately; the staff member must change it at their next sign-in.</small></div>}
     </>}
     </div>}
@@ -2707,7 +2714,7 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
     <p className="form-hint">Staff accounts are separate from administrator and parent accounts. The first 5 matching accounts are shown; search to find any other account.</p>
     <div className="table-tools student-tools"><div className="search-box"><Search size={17}/><input aria-label="Search staff login accounts" placeholder="Search staff name, staff number or username..." value={staffLoginSearch} onChange={e=>setStaffLoginSearch(e.target.value)}/></div><span className="count-pill">Showing {visibleStaffLogins.length} of {staffLoginMatches.length} matching staff accounts</span></div>
     <div className="table-wrap"><table><thead><tr><th>Staff member</th><th>Username</th><th>Job role</th><th>Areas available</th><th>Status</th><th>Actions</th></tr></thead><tbody>
-      {visibleStaffLogins.map(u=>{const person=staff.find((p:any)=>p.id===u.staff_id);return <tr key={u.id}><td>{person?person.first_name+' '+person.last_name:'Unlinked staff login'}</td><td>{u.username}</td><td>{u.role_label||u.role}</td><td>{Object.keys(u.permissions||{}).length||'Limited'}</td><td>{u.active?'Active':'Disabled'}</td><td><button type="button" className="secondary-button" disabled={busy} onClick={()=>{setSelectedId(String(u.id));setResetPasscode(null);setRoleLabel(u.role_label||u.role);setRoleType(u.role==='teacher'?'teacher':'staff');setPermissions(u.permissions||{});void resetAccountPassword(String(u.id),u.username)}}>Reset password</button></td></tr>})}
+      {visibleStaffLogins.map(u=>{const person=staff.find((p:any)=>p.id===u.staff_id);return <tr key={u.id}><td>{person?person.first_name+' '+person.last_name:'Unlinked staff login'}</td><td>{u.username}</td><td>{u.role_label||u.role}</td><td>{Object.keys(u.permissions||{}).length||'Limited'}</td><td>{u.active?'Active':'Disabled'}</td><td>{u.role==='staff' ? <button type="button" className="secondary-button" disabled={busy} onClick={()=>{setSelectedId(String(u.id));setResetPasscode(null);setRoleLabel(u.role_label||u.role);setRoleType('staff');setPermissions(u.permissions||{});void resetAccountPassword(String(u.id),u.username)}}>Reset password</button> : <span className="form-hint">QR access</span>}</td></tr>})}
       {!staffLoginMatches.length&&<tr><td colSpan={6}>No staff login accounts match this search.</td></tr>}
     </tbody></table></div>
     {resetPasscode&&<div className="success-notice password-reset-result" role="status"><strong>Temporary password for {resetPasscode.username}</strong><code>{resetPasscode.password}</code><button type="button" className="secondary-button" onClick={()=>void navigator.clipboard.writeText('Username: '+resetPasscode.username+'\\nTemporary password: '+resetPasscode.password)}>Copy login details</button><small>Shown once. Share it privately. The staff member must change it at their next sign-in.</small></div>}
