@@ -5,7 +5,7 @@ type Device = {
   device_id: string; device_name: string; created_at: string; last_seen_at: string
   last_sync_sequence: number; last_issued_sequence: number; revoked_at: string | null; active: boolean
 }
-type Props = { token: string; userId: number; isAdmin: boolean }
+type Props = { token: string; userId: number; schoolId: string; isAdmin: boolean }
 const isTauriDesktop = typeof window !== 'undefined' && (
   '__TAURI_INTERNALS__' in window || window.location.hostname === 'tauri.localhost' || window.location.protocol === 'tauri:'
 )
@@ -33,7 +33,7 @@ async function request<T>(path: string, token: string, options: RequestInit = {}
   return result as T
 }
 
-export default function SyncDevices({ token, userId, isAdmin }: Props) {
+export default function SyncDevices({ token, userId, schoolId, isAdmin }: Props) {
   const [devices, setDevices] = useState<Device[]>([])
   const [deviceId, setDeviceId] = useState('')
   const [loading, setLoading] = useState(true)
@@ -73,12 +73,12 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
       return response.blob()
     }).then(blob => { objectUrl = URL.createObjectURL(blob); setSchoolQrUrl(objectUrl) })
       .catch(err => { if (err.name !== 'AbortError') setError(err instanceof Error ? err.message : 'Unable to create the school access QR code.') })
-    fetchSchoolBridge(API_BASE_URL + '/api/public/school', { cache: 'no-store', signal: controller.signal })
+    fetchSchoolBridge(API_BASE_URL + '/api/public/school?school=' + encodeURIComponent(schoolId), { cache: 'no-store', signal: controller.signal })
       .then(response => response.ok ? response.json() : Promise.reject(new Error('School identity is unavailable.')))
       .then(identity => setSchoolAccessUrl(destination + encodeURIComponent(identity.school_id)))
       .catch(err => { if (err.name !== 'AbortError') setError(err instanceof Error ? err.message : 'Unable to load school identity.') })
     return () => { controller.abort(); if (objectUrl) URL.revokeObjectURL(objectUrl) }
-  }, [isAdmin, token])
+  }, [isAdmin, schoolId, token])
 
   async function register(replaceIdentity = false) {
     setBusy(true); setError(''); setMessage('')
