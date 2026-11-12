@@ -14,7 +14,7 @@ test('scanning a school QR opens that school registration page directly', () => 
   assert.doesNotMatch(app, /Essential staff access/)
   assert.match(app, /<RegistrationFlow schoolId=\{selectedSchoolId\}/)
   assert.match(app, /\/api\/public\/school\?school=/)
-  assert.match(syncDevices, /SchoolBridge registration page/)
+  assert.match(syncDevices, /Parent &amp; Teacher Access/)
   assert.match(syncDevices, /setSchoolAccessUrl\(destination \+ encodeURIComponent\(identity\.school_id\)\)/)
 })
 
