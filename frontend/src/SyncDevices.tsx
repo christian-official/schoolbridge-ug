@@ -458,7 +458,7 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
 
     {isAdmin && !isTauriDesktop && <section className="offline-record-tools school-access-qr">
       <h3>School mobile access QR</h3>
-      <p className="form-hint">This reusable QR code opens this school's SchoolBridge sign-in page. It identifies the school installation only; it does not sign anyone in or grant permissions. Staff and parents must still use their own accounts.</p>
+      <p className="form-hint">This reusable QR code opens this school's SchoolBridge registration page. Parents and teachers enter their details, which are checked automatically against the school's existing records. Successful verification opens the correct dashboard; the QR code itself does not expose student records or grant access.</p>
       {qrUnavailableReason ? <p className="form-hint">{qrUnavailableReason}</p> : schoolQrUrl ? <div className="school-access-qr-content">
         <img src={schoolQrUrl} alt="Reusable SchoolBridge school access QR code" width="240" height="240" />
         <div>
