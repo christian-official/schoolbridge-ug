@@ -1512,15 +1512,6 @@ function App() {
     }
   }
 
-  function logout() {
-    const activeToken = token
-    if (activeToken) void api('auth/logout', activeToken, { method: 'POST' }).catch(() => {})
-    void clearStoredSessionToken().catch(() => {})
-    setToken('')
-    setUser(null)
-    setStudents([])
-    setClasses([])
-  }
 
   const filteredStudents = students
 
