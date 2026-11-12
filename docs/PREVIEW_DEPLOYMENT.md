@@ -44,6 +44,7 @@ The frontend's `VITE_API_BASE_URL` points to the one shared Koyeb API. The API's
    | `SCHOOLBRIDGE_SEED_DEMO_DATA` | `false` |
 
 7. Wait for the generated `.koyeb.app` service URL to become healthy at `/api/health`. Keep the service URL; it is the one shared API origin.
+8. Set `SCHOOLBRIDGE_ALLOWED_HOSTS` to the API hostname only (for example, `schoolbridge-preview-api.koyeb.app`; no scheme, path, or wildcard), then redeploy. This enables the backend's trusted-host check for the public API domain.
 
 ## 3. Deploy the frontend on Cloudflare Pages
 
