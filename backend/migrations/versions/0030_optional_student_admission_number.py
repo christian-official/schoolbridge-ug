@@ -1,13 +1,13 @@
 """Allow student records without admission numbers.
 
-Revision ID: 0030_optional_student_admission_number
+Revision ID: 0030_optional_admission_no
 Revises: 0029_enrolment_invitations
 """
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy import inspect, text
 
-revision = "0030_optional_student_admission_number"
+revision = "0030_optional_admission_no"
 down_revision = "0029_enrolment_invitations"
 branch_labels = None
 depends_on = None
