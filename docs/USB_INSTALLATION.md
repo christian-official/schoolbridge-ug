@@ -17,7 +17,8 @@ The older Docker/WSL2 package remains a prototype only. Do not use `scripts/prep
 Build the standalone installer using the Task 1.11 desktop build process on a trusted preparation computer. Then, from the repository root, run:
 
 ```powershell
-.\scripts\prepare-desktop-usb.ps1 -InstallerPath ".\frontend\src-tauri\target\release\bundle\nsis\SchoolBridge_*.exe"
+$installer = Get-ChildItem ".\frontend\src-tauri\target\release\bundle\nsis" -Filter "*.exe" | Select-Object -First 1
+.\scripts\prepare-desktop-usb.ps1 -InstallerPath $installer.FullName
 ```
 
 Replace the example path with the exact installer file produced by the build. The script creates `dist\SchoolBridge-USB`, copies the installer and guide, generates SHA-256 hashes, and runs the verifier against the finished package. It deliberately starts with a clean output folder so stale files cannot conceal an incomplete package.
