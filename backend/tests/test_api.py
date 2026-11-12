@@ -3368,14 +3368,6 @@ def test_enrolment_invitation_is_account_bound_single_use_and_registers_device()
     teacher = create_teacher()
     admin_headers = {"Authorization": f"Bearer {create_access_token(admin)}"}
     teacher_headers = {"Authorization": f"Bearer {create_access_token(teacher)}"}
-    with SessionLocal() as db:
-        db.add(models.SchoolSetupState(
-            id=1,
-            installation_id="00000000-0000-4000-8000-000000000099",
-            setup_completed_at=datetime.utcnow(),
-        ))
-        db.commit()
-
     with TestClient(app) as client:
         anonymous_issue = client.post("/api/enrolment/invitations", json={"user_id": admin.id})
         assert anonymous_issue.status_code == 401
@@ -3399,7 +3391,7 @@ def test_enrolment_invitation_is_account_bound_single_use_and_registers_device()
         )
         assert redeemed.status_code == 200, redeemed.text
         assert redeemed.json()["active"] is True
-        assert redeemed.json()["school_installation_id"] == "00000000-0000-4000-8000-000000000099"
+        assert redeemed.json()["school_installation_id"] == "test-existing-installation"
 
         replay = client.post(
             "/api/enrolment/redeem", headers=admin_headers,
