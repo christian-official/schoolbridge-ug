@@ -19,7 +19,7 @@ function examGroupKey(exam: Exam) { return [exam.exam_type || 'Other', exam.term
 
 
 
-async function request<T>(path: string, token: string, options: RequestInit = {}): Promise<T> {
+async function request<T>(path: string, token: string, options: RequestInit = {}, apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')): Promise<T> {
   const response = await fetchSchoolBridge(`${apiBaseUrl}/api/${path}`, {
     ...options,
     headers: {
@@ -82,18 +82,19 @@ function studentOffersSubject(student: Student, subject: Subject) {
   return false
 }
 
-async function fetchClassStudents(token: string, classId: number | null): Promise<Student[]> {
+async function fetchClassStudents(token: string, classId: number | null, apiBaseUrl: string): Promise<Student[]> {
   const query = classId === null ? '' : `&class_id=${classId}`
-  const first = await request<Page<Student>>(`students/search?page=1&page_size=100${query}`, token)
+  const first = await request<Page<Student>>(`students/search?page=1&page_size=100${query}`, token, {}, apiBaseUrl)
   const remaining = await Promise.all(
     Array.from({ length: Math.max(0, (first.pages || 1) - 1) }, (_, index) =>
-      request<Page<Student>>(`students/search?page=${index + 2}&page_size=100${query}`, token)
+      request<Page<Student>>(`students/search?page=${index + 2}&page_size=100${query}`, token, {}, apiBaseUrl)
     )
   )
   return [first, ...remaining].flatMap(page => page.items)
 }
 
 export default function AcademicManagement({ token, classes, canVerify = false, userId, isTeacher = false, isAdmin = false, apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '') }: { token: string; classes: SchoolClass[]; canVerify?: boolean; userId: number; isTeacher?: boolean; isAdmin?: boolean; apiBaseUrl?: string }) {
+  const apiRequest = <T,>(path: string, requestToken: string, options: RequestInit = {}) => apiRequest<T>(path, requestToken, options, apiBaseUrl)
   const [exams, setExams] = useState<Exam[]>([])
   const [subjects, setSubjects] = useState<Subject[]>([])
   const [students, setStudents] = useState<Student[]>([])
@@ -141,7 +142,7 @@ export default function AcademicManagement({ token, classes, canVerify = false, 
     const refreshHistory = async () => {
       if (!navigator.onLine) { if (active) setOfflineConnectionOnline(false); return }
       try {
-        const result = await request<{proposals:Array<{id:number;exam_name:string;term:string;year:number|null;subject_name:string;status:string;record_count:number;submitted_at:string;resolution:string|null;conflict_sequence:number|null}>}>('sync/teacher-mark-proposals/mine', token)
+        const result = await apiRequest<{proposals:Array<{id:number;exam_name:string;term:string;year:number|null;subject_name:string;status:string;record_count:number;submitted_at:string;resolution:string|null;conflict_sequence:number|null}>}>('sync/teacher-mark-proposals/mine', token)
         if (active) { setOfflineMarkHistory(result.proposals || []); setOfflineConnectionOnline(true) }
       } catch { if (active) setOfflineConnectionOnline(navigator.onLine) }
     }
@@ -158,10 +159,10 @@ export default function AcademicManagement({ token, classes, canVerify = false, 
     setError('')
     try {
       const [examRows, subjectRows, gradeRows, profile] = await Promise.all([
-        request<Exam[]>('exams', token),
-        request<Subject[]>('subjects', token),
-        request<GradeBand[]>('grading-scale', token),
-        request<SchoolProfile>('settings/school-profile', token),
+        apiRequest<Exam[]>('exams', token),
+        apiRequest<Subject[]>('subjects', token),
+        apiRequest<GradeBand[]>('grading-scale', token),
+        apiRequest<SchoolProfile>('settings/school-profile', token),
       ])
       setExams(examRows)
       setSubjects(subjectRows)
@@ -196,8 +197,8 @@ export default function AcademicManagement({ token, classes, canVerify = false, 
     let cancelled = false
     setError('')
     Promise.all([
-      fetchClassStudents(token, selectedExam.class_id),
-      request<Mark[]>(`marks?exam_id=${selectedExam.id}`, token),
+      fetchClassStudents(token, selectedExam.class_id, apiBaseUrl),
+      apiRequest<Mark[]>(`marks?exam_id=${selectedExam.id}`, token),
     ]).then(async ([studentRows, markRows]) => {
       if (cancelled) return
       setStudents(studentRows)
@@ -208,7 +209,7 @@ export default function AcademicManagement({ token, classes, canVerify = false, 
         setPendingOfflineMarkDraft(null)
       }
       setMarkDrafts(nextDrafts)
-      if(isTeacher){const deviceId=localStorage.getItem('schoolbridge-sync-device-'+userId)||'';if(deviceId){try{const result=await request<{devices:Array<{device_id:string;active:boolean;last_issued_sequence:number}>}>('sync/devices',token);const device=result.devices.find(row=>row.device_id===deviceId&&row.active);setMarkSyncBaseline(device?{deviceId,baseSequence:device.last_issued_sequence}:null)}catch{setMarkSyncBaseline(null)}}else setMarkSyncBaseline(null)}
+      if(isTeacher){const deviceId=localStorage.getItem('schoolbridge-sync-device-'+userId)||'';if(deviceId){try{const result=await apiRequest<{devices:Array<{device_id:string;active:boolean;last_issued_sequence:number}>}>('sync/devices',token);const device=result.devices.find(row=>row.device_id===deviceId&&row.active);setMarkSyncBaseline(device?{deviceId,baseSequence:device.last_issued_sequence}:null)}catch{setMarkSyncBaseline(null)}}else setMarkSyncBaseline(null)}
     }).catch(e => {
       if (!cancelled) setError(e instanceof Error ? e.message : 'Unable to load this examination.')
     })
@@ -223,7 +224,7 @@ export default function AcademicManagement({ token, classes, canVerify = false, 
     }
     let cancelled = false
     setHistoryError('')
-    request<Mark[]>(`marks?student_id=${historyStudentId}`, token).then(rows => {
+    apiRequest<Mark[]>(`marks?student_id=${historyStudentId}`, token).then(rows => {
       if (!cancelled) setHistoryMarks(rows)
     }).catch(e => {
       if (!cancelled) setHistoryError(e instanceof Error ? e.message : 'Unable to load student academic history.')
@@ -302,13 +303,13 @@ export default function AcademicManagement({ token, classes, canVerify = false, 
       const skipped = examForm.class_ids.length - classIdsToCreate.length
       const created: Exam[] = []
       for (const classId of classIdsToCreate) {
-        const row = await request<Exam>('exams', token, {
+        const row = await apiRequest<Exam>('exams', token, {
           method: 'POST',
           body: JSON.stringify({ name: generatedExamName, exam_type: examForm.exam_type, term: examForm.term, year: Number(examForm.year), class_id: classId }),
         })
         created.push(row)
       }
-      const next = await request<Exam[]>('exams', token)
+      const next = await apiRequest<Exam[]>('exams', token)
       setExams(next)
       setActiveExamType(examForm.exam_type)
       if (created.length) {
@@ -333,7 +334,7 @@ export default function AcademicManagement({ token, classes, canVerify = false, 
     if (!window.confirm(prompt)) return
     setSaving(true); setError(''); setMessage('')
     try {
-      const updated = await request<{id:number;status:'closed'|'published';closed_at?:string;published_at?:string}>('exams/' + selectedExam.id + '/' + action, token, { method: 'POST' })
+      const updated = await apiRequest<{id:number;status:'closed'|'published';closed_at?:string;published_at?:string}>('exams/' + selectedExam.id + '/' + action, token, { method: 'POST' })
       setExams(current => current.map(exam => exam.id === updated.id ? { ...exam, status: updated.status, closed_at: updated.closed_at ?? exam.closed_at, published_at: updated.published_at ?? exam.published_at } : exam))
       setMessage(action === 'close' ? 'Examination closed. Results are locked and remain hidden from parents until publication.' : 'Examination results published. Linked parents can now view the verified results.')
     } catch (e) {
@@ -360,13 +361,13 @@ export default function AcademicManagement({ token, classes, canVerify = false, 
         if (!Number.isFinite(score) || !Number.isInteger(score) || score < 0 || score > 100) throw new Error('Enter a valid score from 0 to 100 for ' + studentName(student) + '.')
         const existing = marks.find(mark => mark.student_id === student.id && String(mark.subject_id) === selectedSubjectId)
         if (!(existing && existing.verified) && !(existing && Number(existing.score) === score)) {
-          if (existing) await request<Mark>('marks/' + existing.id, token, { method: 'PATCH', body: JSON.stringify({ score }) })
-          else await request<Mark>('marks', token, { method: 'POST', body: JSON.stringify({ exam_id: selectedExam.id, student_id: student.id, subject_id: Number(selectedSubjectId), score }) })
+          if (existing) await apiRequest<Mark>('marks/' + existing.id, token, { method: 'PATCH', body: JSON.stringify({ score }) })
+          else await apiRequest<Mark>('marks', token, { method: 'POST', body: JSON.stringify({ exam_id: selectedExam.id, student_id: student.id, subject_id: Number(selectedSubjectId), score }) })
           saved += 1
         }
         setSaveProgress(Math.round(((index + 1) / eligibleStudents.length) * 100))
       }
-      const next = await request<Mark[]>('marks?exam_id=' + selectedExam.id, token)
+      const next = await apiRequest<Mark[]>('marks?exam_id=' + selectedExam.id, token)
       setMarks(next)
       setMarkDrafts(Object.fromEntries(next.map(mark => [String(mark.student_id) + ':' + String(mark.subject_id), String(Math.round(mark.score))])))
       setSubmittedSubjectId(selectedSubjectId)
@@ -382,7 +383,7 @@ export default function AcademicManagement({ token, classes, canVerify = false, 
 
   async function clearOfflineMarkDraft(){const deviceId=localStorage.getItem('schoolbridge-sync-device-'+userId)||'';if(!deviceId)return;if(!window.confirm('Clear the encrypted offline marks draft saved on this browser?'))return;setOfflineMarkBusy(true);try{await deleteEncryptedOfflineDraft(userId,deviceId);setOfflineMarkMessage('Saved offline marks draft cleared.')}catch(error){setOfflineMarkMessage(error instanceof Error?error.message:'Unable to clear the saved marks draft.')}finally{setOfflineMarkBusy(false)}}
 
-  async function submitOfflineMarkDraft(){const deviceId=localStorage.getItem('schoolbridge-sync-device-'+userId)||'';if(!deviceId||offlinePassphrase.length<12){setOfflineMarkMessage('Register this device and enter the offline passphrase.');return}setOfflineMarkBusy(true);try{const draft=await loadEncryptedOfflineDraft<any>(userId,deviceId,offlinePassphrase);if(draft.version!==1||draft.userId!==userId||draft.deviceId!==deviceId||draft.expiresAt<=Date.now())throw new Error('This marks draft is expired or belongs to another account or device.');const result=await request<{proposal_id:number;status:string;applied:boolean;saved:number}>('sync/teacher-mark-proposals',token,{method:'POST',body:JSON.stringify({device_id:deviceId,idempotency_key:draft.idempotencyKey,exam_id:draft.examId,subject_id:draft.subjectId,base_sequence:draft.baseSequence,base_mark_ids:draft.baseMarkIds,records:draft.records})});if(result.applied){await deleteEncryptedOfflineDraft(userId,deviceId);setOfflineMarkMessage(result.saved+' marks synchronised as unverified results; normal verification still applies.');if(selectedExamId===String(draft.examId)){const next=await request<Mark[]>('marks?exam_id='+draft.examId,token);setMarks(next);setMarkDrafts(Object.fromEntries(next.map(mark=>[String(mark.student_id)+':'+String(mark.subject_id),String(Math.round(mark.score))])))}const history=await request<{proposals:typeof offlineMarkHistory}>('sync/teacher-mark-proposals/mine',token);setOfflineMarkHistory(history.proposals||[])}else{setOfflineMarkMessage('Submission #'+result.proposal_id+' was not applied because a conflict was detected. The encrypted draft is retained.');const history=await request<{proposals:typeof offlineMarkHistory}>('sync/teacher-mark-proposals/mine',token);setOfflineMarkHistory(history.proposals||[])}}catch(error){setOfflineMarkMessage(error instanceof Error?error.message:'Unable to submit offline marks. The encrypted draft remains saved.')}finally{setOfflineMarkBusy(false)}}
+  async function submitOfflineMarkDraft(){const deviceId=localStorage.getItem('schoolbridge-sync-device-'+userId)||'';if(!deviceId||offlinePassphrase.length<12){setOfflineMarkMessage('Register this device and enter the offline passphrase.');return}setOfflineMarkBusy(true);try{const draft=await loadEncryptedOfflineDraft<any>(userId,deviceId,offlinePassphrase);if(draft.version!==1||draft.userId!==userId||draft.deviceId!==deviceId||draft.expiresAt<=Date.now())throw new Error('This marks draft is expired or belongs to another account or device.');const result=await apiRequest<{proposal_id:number;status:string;applied:boolean;saved:number}>('sync/teacher-mark-proposals',token,{method:'POST',body:JSON.stringify({device_id:deviceId,idempotency_key:draft.idempotencyKey,exam_id:draft.examId,subject_id:draft.subjectId,base_sequence:draft.baseSequence,base_mark_ids:draft.baseMarkIds,records:draft.records})});if(result.applied){await deleteEncryptedOfflineDraft(userId,deviceId);setOfflineMarkMessage(result.saved+' marks synchronised as unverified results; normal verification still applies.');if(selectedExamId===String(draft.examId)){const next=await apiRequest<Mark[]>('marks?exam_id='+draft.examId,token);setMarks(next);setMarkDrafts(Object.fromEntries(next.map(mark=>[String(mark.student_id)+':'+String(mark.subject_id),String(Math.round(mark.score))])))}const history=await apiRequest<{proposals:typeof offlineMarkHistory}>('sync/teacher-mark-proposals/mine',token);setOfflineMarkHistory(history.proposals||[])}else{setOfflineMarkMessage('Submission #'+result.proposal_id+' was not applied because a conflict was detected. The encrypted draft is retained.');const history=await apiRequest<{proposals:typeof offlineMarkHistory}>('sync/teacher-mark-proposals/mine',token);setOfflineMarkHistory(history.proposals||[])}}catch(error){setOfflineMarkMessage(error instanceof Error?error.message:'Unable to submit offline marks. The encrypted draft remains saved.')}finally{setOfflineMarkBusy(false)}}
 
   async function setSubjectVerification(subjectId: number, verified: boolean) {
     if (!selectedExam) { setError('Choose an examination first.'); return }
@@ -393,8 +394,8 @@ export default function AcademicManagement({ token, classes, canVerify = false, 
     setSaving(true); setError(''); setMessage('')
     try {
       const params = new URLSearchParams({ exam_id: String(selectedExam.id), subject_id: String(subjectId), verified: String(verified) })
-      const result = await request<{records:number;changed:number}>(`subjects/${subjectId}/marks/verification?${params.toString()}`, token, { method: 'PATCH' })
-      const next = await request<Mark[]>(`marks?exam_id=${selectedExam.id}`, token)
+      const result = await apiRequest<{records:number;changed:number}>(`subjects/${subjectId}/marks/verification?${params.toString()}`, token, { method: 'PATCH' })
+      const next = await apiRequest<Mark[]>(`marks?exam_id=${selectedExam.id}`, token)
       setMarks(next)
       setMessage((verified ? 'All ' : 'All ') + result.records + ' recorded ' + (subject?.name || 'subject') + ' scores ' + (verified ? 'verified and locked.' : 'unlocked for correction.') )
     } catch (e) {
@@ -410,8 +411,8 @@ export default function AcademicManagement({ token, classes, canVerify = false, 
     if (!window.confirm(`Verify and lock all ${pending} submitted scores for ${selectedExam.name}?`)) return
     setSaving(true); setError(''); setMessage('')
     try {
-      const result = await request<{records:number;changed:number}>(`exams/${selectedExam.id}/results/verification?verified=true`, token, { method: 'PATCH' })
-      const next = await request<Mark[]>(`marks?exam_id=${selectedExam.id}`, token)
+      const result = await apiRequest<{records:number;changed:number}>(`exams/${selectedExam.id}/results/verification?verified=true`, token, { method: 'PATCH' })
+      const next = await apiRequest<Mark[]>(`marks?exam_id=${selectedExam.id}`, token)
       setMarks(next)
       setMessage(`Verified and locked all ${result.records} submitted results for ${selectedExam.name}.`)
     } catch (e) {
@@ -423,7 +424,7 @@ export default function AcademicManagement({ token, classes, canVerify = false, 
     event.preventDefault()
     setSaving(true); setError(''); setMessage('')
     try {
-      const rows = await request<GradeBand[]>('grading-scale', token, {
+      const rows = await apiRequest<GradeBand[]>('grading-scale', token, {
         method: 'PUT',
         body: JSON.stringify({ bands: draftBands }),
       })
