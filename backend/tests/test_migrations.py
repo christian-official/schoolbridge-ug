@@ -347,3 +347,58 @@ def test_user_session_version_column_is_migrated(migrated_database):
     assert "token_version" in columns
     assert columns["token_version"]["nullable"] is False
     assert columns["token_version"]["default"] in {"0", "'0'"}
+
+
+
+def test_existing_student_table_migrates_to_optional_admission_number(tmp_path):
+    import sqlite3
+
+    database_path = tmp_path / "legacy-students.sqlite3"
+    database_url = f"sqlite:///{database_path}"
+    connection = sqlite3.connect(database_path)
+    try:
+        connection.execute("""
+            CREATE TABLE students (
+                id INTEGER PRIMARY KEY,
+                admission_number VARCHAR(40) NOT NULL,
+                first_name VARCHAR(80) NOT NULL
+            )
+        """)
+        connection.execute(
+            "CREATE UNIQUE INDEX ix_students_admission_number ON students (admission_number)"
+        )
+        connection.execute(
+            "INSERT INTO students (id, admission_number, first_name) VALUES (1, ?, ?)",
+            ("OLD-001", "Amina"),
+        )
+        connection.execute("CREATE TABLE alembic_version (version_num VARCHAR(32) NOT NULL)")
+        connection.execute(
+            "INSERT INTO alembic_version (version_num) VALUES (?)",
+            ("0029_enrolment_invitations",),
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    upgrade_database(database_url)
+
+    connection = sqlite3.connect(database_path)
+    try:
+        columns = {
+            row[1]: row for row in connection.execute("PRAGMA table_info(students)")
+        }
+        connection.execute(
+            "INSERT INTO students (id, admission_number, first_name) VALUES (2, NULL, ?)",
+            ("Brian",),
+        )
+        connection.commit()
+        rows = connection.execute(
+            "SELECT id, admission_number, first_name FROM students ORDER BY id"
+        ).fetchall()
+        indexes = connection.execute("PRAGMA index_list(students)").fetchall()
+    finally:
+        connection.close()
+
+    assert columns["admission_number"][3] == 0
+    assert rows == [(1, "OLD-001", "Amina"), (2, None, "Brian")]
+    assert any(index[2] for index in indexes)
