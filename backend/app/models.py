@@ -10,6 +10,7 @@ class SchoolClass(Base):
     __tablename__ = "classes"
     __table_args__ = (UniqueConstraint("name", "section", name="uq_classes_name_section"),)
 
+    school_tenant_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1", index=True)
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(80), index=True)
     section: Mapped[str] = mapped_column(String(40), default="")
@@ -19,6 +20,7 @@ class Subject(Base):
     __tablename__ = "subjects"
     __table_args__ = (UniqueConstraint("name", "school_type", name="uq_subjects_name_school_type"),)
 
+    school_tenant_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1", index=True)
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(100), index=True)
     code: Mapped[str | None] = mapped_column(String(20), nullable=True)
@@ -28,6 +30,7 @@ class Subject(Base):
 class Student(Base):
     __tablename__ = "students"
 
+    school_tenant_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1", index=True)
     id: Mapped[int] = mapped_column(primary_key=True)
     admission_number: Mapped[str | None] = mapped_column(String(40), unique=True, index=True, nullable=True)
     first_name: Mapped[str] = mapped_column(String(80))
@@ -64,6 +67,7 @@ class Attendance(Base):
         UniqueConstraint("student_id", "attendance_date"),
     )
 
+    school_tenant_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1", index=True)
     id: Mapped[int] = mapped_column(primary_key=True)
     student_id: Mapped[int] = mapped_column(ForeignKey("students.id"))
     attendance_date: Mapped[date] = mapped_column(Date, default=date.today)
@@ -73,6 +77,7 @@ class Attendance(Base):
 class Exam(Base):
     __tablename__ = "exams"
 
+    school_tenant_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1", index=True)
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(100))
     term: Mapped[str] = mapped_column(String(40))
@@ -90,6 +95,7 @@ class Mark(Base):
         UniqueConstraint("student_id", "subject_id", "exam_id"),
     )
 
+    school_tenant_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1", index=True)
     id: Mapped[int] = mapped_column(primary_key=True)
     student_id: Mapped[int] = mapped_column(ForeignKey("students.id"))
     subject_id: Mapped[int] = mapped_column(ForeignKey("subjects.id"))
@@ -102,6 +108,7 @@ class GradeBand(Base):
     __tablename__ = "grade_bands"
     __table_args__ = (UniqueConstraint("grade"),)
 
+    school_tenant_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1", index=True)
     id: Mapped[int] = mapped_column(primary_key=True)
     grade: Mapped[str] = mapped_column(String(20), unique=True)
     min_score: Mapped[float]
@@ -112,6 +119,7 @@ class GradeBand(Base):
 class User(Base):
     __tablename__ = "users"
 
+    school_tenant_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1", index=True)
     id: Mapped[int] = mapped_column(primary_key=True)
     username: Mapped[str] = mapped_column(String(80), unique=True, index=True)
     email: Mapped[str] = mapped_column(String(150), unique=True, index=True)
@@ -135,6 +143,7 @@ class TeacherAssignment(Base):
         UniqueConstraint("teacher_id", "class_id", "subject_id"),
     )
 
+    school_tenant_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1", index=True)
     id: Mapped[int] = mapped_column(primary_key=True)
     teacher_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     class_id: Mapped[int] = mapped_column(ForeignKey("classes.id"))
@@ -145,6 +154,7 @@ class ClassTeacherAssignment(Base):
     __tablename__ = "class_teacher_assignments"
     __table_args__ = (UniqueConstraint("class_id", name="uq_class_teacher_class"),)
 
+    school_tenant_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1", index=True)
     id: Mapped[int] = mapped_column(primary_key=True)
     teacher_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     class_id: Mapped[int] = mapped_column(ForeignKey("classes.id"), index=True)
@@ -154,6 +164,7 @@ class ClassTeacherAssignment(Base):
 class SchoolSettings(Base):
     __tablename__ = "school_settings"
 
+    school_tenant_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1", index=True)
     id: Mapped[int] = mapped_column(primary_key=True)
     admission_prefix: Mapped[str] = mapped_column(String(20), default="SB")
     include_year: Mapped[bool] = mapped_column(default=True)
@@ -165,6 +176,7 @@ class SchoolSettings(Base):
 
 class StaffMember(Base):
     __tablename__ = "staff_members"
+    school_tenant_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1", index=True)
     id: Mapped[int] = mapped_column(primary_key=True)
     staff_number: Mapped[str] = mapped_column(String(40), unique=True, index=True)
     first_name: Mapped[str] = mapped_column(String(80))
@@ -184,6 +196,7 @@ class StaffMember(Base):
 class FeeCharge(Base):
     __tablename__ = "fee_charges"
     __table_args__ = (UniqueConstraint("student_id", "term", "year"),)
+    school_tenant_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1", index=True)
     id: Mapped[int] = mapped_column(primary_key=True)
     student_id: Mapped[int] = mapped_column(ForeignKey("students.id"), index=True)
     term: Mapped[str] = mapped_column(String(20))
@@ -193,6 +206,7 @@ class FeeCharge(Base):
 
 class FeePayment(Base):
     __tablename__ = "fee_payments"
+    school_tenant_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1", index=True)
     id: Mapped[int] = mapped_column(primary_key=True)
     charge_id: Mapped[int] = mapped_column(ForeignKey("fee_charges.id"), index=True)
     amount: Mapped[int] = mapped_column(Integer)
@@ -206,6 +220,7 @@ class FeePayment(Base):
 class ClassFee(Base):
     __tablename__ = "class_fees"
     __table_args__ = (UniqueConstraint("class_id", "term", "year"),)
+    school_tenant_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1", index=True)
     id: Mapped[int] = mapped_column(primary_key=True)
     class_id: Mapped[int] = mapped_column(ForeignKey("classes.id"), index=True)
     term: Mapped[str] = mapped_column(String(20))
@@ -217,6 +232,7 @@ class ClassFee(Base):
 
 class SalaryPayment(Base):
     __tablename__ = "salary_payments"
+    school_tenant_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1", index=True)
     id: Mapped[int] = mapped_column(primary_key=True)
     staff_id: Mapped[int] = mapped_column(ForeignKey("staff_members.id"), index=True)
     amount: Mapped[int] = mapped_column(Integer)
@@ -227,6 +243,7 @@ class SalaryPayment(Base):
 
 class OtherExpense(Base):
     __tablename__ = "other_expenses"
+    school_tenant_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1", index=True)
     id: Mapped[int] = mapped_column(primary_key=True)
     description: Mapped[str] = mapped_column(String(160))
     category: Mapped[str] = mapped_column(String(60), default="General")
@@ -237,6 +254,7 @@ class OtherExpense(Base):
 
 class AuditLog(Base):
     __tablename__ = "audit_logs"
+    school_tenant_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1", index=True)
     id: Mapped[int] = mapped_column(primary_key=True)
     actor_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     actor_username: Mapped[str] = mapped_column(String(80))
@@ -249,6 +267,7 @@ class AuditLog(Base):
 
 class SchoolProfile(Base):
     __tablename__ = "school_profile"
+    school_tenant_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1", index=True)
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(160), default="My School")
     address: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -270,6 +289,7 @@ class ParentStudentLink(Base):
     __tablename__ = "parent_student_links"
     __table_args__ = (UniqueConstraint("user_id", "student_id", name="uq_parent_student_link"),)
 
+    school_tenant_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1", index=True)
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     student_id: Mapped[int] = mapped_column(ForeignKey("students.id"), index=True)
@@ -279,6 +299,7 @@ class ParentStudentLink(Base):
 class SchoolAnnouncement(Base):
     __tablename__ = "school_announcements"
 
+    school_tenant_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1", index=True)
     id: Mapped[int] = mapped_column(primary_key=True)
     title: Mapped[str] = mapped_column(String(160))
     message: Mapped[str] = mapped_column(Text)
@@ -291,6 +312,7 @@ class SchoolAnnouncement(Base):
 class PrefectAssignment(Base):
     __tablename__ = "prefect_assignments"
 
+    school_tenant_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1", index=True)
     id: Mapped[int] = mapped_column(primary_key=True)
     student_id: Mapped[int] = mapped_column(ForeignKey("students.id"), index=True)
     position: Mapped[str] = mapped_column(String(100))
@@ -303,6 +325,7 @@ class TeacherDuty(Base):
     __tablename__ = "teacher_duties"
     __table_args__ = (UniqueConstraint("duty_date"),)
 
+    school_tenant_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1", index=True)
     id: Mapped[int] = mapped_column(primary_key=True)
     staff_id: Mapped[int] = mapped_column(ForeignKey("staff_members.id"), index=True)
     duty_date: Mapped[date] = mapped_column(Date, index=True)
@@ -312,6 +335,7 @@ class StaffAttendance(Base):
     __tablename__ = "staff_attendance"
     __table_args__ = (UniqueConstraint("staff_id", "attendance_date"),)
 
+    school_tenant_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1", index=True)
     id: Mapped[int] = mapped_column(primary_key=True)
     staff_id: Mapped[int] = mapped_column(ForeignKey("staff_members.id"), index=True)
     attendance_date: Mapped[date] = mapped_column(Date, default=date.today, index=True)
@@ -325,6 +349,7 @@ class TimetableEntry(Base):
     __tablename__ = "timetable_entries"
     __table_args__ = (UniqueConstraint("class_id", "day_of_week", "start_time"),)
 
+    school_tenant_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1", index=True)
     id: Mapped[int] = mapped_column(primary_key=True)
     class_id: Mapped[int] = mapped_column(ForeignKey("classes.id"), index=True)
     subject_id: Mapped[int | None] = mapped_column(ForeignKey("subjects.id"), nullable=True)
@@ -338,6 +363,7 @@ class TimetableEntry(Base):
 class ParentLiaisonThread(Base):
     __tablename__ = "parent_liaison_threads"
 
+    school_tenant_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1", index=True)
     id: Mapped[int] = mapped_column(primary_key=True)
     student_id: Mapped[int] = mapped_column(ForeignKey("students.id"), index=True)
     parent_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
@@ -352,6 +378,7 @@ class ParentLiaisonThread(Base):
 class ParentLiaisonMessage(Base):
     __tablename__ = "parent_liaison_messages"
 
+    school_tenant_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1", index=True)
     id: Mapped[int] = mapped_column(primary_key=True)
     thread_id: Mapped[int] = mapped_column(ForeignKey("parent_liaison_threads.id", ondelete="CASCADE"), index=True)
     sender_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
@@ -366,6 +393,7 @@ class SyncDevice(Base):
         UniqueConstraint("user_id", "device_id", name="uq_sync_devices_user_device"),
     )
 
+    school_tenant_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1", index=True)
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     device_id: Mapped[str] = mapped_column(String(36), nullable=False)
@@ -382,6 +410,7 @@ class EnrolmentInvitation(Base):
     """Single-use, account-bound device enrolment authorisation."""
     __tablename__ = "enrolment_invitations"
 
+    school_tenant_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1", index=True)
     id: Mapped[int] = mapped_column(primary_key=True)
     token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
     installation_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
@@ -397,6 +426,7 @@ class SyncChangeProposal(Base):
     """Audited offline proposal; never applied directly to live records."""
     __tablename__ = "sync_change_proposals"
     __table_args__ = (UniqueConstraint("user_id", "idempotency_key", name="uq_sync_proposal_user_key"),)
+    school_tenant_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1", index=True)
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     device_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
@@ -417,6 +447,7 @@ class SyncChange(Base):
     """Append-only metadata journal; record contents remain on the authoritative server."""
     __tablename__ = "sync_changes"
 
+    school_tenant_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1", index=True)
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     entity_type: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
     entity_id: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -429,6 +460,7 @@ class SchoolSetupState(Base):
     """Persistent installation activation and first-time setup state."""
     __tablename__ = "school_setup_state"
 
+    school_tenant_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1", index=True)
     id: Mapped[int] = mapped_column(primary_key=True)
     installation_id: Mapped[str] = mapped_column(String(36), unique=True, nullable=False)
     activated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
@@ -443,6 +475,7 @@ class SchoolIdentityCorrection(Base):
     """One-time owner-authorised change to a protected school identity."""
     __tablename__ = "school_identity_corrections"
 
+    school_tenant_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1", index=True)
     id: Mapped[int] = mapped_column(primary_key=True)
     license_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     license_id: Mapped[str] = mapped_column(String(100), nullable=False)
