@@ -116,7 +116,6 @@ export default function SyncDevices({ token, userId, schoolId, isAdmin }: Props)
   const currentRevoked = Boolean(currentDevice && !currentDevice.active)
   return <section className="panel settings-panel sync-devices-panel">
     <div className="panel-heading"><div><h2>Registered devices</h2><p>Review browsers and computers registered to your SchoolBridge account.</p></div><button className="secondary-button" type="button" onClick={() => void load()} disabled={loading || busy}>Refresh</button></div>
-    <p className="form-hint">Manage the devices associated with your account. School records and dashboards are retrieved directly from the school server.</p>
     {isAdmin && !isTauriDesktop && <section className="offline-record-tools school-access-qr">
       <h3>School mobile access QR</h3>
       {qrUnavailableReason ? <p className="form-hint">{qrUnavailableReason}</p> : schoolQrUrl ? <div className="school-access-qr-content">
