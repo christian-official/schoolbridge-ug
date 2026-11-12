@@ -450,3 +450,23 @@ class SchoolIdentityCorrection(Base):
     old_identity_json: Mapped[str] = mapped_column(Text, nullable=False)
     new_identity_json: Mapped[str] = mapped_column(Text, nullable=False)
     corrected_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+class SchoolTenant(Base):
+    """Stable tenant identity for one school in a shared SchoolBridge service.
+
+    Installation identity remains separate: one school tenant may have one or
+    more offline installations/devices, while public_id is the non-secret
+    identifier used for school discovery.
+    """
+    __tablename__ = "school_tenants"
+    __table_args__ = (
+        UniqueConstraint("public_id", name="uq_school_tenants_public_id"),
+        UniqueConstraint("installation_id", name="uq_school_tenants_installation_id"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    public_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    installation_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    name: Mapped[str] = mapped_column(String(160), nullable=False, default="My School")
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="pending_setup")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
