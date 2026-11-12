@@ -70,3 +70,12 @@ test('connection indicator responds immediately to browser offline and online ev
   assert.match(app, /window\.removeEventListener\('offline', handleOffline\)/)
   assert.match(app, /window\.removeEventListener\('online', handleOnline\)/)
 })
+
+test('reconnect invalidates encrypted offline access when the registered device is revoked', async () => {
+  const app = await readFile(new URL('../src/App.tsx', import.meta.url), 'utf8')
+  assert.match(app, /api<\{ devices: \{ device_id: string; active: boolean \}\[\]\}>\('sync\/devices', token\)/)
+  assert.match(app, /find\(device => device\.device_id === deviceId\)/)
+  assert.match(app, /if \(!currentDevice\?\.active\)/)
+  assert.match(app, /deleteEncryptedOfflineSnapshot\(user\.id, deviceId\)/)
+  assert.match(app, /localStorage\.removeItem\('schoolbridge-offline-login-index'\)/)
+})
