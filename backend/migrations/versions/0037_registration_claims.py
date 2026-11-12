@@ -15,6 +15,8 @@ depends_on = None
 
 def upgrade():
     bind = op.get_bind()
+    if bind.dialect.name == "sqlite":
+        bind.exec_driver_sql("PRAGMA defer_foreign_keys=ON")
     inspector = inspect(bind)
     if "users" in set(inspector.get_table_names()):
         email_column = next(
@@ -65,6 +67,8 @@ def upgrade():
 
 def downgrade():
     bind = op.get_bind()
+    if bind.dialect.name == "sqlite":
+        bind.exec_driver_sql("PRAGMA defer_foreign_keys=ON")
     if "registration_claims" in set(inspect(bind).get_table_names()):
         indexes = {item["name"] for item in inspect(bind).get_indexes("registration_claims")}
         for name in ("ix_registration_claims_tenant_status", "ix_registration_claims_reference_hash", "ix_registration_claims_school_tenant_id"):
