@@ -844,7 +844,7 @@ function readOfflineLoginIndex(expectedSchoolId = ''): { userId:number; deviceId
 }
 
 type OfflineWorkspaceSnapshot = {
-  version:number; userId:number; deviceId:string; username:string; installationId:string; role:string; role_label?:string;
+  version:number; userId:number; deviceId:string; username:string; schoolId?:string; schoolName?:string; installationId:string; role:string; role_label?:string;
   permissions?:Record<string,string[]>; downloadedAt:number; expiresAt:number;
   students:any[]; classes:any[]; attendance:any[]; exams:any[]; marks:any[];
   charges:any[]; payments:any[]; class_fees:any[];

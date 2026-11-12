@@ -8,14 +8,14 @@ const storage = await readFile(new URL('../src/syncStorage.ts', import.meta.url)
 const desktopShell = await readFile(new URL('../src-tauri/src/main.rs', import.meta.url), 'utf8')
 
 test('desktop offline sign-in remains reachable when the local API is unavailable', () => {
-  assert.match(app, /const offlineLoginIndex = setupStatus\.error \? readOfflineLoginIndex\(\) : null/)
+  assert.match(app, /const offlineLoginIndex = setupStatus\.error \? readOfflineLoginIndex\(selectedSchoolId\) : null/)
   assert.match(app, /if\(!setupStatus\.setup_completed && !offlineLoginIndex\)/)
   assert.match(app, /if\(setupStatus\.error && !offlineLoginIndex\)/)
 })
 
 test('offline login metadata and encrypted snapshot are bound to one installation', () => {
   assert.match(devices, /installationId:installation\.installation_id/)
-  assert.match(devices, /installation_id:string;setup_completed:boolean;activated:boolean/)
+  assert.match(devices, /installation_id:string;school_id:string;setup_completed:boolean;activated:boolean/)
   assert.match(app, /snapshot\.installationId!==index\.installationId/)
   assert.match(app, /index\.installationId !== installedIdentity/)
   assert.match(app, /localStorage\.setItem\('schoolbridge-installation-id', result\.installation_id\)/)
