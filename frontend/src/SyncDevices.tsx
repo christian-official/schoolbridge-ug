@@ -140,7 +140,7 @@ export default function SyncDevices({ token, userId, isAdmin }: Props) {
     })
     fetch(API_BASE_URL + '/api/public/school', { cache: 'no-store', signal: controller.signal })
       .then(response => response.ok ? response.json() : Promise.reject(new Error('School identity is unavailable.')))
-      .then(identity => setSchoolAccessUrl(destination + encodeURIComponent(identity.installation_id)))
+      .then(identity => setSchoolAccessUrl(destination + encodeURIComponent(identity.school_id)))
       .catch(error => { if (error.name !== 'AbortError') setError(error instanceof Error ? error.message : 'Unable to load school identity.') })
     return () => {
       controller.abort()
