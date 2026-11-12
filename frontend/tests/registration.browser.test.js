@@ -140,3 +140,63 @@ test('QR access opens the correct school registration flow on a mobile viewport 
     server.kill()
   }
 })
+
+
+test('QR teacher registration verifies staff details and opens the teacher dashboard directly', async () => {
+  const server = spawn('npm', ['run', 'preview', '--', '--host', '127.0.0.1', '--port', '4174', '--strictPort'], {
+    stdio: 'ignore', shell: process.platform === 'win32',
+  })
+  let browser
+  let submittedPayload
+  try {
+    let ready = false
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      try { const response = await fetch(baseUrl); if (response.ok) { ready = true; break } } catch { /* Preview is starting. */ }
+      await delay(500)
+    }
+    assert.equal(ready, true, 'Vite preview should become available')
+    browser = await chromium.launch({ headless: true })
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 } })
+    const frontendOrigin = new URL(baseUrl).origin
+    await page.route('**/api/**', async route => {
+      const request = route.request()
+      const url = new URL(request.url())
+      const headers = { 'access-control-allow-origin': frontendOrigin, 'access-control-allow-methods': 'GET, POST, OPTIONS', 'access-control-allow-headers': 'content-type', 'content-type': 'application/json' }
+      if (request.method() === 'OPTIONS') { await route.fulfill({ status: 204, headers }); return }
+      if (url.pathname === '/api/setup/status') {
+        await route.fulfill({ status: 200, headers, body: JSON.stringify({ installation_id: 'teacher-qr-installation', activated: true, setup_completed: true, requires_activation: false, requires_setup: false, identity_locked: true, school_id: schoolId }) }); return
+      }
+      if (url.pathname === '/api/public/school') {
+        await route.fulfill({ status: 200, headers, body: JSON.stringify({ school_id: schoolId, school_name: 'Teacher QR Test School', school_type: 'Secondary' }) }); return
+      }
+      if (url.pathname === '/api/public/registration/teacher' && request.method() === 'POST') {
+        submittedPayload = request.postDataJSON()
+        await route.fulfill({ status: 200, headers, body: JSON.stringify({ access_token: 'teacher-qr-session', role: 'teacher', username: 'teacher-qr-test', message: 'Verified. Opening dashboard.' }) }); return
+      }
+      if (url.pathname === '/api/auth/me') {
+        await route.fulfill({ status: 200, headers, body: JSON.stringify({ id: 52, school_id: schoolId, username: 'teacher-qr-test', email: null, role: 'teacher', role_label: 'Teacher', permissions: {}, active: true, must_change_password: false }) }); return
+      }
+      if (url.pathname === '/api/teacher/my-assignments' || url.pathname === '/api/teacher/my-class-teacher-assignments') {
+        await route.fulfill({ status: 200, headers, body: '[]' }); return
+      }
+      await route.fulfill({ status: 404, headers, body: JSON.stringify({ detail: 'Unexpected teacher QR browser-test request.' }) })
+    })
+    await page.goto(baseUrl + '/?school=' + schoolId)
+    await page.getByRole('heading', { name: 'Join your school' }).waitFor()
+    await page.getByRole('button', { name: 'Teacher', exact: true }).click()
+    await page.getByLabel('First name as recorded by the school').fill('Grace')
+    await page.getByLabel('Last name as recorded by the school').fill('Teacher')
+    await page.getByLabel('Staff number').fill('ST-QR-001')
+    await page.getByRole('button', { name: 'Verify and open my dashboard' }).click()
+    await page.getByRole('heading', { name: 'My assigned classes' }).waitFor()
+    assert.deepEqual(submittedPayload, {
+      school_id: schoolId, first_name: 'Grace', last_name: 'Teacher',
+      staff_number: 'ST-QR-001', position: null, department: null,
+    })
+    assert.equal(await page.getByLabel('Password').count(), 0, 'teacher QR registration must not ask for a password')
+    await page.close()
+  } finally {
+    if (browser) await browser.close()
+    server.kill()
+  }
+})
