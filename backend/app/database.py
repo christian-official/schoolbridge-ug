@@ -110,9 +110,11 @@ def _scope_orm_statements_to_school(execute_state):
     for mapper in Base.registry.mappers:
         model = mapper.class_
         if hasattr(model, "school_tenant_id"):
+            # Use a concrete SQL expression so each mapped class receives
+            # the active session tenant as a bound SQL value.
             options.append(with_loader_criteria(
                 model,
-                lambda entity, tenant_id=tenant_id: entity.school_tenant_id == tenant_id,
+                model.school_tenant_id == tenant_id,
                 include_aliases=True,
             ))
     if options:
