@@ -880,8 +880,16 @@ function OfflineWorkspace({snapshot,onExit}:{snapshot:OfflineWorkspaceSnapshot;o
   </section></main>
 }
 
+function getSelectedSchoolId(): string {
+  if (typeof window === 'undefined') return ''
+  const fromUrl = new URLSearchParams(window.location.search).get('school')
+  if (fromUrl) return fromUrl
+  try { return localStorage.getItem('schoolbridge-selected-school-id') || '' }
+  catch { return '' }
+}
+
 function App() {
-  const selectedSchoolId = typeof window !== 'undefined' ? (new URLSearchParams(window.location.search).get('school') || localStorage.getItem('schoolbridge-selected-school-id') || '') : ''
+  const selectedSchoolId = getSelectedSchoolId()
   const [token, setToken] = useState('')
   const [user, setUser] = useState<User | null>(null)
   const [username, setUsername] = useState('')
