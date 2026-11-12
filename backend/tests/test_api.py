@@ -3473,8 +3473,14 @@ def test_student_can_be_registered_without_an_admission_number():
             **payload, "first_name": "Brian", "guardian_name": "Parent Two",
             "guardian_phone": "0700000002",
         })
+        generated = client.post("/api/students", headers=headers, json={
+            **payload, "first_name": "Carol", "guardian_name": "Parent Three",
+            "guardian_phone": "0700000003", "generate_admission_number": True,
+        })
 
     assert first.status_code == 200, first.text
     assert second.status_code == 200, second.text
+    assert generated.status_code == 200, generated.text
     assert first.json()["admission_number"] is None
     assert second.json()["admission_number"] is None
+    assert generated.json()["admission_number"].startswith("SB-")
