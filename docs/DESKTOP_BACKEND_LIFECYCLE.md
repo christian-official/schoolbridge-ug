@@ -1,13 +1,26 @@
 # Desktop backend lifecycle
 
-The desktop executable and native backend package are installed side by side in one
-installation directory. The required layout is:
+The Tauri installer places the desktop executable and immutable backend/Python
+resources in the application installation. The backend and runtime are resolved
+from Tauri's resource directory, not by assuming that the executable's parent
+directory is writable or contains the resources.
+
+The packaged resource layout is:
 
 - `SchoolBridge.exe`
-- `run-native-windows.ps1` (retained for the standalone native launcher)
-- `runtime/python.exe`
-- `backend/app/` and `backend/app/static/`
-- `.env`
+- `runtime/python.exe` and its provisioned `Lib/site-packages`
+- `backend/app/`, `backend/migrations/`, and `backend/app/static/`
+
+Mutable files are stored separately under the current Windows user's
+`%LOCALAPPDATA%\\SchoolBridge` directory:
+
+- `config/.env` — persistent application configuration and generated secret
+- `data/schoolbridge.sqlite3` — local school database
+- `logs/backend.log` — backend diagnostics
+
+The app creates the configuration on first launch and passes its exact path to
+the backend as `SCHOOLBRIDGE_CONFIG_FILE`. The backend loads it before importing
+the database module. Application upgrades must preserve this per-user directory.
 
 The Tauri application starts the bundled Python runtime directly. It does not
 launch a browser or invoke the PowerShell browser launcher. The backend binds
