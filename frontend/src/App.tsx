@@ -1336,12 +1336,13 @@ function App() {
   useEffect(() => {
     if (!token || !user) return
     const deviceId = localStorage.getItem('schoolbridge-sync-device-' + user.id)
-    if (!deviceId) return
-    void clearLocalSyncData(user.id, deviceId).catch(() => {})
-    localStorage.removeItem('schoolbridge-offline-snapshot-meta-' + user.id + '-' + deviceId)
+    if (deviceId) {
+      void clearLocalSyncData(user.id, deviceId).catch(() => {})
+      localStorage.removeItem('schoolbridge-offline-snapshot-meta-' + user.id + '-' + deviceId)
+    }
     try {
       const legacyIndex = JSON.parse(localStorage.getItem('schoolbridge-offline-login-index') || 'null')
-      if (legacyIndex?.userId === user.id && legacyIndex?.deviceId === deviceId) localStorage.removeItem('schoolbridge-offline-login-index')
+      if (legacyIndex?.userId === user.id) localStorage.removeItem('schoolbridge-offline-login-index')
     } catch {
       localStorage.removeItem('schoolbridge-offline-login-index')
     }
