@@ -3359,3 +3359,55 @@ def test_parent_account_removal_deactivates_without_deleting_links():
         assert db.query(models.ParentStudentLink).filter_by(
             user_id=parent_id, student_id=student_id
         ).count() == 1
+
+
+
+def test_enrolment_invitation_is_account_bound_single_use_and_registers_device():
+    reset_database()
+    admin = create_admin()
+    teacher = create_teacher()
+    admin_headers = {"Authorization": f"Bearer {create_access_token(admin)}"}
+    teacher_headers = {"Authorization": f"Bearer {create_access_token(teacher)}"}
+    with SessionLocal() as db:
+        db.add(models.SchoolSetupState(
+            id=1,
+            installation_id="00000000-0000-4000-8000-000000000099",
+            setup_completed_at=datetime.utcnow(),
+        ))
+        db.commit()
+
+    with TestClient(app) as client:
+        anonymous_issue = client.post("/api/enrolment/invitations", json={"user_id": admin.id})
+        assert anonymous_issue.status_code == 401
+
+        issued = client.post(
+            "/api/enrolment/invitations", headers=admin_headers,
+            json={"user_id": admin.id, "expires_in_minutes": 60},
+        )
+        assert issued.status_code == 200, issued.text
+        token = issued.json()["token"]
+
+        wrong_account = client.post(
+            "/api/enrolment/redeem", headers=teacher_headers,
+            json={"token": token, "device_id": "00000000-0000-4000-8000-000000000099", "device_name": "Teacher phone"},
+        )
+        assert wrong_account.status_code == 403
+
+        redeemed = client.post(
+            "/api/enrolment/redeem", headers=admin_headers,
+            json={"token": token, "device_id": "00000000-0000-4000-8000-000000000098", "device_name": "Admin phone"},
+        )
+        assert redeemed.status_code == 200, redeemed.text
+        assert redeemed.json()["active"] is True
+        assert redeemed.json()["school_installation_id"] == "00000000-0000-4000-8000-000000000099"
+
+        replay = client.post(
+            "/api/enrolment/redeem", headers=admin_headers,
+            json={"token": token, "device_id": "00000000-0000-4000-8000-000000000097", "device_name": "Second phone"},
+        )
+        assert replay.status_code == 409
+
+        devices = client.get("/api/sync/devices", headers=admin_headers)
+        assert [item["device_id"] for item in devices.json()["devices"]] == [
+            "00000000-0000-4000-8000-000000000098"
+        ]
