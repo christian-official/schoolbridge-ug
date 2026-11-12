@@ -13,7 +13,7 @@ from datetime import date, datetime, time
 from pathlib import Path
 from zoneinfo import ZoneInfo
 from uuid import UUID, uuid4
-from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Response, Query
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Response, Query, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import FileResponse
@@ -36,7 +36,7 @@ load_dotenv()
 from .desktop_storage import configure_desktop_database
 configure_desktop_database()
 
-from .database import DATABASE_URL, Base, engine, get_db, SessionLocal, create_sqlite_backup, apply_sqlite_restore, sqlite_connection_diagnostics
+from .database import DATABASE_URL, Base, engine, get_db, SessionLocal, create_sqlite_backup, apply_sqlite_restore, sqlite_connection_diagnostics, set_tenant_context
 from .migrations import upgrade_database
 from . import models
 from .sync_tracking import register_sync_tracking
@@ -82,6 +82,28 @@ def get_tenant_singleton(db: Session, model):
     return db.query(model).filter(
         model.school_tenant_id == get_current_tenant_id(db)
     ).order_by(model.id).first()
+
+
+def resolve_school_tenant(db: Session, school_id: str | None = None):
+    """Select a school by its public QR identifier, never by a secret installation ID."""
+    if school_id:
+        tenant = db.query(models.SchoolTenant).filter(
+            models.SchoolTenant.public_id == school_id
+        ).first()
+        if tenant is None:
+            raise HTTPException(404, "The selected school could not be found.")
+    else:
+        tenants = db.query(models.SchoolTenant).order_by(
+            models.SchoolTenant.id
+        ).limit(2).all()
+        if len(tenants) > 1:
+            raise HTTPException(
+                400, "Select your school using its official SchoolBridge access QR code."
+            )
+        tenant = tenants[0] if tenants else None
+
+    set_tenant_context(db, tenant.id if tenant else 1)
+    return tenant
 
 
 
@@ -2131,9 +2153,11 @@ async def protect_school_data(request: Request, call_next):
 
 class SchoolActivationRequest(BaseModel):
     license: str = Field(min_length=20, max_length=4096)
+    school_id: str | None = Field(default=None, min_length=36, max_length=36)
 
 
 class FirstSchoolSetupRequest(BaseModel):
+    school_id: str | None = Field(default=None, min_length=36, max_length=36)
     activation_license: str = Field(min_length=20, max_length=4096)
     school_name: str = Field(min_length=2, max_length=160)
     school_type: str = Field(pattern="^(Primary|Secondary|Combined)$")
@@ -2206,6 +2230,9 @@ def apply_school_identity_correction(
     }
     profile.name = school_name
     profile.school_type = school_type
+    tenant = db.query(models.SchoolTenant).filter_by(id=state.school_tenant_id).first()
+    if tenant:
+        tenant.name = school_name
     profile.country = country
     profile.school_structure = school_structure
     # Preserve the immutable first-install identity snapshot. Current identity
@@ -2228,10 +2255,12 @@ def apply_school_identity_correction(
 
 
 @app.get("/api/setup/status", tags=["First-time Setup"])
-def school_setup_status(db: Session = Depends(get_db)):
+def school_setup_status(school: str | None = Query(default=None, min_length=36, max_length=36), db: Session = Depends(get_db)):
+    tenant = resolve_school_tenant(db, school)
     state = get_or_create_setup_state(db)
     return {
         "installation_id": state.installation_id,
+        "school_id": tenant.public_id if tenant else None,
         "activated": bool(state.activated_at),
         "setup_completed": bool(state.setup_completed_at),
         "requires_activation": not bool(state.activated_at),
@@ -2242,6 +2271,7 @@ def school_setup_status(db: Session = Depends(get_db)):
 
 @app.post("/api/setup/activate", tags=["First-time Setup"])
 def activate_school_installation(data: SchoolActivationRequest, db: Session = Depends(get_db)):
+    resolve_school_tenant(db, data.school_id)
     state = get_or_create_setup_state(db)
     if state.activated_at:
         raise HTTPException(409, "This SchoolBridge installation has already been activated.")
@@ -2274,6 +2304,7 @@ def activate_school_installation(data: SchoolActivationRequest, db: Session = De
 
 @app.post("/api/setup/complete", tags=["First-time Setup"])
 def complete_first_school_setup(data: FirstSchoolSetupRequest, db: Session = Depends(get_db)):
+    tenant = resolve_school_tenant(db, data.school_id)
     state = get_or_create_setup_state(db)
     if not state.activated_at:
         raise HTTPException(403, "Activate this installation before completing school setup.")
@@ -2309,6 +2340,10 @@ def complete_first_school_setup(data: FirstSchoolSetupRequest, db: Session = Dep
     db.flush()
     state.original_identity_json = json.dumps(identity, sort_keys=True)
     state.setup_completed_at = datetime.utcnow()
+    if tenant:
+        tenant.installation_id = state.installation_id
+        tenant.name = profile.name
+        tenant.status = "active"
     write_audit(db, admin, "school_first_setup_completed", "school_profile", profile.id,
                 "Initial school identity and first administrator created.")
     try:
@@ -2322,8 +2357,10 @@ def complete_first_school_setup(data: FirstSchoolSetupRequest, db: Session = Dep
 @app.post("/api/auth/login", tags=["Authentication"])
 def login(
     data: OAuth2PasswordRequestForm = Depends(),
+    school_id: str | None = Form(default=None),
     db: Session = Depends(get_db)
 ):
+    resolve_school_tenant(db, school_id)
     state = get_tenant_singleton(db, models.SchoolSetupState)
     if not state or not state.setup_completed_at:
         raise HTTPException(403, "SchoolBridge first-time setup must be completed before signing in.")
@@ -2368,10 +2405,12 @@ def login(
 
 class PasswordResetRequest(BaseModel):
     identifier: str = Field(min_length=1, max_length=160)
+    school_id: str | None = Field(default=None, min_length=36, max_length=36)
 
 
 class PasswordResetConfirm(BaseModel):
     identifier: str = Field(min_length=1, max_length=160)
+    school_id: str | None = Field(default=None, min_length=36, max_length=36)
     code: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
     new_password: str = Field(min_length=8, max_length=128)
 
@@ -2424,6 +2463,8 @@ def send_password_recovery_email(user, code: str) -> bool:
 @app.post("/api/auth/password-reset/request", tags=["Authentication"])
 def request_password_reset(data: PasswordResetRequest, db: Session = Depends(get_db)):
     # Always return the same response so account names and email addresses cannot be enumerated.
+    resolve_school_tenant(db, data.school_id)
+    resolve_school_tenant(db, data.school_id)
     user = find_password_recovery_account(db, data.identifier)
     now = datetime.utcnow()
     if user and user.is_active and user.email and not user.email.endswith(".schoolbridge.local"):
@@ -2489,13 +2530,15 @@ def current_account(user=Depends(get_current_user)):
 
 
 @app.get("/api/public/school", tags=["Public School Identity"])
-def public_school_identity(db: Session = Depends(get_db)):
+def public_school_identity(school: str | None = Query(default=None, min_length=36, max_length=36), db: Session = Depends(get_db)):
+    tenant = resolve_school_tenant(db, school)
     state = get_tenant_singleton(db, models.SchoolSetupState)
     profile = get_tenant_singleton(db, models.SchoolProfile)
     if not state or not state.setup_completed_at or not profile:
         raise HTTPException(404, "School identity is not available.")
     return {
         "school_name": profile.name,
+        "school_id": tenant.public_id if tenant else None,
         "school_type": profile.school_type,
         "country": profile.country,
         "installation_id": state.installation_id,
@@ -2523,7 +2566,10 @@ def school_access_qr(
         or parsed.query or parsed.fragment or parsed.path not in {"", "/"}
     ):
         raise HTTPException(400, "The QR destination must be this SchoolBridge installation's current web origin.")
-    target = origin.rstrip("/") + "/?school=" + state.installation_id
+    tenant = db.query(models.SchoolTenant).filter_by(id=state.school_tenant_id).first()
+    if tenant is None:
+        raise HTTPException(409, "This installation is not registered in the school directory.")
+    target = origin.rstrip("/") + "/?school=" + tenant.public_id
     qr = qrcode.QRCode(
         version=None,
         error_correction=qrcode.constants.ERROR_CORRECT_M,
