@@ -80,11 +80,11 @@ export default function Phase4Workspace({ token, role, active, permissions }: { 
   }
 
   async function decideRegistrationClaim(claim: RegistrationClaim, status: 'approved' | 'rejected') {
+    const candidateIds = JSON.parse(claim.candidate_student_ids_json || '[]') as number[]
+    const childCount = Array.isArray(JSON.parse(claim.details_json || '{}').children) ? JSON.parse(claim.details_json || '{}').children.length : 0
+    const studentIds = claimSelectedStudentIds[claim.id] || (candidateIds.length === childCount ? candidateIds : [])
+    const staffId = claimSelectedStaffIds[claim.id] || claim.candidate_staff_id || null
     if (status === 'approved') {
-      const candidateIds = JSON.parse(claim.candidate_student_ids_json || '[]') as number[]
-      const childCount = Array.isArray(JSON.parse(claim.details_json || '{}').children) ? JSON.parse(claim.details_json || '{}').children.length : 0
-      const studentIds = claimSelectedStudentIds[claim.id] || (candidateIds.length === childCount ? candidateIds : [])
-      const staffId = claimSelectedStaffIds[claim.id] || claim.candidate_staff_id || null
       if (claim.claim_type === 'parent' && (studentIds.length !== childCount || studentIds.some(id => !Number.isInteger(id) || id <= 0) || new Set(studentIds).size !== childCount)) {
         setError('Match one distinct registered learner record for every child before approving this request.')
         return
