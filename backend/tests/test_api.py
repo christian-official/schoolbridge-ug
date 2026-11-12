@@ -3362,6 +3362,46 @@ def test_parent_account_removal_deactivates_without_deleting_links():
 
 
 
+def test_public_school_identity_and_admin_reusable_qr_are_scoped_to_current_origin():
+    reset_database()
+    admin = create_admin()
+    admin_headers = {"Authorization": f"Bearer {create_access_token(admin)}"}
+    with SessionLocal() as db:
+        db.add(models.SchoolProfile(
+            id=1, name="Test School", school_type="Secondary", country="Uganda",
+            school_structure="Day",
+        ))
+        db.commit()
+
+    with TestClient(app) as client:
+        identity = client.get("/api/public/school")
+        assert identity.status_code == 200, identity.text
+        assert identity.json() == {
+            "school_name": "Test School",
+            "school_type": "Secondary",
+            "country": "Uganda",
+            "installation_id": "test-existing-installation",
+        }
+
+        anonymous_qr = client.get("/api/enrolment/school-qr.svg?origin=http://testserver")
+        assert anonymous_qr.status_code == 401
+
+        qr = client.get(
+            "/api/enrolment/school-qr.svg?origin=http://testserver",
+            headers=admin_headers,
+        )
+        assert qr.status_code == 200, qr.text
+        assert qr.headers["content-type"].startswith("image/svg+xml")
+        assert "test-existing-installation" not in qr.text
+        assert "<svg" in qr.text
+
+        external_origin = client.get(
+            "/api/enrolment/school-qr.svg?origin=https://attacker.example",
+            headers=admin_headers,
+        )
+        assert external_origin.status_code == 400
+
+
 def test_enrolment_invitation_is_account_bound_single_use_and_registers_device():
     reset_database()
     admin = create_admin()
