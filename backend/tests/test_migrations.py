@@ -337,7 +337,7 @@ def test_partial_school_setup_state_table_gets_missing_activation_columns(tmp_pa
     assert "activation_locked_until" in columns
     assert attempts == 0
     assert installation_id == "existing-installation-id"
-    assert revision == "0031_school_tenant_registry"
+    assert revision == "0032_school_tenant_ownership"
 
 
 def test_user_session_version_column_is_migrated(migrated_database):
@@ -402,3 +402,30 @@ def test_existing_student_table_migrates_to_optional_admission_number(tmp_path):
     assert columns["admission_number"][3] == 0
     assert rows == [(1, "OLD-001", "Amina"), (2, None, "Brian")]
     assert any(index[2] for index in indexes)
+
+
+
+def test_all_school_owned_tables_receive_tenant_ownership_keys(migrated_database):
+    from app.migrations.versions import _0032_school_tenant_ownership as ownership
+
+    engine = create_engine(migrated_database)
+    inspector = inspect(engine)
+    for table in ownership.TENANT_TABLES:
+        columns = {item["name"] for item in inspector.get_columns(table)}
+        assert "school_tenant_id" in columns, table
+        indexes = {item["name"] for item in inspector.get_indexes(table)}
+        assert f"ix_{table}_school_tenant_id" in indexes, table
+
+    with engine.connect() as connection:
+        tenant_ids = connection.execute(
+            select(models.SchoolTenant.id)
+        ).scalars().all()
+        assert len(tenant_ids) == 1
+        tenant_id = tenant_ids[0]
+        for table in ownership.TENANT_TABLES:
+            count = connection.exec_driver_sql(
+                f'SELECT COUNT(*) FROM "{table}" WHERE school_tenant_id != ?',
+                (tenant_id,),
+            ).scalar_one()
+            assert count == 0, table
+    engine.dispose()
