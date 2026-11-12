@@ -1555,7 +1555,7 @@ function App() {
           {dataError && <div className="notice">{dataError} <button onClick={() => void loadSchoolData(token)}>Retry</button></div>}
           {syncDeviceRevoked && <div className="notice" role="alert">This browser's synchronisation access has been revoked. SchoolBridge does not currently keep offline copies of API records in this browser. The old device identity remains blocked; open Device Management to register a new identity.</div>}
 
-          {(active === 'My Classes' || active === 'Attendance' || active === 'My Attendance' || active === 'My Results') && user.role === 'teacher' && <TeacherWorkspace token={token} active={active} userId={user.id} />}
+          {(active === 'My Classes' || active === 'Attendance' || active === 'My Attendance' || active === 'My Results') && user.role === 'teacher' && <TeacherWorkspace token={token} active={active} />}
           {active === 'My Attendance' && user.role !== 'teacher' && user.role !== 'parent' && user.role !== 'admin' && <StaffSelfAttendance token={token} />}
           {((active === 'Parent Access' || active === 'Announcements') && user.role !== 'parent' || (active === 'My Children' || active === 'Announcements') && user.role === 'parent') && <Phase4Workspace token={token} role={user.role} active={active} permissions={user.permissions} />}
 
@@ -1729,7 +1729,7 @@ function App() {
               </section>
             </div>
           )}
-          {active === 'Examinations' && user.role !== 'parent' && <AcademicManagement token={token} classes={classes} userId={user.id} apiBaseUrl={API_BASE_URL} isTeacher={user.role === 'teacher'} isAdmin={user.role === 'admin'} canVerify={user.role === 'admin' || (user.permissions?.['Examinations'] || []).includes('approve')} />}
+          {active === 'Examinations' && user.role !== 'parent' && <AcademicManagement token={token} classes={classes} apiBaseUrl={API_BASE_URL} isAdmin={user.role === 'admin'} canVerify={user.role === 'admin' || (user.permissions?.['Examinations'] || []).includes('approve')} />}
           {active === 'Attendance' && user.role !== 'parent' && user.role !== 'teacher' && <AttendanceHub token={token} userId={user.id} canViewStudents={user.role === 'admin' || (user.permissions?.['Attendance'] || []).includes('view')} canViewStaff={user.role === 'admin' || (user.permissions?.['Staff Attendance'] || []).includes('view')} canEditStudents={user.role === 'admin' || (user.permissions?.['Attendance'] || []).includes('edit')} permissions={user.permissions} isAdmin={user.role === 'admin'} roleLabel={user.role_label || ''} />}
           {active === 'Timetable' && user.role !== 'parent' && <OperationsManagement token={token} active={active} permissions={user.permissions} isAdmin={user.role === 'admin'} roleLabel={user.role_label || ''} />}
           {active === 'My Profile' && user.role !== 'parent' && user.role !== 'admin' && <MyStaffProfile token={token} />}
@@ -1903,7 +1903,7 @@ type TeacherResultStatus = {subject_id:number;submitted_count:number;pending_cou
 type TeacherOwnAttendance = {staff_name:string;staff_number:string;today:{attendance_date:string;status:string;check_in_at?:string|null;check_out_at?:string|null};records:{id:number;attendance_date:string;status:string;notes?:string|null;check_in_at?:string|null;check_out_at?:string|null}[]}
 type ClassTeacherAssignment = {assignment_id:number;class_id:number;class:string}
 
-function TeacherWorkspace({token,active,userId}:{token:string;active:string;userId:number}) {
+function TeacherWorkspace({token,active}:{token:string;active:string}) {
   const [assignments,setAssignments]=useState<TeacherAssignment[]>([])
   const [classTeacherAssignments,setClassTeacherAssignments]=useState<ClassTeacherAssignment[]>([])
   const [students,setStudents]=useState<TeacherStudent[]>([])
