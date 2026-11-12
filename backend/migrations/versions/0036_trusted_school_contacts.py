@@ -16,25 +16,26 @@ depends_on = None
 def upgrade():
     bind = op.get_bind()
     inspector = inspect(bind)
-    if "staff_members" in set(inspector.get_table_names()):
-        staff_columns = {column["name"] for column in inspector.get_columns("staff_members")}
+    tables = set(inspector.get_table_names())
+
+    # The baseline migration creates missing tables from current ORM metadata.
+    # Therefore a fresh database may already have these columns and table.
+    if "staff_members" in tables:
+        columns = {item["name"] for item in inspector.get_columns("staff_members")}
         additions = (
             ("phone_source", sa.String(40), "legacy_staff_record"),
             ("phone_verification_status", sa.String(20), "unverified"),
+            ("phone_verified_at", sa.DateTime(), None),
+            ("phone_verified_by", sa.Integer(), None),
         )
         for name, column_type, default in additions:
-            if name not in staff_columns:
-                op.add_column(
-                    "staff_members",
-                    sa.Column(name, column_type, nullable=False, server_default=default),
-                )
-        staff_columns = {column["name"] for column in inspect(bind).get_columns("staff_members")}
-        if "phone_verified_at" not in staff_columns:
-            op.add_column("staff_members", sa.Column("phone_verified_at", sa.DateTime(), nullable=True))
-        if "phone_verified_by" not in staff_columns:
-            op.add_column("staff_members", sa.Column("phone_verified_by", sa.Integer(), nullable=True))
+            if name in columns:
+                continue
+            column = sa.Column(name, column_type, nullable=default is None)
+            if default is not None:
+                column.server_default = default
+            op.add_column("staff_members", column)
 
-    tables = set(inspect(bind).get_table_names())
     if "student_guardian_contacts" not in tables:
         op.create_table(
             "student_guardian_contacts",
@@ -56,61 +57,72 @@ def upgrade():
             sa.UniqueConstraint("school_tenant_id", "student_id", "legacy_slot", name="uq_student_guardian_legacy_slot"),
         )
 
-    indexes = {item["name"] for item in inspect(bind).get_indexes("student_guardian_contacts")}
-    if "ix_student_guardian_contacts_school_tenant_id" not in indexes:
-        op.create_index("ix_student_guardian_contacts_school_tenant_id", "student_guardian_contacts", ["school_tenant_id"])
-    if "ix_student_guardian_contacts_student_id" not in indexes:
-        op.create_index("ix_student_guardian_contacts_student_id", "student_guardian_contacts", ["student_id"])
+    inspector = inspect(bind)
+    if "student_guardian_contacts" in set(inspector.get_table_names()):
+        indexes = {item["name"] for item in inspector.get_indexes("student_guardian_contacts")}
+        if "ix_student_guardian_contacts_school_tenant_id" not in indexes:
+            op.create_index("ix_student_guardian_contacts_school_tenant_id", "student_guardian_contacts", ["school_tenant_id"])
+        if "ix_student_guardian_contacts_student_id" not in indexes:
+            op.create_index("ix_student_guardian_contacts_student_id", "student_guardian_contacts", ["student_id"])
 
-    # Preserve existing paper-record guardian details without treating them
-    # as verified. A school administrator must explicitly confirm trust.
-    op.execute(sa.text("""
-        INSERT INTO student_guardian_contacts
-            (school_tenant_id, student_id, guardian_name, relationship, phone,
-             legacy_slot, source, verification_status, is_primary, active,
-             created_at, updated_at)
-        SELECT s.school_tenant_id, s.id, s.guardian_name, s.guardian_relationship, s.guardian_phone,
-               'primary', 'legacy_student_fields', 'unverified', 1, 1,
-               CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-        FROM students s
-        WHERE s.guardian_name IS NOT NULL AND trim(s.guardian_name) <> ''
-          AND NOT EXISTS (
-              SELECT 1 FROM student_guardian_contacts g
-              WHERE g.school_tenant_id = s.school_tenant_id
-                AND g.student_id = s.id AND g.legacy_slot = 'primary'
-          )
-    """))
-    op.execute(sa.text("""
-        INSERT INTO student_guardian_contacts
-            (school_tenant_id, student_id, guardian_name, relationship, phone,
-             legacy_slot, source, verification_status, is_primary, active,
-             created_at, updated_at)
-        SELECT s.school_tenant_id, s.id, s.guardian2_name, s.guardian2_relationship, s.guardian2_phone,
-               'secondary', 'legacy_student_fields', 'unverified', 0, 1,
-               CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-        FROM students s
-        WHERE s.guardian2_name IS NOT NULL AND trim(s.guardian2_name) <> ''
-          AND NOT EXISTS (
-              SELECT 1 FROM student_guardian_contacts g
-              WHERE g.school_tenant_id = s.school_tenant_id
-                AND g.student_id = s.id AND g.legacy_slot = 'secondary'
-          )
-    """))
+    # Older supported databases may not yet contain the legacy guardian fields,
+    # or may not have a students table at all. Backfill only when the source
+    # columns exist. Boolean literals remain portable across SQLite/PostgreSQL.
+    inspector = inspect(bind)
+    if "students" in set(inspector.get_table_names()):
+        student_columns = {item["name"] for item in inspector.get_columns("students")}
+        primary_fields = {"school_tenant_id", "id", "guardian_name", "guardian_relationship", "guardian_phone"}
+        if primary_fields <= student_columns:
+            op.execute(sa.text("""
+                INSERT INTO student_guardian_contacts
+                    (school_tenant_id, student_id, guardian_name, relationship, phone,
+                     legacy_slot, source, verification_status, is_primary, active,
+                     created_at, updated_at)
+                SELECT s.school_tenant_id, s.id, s.guardian_name, s.guardian_relationship, s.guardian_phone,
+                       'primary', 'legacy_student_fields', 'unverified', TRUE, TRUE,
+                       CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                FROM students AS s
+                WHERE s.guardian_name IS NOT NULL AND trim(s.guardian_name) <> ''
+                  AND NOT EXISTS (
+                      SELECT 1 FROM student_guardian_contacts AS c
+                      WHERE c.school_tenant_id = s.school_tenant_id
+                        AND c.student_id = s.id AND c.legacy_slot = 'primary'
+                  )
+            """))
+        secondary_fields = {"school_tenant_id", "id", "guardian2_name", "guardian2_relationship", "guardian2_phone"}
+        if secondary_fields <= student_columns:
+            op.execute(sa.text("""
+                INSERT INTO student_guardian_contacts
+                    (school_tenant_id, student_id, guardian_name, relationship, phone,
+                     legacy_slot, source, verification_status, is_primary, active,
+                     created_at, updated_at)
+                SELECT s.school_tenant_id, s.id, s.guardian2_name, s.guardian2_relationship, s.guardian2_phone,
+                       'secondary', 'legacy_student_fields', 'unverified', FALSE, TRUE,
+                       CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                FROM students AS s
+                WHERE s.guardian2_name IS NOT NULL AND trim(s.guardian2_name) <> ''
+                  AND NOT EXISTS (
+                      SELECT 1 FROM student_guardian_contacts AS c
+                      WHERE c.school_tenant_id = s.school_tenant_id
+                        AND c.student_id = s.id AND c.legacy_slot = 'secondary'
+                  )
+            """))
 
 
 def downgrade():
     bind = op.get_bind()
-    if bind.dialect.name == "sqlite":
-        bind.exec_driver_sql("PRAGMA defer_foreign_keys=ON")
-    tables = set(inspect(bind).get_table_names())
+    inspector = inspect(bind)
+    tables = set(inspector.get_table_names())
     if "student_guardian_contacts" in tables:
-        indexes = {item["name"] for item in inspect(bind).get_indexes("student_guardian_contacts")}
+        if bind.dialect.name == "sqlite":
+            bind.exec_driver_sql("PRAGMA defer_foreign_keys=ON")
+        indexes = {item["name"] for item in inspector.get_indexes("student_guardian_contacts")}
         for name in ("ix_student_guardian_contacts_student_id", "ix_student_guardian_contacts_school_tenant_id"):
             if name in indexes:
                 op.drop_index(name, table_name="student_guardian_contacts")
         op.drop_table("student_guardian_contacts")
     if "staff_members" in tables:
-        columns = {column["name"] for column in inspect(bind).get_columns("staff_members")}
+        columns = {item["name"] for item in inspect(bind).get_columns("staff_members")}
         with op.batch_alter_table("staff_members") as batch:
             for name in ("phone_verified_by", "phone_verified_at", "phone_verification_status", "phone_source"):
                 if name in columns:
