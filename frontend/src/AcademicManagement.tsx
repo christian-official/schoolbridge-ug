@@ -94,7 +94,7 @@ async function fetchClassStudents(token: string, classId: number | null, apiBase
 }
 
 export default function AcademicManagement({ token, classes, canVerify = false, userId, isTeacher = false, isAdmin = false, apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '') }: { token: string; classes: SchoolClass[]; canVerify?: boolean; userId: number; isTeacher?: boolean; isAdmin?: boolean; apiBaseUrl?: string }) {
-  const apiRequest = <T,>(path: string, requestToken: string, options: RequestInit = {}) => apiRequest<T>(path, requestToken, options, apiBaseUrl)
+  const apiRequest = <T,>(path: string, requestToken: string, options: RequestInit = {}): Promise<T> => request<T>(path, requestToken, options, apiBaseUrl)
   const [exams, setExams] = useState<Exam[]>([])
   const [subjects, setSubjects] = useState<Subject[]>([])
   const [students, setStudents] = useState<Student[]>([])
