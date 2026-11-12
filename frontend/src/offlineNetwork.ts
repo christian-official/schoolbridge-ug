@@ -4,7 +4,7 @@ export async function fetchSchoolBridge(input: RequestInfo | URL, init?: Request
     response = await fetch(input, init)
   } catch (error) {
     if (error instanceof TypeError || (typeof navigator !== 'undefined' && !navigator.onLine)) {
-      throw new TypeError("SchoolBridge cannot reach its server right now. You're offline or the connection is unavailable. Reconnect to refresh live records; check an action's status before retrying.")
+      throw new TypeError("SchoolBridge could not complete this server request. Your device may still be online; the service or this request may be temporarily unavailable. Retry after checking whether the action was completed.")
     }
     throw error
   }
