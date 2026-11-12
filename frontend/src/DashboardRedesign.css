@@ -795,3 +795,58 @@
   outline: 2px solid #fff;
   outline-offset: 2px;
 }
+
+/* Compact, two-row mobile toolbar: never let workspace title or actions clip. */
+@media (max-width: 760px) {
+  .redesigned-app-shell > .main-area > .topbar {
+    display: grid !important;
+    grid-template-columns: auto minmax(0, 1fr) !important;
+    grid-template-rows: auto auto !important;
+    align-items: center !important;
+    column-gap: 10px !important;
+    row-gap: 9px !important;
+    height: auto !important;
+    min-height: calc(104px + env(safe-area-inset-top, 0px)) !important;
+    flex: 0 0 auto !important;
+    padding: max(10px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) 10px max(12px, env(safe-area-inset-left, 0px)) !important;
+    overflow: visible !important;
+  }
+  .redesigned-app-shell > .main-area > .topbar .mobile-menu-button {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 68px !important;
+  }
+  .redesigned-app-shell > .main-area > .topbar .breadcrumb {
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    font-size: 12px !important;
+  }
+  .redesigned-app-shell > .main-area > .topbar .top-actions {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    display: flex !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    gap: 8px !important;
+  }
+  .redesigned-app-shell > .main-area > .topbar .connection-indicator {
+    margin-right: auto;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .redesigned-app-shell > .main-area > .topbar .connection-indicator > span {
+    display: none !important;
+  }
+  .redesigned-app-shell > .main-area > .topbar .refresh-button {
+    flex: 0 0 auto !important;
+    min-height: 40px !important;
+    padding: 8px 12px !important;
+    white-space: nowrap !important;
+  }
+}
