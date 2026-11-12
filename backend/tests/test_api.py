@@ -3487,6 +3487,28 @@ def test_student_can_be_registered_without_an_admission_number():
     assert generated.json()["admission_number"].startswith("SB-")
 
 
+def test_tenant_scoped_writes_reject_cross_school_foreign_key_targets():
+    reset_database()
+    with SessionLocal() as db:
+        other_school_student = models.Student(
+            first_name="Other", last_name="School", school_tenant_id=2,
+        )
+        db.add(other_school_student)
+        db.commit()
+        other_student_id = other_school_student.id
+
+    with SessionLocal() as db:
+        set_tenant_context(db, 1)
+        db.add(models.Attendance(
+            student_id=other_student_id,
+            attendance_date=date(2026, 11, 12),
+            status="Present",
+        ))
+        with pytest.raises(ValueError, match="cannot reference another school's record"):
+            db.commit()
+        db.rollback()
+
+
 def test_orm_sessions_are_scoped_to_one_school_and_reject_cross_tenant_writes():
     reset_database()
     with SessionLocal() as db:

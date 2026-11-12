@@ -2,7 +2,7 @@ import os
 import shutil
 import sqlite3
 
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, select
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 DATABASE_URL = os.getenv(
@@ -126,7 +126,9 @@ def _enforce_school_tenant_on_writes(session, _flush_context, _instances):
     tenant_id = session.info.get("school_tenant_id")
     if tenant_id is None:
         return
-    for instance in session.new.union(session.dirty).union(session.deleted):
+
+    pending = session.new.union(session.dirty)
+    for instance in pending.union(session.deleted):
         if not hasattr(instance, "school_tenant_id"):
             continue
         record_tenant_id = getattr(instance, "school_tenant_id", None)
@@ -134,6 +136,53 @@ def _enforce_school_tenant_on_writes(session, _flush_context, _instances):
             instance.school_tenant_id = tenant_id
         elif int(record_tenant_id) != int(tenant_id):
             raise ValueError("A school-scoped session cannot modify another school's record.")
+
+    # A tenant-owned row must never point at a row owned by another tenant.
+    # Use Core SQL here so this integrity check is independent of ORM loader
+    # criteria and cannot accidentally hide a cross-tenant foreign-key target.
+    connection = session.connection()
+    for instance in pending:
+        mapper = instance.__mapper__
+        for foreign_key in mapper.local_table.foreign_keys:
+            local_value = getattr(instance, foreign_key.parent.key, None)
+            if local_value is None:
+                continue
+
+            target_table = foreign_key.column.table
+            if "school_tenant_id" not in target_table.c:
+                continue
+
+            target_column = foreign_key.column
+            target_mapper = next(
+                (candidate for candidate in Base.registry.mappers
+                 if candidate.local_table is target_table),
+                None,
+            )
+            if target_mapper is None:
+                continue
+
+            # Include pending target rows with explicit primary keys; rows
+            # generated in this flush cannot be referenced by an integer FK
+            # until their IDs have been assigned.
+            pending_target = next(
+                (candidate for candidate in session.new
+                 if isinstance(candidate, target_mapper.class_)
+                 and getattr(candidate, target_column.key, None) == local_value),
+                None,
+            )
+            if pending_target is not None:
+                target_tenant_id = getattr(pending_target, "school_tenant_id", tenant_id)
+            else:
+                target_tenant_id = connection.execute(
+                    select(target_table.c.school_tenant_id).where(
+                        target_column == local_value
+                    )
+                ).scalar_one_or_none()
+
+            if target_tenant_id is not None and int(target_tenant_id) != int(tenant_id):
+                raise ValueError(
+                    "A school-scoped record cannot reference another school's record."
+                )
 
 
 class Base(DeclarativeBase):
