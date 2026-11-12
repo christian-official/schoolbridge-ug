@@ -3596,7 +3596,7 @@ def test_school_profile_settings_and_setup_state_are_tenant_singletons():
 
     with SessionLocal() as db:
         db.add(models.SchoolTenant(
-            public_id="00000000-0000-4000-8000-000000000777",
+            id=2, public_id="00000000-0000-4000-8000-000000000777",
             name="Second School", status="active",
         ))
         db.commit()
