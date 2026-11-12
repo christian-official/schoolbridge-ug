@@ -23,6 +23,17 @@ foreach ($required in @($verifySource, $guideSource)) {
 }
 
 $target = [IO.Path]::GetFullPath($OutputDirectory)
+$repoFull = [IO.Path]::GetFullPath($RepoRoot).TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+$targetFull = $target.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+$targetPrefix = $targetFull + [IO.Path]::DirectorySeparatorChar
+if ($targetFull.Equals($repoFull, [StringComparison]::OrdinalIgnoreCase) -or
+    $repoFull.StartsWith($targetPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+    throw "OutputDirectory cannot be the repository root or one of its parent directories."
+}
+$sourceFull = [IO.Path]::GetFullPath($source)
+if ($sourceFull.StartsWith($targetPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+    throw "InstallerPath cannot point inside OutputDirectory because that folder is rebuilt from scratch."
+}
 if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Recurse -Force }
 New-Item -ItemType Directory -Path $target -Force | Out-Null
 
