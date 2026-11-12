@@ -43,6 +43,13 @@ jobs:
         shell: pwsh
         run: |
           ./scripts/prepare-native-windows.ps1 -PythonEmbedZip "$env:PYTHON_EMBED_ZIP" -GetPipScript "$env:GET_PIP_SCRIPT"
+      - name: Supply CI-only owner activation test public key
+        shell: pwsh
+        run: |
+          $bytes = New-Object byte[] 32
+          [Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
+          $key = [Convert]::ToBase64String($bytes)
+          Set-Content -LiteralPath "frontend/src-tauri/owner-activation-public-key.txt" -Value $key -Encoding ASCII -NoNewline
       - name: Stage backend and Python runtime as Tauri resources
         shell: pwsh
         run: |

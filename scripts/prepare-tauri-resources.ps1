@@ -10,6 +10,16 @@ $BackendSource = Join-Path $NativePackageDir "backend"
 $PythonZip = Join-Path $NativePackageDir "python-3.12-embed-amd64.zip"
 $GetPip = Join-Path $NativePackageDir "get-pip.py"
 $Wheelhouse = Join-Path $NativePackageDir "wheelhouse"
+$OwnerPublicKeyFile = Join-Path $RepoRoot "frontend/src-tauri/owner-activation-public-key.txt"
+if (-not (Test-Path $OwnerPublicKeyFile -PathType Leaf)) {
+    throw "Owner activation public key is missing. Put the Base64 Ed25519 PUBLIC key (one line) in frontend/src-tauri/owner-activation-public-key.txt before building a distributable installer."
+}
+$OwnerPublicKey = (Get-Content -LiteralPath $OwnerPublicKeyFile -Raw).Trim()
+try { $OwnerPublicKeyBytes = [Convert]::FromBase64String($OwnerPublicKey) }
+catch { throw "Owner activation public key must be valid Base64." }
+if ($OwnerPublicKeyBytes.Length -ne 32 -or [Convert]::ToBase64String($OwnerPublicKeyBytes) -ne $OwnerPublicKey) {
+    throw "Owner activation public key must be canonical Base64 encoding of exactly 32 Ed25519 public-key bytes."
+}
 
 foreach ($required in @(
     $BackendSource,
@@ -30,6 +40,7 @@ if (Test-Path $ResourcesDir) {
 }
 $null = New-Item -ItemType Directory -Force -Path $ResourcesDir
 Copy-Item $BackendSource (Join-Path $ResourcesDir "backend") -Recurse
+Set-Content -LiteralPath (Join-Path $ResourcesDir "owner-activation-public-key.txt") -Value $OwnerPublicKey -Encoding ASCII -NoNewline
 $null = New-Item -ItemType Directory -Force -Path $RuntimeDir
 Expand-Archive -LiteralPath $PythonZip -DestinationPath $RuntimeDir -Force
 

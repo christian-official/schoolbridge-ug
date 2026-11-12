@@ -26,3 +26,6 @@ build/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Local production owner activation public key; never commit this file.
+/frontend/src-tauri/owner-activation-public-key.txt

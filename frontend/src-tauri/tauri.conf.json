@@ -33,7 +33,8 @@
     ],
     "resources": {
       "../desktop-resources/backend/": "backend/",
-      "../desktop-resources/runtime/": "runtime/"
+      "../desktop-resources/runtime/": "runtime/",
+      "../desktop-resources/owner-activation-public-key.txt": "owner-activation-public-key.txt"
     },
     "windows": {
       "webviewInstallMode": {

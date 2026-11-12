@@ -22,9 +22,15 @@ The backend receives `SCHOOLBRIDGE_CONFIG_FILE` explicitly, loads that configura
 
 ## First-run activation configuration
 
-The initial desktop configuration is generated with a new application secret and an empty `SCHOOLBRIDGE_LICENSE_PUBLIC_KEY`. Before owner activation can be completed, the school's approved public verification key must be configured in `%LOCALAPPDATA%\SchoolBridge\config\.env`. The private signing key must never be placed on the school computer or in the installer.
+A production Windows desktop package requires the owner's approved Base64 Ed25519 **public** verification key at build time. Put the one-line public value in:
 
-A guided, administrator-friendly first-run public-key configuration flow is still outstanding. Do not treat a healthy backend startup as proof that owner activation and school setup are complete.
+`frontend/src-tauri/owner-activation-public-key.txt`
+
+This local file is ignored by Git. The packaging script validates canonical Base64 encoding of exactly 32 bytes and includes the key as a Tauri resource. On first launch, SchoolBridge writes it into `%LOCALAPPDATA%\\SchoolBridge\\config\\.env`. If an existing configuration has an empty key, it is populated; if it already contains a different key, startup fails closed instead of silently changing the owner identity.
+
+Never place the private signing key or passphrase on the school computer, in this file, or in the installer. CI creates a fresh random test-only public value for packaging tests. That value is not an owner production key; CI artifacts are test artifacts, not production releases.
+
+Do not treat a healthy backend startup as proof that owner activation and school setup are complete.
 
 ## Build and CI
 

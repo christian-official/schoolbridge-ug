@@ -363,7 +363,54 @@ fn desktop_data_directory() -> Result<PathBuf, String> {
     Ok(data_dir)
 }
 
-fn desktop_config_file(python: &Path) -> Result<PathBuf, String> {
+fn valid_ed25519_public_key(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    if bytes.len() != 44 || bytes[43] != b'=' { return false; }
+    let alphabet = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    if !bytes[..43].iter().all(|byte| alphabet.contains(byte)) { return false; }
+    alphabet.iter().position(|byte| *byte == bytes[42]).map(|index| index % 4 == 0).unwrap_or(false)
+}
+
+fn packaged_license_public_key(resource_root: &Path) -> Result<String, String> {
+    let key_path = resource_root.join("owner-activation-public-key.txt");
+    let key = fs::read_to_string(&key_path)
+        .map_err(|_| format!("The packaged owner activation public key is missing: {}", key_path.display()))?
+        .trim().to_string();
+    if !valid_ed25519_public_key(&key) {
+        return Err("The packaged owner activation public key is invalid; expected Base64 Ed25519 public key (32 bytes).".into());
+    }
+    Ok(key)
+}
+
+fn ensure_license_public_key(env_file: &Path, public_key: &str) -> Result<(), String> {
+    let contents = fs::read_to_string(env_file)
+        .map_err(|error| format!("Could not read SchoolBridge configuration: {error}"))?;
+    let matching: Vec<&str> = contents.lines().filter(|line|
+        line.split_once('=').map(|(key, _)| key.trim() == "SCHOOLBRIDGE_LICENSE_PUBLIC_KEY").unwrap_or(false)
+    ).collect();
+    if matching.len() > 1 { return Err("SchoolBridge configuration contains duplicate owner activation public-key settings.".into()); }
+    if let Some(line) = matching.first() {
+        let configured = line.split_once('=').map(|(_, value)| value.trim().trim_matches('"').trim_matches('\'')).unwrap_or("");
+        if !configured.is_empty() && configured != public_key {
+            return Err("The configured owner activation public key does not match this SchoolBridge package. Existing owner identity settings were not changed.".into());
+        }
+        if configured == public_key { return Ok(()); }
+    }
+    let mut updated = String::new();
+    let mut replaced = false;
+    for line in contents.lines() {
+        if line.split_once('=').map(|(key, _)| key.trim() == "SCHOOLBRIDGE_LICENSE_PUBLIC_KEY").unwrap_or(false) {
+            updated.push_str(&format!("SCHOOLBRIDGE_LICENSE_PUBLIC_KEY={public_key}"));
+            replaced = true;
+        } else { updated.push_str(line); }
+        updated.push('\n');
+    }
+    if !replaced { updated.push_str(&format!("SCHOOLBRIDGE_LICENSE_PUBLIC_KEY={public_key}\n")); }
+    fs::write(env_file, updated).map_err(|error| format!("Could not configure the owner activation public key: {error}"))
+}
+
+fn desktop_config_file(python: &Path, resource_root: &Path) -> Result<PathBuf, String> {
+    let public_key = packaged_license_public_key(resource_root)?;
     let local_app_data = std::env::var_os("LOCALAPPDATA")
         .map(PathBuf::from)
         .ok_or_else(|| "Windows did not provide LOCALAPPDATA; cannot select a persistent SchoolBridge configuration directory.".to_string())?;
@@ -392,7 +439,7 @@ fn desktop_config_file(python: &Path) -> Result<PathBuf, String> {
         }
 
         let contents = format!(
-            "SCHOOLBRIDGE_SECRET_KEY={secret}\nSCHOOLBRIDGE_LICENSE_PUBLIC_KEY=\nSCHOOLBRIDGE_PORT={DEFAULT_BACKEND_PORT}\nSCHOOLBRIDGE_LAN_ENABLED=false\nSCHOOLBRIDGE_LAN_PORT=8443\n"
+            "SCHOOLBRIDGE_SECRET_KEY={secret}\nSCHOOLBRIDGE_LICENSE_PUBLIC_KEY={public_key}\nSCHOOLBRIDGE_PORT={DEFAULT_BACKEND_PORT}\nSCHOOLBRIDGE_LAN_ENABLED=false\nSCHOOLBRIDGE_LAN_PORT=8443\n"
         );
         match OpenOptions::new().write(true).create_new(true).open(&env_file) {
             Ok(mut file) => {
@@ -407,6 +454,7 @@ fn desktop_config_file(python: &Path) -> Result<PathBuf, String> {
         }
     }
 
+    ensure_license_public_key(&env_file, &public_key)?;
     Ok(env_file)
 }
 
@@ -529,7 +577,7 @@ fn start_backend(resource_dir: &Path) -> Result<ManagedBackend, String> {
     let root = resolve_resource_root(resource_dir)?;
     let python = root.join("runtime").join("python.exe");
     let backend_dir = root.join("backend");
-    let env_file = desktop_config_file(&python)?;
+    let env_file = desktop_config_file(&python, &root)?;
     let static_dir = backend_dir.join("app").join("static");
     let data_dir = desktop_data_directory()?;
     let database_path = data_dir.join("schoolbridge.sqlite3");
@@ -851,6 +899,31 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn accepts_only_canonical_32_byte_ed25519_public_keys() {
+        assert!(super::valid_ed25519_public_key("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="));
+        assert!(!super::valid_ed25519_public_key(""));
+        assert!(!super::valid_ed25519_public_key("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"));
+        assert!(!super::valid_ed25519_public_key("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB"));
+        assert!(!super::valid_ed25519_public_key("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"));
+    }
+
+    #[test]
+    fn fills_missing_owner_public_key_but_rejects_owner_identity_change() {
+        let dir = std::env::temp_dir().join(format!("schoolbridge-owner-key-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let env_file = dir.join(".env");
+        std::fs::write(&env_file, "SCHOOLBRIDGE_SECRET_KEY=secret\\nSCHOOLBRIDGE_LICENSE_PUBLIC_KEY=\\n").unwrap();
+        let key = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+        super::ensure_license_public_key(&env_file, key).unwrap();
+        let contents = std::fs::read_to_string(&env_file).unwrap();
+        assert!(contents.contains(&format!("SCHOOLBRIDGE_LICENSE_PUBLIC_KEY={key}")));
+        super::ensure_license_public_key(&env_file, key).unwrap();
+        assert!(super::ensure_license_public_key(&env_file, "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=").is_err());
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+
     use super::{is_healthy_response, resolve_resource_root, Ipv4Addr};
 
     #[test]
