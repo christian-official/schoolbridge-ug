@@ -3818,6 +3818,7 @@ def test_teachers_use_qr_registration_instead_of_password_login():
             username="sam.teacher", email="sam.teacher@example.invalid",
             hashed_password=password_hash.hash("StaffPassword123!"),
             role="teacher", staff_id=staff.id, school_tenant_id=1,
+            must_change_password=True,
         ))
         db.commit()
 
@@ -3849,6 +3850,7 @@ def test_teachers_use_qr_registration_instead_of_password_login():
         )
         assert account.status_code == 200
         assert account.json()["username"] == "sam.teacher"
+        assert account.json()["must_change_password"] is False
 
 
 def test_teaching_staff_profile_does_not_create_a_password_account():
