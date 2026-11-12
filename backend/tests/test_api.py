@@ -3818,3 +3818,91 @@ def test_usernames_and_emails_are_unique_per_school_not_globally():
         )
         assert account is not None
         assert account.school_tenant_id == 2
+
+
+def test_guardian_contacts_allow_missing_phone_and_require_school_verification():
+    reset_database()
+    admin = create_admin()
+    token = create_access_token(admin)
+    headers = {"Authorization": f"Bearer {token}"}
+    with SessionLocal() as db:
+        school_class = models.SchoolClass(
+            name="Primary 1", section="General", school_tenant_id=1,
+        )
+        db.add(school_class)
+        db.commit()
+        class_id = school_class.id
+
+    with TestClient(app) as client:
+        created = client.post("/api/students", headers=headers, json={
+            "first_name": "Amina", "last_name": "One", "gender": "Female",
+            "guardian_name": "Parent One", "guardian_relationship": "Mother",
+            "class_id": class_id,
+        })
+        assert created.status_code == 200, created.text
+        student_id = created.json()["id"]
+
+        contacts = client.get(
+            f"/api/students/{student_id}/guardian-contacts", headers=headers,
+        )
+        assert contacts.status_code == 200
+        assert len(contacts.json()) == 1
+        assert contacts.json()[0]["phone"] is None
+        assert contacts.json()[0]["verification_status"] == "unverified"
+
+        missing_phone = client.patch(
+            f"/api/guardian-contacts/{contacts.json()[0]['id']}/verification",
+            headers=headers, json={"status": "school_verified"},
+        )
+        assert missing_phone.status_code == 409
+
+        added = client.post(
+            f"/api/students/{student_id}/guardian-contacts",
+            headers=headers,
+            json={
+                "guardian_name": "Parent One", "relationship": "Mother",
+                "phone": "+256700000111", "is_primary": True,
+            },
+        )
+        assert added.status_code == 200, added.text
+        assert added.json()["verification_status"] == "unverified"
+
+        verified = client.patch(
+            f"/api/guardian-contacts/{added.json()['id']}/verification",
+            headers=headers, json={"status": "school_verified"},
+        )
+        assert verified.status_code == 200, verified.text
+        assert verified.json()["verification_status"] == "school_verified"
+        assert verified.json()["verified_by"] == admin.id
+
+
+def test_staff_phone_trust_is_admin_verified_and_resets_when_phone_changes():
+    reset_database()
+    admin = create_admin()
+    token = create_access_token(admin)
+    headers = {"Authorization": f"Bearer {token}"}
+    with SessionLocal() as db:
+        staff = models.StaffMember(
+            staff_number="TRUST-ST-001", first_name="Alex", last_name="One",
+            category="Teaching", phone="+256700000222",
+            school_tenant_id=1,
+        )
+        db.add(staff)
+        db.commit()
+        staff_id = staff.id
+
+    with TestClient(app) as client:
+        verified = client.patch(
+            f"/api/staff/{staff_id}/phone-verification",
+            headers=headers, json={"status": "school_verified"},
+        )
+        assert verified.status_code == 200, verified.text
+        assert verified.json()["staff"]["phone_verification_status"] == "school_verified"
+
+        changed = client.patch(
+            f"/api/staff/{staff_id}", headers=headers,
+            json={"phone": "+256700000333"},
+        )
+        assert changed.status_code == 200, changed.text
+        assert changed.json()["staff"]["phone_verification_status"] == "unverified"
+        assert changed.json()["staff"]["phone_verified_at"] is None
