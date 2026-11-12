@@ -46,5 +46,6 @@ test('successful QR verification issues a session directly without account passw
   assert.match(backend, /def _create_qr_registration_session/)
   assert.match(backend, /"access_token": create_access_token\(user\)/)
   assert.match(app, /storeSessionToken\(accessToken\);setToken\(accessToken\)/)
+  assert.match(app, /profile\.school_id && profile\.school_id !== selectedSchoolId/)
   assert.doesNotMatch(flow, /Create password|Choose a password|username:\s*username/)
 })
