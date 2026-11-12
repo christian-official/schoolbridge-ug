@@ -13,36 +13,37 @@ _TRACKED_MODELS = (
 )
 
 def _scope_for_target(connection, target):
+    tenant_id = int(getattr(target, "school_tenant_id", 1) or 1)
     scope = {"class_ids": set(), "student_ids": set(), "subject_ids": set(),
              "parent_user_ids": set(), "teacher_user_ids": set(), "staff_ids": set(),
              "finance_only": False, "verified": None}
     def add_staff(staff_id):
         if not staff_id: return
         scope["staff_ids"].add(int(staff_id))
-        rows = connection.execute(select(models.User.id).where(models.User.staff_id == staff_id)).all()
+        rows = connection.execute(select(models.User.id).where(models.User.school_tenant_id == tenant_id, models.User.staff_id == staff_id)).all()
         scope["teacher_user_ids"].update(int(row[0]) for row in rows)
     def add_subject(subject_id):
         if not subject_id: return
         scope["subject_ids"].add(int(subject_id))
-        rows = connection.execute(select(models.TeacherAssignment.teacher_id).where(models.TeacherAssignment.subject_id == subject_id)).all()
+        rows = connection.execute(select(models.TeacherAssignment.teacher_id).where(models.TeacherAssignment.school_tenant_id == tenant_id, models.TeacherAssignment.subject_id == subject_id)).all()
         scope["teacher_user_ids"].update(int(row[0]) for row in rows)
     def add_student(student_id, class_hint=None):
         if not student_id: return
         scope["student_ids"].add(int(student_id))
-        row = connection.execute(select(models.Student.class_id).where(models.Student.id == student_id)).first()
+        row = connection.execute(select(models.Student.class_id).where(models.Student.school_tenant_id == tenant_id, models.Student.id == student_id)).first()
         class_id = row[0] if row else class_hint
         if class_id: add_class(class_id, include_students=False)
-        parents = connection.execute(select(models.ParentStudentLink.user_id).where(models.ParentStudentLink.student_id == student_id)).all()
+        parents = connection.execute(select(models.ParentStudentLink.user_id).where(models.ParentStudentLink.school_tenant_id == tenant_id, models.ParentStudentLink.student_id == student_id)).all()
         scope["parent_user_ids"].update(int(item[0]) for item in parents)
     def add_class(class_id, include_students=True):
         if not class_id: return
         scope["class_ids"].add(int(class_id))
-        teachers = connection.execute(select(models.TeacherAssignment.teacher_id).where(models.TeacherAssignment.class_id == class_id)).all()
+        teachers = connection.execute(select(models.TeacherAssignment.teacher_id).where(models.TeacherAssignment.school_tenant_id == tenant_id, models.TeacherAssignment.class_id == class_id)).all()
         scope["teacher_user_ids"].update(int(item[0]) for item in teachers)
-        class_teachers = connection.execute(select(models.ClassTeacherAssignment.teacher_id).where(models.ClassTeacherAssignment.class_id == class_id)).all()
+        class_teachers = connection.execute(select(models.ClassTeacherAssignment.teacher_id).where(models.ClassTeacherAssignment.school_tenant_id == tenant_id, models.ClassTeacherAssignment.class_id == class_id)).all()
         scope["teacher_user_ids"].update(int(item[0]) for item in class_teachers)
         if include_students:
-            students = connection.execute(select(models.Student.id).where(models.Student.class_id == class_id)).all()
+            students = connection.execute(select(models.Student.id).where(models.Student.school_tenant_id == tenant_id, models.Student.class_id == class_id)).all()
             for item in students: add_student(item[0], class_id)
     if isinstance(target, models.User):
         # Account changes must invalidate the account owner's offline view
@@ -91,7 +92,7 @@ def _scope_for_target(connection, target):
         add_student(target.student_id); add_subject(target.subject_id); scope["verified"] = bool(target.verified)
     elif isinstance(target, models.FeeCharge): add_student(target.student_id)
     elif isinstance(target, models.FeePayment):
-        charge = connection.execute(select(models.FeeCharge.student_id).where(models.FeeCharge.id == target.charge_id)).first()
+        charge = connection.execute(select(models.FeeCharge.student_id).where(models.FeeCharge.school_tenant_id == tenant_id, models.FeeCharge.id == target.charge_id)).first()
         if charge: add_student(charge[0])
     elif isinstance(target, models.ClassFee): add_class(target.class_id)
     elif isinstance(target, models.StaffMember): add_staff(target.id)
@@ -120,13 +121,15 @@ def register_sync_tracking() -> None:
     def record(operation):
         def listener(mapper, connection, target):
             scope = _scope_for_target(connection, target)
-            common = {"entity_id": target.id, "operation": operation,
+            common = {"school_tenant_id": int(getattr(target, "school_tenant_id", 1) or 1),
+                      "entity_id": target.id, "operation": operation,
                       "changed_at": datetime.utcnow(),
                       "scope_json": json.dumps(scope, sort_keys=True, separators=(",", ":"))}
             entity_type = "UserAccess" if isinstance(target, models.User) else target.__class__.__name__
             connection.execute(models.SyncChange.__table__.insert().values(entity_type=entity_type, **common))
             if isinstance(target, models.Attendance):
                 connection.execute(models.SyncChange.__table__.insert().values(
+                    school_tenant_id=int(getattr(target, "school_tenant_id", 1) or 1),
                     entity_type=f"AttendanceScope:{target.attendance_date.isoformat()}",
                     entity_id=target.student_id, operation=operation,
                     changed_at=datetime.utcnow(),
@@ -143,6 +146,7 @@ def register_sync_tracking() -> None:
                     "delete" if was_verified and not target.verified else operation
                 )
                 connection.execute(models.SyncChange.__table__.insert().values(
+                    school_tenant_id=int(getattr(target, "school_tenant_id", 1) or 1),
                     entity_type=f"MarkScope:{target.exam_id}:{target.subject_id}",
                     entity_id=target.student_id, operation=parent_operation,
                     changed_at=datetime.utcnow(),

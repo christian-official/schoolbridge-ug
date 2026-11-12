@@ -3720,3 +3720,37 @@ def test_staff_surname_is_not_a_login_identifier_but_staff_number_is():
         })
         assert staff_number_login.status_code == 200, staff_number_login.text
         assert staff_number_login.json()["username"] == "sam.teacher"
+
+
+def test_sync_change_journal_writes_and_scopes_events_to_the_target_tenant():
+    reset_database()
+    with SessionLocal() as db:
+        set_tenant_context(db, 2)
+        school_class = models.SchoolClass(
+            name="Primary 3", section="Green", school_tenant_id=2,
+        )
+        db.add(school_class)
+        db.flush()
+        student = models.Student(
+            first_name="Tenant", last_name="Two", class_id=school_class.id,
+            school_tenant_id=2,
+        )
+        db.add(student)
+        db.commit()
+
+        tenant_two_changes = db.query(models.SyncChange).filter_by(
+            school_tenant_id=2
+        ).all()
+        tenant_one_changes = db.query(models.SyncChange).filter_by(
+            school_tenant_id=1
+        ).all()
+        assert tenant_two_changes
+        assert tenant_one_changes == []
+        assert all(change.school_tenant_id == 2 for change in tenant_two_changes)
+        student_change = next(
+            change for change in tenant_two_changes
+            if change.entity_type == "Student"
+        )
+        scope = json.loads(student_change.scope_json)
+        assert scope["student_ids"] == [student.id]
+        assert scope["class_ids"] == [school_class.id]
