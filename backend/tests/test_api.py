@@ -2743,6 +2743,40 @@ def test_environment_admin_bootstrap_cannot_bypass_first_time_setup(monkeypatch)
 
 
 
+def test_environment_admin_bootstrap_is_scoped_to_the_default_school(monkeypatch):
+    reset_database()
+    with SessionLocal() as db:
+        db.add(models.SchoolTenant(
+            id=2, public_id="00000000-0000-4000-8000-000000000002",
+            name="Second School", status="active",
+        ))
+        db.add(models.SchoolSetupState(
+            school_tenant_id=2, installation_id="second-school-installation",
+            activated_at=datetime.utcnow(), setup_completed_at=datetime.utcnow(),
+        ))
+        db.add(models.User(
+            school_tenant_id=2, username="second-admin",
+            email="second-admin@example.invalid",
+            hashed_password=password_hash.hash("SecondSchoolPassword123!"),
+            role="admin", is_active=True,
+        ))
+        db.commit()
+
+    monkeypatch.setenv("SCHOOLBRIDGE_INITIAL_ADMIN_USERNAME", "first-admin")
+    monkeypatch.setenv("SCHOOLBRIDGE_INITIAL_ADMIN_EMAIL", "first-admin@example.invalid")
+    monkeypatch.setenv("SCHOOLBRIDGE_INITIAL_ADMIN_PASSWORD", "LongTestPassword123!")
+    main_module.bootstrap_initial_admin()
+
+    with SessionLocal() as db:
+        set_tenant_context(db, 1)
+        first_school_admins = db.query(models.User).all()
+        assert [user.username for user in first_school_admins] == ["first-admin"]
+    with SessionLocal() as db:
+        set_tenant_context(db, 2)
+        second_school_admins = db.query(models.User).all()
+        assert [user.username for user in second_school_admins] == ["second-admin"]
+
+
 def test_partial_legacy_admin_environment_is_ignored_before_first_setup(monkeypatch):
     reset_new_installation()
     monkeypatch.setenv("SCHOOLBRIDGE_INITIAL_ADMIN_USERNAME", "partial-admin")

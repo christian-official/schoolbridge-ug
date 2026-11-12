@@ -537,6 +537,7 @@ def seed_demo_data_if_empty():
     if os.getenv("SCHOOLBRIDGE_SEED_DEMO_DATA", "false").lower() not in {"1", "true", "yes"}:
         return
     db = SessionLocal()
+    set_tenant_context(db, 1)
     try:
         profile = get_tenant_singleton(db, models.SchoolProfile)
         if profile is None:
@@ -1688,6 +1689,7 @@ def update_grading_scale(data: GradingScaleUpdate, db: Session = Depends(get_db)
 def bootstrap_initial_admin():
     """Retain legacy environment bootstrap only for already-initialised installations."""
     setup_probe = SessionLocal()
+    set_tenant_context(setup_probe, 1)
     try:
         setup_state = get_tenant_singleton(setup_probe, models.SchoolSetupState)
         if not setup_state or not setup_state.setup_completed_at:
@@ -1712,6 +1714,7 @@ def bootstrap_initial_admin():
         raise RuntimeError("SCHOOLBRIDGE_INITIAL_ADMIN_PASSWORD must be at least 12 characters.")
 
     db = SessionLocal()
+    set_tenant_context(db, 1)
     try:
         setup_state = get_tenant_singleton(db, models.SchoolSetupState)
         if not setup_state or not setup_state.setup_completed_at:
