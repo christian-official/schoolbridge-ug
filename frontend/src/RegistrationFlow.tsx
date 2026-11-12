@@ -13,13 +13,11 @@ export default function RegistrationFlow({
   schoolId,
   schoolName,
   apiBaseUrl,
-  onBack,
   onAuthenticated,
 }: {
   schoolId: string
   schoolName: string
   apiBaseUrl: string
-  onBack: () => void
   onAuthenticated: (token: string) => Promise<void> | void
 }) {
   const [kind, setKind] = useState<'parent' | 'teacher'>('parent')
