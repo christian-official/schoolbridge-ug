@@ -387,12 +387,12 @@ fn desktop_config_file(python: &Path) -> Result<PathBuf, String> {
             .map_err(|_| "The generated SchoolBridge application secret was not valid UTF-8.".to_string())?
             .trim()
             .to_string();
-        if secret.len() < 48 || secret.contains(['\\r', '\\n', '=']) {
+        if secret.len() < 48 || secret.chars().any(|character| matches!(character, '\\r' | '\\n' | '=')) {
             return Err("The bundled Python runtime returned an invalid application secret.".into());
         }
 
         let contents = format!(
-            "SCHOOLBRIDGE_SECRET_KEY={secret}\\nSCHOOLBRIDGE_LICENSE_PUBLIC_KEY=\\nSCHOOLBRIDGE_PORT={DEFAULT_BACKEND_PORT}\\nSCHOOLBRIDGE_LAN_ENABLED=false\\nSCHOOLBRIDGE_LAN_PORT=8443\\n"
+            "SCHOOLBRIDGE_SECRET_KEY={secret}\nSCHOOLBRIDGE_LICENSE_PUBLIC_KEY=\nSCHOOLBRIDGE_PORT={DEFAULT_BACKEND_PORT}\nSCHOOLBRIDGE_LAN_ENABLED=false\nSCHOOLBRIDGE_LAN_PORT=8443\n"
         );
         match OpenOptions::new().write(true).create_new(true).open(&env_file) {
             Ok(mut file) => file.write_all(contents.as_bytes())
@@ -575,6 +575,7 @@ fn start_backend(resource_dir: &Path) -> Result<ManagedBackend, String> {
         .current_dir(&root)
         .env("PYTHONPATH", &backend_dir)
         .env("SCHOOLBRIDGE_STATIC_DIR", &static_dir)
+        .env("SCHOOLBRIDGE_CONFIG_FILE", &env_file)
         .env("SCHOOLBRIDGE_DATA_DIR", &data_dir)
         // Force the desktop database into per-user local storage, never the USB
         // installation directory or the process working directory.
@@ -645,6 +646,7 @@ fn start_backend(resource_dir: &Path) -> Result<ManagedBackend, String> {
             .current_dir(&root)
             .env("PYTHONPATH", &backend_dir)
             .env("SCHOOLBRIDGE_STATIC_DIR", &static_dir)
+            .env("SCHOOLBRIDGE_CONFIG_FILE", &env_file)
             .env("SCHOOLBRIDGE_DATA_DIR", &data_dir)
             .env("SCHOOLBRIDGE_DATABASE_URL", &database_url)
             .env("SCHOOLBRIDGE_CORS_ORIGINS", format!("https://{bind_ip}:{port_text}"))
