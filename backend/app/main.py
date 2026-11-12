@@ -4000,7 +4000,7 @@ def teacher_exams(db: Session = Depends(get_db), teacher=Depends(get_current_use
         subject_ids = [subject_id for class_id, subject_id in assigned_pairs if class_id == exam.class_id]
         subjects = db.query(models.Subject).filter(models.Subject.id.in_(subject_ids or [-1])).order_by(models.Subject.name).all()
         if subjects:
-            output.append({**{key: getattr(exam, key) for key in ("id", "name", "term", "year", "class_id")},
+            output.append({**{key: getattr(exam, key) for key in ("id", "name", "term", "year", "class_id", "status")},
                            "assigned_subjects": [{"id": subject.id, "name": subject.name} for subject in subjects]})
     return output
 
@@ -5522,6 +5522,7 @@ def submit_offline_teacher_marks(data: OfflineTeacherMarkBatch, db: Session = De
     subject = db.get(models.Subject, data.subject_id)
     if not exam or not subject or exam.class_id is None:
         raise HTTPException(404, "Class examination or subject not found.")
+    require_exam_open(exam)
     payload = json.dumps({
         "class_id": exam.class_id, "exam_id": exam.id, "subject_id": subject.id,
         "records": [entry.model_dump() for entry in data.records],
