@@ -14,10 +14,12 @@ Admission numbers are optional. They must never be required to identify a studen
 2. The parent confirms the displayed school and chooses **Create parent account**.
 3. The parent enters their own details and the details requested to identify their relationship to one or more enrolled children. The form must support schools whose paper records do not contain admission numbers.
 4. The platform compares the submitted information only against records belonging to that school.
-5. Where the match is unique and the parent's contact ownership can be verified using a contact already trusted in the school record, the parent can create a password and claim the matched children.
-6. One parent account can link to multiple children at the same school. The process must not create separate accounts for siblings.
-7. If the match is ambiguous, the submitted details conflict, or no trusted contact channel exists, create a pending claim for review. Do not guess, expose a list of students, or grant access while pending.
-8. Once verified, the parent sees only their linked children and permitted parent features.
+5. The applicant must not type in, edit, or nominate the phone number used for verification. SchoolBridge retrieves the phone number from the matched, trusted school record and displays only a masked version (for example, `+256 7XX XXX 482`) so the parent can recognise it without exposing the full number.
+6. The parent confirms whether they can access that displayed number. SchoolBridge sends a one-time verification code only to that existing recorded number. The applicant cannot substitute a different number during this step.
+7. After successful code verification, the parent can create their own password and claim the matched children. If the recorded number is missing, untrusted, inaccessible, or the match is not sufficiently reliable, route the claim to school review instead of allowing the applicant to supply a replacement number.
+8. One parent account can link to multiple children at the same school. The process must not create separate accounts for siblings.
+9. If the match is ambiguous, the submitted details conflict, or no trusted contact channel exists, create a pending claim for review. Do not guess, expose a list of students, or grant access while pending.
+10. Once verified, the parent sees only their linked children and permitted parent features.
 
 ## Teacher journey
 
@@ -46,7 +48,10 @@ Admission numbers are optional. They must never be required to identify a studen
 - Multiple possible matches, conflicting details, or no adequate verification evidence must enter review.
 - Never reveal candidate student records to an unauthenticated registrant.
 - Apply rate limits, generic failure messages, audit events, and abuse monitoring to registration attempts.
-- Verify ownership of a contact channel already recorded by the school before automatic account activation. Do not send a verification code to a newly supplied, untrusted number and treat that as proof of identity.
+- For parent registration, the verification phone number must come from the matched trusted school record; the applicant must never provide or change it in the verification flow.
+- Display only a masked version of the recorded number before verification. Do not reveal the full number to an unauthenticated applicant.
+- Ask the parent to confirm access to the displayed number, then send a short-lived, single-use verification code only to that recorded number. Rate-limit code requests and attempts, invalidate used/expired codes, and audit verification events.
+- Do not send a verification code to a newly supplied, untrusted number and treat that as proof of identity. If the recorded number is missing, untrusted, or inaccessible, use the asynchronous school-review path; any contact-number correction must be verified and recorded by the school through an authorised process.
 - Where no trusted contact channel exists, use the asynchronous school-review path. Do not force schools to invent phone numbers or admission numbers.
 - Parent account creation and student linking must be atomic. A failed or pending claim must not leave a partially privileged account.
 - Revoke sessions and remove access promptly when a guardian relationship or staff employment record is withdrawn.
