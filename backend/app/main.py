@@ -1016,8 +1016,6 @@ def create_student(data: StudentCreate, db: Session = Depends(get_db), admin=Dep
         raise HTTPException(422, "Select the student's gender before registering.")
     if not data.guardian_name or not data.guardian_name.strip():
         raise HTTPException(422, "Enter a parent or guardian name before registering.")
-    if not data.guardian_phone or not data.guardian_phone.strip():
-        raise HTTPException(422, "Enter a parent or guardian phone number before registering.")
     if data.class_id is None:
         raise HTTPException(422, "Select a class before registering the student.")
     selected_class = db.get(models.SchoolClass, data.class_id)
