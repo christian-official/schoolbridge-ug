@@ -926,6 +926,8 @@ function App() {
   const [showRecovery, setShowRecovery] = useState(false)
   const [showRegistration, setShowRegistration] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [sessionRestoring, setSessionRestoring] = useState(true)
+  const [sessionError, setSessionError] = useState('')
   const [active, setActive] = useState('Overview')
 
   async function signOut() {
@@ -954,6 +956,8 @@ function App() {
       if (!cancelled && savedToken) setToken(savedToken)
     }).catch(error => {
       if (!cancelled) setLoginError(error instanceof Error ? error.message : 'Unable to access secure session storage.')
+    }).finally(() => {
+      if (!cancelled) setSessionRestoring(false)
     })
     return () => { cancelled = true }
   }, [])
@@ -1337,9 +1341,11 @@ function App() {
   }, [studentForm.class_id, token])
 
   async function loadUser(authToken: string) {
+    setSessionError('')
     try {
       const profile = await api<User>('auth/me', authToken)
       setUser(profile)
+      setLoginError('')
       if(profile.role==='teacher') setActive('My Classes')
       else if(profile.role==='parent') setActive('My Children')
       else if(profile.role==='admin') await loadSchoolData(authToken,profile)
@@ -1350,19 +1356,29 @@ function App() {
       }
     } catch (error) {
       const connectionUnavailable = error instanceof TypeError || !navigator.onLine
-      // Keep the saved token during an outage so the user can reconnect without
-      // being signed out permanently. Offline access still requires the separate
-      // encrypted snapshot and its offline passphrase.
-      if (!connectionUnavailable) void clearStoredSessionToken().catch(() => {})
+      if (connectionUnavailable) {
+        // A temporary outage must not discard the saved session or show the password form.
+        setSessionError('SchoolBridge cannot verify your saved session while the server is unavailable. Your saved sign-in is retained; reconnect and retry.')
+        return
+      }
+      // Clear the session only after a definitive authentication rejection.
+      await clearStoredSessionToken().catch(() => {})
       setToken('')
       setUser(null)
-      setLoginError(connectionUnavailable ? '' : error instanceof Error ? `Sign-in succeeded, but account verification failed: ${error.message}` : 'Sign-in succeeded, but account verification failed.')
+      setLoginError(error instanceof Error ? `Your saved session is no longer valid: ${error.message}` : 'Your saved session is no longer valid. Sign in again.')
     }
   }
 
   useEffect(() => {
     if (token) void loadUser(token)
   }, [token])
+
+  useEffect(() => {
+    if (!token || user || !sessionError) return
+    const retry = () => { if (navigator.onLine) void loadUser(token) }
+    window.addEventListener('online', retry)
+    return () => window.removeEventListener('online', retry)
+  }, [token, user, sessionError])
 
   useEffect(() => {
     if (!token || !user || serverConnection !== 'connected') return
@@ -1547,6 +1563,10 @@ function App() {
   const [artsCombinations, sciencesCombinations] = (schoolConfig.a_level_combinations || '').split(/\r?\n/).reduce((groups: string[][], line: string) => { const match = line.match(/^(ARTS|SCIENCES)::(.*)$/i); if (match && match[2].trim()) groups[match[1].toUpperCase() === 'ARTS' ? 0 : 1].push(match[2].trim()); return groups }, [[], []])
 
   if (offlineWorkspace) return <OfflineWorkspace snapshot={offlineWorkspace} onExit={()=>setOfflineWorkspace(null)}/>;
+
+  if (!token && sessionRestoring) return <main className="login-page"><section className="login-card"><div className="brand-name">School<span>Bridge</span></div><p className="muted">Restoring your saved session…</p></section></main>;
+
+  if (token && !user) return <main className="login-page"><section className="login-card"><div className="brand-mark"><ShieldCheck size={30}/></div><div className="brand-name">School<span>Bridge</span></div><h1>Restoring your session</h1><p className="muted">{sessionError || 'Verifying your saved device session. You do not need to enter your password again.'}</p><button type="button" className="primary-button login-button" onClick={()=>void loadUser(token)} disabled={!navigator.onLine}>Retry connection</button><button type="button" className="recovery-link" onClick={()=>void signOut()}>Sign out</button></section></main>;
 
   if (!token || !user) {
     if(setupStatus.loading) return <main className="login-page"><section className="login-card"><div className="brand-name">School<span>Bridge</span></div><p className="muted">Checking school installation...</p></section></main>
