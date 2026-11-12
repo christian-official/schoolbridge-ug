@@ -2599,7 +2599,7 @@ function TeacherUsersSettings({token,classes,onSaved}:{token:string;classes:Reco
     setBusy(true);setError('');setMessage('')
     try {
       await api('auth/users/'+selectedId+'/permissions',token,{method:'PUT',body:JSON.stringify({role:roleType,role_label:roleLabel.trim(),permissions})})
-      setMessage('Staff access settings saved. The staff member should sign in again to refresh their access.')
+      setMessage('Staff access settings saved. Teachers should scan the school QR code again to refresh their access; non-teaching staff can sign in with their password.')
       await load();onSaved()
     } catch(e) {setError(e instanceof Error?e.message:'Unable to save staff access settings.')}
     finally {setBusy(false)}
