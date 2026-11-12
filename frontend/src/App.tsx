@@ -1486,7 +1486,6 @@ function App() {
           })}
         </nav>
         <div className="sidebar-bottom">
-          {user.role === 'admin' && <button className="nav-item" onClick={() => { if (active !== 'Settings') setActive('Settings') }}><Settings size={19} /> Settings</button>}
           <div className="sidebar-account-control">
             {profileMenuOpen && <div className="sidebar-account-menu" role="menu">
               {user.role !== 'parent' && user.role !== 'admin' && <button type="button" role="menuitem" onClick={() => { setActive('My Profile'); setProfileMenuOpen(false); setMobileMenu(false) }}><Contact size={17}/> My profile</button>}
