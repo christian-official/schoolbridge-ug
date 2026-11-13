@@ -459,26 +459,27 @@ fn desktop_config_file(python: &Path, resource_root: &Path) -> Result<PathBuf, S
 }
 
 fn resolve_resource_root(resource_dir: &Path) -> Result<PathBuf, String> {
-    let has_packaged_runtime = |root: &Path| {
+    let has_complete_packaged_resources = |root: &Path| {
         root.join("runtime").join("python.exe").is_file()
             && root.join("backend").join("app").join("main.py").is_file()
             && root.join("backend").join("app").join("static").join("index.html").is_file()
+            && packaged_license_public_key(root).is_ok()
     };
 
-    if has_packaged_runtime(resource_dir) {
+    if has_complete_packaged_resources(resource_dir) {
         return Ok(resource_dir.to_path_buf());
     }
 
     // Preserve the side-by-side development/prototype layout while preferring
     // Tauri's managed resource directory for an installed application.
     if let Ok(root) = installation_root() {
-        if has_packaged_runtime(&root) {
+        if has_complete_packaged_resources(&root) {
             return Ok(root);
         }
     }
 
     Err(format!(
-        "The packaged SchoolBridge backend or Python runtime is missing from {}. Reinstall the complete SchoolBridge package.",
+        "The packaged SchoolBridge backend, Python runtime, or valid owner activation public key is missing from {}. Reinstall the complete SchoolBridge package.",
         resource_dir.display()
     ))
 }
@@ -950,11 +951,25 @@ mod tests {
             "the runtime must read the exact root-level path mapped by tauri.conf.json"
         );
 
-        std::fs::write(root.join("owner-activation-public-key.txt"), "not-a-valid-key")
-            .expect("replace key with invalid test value");
+        std::fs::remove_file(root.join("owner-activation-public-key.txt"))
+            .expect("remove packaged owner public-key resource");
         assert!(
-            super::packaged_license_public_key(&resolved).is_err(),
-            "the runtime must reject a malformed packaged public key"
+            resolve_resource_root(&root).is_err(),
+            "the runtime must reject a package with no owner activation public key"
+        );
+
+        std::fs::write(root.join("owner-activation-public-key.txt"), "not-a-valid-key")
+            .expect("write malformed packaged owner public key");
+        assert!(
+            resolve_resource_root(&root).is_err(),
+            "the runtime must reject a package with a malformed owner activation public key"
+        );
+
+        std::fs::write(root.join("owner-activation-public-key.txt"), public_key)
+            .expect("restore valid packaged owner public key");
+        assert!(
+            resolve_resource_root(&root).is_ok(),
+            "the runtime should resolve the package after its valid owner public key is restored"
         );
 
         std::fs::remove_dir_all(&root).expect("remove temporary resources");
