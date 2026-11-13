@@ -557,6 +557,19 @@ class SchoolIdentityCorrection(Base):
     new_identity_json: Mapped[str] = mapped_column(Text, nullable=False)
     corrected_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
+class SchoolMachineTransfer(Base):
+    """One-time developer-authorised transfer of an installation to another computer."""
+    __tablename__ = "school_machine_transfers"
+
+    school_tenant_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1", index=True)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    installation_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    license_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    license_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    previous_machine_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    new_machine_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    transferred_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
 class SchoolTenant(Base):
     """Stable tenant identity for one school in a shared SchoolBridge service.
 
