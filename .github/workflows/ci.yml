@@ -110,7 +110,7 @@ jobs:
       - name: Publish offline Windows installer
         uses: actions/upload-artifact@v4
         with:
-          name: SchoolBridge-Offline-Windows-Installer
+          name: SchoolBridge-Offline-Windows-Installer-CI-TEST-ONLY
           path: frontend/src-tauri/target/release/bundle/nsis/*.exe
           if-no-files-found: error
           retention-days: 30
