@@ -40,8 +40,10 @@ export default function SyncDevices({ token, userId, schoolId, isAdmin }: Props)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
-  const [schoolQrUrl, setSchoolQrUrl] = useState('')
-  const [schoolAccessUrl, setSchoolAccessUrl] = useState('')
+  const [parentQrUrl, setParentQrUrl] = useState('')
+  const [teacherQrUrl, setTeacherQrUrl] = useState('')
+  const [parentAccessUrl, setParentAccessUrl] = useState('')
+  const [teacherAccessUrl, setTeacherAccessUrl] = useState('')
   const [schoolName, setSchoolName] = useState('')
   const [qrUnavailableReason, setQrUnavailableReason] = useState('')
 
@@ -66,19 +68,28 @@ export default function SyncDevices({ token, userId, schoolId, isAdmin }: Props)
     }
     let objectUrl = ''
     const controller = new AbortController()
-    const destination = window.location.origin + '/?school='
-    fetchSchoolBridge(API_BASE_URL + '/api/enrolment/school-qr.svg?origin=' + encodeURIComponent(window.location.origin), {
-      headers: { Authorization: 'Bearer ' + token }, cache: 'no-store', signal: controller.signal,
-    }).then(async response => {
-      if (!response.ok) throw new Error('Unable to create the school access QR code.')
-      return response.blob()
-    }).then(blob => { objectUrl = URL.createObjectURL(blob); setSchoolQrUrl(objectUrl) })
-      .catch(err => { if (err.name !== 'AbortError') setError(err instanceof Error ? err.message : 'Unable to create the school access QR code.') })
+    const destination = window.location.origin + '/?school=' + encodeURIComponent(schoolId)
+    const loadQr = async (audience: 'parent' | 'teacher') => {
+      const response = await fetchSchoolBridge(API_BASE_URL + '/api/enrolment/school-qr.svg?audience=' + audience + '&origin=' + encodeURIComponent(window.location.origin), {
+        headers: { Authorization: 'Bearer ' + token }, cache: 'no-store', signal: controller.signal,
+      })
+      if (!response.ok) throw new Error('Unable to create the ' + audience + ' access QR code.')
+      const blob = await response.blob()
+      return URL.createObjectURL(blob)
+    }
+    Promise.all([loadQr('parent'), loadQr('teacher')]).then(([parentUrl, teacherUrl]) => {
+      objectUrl = parentUrl + '|' + teacherUrl
+      setParentQrUrl(parentUrl); setTeacherQrUrl(teacherUrl)
+    }).catch(err => { if (err.name !== 'AbortError') setError(err instanceof Error ? err.message : 'Unable to create school access QR codes.') })
     fetchSchoolBridge(API_BASE_URL + '/api/public/school?school=' + encodeURIComponent(schoolId), { cache: 'no-store', signal: controller.signal })
       .then(response => response.ok ? response.json() : Promise.reject(new Error('School identity is unavailable.')))
-      .then(identity => { setSchoolName(identity.school_name || 'School'); setSchoolAccessUrl(destination + encodeURIComponent(identity.school_id)) })
+      .then(identity => {
+        setSchoolName(identity.school_name || 'School')
+        setParentAccessUrl(destination + '&audience=parent')
+        setTeacherAccessUrl(destination + '&audience=teacher')
+      })
       .catch(err => { if (err.name !== 'AbortError') setError(err instanceof Error ? err.message : 'Unable to load school identity.') })
-    return () => { controller.abort(); if (objectUrl) URL.revokeObjectURL(objectUrl) }
+    return () => { controller.abort(); if (objectUrl) objectUrl.split('|').forEach(URL.revokeObjectURL) }
   }, [isAdmin, schoolId, token])
 
   function printSchoolQr() {
@@ -125,23 +136,20 @@ export default function SyncDevices({ token, userId, schoolId, isAdmin }: Props)
   return <section className="panel settings-panel sync-devices-panel">
     <div className="panel-heading"><div><h2>Registered devices</h2><p>Review browsers and computers registered to your SchoolBridge account.</p></div><button className="secondary-button" type="button" onClick={() => void load()} disabled={loading || busy}>Refresh</button></div>
     {isAdmin && !isTauriDesktop && <section className="offline-record-tools school-access-qr">
-      <h3>School mobile access QR</h3>
-      {qrUnavailableReason ? <p className="form-hint">{qrUnavailableReason}</p> : schoolQrUrl ? <div className="school-access-qr-content">
-        <div className="school-access-qr-print">
-          <div className="school-access-qr-print-brand">SchoolBridge</div>
-          <h2>{schoolName}</h2>
-          <img src={schoolQrUrl} alt="School access QR code" width="280" height="280" />
-          <strong>Parent &amp; Teacher Access</strong>
-          <p>Scan to open the school's secure registration page.</p>
-          <small>{schoolAccessUrl}</small>
-        </div>
-        <div className="school-access-qr-screen"><strong>School access link</strong><input readOnly value={schoolAccessUrl} onFocus={event => event.currentTarget.select()} aria-label="School access link" />
-          <div className="proposal-review-actions">
-            <button className="secondary-button" type="button" onClick={() => { void navigator.clipboard?.writeText(schoolAccessUrl).then(() => setMessage('School access link copied.')).catch(() => setMessage('Select and copy the school access link manually.')) }}>Copy access link</button>
-            <button className="secondary-button" type="button" onClick={printSchoolQr}>Print QR</button>
+      <h3>Separate parent and teacher access QR codes</h3>
+      <p className="muted">Each QR opens the correct registration page directly. Staff use the school webpage to sign in and download the desktop app.</p>
+      {qrUnavailableReason ? <p className="form-hint">{qrUnavailableReason}</p> : parentQrUrl && teacherQrUrl ? <div className="school-access-qr-grid">
+        {([{label:'Parent access',url:parentQrUrl,link:parentAccessUrl},{label:'Teacher access',url:teacherQrUrl,link:teacherAccessUrl}] as const).map(item => <div className="school-access-qr-item" key={item.label}>
+          <div className="school-access-qr-print">
+            <div className="school-access-qr-print-brand">SchoolBridge</div><h2>{schoolName}</h2>
+            <img src={item.url} alt={item.label + ' QR code'} width="280" height="280"/>
+            <strong>{item.label}</strong><p>Scan to open this registration page.</p><small>{item.link}</small>
           </div>
-        </div>
-      </div> : <p className="form-hint">Preparing the school QR code…</p>}
+          <div className="school-access-qr-screen"><input readOnly value={item.link} aria-label={item.label + ' link'} onFocus={event=>event.currentTarget.select()}/>
+            <button className="secondary-button" type="button" onClick={()=>{void navigator.clipboard?.writeText(item.link).then(()=>setMessage(item.label+' link copied.')).catch(()=>setMessage('Select and copy the link manually.'))}}>Copy link</button>
+          </div>
+        </div>)}
+      </div> : <p className="form-hint">Preparing separate access QR codes…</p>}
     </section>}
     {error && <div className="form-error" role="alert">{error}</div>}
     {message && <div className="success-notice" role="status">{message}</div>}
