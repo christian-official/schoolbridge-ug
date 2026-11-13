@@ -2627,6 +2627,17 @@ def apply_machine_transfer(data: MachineTransferRequest, db: Session = Depends(g
     if db.query(models.SchoolMachineTransfer.id).filter_by(license_hash=fingerprint).first():
         raise HTTPException(409, "This developer transfer authorisation has already been used.")
     previous_fingerprint = state.machine_binding_hash
+    claimed = db.query(models.SchoolSetupState).filter(
+        models.SchoolSetupState.id == state.id,
+        models.SchoolSetupState.school_tenant_id == state.school_tenant_id,
+        models.SchoolSetupState.machine_binding_hash == previous_fingerprint,
+    ).update(
+        {"machine_binding_hash": destination_fingerprint},
+        synchronize_session=False,
+    )
+    if claimed != 1:
+        db.rollback()
+        raise HTTPException(409, "The installation computer binding changed during this transfer. Request a fresh developer authorisation.")
     db.add(models.SchoolMachineTransfer(
         school_tenant_id=state.school_tenant_id,
         installation_id=state.installation_id,
@@ -2635,7 +2646,6 @@ def apply_machine_transfer(data: MachineTransferRequest, db: Session = Depends(g
         previous_machine_hash=previous_fingerprint,
         new_machine_hash=destination_fingerprint,
     ))
-    state.machine_binding_hash = destination_fingerprint
     db.add(models.AuditLog(
         school_tenant_id=state.school_tenant_id,
         actor_id=None,
