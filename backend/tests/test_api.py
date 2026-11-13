@@ -2789,6 +2789,7 @@ def test_developer_transfer_is_bound_to_destination_and_single_use(monkeypatch):
         request = _signed_test_license(installation_id, private_key, {
             "action": "machine_transfer",
             "machine_binding_hash": destination_hash,
+            "expires_at": int(datetime.utcnow().timestamp()) + 3600,
         })
         transferred = client.post("/api/setup/transfer", json={"license": request})
         assert transferred.status_code == 200, transferred.text
