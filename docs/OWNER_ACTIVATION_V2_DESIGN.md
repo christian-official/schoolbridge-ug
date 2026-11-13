@@ -55,7 +55,7 @@ No private owner key, owner sequence, verifier secret, or production credential 
 After receiving the installation ID and destination fingerprint from the transfer screen, the developer issues a single-use token from the offline owner-key utility:
 
 ```powershell
-python backend/tools/schoolbridge_owner_license.py sign-license --private-key <protected-private-key-file> --installation-id <installation-id> --license-id <new-unique-transfer-id> --action machine_transfer --machine-binding-hash <destination-fingerprint>
+python backend/tools/schoolbridge_owner_license.py sign-license --private-key <protected-private-key-file> --installation-id <installation-id> --license-id <new-unique-transfer-id> --action machine_transfer --machine-binding-hash <destination-fingerprint> --expires-at <unix-timestamp-within-seven-days>
 ```
 
-The private key stays with the developer and is never placed on the school computer. The generated transfer token is bound to one installation and one destination fingerprint; the backend records its hash and rejects reuse.
+The private key stays with the developer and is never placed on the school computer. The token must expire within seven days. The generated transfer token is bound to one installation and one destination fingerprint; the backend records its hash and rejects reuse.
