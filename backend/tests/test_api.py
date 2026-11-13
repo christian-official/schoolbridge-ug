@@ -727,6 +727,15 @@ def test_phase_one_staff_and_finance_workflow_end_to_end():
         )
         assert created_staff.status_code == 200, created_staff.text
         staff_id = created_staff.json()["id"]
+        original_staff_number = created_staff.json()["staff_number"]
+        updated_staff = client.patch(
+            f"/api/staff/{staff_id}",
+            headers=headers,
+            json={"staff_number": "SCHOOL-STAFF-0042"},
+        )
+        assert updated_staff.status_code == 200, updated_staff.text
+        assert updated_staff.json()["staff"]["staff_number"] == "SCHOOL-STAFF-0042"
+        assert updated_staff.json()["staff"]["staff_number"] != original_staff_number
 
         staff_page = client.get("/api/staff?page=1&page_size=100", headers=headers)
         assert staff_page.status_code == 200, staff_page.text
@@ -1233,7 +1242,7 @@ def test_parent_portal_only_exposes_linked_child_records_and_audience_announceme
         created = client.post("/api/public/registration/parent", json={
             "school_id": "00000000-0000-4000-8000-000000000001",
             "parent_name": "Amina Parent", "relationship": "Mother",
-            "children": [{"first_name": "Amina", "last_name": "Learner", "admission_number": "SB-PARENT-001"}],
+            "children": [{"first_name": "Amina", "last_name": "Learner"}],
         })
         assert created.status_code == 200, created.text
         assert created.json()["role"] == "parent"
