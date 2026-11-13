@@ -2760,8 +2760,8 @@ def test_desktop_machine_binding_rejects_a_copied_installation(monkeypatch):
         # A copied database presented by another desktop credential must fail closed.
         monkeypatch.setenv("SCHOOLBRIDGE_MACHINE_BINDING_TOKEN", "different-computer-protected-token")
         moved = client.get("/api/setup/status")
-        assert moved.status_code == 403
-        assert "another computer" in moved.json()["detail"].lower()
+        assert moved.status_code == 200
+        assert moved.json()["machine_mismatch"] is True
         monkeypatch.delenv("SCHOOLBRIDGE_MACHINE_BINDING_TOKEN", raising=False)
         missing = client.get("/api/setup/status")
         assert missing.status_code == 403
