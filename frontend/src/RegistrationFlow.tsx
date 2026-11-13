@@ -12,14 +12,16 @@ export default function RegistrationFlow({
   schoolId,
   schoolName,
   apiBaseUrl,
+  audience,
   onAuthenticated,
 }: {
   schoolId: string
   schoolName: string
   apiBaseUrl: string
+  audience: 'parent' | 'teacher'
   onAuthenticated: (token: string) => Promise<void> | void
 }) {
-  const [kind, setKind] = useState<'parent' | 'teacher'>('parent')
+  const [kind, setKind] = useState<'parent' | 'teacher'>(audience)
   const [formOpen, setFormOpen] = useState(false)
   const [parentName, setParentName] = useState('')
   const [relationship, setRelationship] = useState('')
@@ -98,8 +100,8 @@ export default function RegistrationFlow({
       <h1>Join your school</h1>
       <p className="muted">School: <strong>{schoolName}</strong></p>
       <div className="registration-kind">
-        <button type="button" className="primary-button" onClick={() => { setKind('parent'); setError(''); setMessage(''); setFormOpen(true) }}>Parent</button>
-        <button type="button" className="primary-button" onClick={() => { setKind('teacher'); setError(''); setMessage(''); setFormOpen(true) }}>Teacher</button>
+        <p className="form-hint">{audience === 'parent' ? 'Parent access' : 'Teacher access'} · {schoolName}</p>
+        <button type="button" className="primary-button" onClick={() => { setError(''); setMessage(''); setFormOpen(true) }}>Continue as {audience}</button>
       </div>
 
       {formOpen && <div className="registration-modal-backdrop" role="presentation">
