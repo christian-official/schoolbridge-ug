@@ -122,7 +122,7 @@ test('QR access opens the correct school registration flow on a mobile viewport 
     await page.getByLabel('Relationship to the child(ren)').fill('Guardian')
     await page.getByLabel('First name').fill('Test')
     await page.getByLabel('Last name').fill('Learner')
-    await page.getByLabel('Admission number').fill('TEST-001')
+    assert.equal(await page.getByLabel('Admission number').count(), 0, 'parent registration must not require an admission number')
 
     await page.getByRole('button', { name: 'Verify and open my dashboard' }).click()
     await page.getByRole('heading', { name: 'My children', exact: true }).waitFor()
@@ -131,7 +131,7 @@ test('QR access opens the correct school registration flow on a mobile viewport 
       school_id: schoolId,
       parent_name: 'Test Parent',
       relationship: 'Guardian',
-      children: [{ first_name: 'Test', last_name: 'Learner', admission_number: 'TEST-001', date_of_birth: null, class_name: null }],
+      children: [{ first_name: 'Test', last_name: 'Learner', date_of_birth: null, class_name: null }],
     })
     assert.ok(apiRequests.length >= 3, 'setup, school identity and registration should call the API')
     assert.ok(apiRequests.every(request => request.origin === configuredApiOrigin), `every QR flow request must use the configured shared API origin: ${JSON.stringify(apiRequests)}`)
