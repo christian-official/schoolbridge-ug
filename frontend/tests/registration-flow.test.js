@@ -8,14 +8,19 @@ const backend = await readFile(new URL('../../backend/app/main.py', import.meta.
 const syncDevices = await readFile(new URL('../src/SyncDevices.tsx', import.meta.url), 'utf8')
 
 test('scanning a school QR opens that school registration page directly', () => {
-  assert.match(app, /useState\(\(\) => Boolean\(new URLSearchParams\(window\.location\.search\)\.get\('school'\)\)\)/)
-  assert.match(app, /Only an explicit school QR URL starts Parent\/Teacher registration/)
+  assert.match(app, /schoolQuery.get\('audience'\)/)
+  assert.match(app, /showSchoolLanding = Boolean\(schoolQuery.get\('school'\) && !schoolAudience\)/)
+  assert.match(app, /SchoolAccessLanding/)
+  assert.match(app, /audience=\{schoolAudience as 'parent'\|'teacher'\}/)
   assert.match(app, /<h1>Welcome back<\/h1>/)
   assert.doesNotMatch(app, /Essential staff access/)
   assert.match(app, /<RegistrationFlow schoolId=\{selectedSchoolId\}/)
   assert.match(app, /\/api\/public\/school\?school=/)
-  assert.match(syncDevices, /Parent &amp; Teacher Access/)
-  assert.match(syncDevices, /setSchoolAccessUrl\(destination \+ encodeURIComponent\(identity\.school_id\)\)/)
+  assert.match(syncDevices, /Separate parent and teacher access QR codes/)
+  assert.match(syncDevices, /loadQr\('parent'\)/)
+  assert.match(syncDevices, /loadQr\('teacher'\)/)
+  assert.match(backend, /audience = request\.query_params\.get\("audience", "parent"\)/)
+  assert.match(backend, /&audience=\{audience\}/)
 })
 
 test('parent and teacher registration submits existing-record details without passwords, phone codes or administrator review', () => {
@@ -42,6 +47,8 @@ test('teacher verification matches an active teaching staff record and opens the
   assert.match(backend, /def _match_teacher_registration/)
   assert.match(backend, /models\.StaffMember\.staff_number/)
   assert.match(backend, /def submit_teacher_registration[\s\S]*?_create_qr_registration_session/)
+  assert.match(flow, /audience: 'parent' \| 'teacher'/)
+  assert.match(flow, /const \[kind, setKind\] = useState<'parent' \| 'teacher'>\(audience\)/)
   assert.match(flow, /staff_number/)
   assert.match(flow, /Verify and open my dashboard/)
 })
