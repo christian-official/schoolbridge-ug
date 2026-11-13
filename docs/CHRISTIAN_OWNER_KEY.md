@@ -1,19 +1,21 @@
-# CHRISTIAN Owner Key provisioning
+# CHRISTIAN Owner Key — developer-only operations
 
-The visible owner-activation brand is **CHRISTIAN**. Signed activation codes begin with `CHRISTIAN:`; the cryptographic signature algorithm remains Ed25519 internally.
+The normal SchoolBridge first-install activation is the five-choice owner recognition challenge documented in [OWNER_ACTIVATION_V2_DESIGN.md](OWNER_ACTIVATION_V2_DESIGN.md). The school installer does not paste a `CHRISTIAN:` activation code and does not handle Ed25519 keys during ordinary activation.
+
+The owner key remains a developer-only signing tool for two exceptional operations:
+- Authorising a protected school-identity correction.
+- Authorising a one-time transfer of an installation to a different computer.
 
 ## Key-handling rules
 
-- Generate the owner keypair on your trusted owner computer, not in a browser and not on the school server.
-- The private key is encrypted with a passphrase and must remain outside this repository, GitHub, Render environment variables and school installations.
+- Generate the keypair once on a trusted developer-controlled Windows computer.
+- Keep the encrypted private key and its passphrase outside this repository and outside school computers.
 - Never send the private key or passphrase in chat, email, screenshots or support tickets.
-- Only the matching Base64 public key is configured in the backend environment.
-- Keep a secure offline backup of the encrypted private-key file and store the passphrase separately. Losing either means you may be unable to sign future activation or identity-correction codes.
-- Generate the keypair once for the owner identity. Do not generate a new keypair for every school.
+- Only the matching Base64 public key is packaged for backend verification.
+- The private key must never be committed, uploaded to GitHub, or distributed with an installer.
+- School staff do not need to know what Ed25519 is or handle key files.
 
-## 1. Generate the owner keypair on your trusted Windows computer
-
-Use a local copy of the reviewed SchoolBridge release. Open PowerShell in the repository root:
+## 1. Generate the developer keypair
 
 ```powershell
 New-Item -ItemType Directory -Force "$HOME\SchoolBridgeOwner"
@@ -21,50 +23,34 @@ python -m pip install cryptography
 python backend\tools\schoolbridge_owner_license.py generate-keypair --private-key "$HOME\SchoolBridgeOwner\christian-owner-private.pem" --public-key "$HOME\SchoolBridgeOwner\christian-owner-public.key"
 ```
 
-The utility asks for a passphrase twice. Use a unique passphrase of at least 14 characters and store it separately in a reputable password manager. The private-key file is encrypted before it is written. Do not put either key file inside the repository or a shared school folder.
+The utility encrypts the private key with a passphrase. Store the passphrase separately. The public key is used by the backend to verify developer authorisations.
 
-The command prints the public key as Base64. This public value is the only key value that belongs in a server environment.
+## 2. Authorise a computer transfer
 
-## 2. Configure the public key on the school installation
+When a school moves an installation, the destination screen displays:
+- The existing installation ID.
+- A fingerprint for the destination computer.
 
-For the current local-network school installation, open the school's private `.env` file on the school host and set:
-
-- Variable: `SCHOOLBRIDGE_LICENSE_PUBLIC_KEY`
-- Value: the Base64 public-key value printed by the key-generation command.
-
-Restart/recreate the backend service after changing the environment. Never put the private key or its passphrase in the school's `.env`.
-
-For a separately hosted preview or future hosted service, the public key belongs in that backend service's environment configuration (not the frontend static site). The private key still remains on the owner's trusted computer.
-
-## 3. Sign an activation code for a school's installation
-
-After the school host has started and the first-time setup page displays its **Unique Installation ID**, copy that exact ID.
-
-On your trusted owner computer, from the repository root, run:
+The developer uses those two values to create an expiring, single-use transfer authorisation:
 
 ```powershell
-python backend\tools\schoolbridge_owner_license.py sign-license --private-key "$HOME\SchoolBridgeOwner\christian-owner-private.pem" --installation-id "PASTE-INSTALLATION-ID" --license-id "SB-OWNER-0001"
+python backend\tools\schoolbridge_owner_license.py sign-license --private-key "$HOME\SchoolBridgeOwner\christian-owner-private.pem" --installation-id "PASTE-INSTALLATION-ID" --license-id "SB-TRANSFER-UNIQUE-001" --action machine_transfer --machine-binding-hash "PASTE-DESTINATION-FINGERPRINT" --expires-at 1794614400
 ```
 
-Enter the private-key passphrase when prompted. The command prints a signed activation code beginning with `CHRISTIAN:`. Paste that code into the intended SchoolBridge installation's activation field. The same code is required again to complete initial school setup and create the first administrator.
+Use a new unique license ID for every transfer and set an expiry within seven days. Send the resulting token to the school contact. It is bound to the named installation and destination fingerprint, and the backend rejects reuse.
 
-Use a new unique license ID for every newly signed code. The code is bound to the installation ID and cannot activate a different installation.
+## 3. Authorise a school identity correction
 
-## 4. Verification checklist
+A school administrator cannot independently change the protected school name, type, country or day/boarding structure. For a legitimate legal or structural correction, the developer signs a separate correction authorisation:
 
-- The school's backend has the public key configured and has restarted successfully.
-- The installation ID was copied from the intended school's first-time setup page.
-- The activation code begins with `CHRISTIAN:`.
-- The code is pasted only into the intended installation.
-- The first administrator is created only after activation succeeds.
-- The private-key file and passphrase remain under the owner's control.
+```powershell
+python backend\tools\schoolbridge_owner_license.py sign-license --private-key "$HOME\SchoolBridgeOwner\christian-owner-private.pem" --installation-id "PASTE-INSTALLATION-ID" --license-id "SB-IDENTITY-CORRECTION-UNIQUE-002" --action school_identity_correction --school-name "New Registered School Name" --school-type Combined --country Uganda --school-structure Both
+```
 
-**Never generate a production key or configure it on a school host until the corresponding owner-key code has passed CI and is included in the reviewed release intended for that school.**
+An authenticated school administrator submits that authorisation through the protected identity-correction control. The backend applies only the identity embedded in the signed token, records the previous and new identity, and rejects reuse.
 
-## Desktop installer packaging and CI test keys
+## 4. Desktop installer packaging and CI test keys
 
-The production desktop build reads the owner's Base64 Ed25519 **public** verification key from `frontend/src-tauri/owner-activation-public-key.txt`. Keep the matching private key outside the repository. The packaging script validates the public key, stages it as `frontend/desktop-resources/owner-activation-public-key.txt`, and Tauri embeds that staged file in the installer.
+The Windows desktop package still embeds the public verification key for these exceptional developer-authorised operations. The matching private key remains outside the repository. GitHub Actions creates a fresh random CI-only public key to exercise the packaging path; workflow installers and USB artifacts using that test key are not production releases.
 
-GitHub Actions creates a fresh random **CI-only test public key** to exercise this packaging path. Any installer or USB artifact produced by that workflow is test-only and must not be distributed to schools or treated as a production release. The workflow labels the desktop installer artifact accordingly.
-
-A production installer build remains blocked until the real owner's public key is provisioned in the source file on the trusted build machine. Do not substitute the CI test key or commit the private key.
+Do not substitute a CI test key for the production developer public key, and never commit the private key.
