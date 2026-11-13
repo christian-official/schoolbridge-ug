@@ -130,7 +130,7 @@ export default function RegistrationFlow({
             <label>Class (optional)<input value={child.class_name} onChange={e => updateChild(index, 'class_name', e.target.value)} maxLength={80}/></label>
             {children.length > 1 && <button type="button" className="recovery-link" onClick={() => setChildren(current => current.filter((_, i) => i !== index))}>Remove child</button>}
           </fieldset>)}
-          {children.length < 10 && <button type="button" className="secondary-button" onClick={() => setChildren(current => [...current, { first_name: '', last_name: '', admission_number: '', date_of_birth: '', class_name: '' }])}>Add another child</button>}
+          {children.length < 10 && <button type="button" className="secondary-button" onClick={() => setChildren(current => [...current, { first_name: '', last_name: '', date_of_birth: '', class_name: '' }])}>Add another child</button>}
         </> : <>
           <label htmlFor="reg-teacher-first">First name as recorded by the school</label>
           <input id="reg-teacher-first" value={teacher.first_name} onChange={e => setTeacher({ ...teacher, first_name: e.target.value })} required maxLength={80}/>
