@@ -1157,6 +1157,19 @@ def test_staff_registration_handles_contact_email_already_used_by_another_login(
         assert second.json()["login"]["email"].endswith("@accounts.schoolbridge.local")
         assert second.json()["email"] == "shared-staff@example.com"
 
+        first_staff_id = first.json()["id"]
+        old_username = first.json()["login"]["username"]
+        changed_number = client.patch(
+            f"/api/staff/{first_staff_id}", headers=headers,
+            json={"staff_number": "STAFF-EDITED-001"},
+        )
+        assert changed_number.status_code == 200, changed_number.text
+        assert changed_number.json()["staff"]["staff_number"] == "STAFF-EDITED-001"
+        with SessionLocal() as db:
+            linked_login = db.query(models.User).filter_by(staff_id=first_staff_id).one()
+            assert linked_login.username == "staff-edited-001"
+            assert linked_login.username != old_username
+
         searched = client.get("/api/staff?search=Administration&page_size=100", headers=headers)
         assert searched.status_code == 200
         assert searched.json()["total"] == 2
