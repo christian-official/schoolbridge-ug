@@ -28,6 +28,13 @@ def upgrade():
         if name not in existing:
             op.add_column("school_setup_state", sa.Column(name, column_type, nullable=True))
 
+    # Attempts from the previous temporary-rate-limit license flow are not
+    # attempts at the new single-selection challenge.
+    bind.execute(sa.text(
+        "UPDATE school_setup_state SET activation_attempts = 0, activation_locked_until = NULL "
+        "WHERE activated_at IS NULL"
+    ))
+
 
 def downgrade():
     bind = op.get_bind()
