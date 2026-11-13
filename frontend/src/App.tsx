@@ -742,7 +742,7 @@ function FirstTimeSetupWizard({status,onStatusChange}:{status:FirstSetupStatus;o
   },[status.loading,status.activated,status.activation_declined,status.installation_id,status.school_id])
   useEffect(()=>{
     // Persist only non-secret school profile fields for this browser tab/session.
-    // Never persist the activation code, logo data, administrator identity or password.
+    // Never persist the challenge selection, logo data, administrator identity or password.
     const draft={
       school_name:school.school_name,school_type:school.school_type,country:school.country,
       school_structure:school.school_structure,address:school.address,phone:school.phone,
@@ -955,7 +955,7 @@ function App() {
           if(result.setup_completed && result.activated && result.installation_id) localStorage.setItem('schoolbridge-installation-id', result.installation_id)
           else localStorage.removeItem('schoolbridge-installation-id')
         } catch { /* Ignore unavailable browser storage. */ }
-        setSetupStatus({loading:false,setup_completed:Boolean(result.setup_completed),activated:Boolean(result.activated),installation_id:result.installation_id||'',school_id:result.school_id||'',identity_locked:Boolean(result.identity_locked),error:''})
+        setSetupStatus({loading:false,setup_completed:Boolean(result.setup_completed),activated:Boolean(result.activated),activation_declined:Boolean(result.activation_declined),installation_id:result.installation_id||'',school_id:result.school_id||'',identity_locked:Boolean(result.identity_locked),error:''})
       }
     }).catch(e=>{if(!cancelled)setSetupStatus({loading:false,setup_completed:false,activated:false,installation_id:'',school_id:selectedSchoolId,identity_locked:false,error:e instanceof Error?e.message:'Unable to check installation setup.'})})
     return ()=>{cancelled=true}
