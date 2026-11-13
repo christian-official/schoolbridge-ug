@@ -50,10 +50,10 @@ A teacher profile is entered into the Staff directory without creating a login. 
 
 ## Verification and abuse controls
 
-- Parent matching uses the child's exact first and last names plus an admission number or date of birth, and the parent's exact recorded name and relationship.
-- Teacher matching uses the exact recorded first and last names and staff number, and requires an active teaching staff record.
+- Parent matching uses the child's exact first and last names plus the parent's exact recorded guardian name and relationship. Date of birth and class are optional supporting checks; admission numbers are not required.
+- Teacher matching uses the exact recorded first and last names and current staff number, and requires an active teaching staff record.
 - Multiple possible student or staff matches fail closed. SchoolBridge never guesses which record to link.
-- Parent matching uses the child's exact first and last names plus the parent's exact recorded guardian name and relationship; date of birth and class are optional supporting checks. Admission numbers are not required.\n- Matching never searches another school or returns candidate student/staff records to an unauthenticated applicant.
+- Matching never searches another school or returns candidate student/staff records to an unauthenticated applicant.
 - Registration attempts are rate-limited per school and client connection. Attempt identifiers are HMAC-hashed in the audit log.
 - Account creation and parent-child linking occur in one database transaction. Repeating the same verified registration resumes the existing account rather than creating a duplicate for the same identity and child set.
 - Existing teacher accounts are resumed by their linked staff record; legacy forced-password-change state is cleared when the teacher successfully activates through QR.
