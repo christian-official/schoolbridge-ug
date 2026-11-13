@@ -938,9 +938,24 @@ mod tests {
         std::fs::write(root.join("runtime/python.exe"), b"test runtime").expect("write runtime marker");
         std::fs::write(root.join("backend/app/main.py"), b"# backend").expect("write backend marker");
         std::fs::write(root.join("backend/app/static/index.html"), b"<!doctype html>").expect("write frontend marker");
+        let public_key = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+        std::fs::write(root.join("owner-activation-public-key.txt"), public_key)
+            .expect("write packaged owner public-key resource");
 
         let resolved = resolve_resource_root(&root).expect("complete packaged resources should resolve");
         assert_eq!(resolved, root);
+        assert_eq!(
+            super::packaged_license_public_key(&resolved).expect("packaged public key should resolve"),
+            public_key,
+            "the runtime must read the exact root-level path mapped by tauri.conf.json"
+        );
+
+        std::fs::write(root.join("owner-activation-public-key.txt"), "not-a-valid-key")
+            .expect("replace key with invalid test value");
+        assert!(
+            super::packaged_license_public_key(&resolved).is_err(),
+            "the runtime must reject a malformed packaged public key"
+        );
 
         std::fs::remove_dir_all(&root).expect("remove temporary resources");
     }
