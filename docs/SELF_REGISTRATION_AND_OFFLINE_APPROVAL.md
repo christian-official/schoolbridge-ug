@@ -2,15 +2,22 @@
 
 ## Agreed product decision
 
-Parents and teachers register themselves by scanning their school's reusable QR code. SchoolBridge verifies the details they submit against that school's existing records and, when there is one unambiguous match, creates or resumes the appropriate account and opens the correct dashboard automatically.
+Parents and teachers use separate role-specific QR codes. The parent QR opens the parent registration page directly; the teacher QR opens the teacher registration page directly. The plain school webpage is the staff access page: administrators and authorised essential non-teaching staff sign in there and can download the Windows desktop application before signing in. SchoolBridge verifies parent and teacher details against that school's existing records and, when there is one unambiguous match, creates or resumes the appropriate account and opens the correct dashboard automatically.
 
 There is no administrator-initiated parent or teacher account creation, no administrator approval queue, no SMS verification code, and no password creation for parents or teachers. The process is designed for schools whose source records may still be paper-based: the school enters its roster and guardian/staff details into SchoolBridge once; families and teachers then register themselves.
 
 Passwords are reserved for administrator accounts and explicitly selected essential non-teaching staff accounts.
 
+## Public school access webpage
+
+1. The plain school URL opens the school's branded access page.
+2. The page offers separate Parent access and Teacher access routes, plus Administrator & essential staff sign-in.
+3. The Windows desktop download link is available on this page and on the staff sign-in page. The desktop installer is for administrators and authorised essential non-teaching staff; downloading it does not authenticate a user.
+4. Parent and teacher QR codes carry explicit audience values so each opens only its own registration flow. A generic school QR must not make a parent or teacher choose a role manually.
+
 ## Parent journey
 
-1. A parent scans the school's QR code.
+1. A parent scans the parent-specific school QR code.
 2. The QR opens the school's registration page directly and displays the verified school identity.
 3. The parent enters their full name and relationship to the child or children.
 4. For each child, the parent enters the child's first and last names. Date of birth and class are optional supporting checks; an admission number is never required. A parent can submit up to ten children in one registration.
@@ -22,7 +29,7 @@ If a child's identity is ambiguous, the student record is not found, or the guar
 
 ## Teacher journey
 
-1. A teacher scans the school's QR code and reaches the same school-specific registration entry point.
+1. A teacher scans the teacher-specific school QR code and reaches the teacher registration page directly.
 2. The teacher selects **Teacher** and enters their first name, last name and staff number. Position and department can be supplied as additional checks.
 3. SchoolBridge matches those details against exactly one active teaching staff record belonging to the selected school.
 4. On a unique match, SchoolBridge creates or resumes the teacher account, associates it with the verified staff record, issues a secure session and opens the teacher dashboard.
