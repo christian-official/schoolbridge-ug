@@ -14,7 +14,6 @@ export default function PWAInstallPrompt() {
   const [isAppleMobile, setIsAppleMobile] = useState(false)
   const [isAndroid, setIsAndroid] = useState(false)
   const [showAppleSteps, setShowAppleSteps] = useState(false)
-  const [showAndroidSteps, setShowAndroidSteps] = useState(false)
   const [dismissed, setDismissed] = useState(false)
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null)
   const [applyingUpdate, setApplyingUpdate] = useState(false)
@@ -114,12 +113,9 @@ export default function PWAInstallPrompt() {
           {waitingWorker ? <><strong>SchoolBridge update ready</strong><span>Refresh the app to use the latest version.</span></> :
             isAppleMobile ? <><strong>Add SchoolBridge to your Home Screen</strong><span>Install from Safari to open SchoolBridge like an app.</span></> :
               installEvent ? <><strong>Install SchoolBridge</strong><span>Add the app to your device for quick access.</span></> :
-                <><strong>SchoolBridge is ready to use</strong><span>{isAndroid ? 'Your browser has not offered the one-tap install option.' : 'You can keep using SchoolBridge in this browser.'}</span></>}
+                <><strong>SchoolBridge is ready to use</strong><span>{isAndroid ? 'This browser has not provided an install prompt. Check its app-install controls, or continue using SchoolBridge here.' : 'You can keep using SchoolBridge in this browser.'}</span></>}
           {showAppleSteps && isAppleMobile && (
             <span className="pwa-apple-steps">In Safari, tap <Share size={14} aria-label="Share" /> Share, then choose <strong>Add to Home Screen</strong>.</span>
-          )}
-          {showAndroidSteps && isAndroid && !installEvent && (
-            <span className="pwa-android-steps">In Chrome, open the <strong>⋮</strong> menu and choose <strong>Install app</strong> or <strong>Add to Home screen</strong>. If neither option appears, open this page directly in Chrome and try again.</span>
           )}
           {installError && <span className="pwa-install-error" role="status">{installError}</span>}
         </div>
@@ -130,10 +126,6 @@ export default function PWAInstallPrompt() {
         ) : isAppleMobile ? (
           <button type="button" className="pwa-install-action" onClick={() => setShowAppleSteps(value => !value)}>
             {showAppleSteps ? 'Hide steps' : 'Add to Home Screen'}
-          </button>
-        ) : isAndroid ? (
-          <button type="button" className="pwa-install-action" onClick={() => setShowAndroidSteps(value => !value)}>
-            {showAndroidSteps ? 'Hide steps' : 'Install options'}
           </button>
         ) : null}
         <button type="button" className="pwa-dismiss" aria-label="Dismiss install suggestion" onClick={() => setDismissed(true)}><X size={17} /></button>
