@@ -55,8 +55,7 @@ fn machine_binding_token() -> Result<String, String> {
 
 #[cfg(not(windows))]
 fn machine_binding_token() -> Result<String, String> {
-    // Development-only fallback. Production desktop packages are Windows-only.
-    Ok("schoolbridge-nonwindows-development-binding".to_string())
+    Err("Protected computer binding is available only in the Windows desktop application.".into())
 }
 
 #[cfg(windows)]
