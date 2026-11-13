@@ -24,32 +24,29 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install wxWidgets dependency
+      - name: Bootstrap vcpkg and install wxWidgets
         shell: pwsh
         run: |
-          if (-not $env:VCPKG_ROOT) {
-            throw "VCPKG_ROOT is not available on this runner."
-          }
-          & "$env:VCPKG_ROOT\vcpkg.exe" install wxwidgets:x64-windows
-          if ($LASTEXITCODE -ne 0) {
-            throw "wxWidgets installation failed."
-          }
+          $vcpkgRoot = Join-Path $env:RUNNER_TEMP "vcpkg"
+          git clone https://github.com/microsoft/vcpkg.git $vcpkgRoot
+          if ($LASTEXITCODE -ne 0) { throw "Could not clone vcpkg." }
+          & "$vcpkgRoot\bootstrap-vcpkg.bat" -disableMetrics
+          if ($LASTEXITCODE -ne 0) { throw "Could not bootstrap vcpkg." }
+          Add-Content $env:GITHUB_ENV "VCPKG_ROOT=$vcpkgRoot"
+          & "$vcpkgRoot\vcpkg.exe" install wxwidgets:x64-windows
+          if ($LASTEXITCODE -ne 0) { throw "wxWidgets installation failed." }
 
       - name: Configure
         shell: pwsh
         run: |
-          $vcpkgRoot = $env:VCPKG_INSTALLATION_ROOT
-          if (-not $vcpkgRoot) { $vcpkgRoot = $env:VCPKG_ROOT }
-          if (-not $vcpkgRoot) { throw "vcpkg root is not available." }
-          cmake -S desktop-legacy-native -B build/legacy-native -A x64 "-DCMAKE_TOOLCHAIN_FILE=$vcpkgRoot/scripts/buildsystems/vcpkg.cmake"
+          cmake -S desktop-legacy-native -B build/legacy-native -A x64 "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
+          if ($LASTEXITCODE -ne 0) { throw "CMake configuration failed." }
 
       - name: Build
         shell: pwsh
         run: |
           cmake --build build/legacy-native --config Release --parallel
-          if ($LASTEXITCODE -ne 0) {
-            throw "Native shell compilation failed."
-          }
+          if ($LASTEXITCODE -ne 0) { throw "Native shell compilation failed." }
 
       - name: Upload compile-only prototype
         uses: actions/upload-artifact@v4
