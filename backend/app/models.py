@@ -536,6 +536,9 @@ class SchoolSetupState(Base):
     activation_license_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     activation_attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
     activation_locked_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    activation_challenge_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    activation_challenge_options_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    activation_correct_option_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     setup_completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     original_identity_json: Mapped[str | None] = mapped_column(Text, nullable=True)
 
