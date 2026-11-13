@@ -20,12 +20,8 @@ pytestmark = pytest.mark.skipif(
 
 
 def test_fresh_postgres_install_runs_owner_activation_and_school_setup(tmp_path, monkeypatch):
-    import base64
     import json
-    from datetime import datetime, timezone
 
-    from cryptography.hazmat.primitives import serialization
-    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
     from fastapi.testclient import TestClient
 
     source_url = make_url(DATABASE_URL)
@@ -40,13 +36,9 @@ def test_fresh_postgres_install_runs_owner_activation_and_school_setup(tmp_path,
         with admin_engine.connect().execution_options(isolation_level="AUTOCOMMIT") as connection:
             connection.execute(text(f'CREATE DATABASE "{target_database}"'))
 
-        private_key = Ed25519PrivateKey.generate()
-        public_key = private_key.public_key().public_bytes(
-            serialization.Encoding.Raw, serialization.PublicFormat.Raw
-        )
         monkeypatch.setenv("SCHOOLBRIDGE_DATABASE_URL", target_url.render_as_string(hide_password=False))
         monkeypatch.setenv("SCHOOLBRIDGE_SECRET_KEY", "postgres-setup-test-secret-not-for-production")
-        monkeypatch.setenv("SCHOOLBRIDGE_LICENSE_PUBLIC_KEY", base64.b64encode(public_key).decode("ascii"))
+        monkeypatch.setenv("SCHOOLBRIDGE_OWNER_SEQUENCE", "123456")
         monkeypatch.setenv("SCHOOLBRIDGE_SEED_DEMO_DATA", "false")
 
         from app.database import SessionLocal, engine
@@ -57,21 +49,16 @@ def test_fresh_postgres_install_runs_owner_activation_and_school_setup(tmp_path,
             status = client.get("/api/setup/status")
             assert status.status_code == 200
             installation_id = status.json()["installation_id"]
-            claims = {
-                "product": "SchoolBridge",
-                "installation_id": installation_id,
-                "license_id": "postgres-fresh-install-001",
-                "issued_at": int(datetime.now(timezone.utc).timestamp()),
-                "action": "activate",
-            }
-            payload = json.dumps(claims, sort_keys=True, separators=(",", ":")).encode()
-            encode = lambda value: base64.urlsafe_b64encode(value).decode().rstrip("=")
-            license_token = "CHRISTIAN:" + encode(payload) + "." + encode(private_key.sign(payload))
-
-            activated = client.post("/api/setup/activate", json={"license": license_token})
+            challenge = client.post("/api/setup/challenge")
+            assert challenge.status_code == 200, challenge.text
+            challenge_data = challenge.json()
+            selected_option = next(option for option in challenge_data["options"] if "123456" in option)
+            activated = client.post("/api/setup/activate", json={
+                "challenge_id": challenge_data["challenge_id"],
+                "selected_option": selected_option,
+            })
             assert activated.status_code == 200, activated.text
             setup = client.post("/api/setup/complete", json={
-                "activation_license": license_token,
                 "school_name": "PostgreSQL Integration School",
                 "school_type": "Combined",
                 "country": "Uganda",
@@ -103,7 +90,8 @@ def test_fresh_postgres_install_runs_owner_activation_and_school_setup(tmp_path,
             assert profile.house_names == "Lions\\nEagles"
             assert state.activated_at is not None
             assert state.setup_completed_at is not None
-            assert state.activation_license_hash
+            assert state.activation_attempts == 1
+            assert state.activation_challenge_id
             assert identity["installation_id"] == installation_id
             assert admin.hashed_password != "LongTestPassword123!"
             assert db.query(models.Student).count() == 0
@@ -122,7 +110,7 @@ def test_fresh_postgres_install_runs_owner_activation_and_school_setup(tmp_path,
         restored_engine = create_engine(target_url.set(database=restored_database))
         with restored_engine.connect() as connection:
             restored_state = connection.execute(text(
-                "SELECT setup_completed_at, activation_license_hash, original_identity_json "
+                "SELECT setup_completed_at, activation_attempts, original_identity_json "
                 "FROM school_setup_state WHERE id=1"
             )).one()
             restored_profile = connection.execute(text(
@@ -133,7 +121,7 @@ def test_fresh_postgres_install_runs_owner_activation_and_school_setup(tmp_path,
             )).scalar_one()
         restored_identity = json.loads(restored_state[2])
         assert restored_state[0] is not None
-        assert restored_state[1]
+        assert restored_state[1] == 1
         assert restored_identity["installation_id"] == installation_id
         assert restored_profile[0] == "PostgreSQL Integration School"
         assert restored_profile[1] == "Combined"
