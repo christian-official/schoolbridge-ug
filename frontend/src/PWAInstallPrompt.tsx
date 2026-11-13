@@ -11,7 +11,9 @@ export default function PWAInstallPrompt() {
   const [installEvent, setInstallEvent] = useState<InstallPromptEvent | null>(null)
   const [isOffline, setIsOffline] = useState(() => !navigator.onLine)
   const [isAppleMobile, setIsAppleMobile] = useState(false)
+  const [isAndroid, setIsAndroid] = useState(false)
   const [showAppleSteps, setShowAppleSteps] = useState(false)
+  const [showAndroidSteps, setShowAndroidSteps] = useState(false)
   const [dismissed, setDismissed] = useState(false)
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null)
   const [applyingUpdate, setApplyingUpdate] = useState(false)
@@ -58,6 +60,7 @@ export default function PWAInstallPrompt() {
     const appleMobile = /iphone|ipad|ipod/i.test(navigator.userAgent) ||
       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
     setIsAppleMobile(appleMobile)
+    setIsAndroid(/android/i.test(navigator.userAgent))
 
     const handleInstallPrompt = (event: Event) => {
       event.preventDefault()
@@ -84,7 +87,7 @@ export default function PWAInstallPrompt() {
     if (choice.outcome === 'accepted') setDismissed(true)
   }
 
-  const hideInstallCard = (dismissed && !waitingWorker) || (!installEvent && !isAppleMobile && !waitingWorker)
+  const hideInstallCard = (dismissed && !waitingWorker) || (!installEvent && !isAppleMobile && !isAndroid && !waitingWorker)
   if (hideInstallCard && !isOffline) return null
 
   return (
@@ -97,11 +100,18 @@ export default function PWAInstallPrompt() {
         {showAppleSteps && isAppleMobile && (
           <span className="pwa-apple-steps">In Safari, tap <Share size={14} aria-label="Share" /> Share, then choose <strong>Add to Home Screen</strong>.</span>
         )}
+        {showAndroidSteps && isAndroid && !installEvent && (
+          <span className="pwa-android-steps">In Chrome, open the <strong>⋮ menu</strong>, then choose <strong>Install app</strong> or <strong>Add to Home screen</strong>. If neither appears, check Chrome's menu again after the page finishes loading.</span>
+        )}
       </div>
       {waitingWorker ? (
         <button type="button" className="pwa-install-action" onClick={applyUpdate} disabled={applyingUpdate}>{applyingUpdate ? 'Updating…' : 'Update now'}</button>
       ) : installEvent ? (
         <button type="button" className="pwa-install-action" onClick={() => void install()}>Install</button>
+      ) : isAndroid ? (
+        <button type="button" className="pwa-install-action" onClick={() => setShowAndroidSteps(value => !value)}>
+          {showAndroidSteps ? 'Hide steps' : 'How to install'}
+        </button>
       ) : (
         <button type="button" className="pwa-install-action" onClick={() => setShowAppleSteps(value => !value)}>
           {showAppleSteps ? 'Hide steps' : 'How to add'}
