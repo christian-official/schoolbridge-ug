@@ -12,16 +12,19 @@ This document records the owner-approved activation experience for the Windows d
 - Exactly one option contains the owner's six-digit sequence as one uninterrupted substring, unchanged and in order. It may occur anywhere in the string.
 - The other four options must not contain that substring.
 - Generate fresh random surrounding characters and a fresh option order for every new installation challenge. Do not reuse a fixed set of examples.
+- The backend reads the six-digit sequence only from the protected `SCHOOLBRIDGE_OWNER_SEQUENCE` environment setting. It must be provisioned outside the repository and must never be written into source, frontend bundles, logs, or installer defaults.
+- The initial five-choice activation does not ask the installer for a Base64 key, private key, signed licence, or Ed25519 operation.
 - Permit one selection only. A wrong selection permanently declines that installation challenge; do not offer a retry or regenerate a new challenge after a wrong answer.
 - Never include the owner's sequence in frontend source, generated assets, logs, telemetry, API responses, or this repository. The verifier must run on the trusted side and use a protected provisioned secret.
 
 ## Computer binding and transfer
 
-- Bind an activated installation to a machine-held, non-exportable device identity (prefer a TPM-backed Windows key where available); do not rely only on a MAC address, hostname, disk serial, or a browser/local-storage identifier.
+- Bind the installation to a random machine token stored in Windows Credential Manager and passed only from the trusted Tauri launcher to its local backend process. Do not place this token in the install folder, database, frontend, or logs.
+- The database stores only a SHA-256 fingerprint of that protected token. A copied database presented without the original Windows credential must fail closed.
 - Store the installation binding and activation state outside the portable application folder, protected by Windows machine/user security.
 - A copied application folder, USB package, database, or configuration must not be sufficient to activate SchoolBridge on another computer.
 - If the device proof is absent, invalid, or belongs to another machine, fail closed and display a clear message that developer-authorised transfer is required.
-- Moving an installation requires an explicit, single-use developer transfer authorization bound to the source installation identity and destination device identity. Record the transfer and revoke the old device binding after successful transfer.
+- Moving an installation requires an explicit, single-use developer transfer authorization bound to the source installation identity and destination machine fingerprint. Record the transfer and replace the old machine binding only after successful verification. The transfer-authorization workflow remains a separate implementation task; until it is complete, a machine mismatch must remain blocked.
 - Do not silently rebind, reset the attempt counter, or create a fresh challenge when a device mismatch is detected.
 
 ## Security boundary
