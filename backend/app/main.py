@@ -146,18 +146,14 @@ def _match_parent_registration(db: Session, data: "ParentSelfRegistrationRequest
     student_ids: list[int] = []
 
     for child in data.children:
-        if not child.admission_number and not child.date_of_birth:
-            raise HTTPException(
-                422,
-                "For each child, provide an admission number or date of birth so the school record can be verified.",
-            )
-
         query = db.query(models.Student).filter(
             models.Student.school_tenant_id == tenant_id,
             models.Student.status == "active",
             func.lower(models.Student.first_name) == child.first_name.strip().lower(),
             func.lower(models.Student.last_name) == child.last_name.strip().lower(),
         )
+        # Admission numbers and dates of birth are optional supporting checks.
+        # The recorded guardian identity is the primary parent-registration match.
         if child.admission_number:
             query = query.filter(
                 func.lower(models.Student.admission_number) == child.admission_number.strip().lower()
@@ -173,39 +169,34 @@ def _match_parent_registration(db: Session, data: "ParentSelfRegistrationRequest
                 func.lower(models.SchoolClass.name) == child.class_name.strip().lower(),
             )
 
-        matches = query.all()
-        if len(matches) != 1:
+        guardian_verified_students = []
+        for student in query.all():
+            guardian_records = [
+                (student.guardian_name, student.guardian_relationship),
+                (student.guardian2_name, student.guardian2_relationship),
+            ]
+            contacts = db.query(models.StudentGuardianContact).filter(
+                models.StudentGuardianContact.school_tenant_id == tenant_id,
+                models.StudentGuardianContact.student_id == student.id,
+                models.StudentGuardianContact.active.is_(True),
+            ).all()
+            guardian_records.extend((contact.guardian_name, contact.relationship) for contact in contacts)
+            if any(
+                _registration_name_key(name) == parent_name
+                and (not relationship or _registration_name_key(relation) == relationship)
+                for name, relation in guardian_records
+            ):
+                guardian_verified_students.append(student)
+
+        if len(guardian_verified_students) != 1:
             raise HTTPException(
                 403,
-                "Your details could not be uniquely verified against this school's records. Check the information and try again.",
+                "Your details could not be uniquely verified against this school's student and guardian records. Check the names and try again.",
             )
-
-        student = matches[0]
-        guardian_records = [
-            (student.guardian_name, student.guardian_relationship),
-            (student.guardian2_name, student.guardian2_relationship),
-        ]
-        contacts = db.query(models.StudentGuardianContact).filter(
-            models.StudentGuardianContact.school_tenant_id == tenant_id,
-            models.StudentGuardianContact.student_id == student.id,
-            models.StudentGuardianContact.active.is_(True),
-        ).all()
-        guardian_records.extend((contact.guardian_name, contact.relationship) for contact in contacts)
-
-        guardian_matches = [
-            (name, relation)
-            for name, relation in guardian_records
-            if _registration_name_key(name) == parent_name
-            and (not relationship or _registration_name_key(relation) == relationship)
-        ]
-        if not guardian_matches:
-            raise HTTPException(
-                403,
-                "Your details could not be verified against the guardian information on this school's records.",
-            )
-        if student.id in student_ids:
+        student_id = guardian_verified_students[0].id
+        if student_id in student_ids:
             raise HTTPException(422, "Select each child only once.")
-        student_ids.append(student.id)
+        student_ids.append(student_id)
 
     return student_ids
 
@@ -862,6 +853,7 @@ class ParentRegistrationChild(BaseModel):
     model_config = ConfigDict(extra="forbid")
     first_name: str = Field(min_length=1, max_length=80)
     last_name: str = Field(min_length=1, max_length=80)
+    # Optional for legacy clients; parent registration no longer requires it.
     admission_number: str | None = Field(default=None, max_length=40)
     date_of_birth: date | None = None
     class_name: str | None = Field(default=None, max_length=80)
@@ -5689,6 +5681,7 @@ def change_student_status(student_id: int, status: str, db: Session = Depends(ge
 
 
 class StaffUpdate(BaseModel):
+    staff_number: str | None = Field(default=None, min_length=1, max_length=40)
     first_name: str | None = None
     last_name: str | None = None
     subjects: str | None = None
@@ -5811,6 +5804,30 @@ def update_staff(staff_id: int, data: StaffUpdate, db: Session = Depends(get_db)
     if not staff:
         raise HTTPException(404, "Staff member not found.")
     changes = data.model_dump(exclude_unset=True)
+    old_staff_number = staff.staff_number
+    if "staff_number" in changes:
+        new_staff_number = (changes["staff_number"] or "").strip()
+        if not new_staff_number:
+            raise HTTPException(422, "Staff number cannot be blank.")
+        duplicate = db.query(models.StaffMember.id).filter(
+            models.StaffMember.staff_number == new_staff_number,
+            models.StaffMember.id != staff.id,
+        ).first()
+        if duplicate:
+            raise HTTPException(409, "That staff number is already assigned to another staff member.")
+        changes["staff_number"] = new_staff_number
+        linked_user = db.query(models.User).filter(
+            models.User.staff_id == staff.id,
+            models.User.school_tenant_id == get_current_tenant_id(db),
+        ).first()
+        if linked_user and linked_user.username.lower() == old_staff_number.lower():
+            username_conflict = db.query(models.User.id).filter(
+                func.lower(models.User.username) == new_staff_number.lower(),
+                models.User.id != linked_user.id,
+            ).first()
+            if username_conflict:
+                raise HTTPException(409, "That staff number conflicts with an existing login username.")
+            linked_user.username = new_staff_number.lower()
     if "phone" in changes and changes["phone"] != staff.phone:
         staff.phone_source = "staff_record_updated"
         staff.phone_verification_status = "unverified"
@@ -5819,9 +5836,14 @@ def update_staff(staff_id: int, data: StaffUpdate, db: Session = Depends(get_db)
     for key, value in changes.items():
         setattr(staff, key, value)
     write_audit(db, admin, "staff_updated", "staff", staff.id, ", ".join(changes.keys()))
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "The staff profile could not be updated because the staff number or linked login conflicts with another record.")
     db.refresh(staff)
     return {"message": "Staff profile updated.", "staff": staff}
+
 
 
 @app.patch("/api/staff/{staff_id}/phone-verification", tags=["Staff"])
