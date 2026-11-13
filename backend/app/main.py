@@ -2297,7 +2297,7 @@ def delete_timetable_entry(
 @app.middleware("http")
 async def protect_school_data(request: Request, call_next):
     path = request.url.path
-    public_paths = {"/api/health", "/api/auth/login", "/api/setup/status", "/api/setup/activate", "/api/setup/complete", "/api/public/school", "/api/public/registration"}
+    public_paths = {"/api/health", "/api/auth/login", "/api/setup/status", "/api/setup/challenge", "/api/setup/activate", "/api/setup/complete", "/api/public/school", "/api/public/registration"}
 
     # Browser CORS preflight requests must reach CORSMiddleware without auth.
     if request.method == "OPTIONS":
@@ -2572,6 +2572,7 @@ def create_school_activation_challenge(
 
 @app.post("/api/setup/activate", tags=["First-time Setup"])
 def activate_school_installation(data: SchoolActivationRequest, db: Session = Depends(get_db)):
+    resolve_school_tenant(db, data.school_id)
     state = get_or_create_setup_state(db)
     if state.activated_at:
         raise HTTPException(409, "This SchoolBridge installation has already been activated.")
