@@ -21,7 +21,7 @@ export default function RegistrationFlow({
   audience: 'parent' | 'teacher'
   onAuthenticated: (token: string) => Promise<void> | void
 }) {
-  const [kind, setKind] = useState<'parent' | 'teacher'>(audience)
+  const kind = audience
   const [formOpen, setFormOpen] = useState(false)
   const [parentName, setParentName] = useState('')
   const [relationship, setRelationship] = useState('')
