@@ -8,7 +8,7 @@ import sqlalchemy as sa
 from sqlalchemy import inspect
 
 revision = "0040_school_machine_transfers"
-down_revision = "0039_installation_machine_binding"
+down_revision = "0039_machine_binding"
 branch_labels = None
 depends_on = None
 
