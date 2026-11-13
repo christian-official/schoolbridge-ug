@@ -2704,13 +2704,39 @@ def test_fresh_install_blocks_school_records_until_setup_is_complete():
         assert "first-time setup" in profile.json()["detail"].lower()
 
 
-def test_invalid_activation_license_is_rejected(monkeypatch):
+def test_activation_challenge_fails_closed_without_owner_sequence(monkeypatch):
     reset_new_installation()
-    monkeypatch.delenv("SCHOOLBRIDGE_LICENSE_PUBLIC_KEY", raising=False)
+    monkeypatch.delenv("SCHOOLBRIDGE_OWNER_SEQUENCE", raising=False)
     with TestClient(app) as client:
         client.get("/api/setup/status")
-        response = client.post("/api/setup/activate", json={"license": "not-a-real-signed-license"})
-    assert response.status_code == 403
+        response = client.post("/api/setup/challenge")
+    assert response.status_code == 503
+
+
+def test_wrong_owner_choice_permanently_declines_installation(monkeypatch):
+    reset_new_installation()
+    monkeypatch.setenv("SCHOOLBRIDGE_OWNER_SEQUENCE", "123456")
+    with TestClient(app) as client:
+        client.get("/api/setup/status")
+        challenge = client.post("/api/setup/challenge")
+        assert challenge.status_code == 200
+        payload = challenge.json()
+        wrong_option = next(option for option in payload["options"] if "123456" not in option)
+
+        rejected = client.post("/api/setup/activate", json={
+            "challenge_id": payload["challenge_id"],
+            "selected_option": wrong_option,
+        })
+        assert rejected.status_code == 403
+        assert "declined" in rejected.json()["detail"].lower()
+
+        assert client.post("/api/setup/challenge").status_code == 403
+        assert client.post("/api/setup/activate", json={
+            "challenge_id": payload["challenge_id"],
+            "selected_option": next(option for option in payload["options"] if "123456" in option),
+        }).status_code == 403
+        status = client.get("/api/setup/status")
+        assert status.json()["activation_declined"] is True
 
 
 def test_demo_data_is_disabled_by_default(monkeypatch):
@@ -2723,16 +2749,6 @@ def test_demo_data_is_disabled_by_default(monkeypatch):
 
 
 
-def test_activation_attempts_are_rate_limited(monkeypatch):
-    reset_new_installation()
-    monkeypatch.delenv("SCHOOLBRIDGE_LICENSE_PUBLIC_KEY", raising=False)
-    with TestClient(app) as client:
-        client.get("/api/setup/status")
-        for _ in range(5):
-            response = client.post("/api/setup/activate", json={"license": "not-a-valid-activation-license"})
-            assert response.status_code == 403
-        locked = client.post("/api/setup/activate", json={"license": "not-a-valid-activation-license"})
-        assert locked.status_code == 429
 
 
 
