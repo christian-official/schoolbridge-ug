@@ -212,6 +212,7 @@ test('real Chromium completes the first-install owner activation and school setu
     assert.equal(await page.getByLabel('Administrator username *').inputValue(), '')
     assert.equal(await page.getByLabel('Administrator email *').inputValue(), '')
     assert.equal(await page.getByLabel('Private password *').inputValue(), '')
+    const setupDraft = await page.evaluate(() => Object.values(sessionStorage).join(' '))
     assert.ok(!setupDraft.includes('LongTestPassword123!'))
     await page.getByLabel('Administrator username *').fill('first-admin')
     await page.getByLabel('Administrator email *').fill('admin@example.invalid')
