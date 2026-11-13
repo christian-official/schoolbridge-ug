@@ -685,6 +685,8 @@ type FirstSetupStatus = {
   setup_completed: boolean
   activated: boolean
   activation_declined?: boolean
+  machine_mismatch?: boolean
+  machine_fingerprint?: string
   installation_id: string
   school_id?: string
   identity_locked: boolean
@@ -882,6 +884,44 @@ function FirstTimeSetupWizard({status,onStatusChange}:{status:FirstSetupStatus;o
   </main>
 }
 
+function MachineTransferWizard({status}:{status:FirstSetupStatus}) {
+  const [license,setLicense]=useState('')
+  const [busy,setBusy]=useState(false)
+  const [error,setError]=useState('')
+  async function submitTransfer(event:React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if(!license.trim()) return
+    setBusy(true);setError('')
+    try {
+      const response=await fetchSchoolBridge(`${API_BASE_URL}/api/setup/transfer`,{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({license:license.trim(),school_id:status.school_id||undefined}),
+      })
+      const result=await response.json().catch(()=>({}))
+      if(!response.ok)throw new Error(result.detail||'The developer transfer could not be verified.')
+      window.location.reload()
+    } catch(e) { setError(e instanceof Error?e.message:'The developer transfer could not be verified.') }
+    finally { setBusy(false) }
+  }
+  return <main className="login-page first-setup-page">
+    <section className="login-card first-setup-card">
+      <div className="brand-mark"><ShieldCheck size={30}/></div>
+      <div className="brand-name">School<span>Bridge</span></div>
+      <h1>Developer-authorised transfer required</h1>
+      <p className="muted">This installation is registered to another computer. It cannot be moved or activated here without a one-time authorisation from the SchoolBridge developer.</p>
+      <div className="installation-id-panel"><small>INSTALLATION ID</small><strong>{status.installation_id}</strong><button type="button" className="secondary-button" onClick={()=>void navigator.clipboard?.writeText(status.installation_id)}>Copy installation ID</button></div>
+      <div className="installation-id-panel"><small>THIS COMPUTER'S TRANSFER FINGERPRINT</small><strong>{status.machine_fingerprint||'Unavailable'}</strong><button type="button" className="secondary-button" disabled={!status.machine_fingerprint} onClick={()=>void navigator.clipboard?.writeText(status.machine_fingerprint||'')}>Copy fingerprint</button></div>
+      <p className="form-hint">Send both values to the developer. They can issue a single-use transfer authorisation for this computer.</p>
+      <form onSubmit={submitTransfer}>
+        <label htmlFor="schoolbridge-transfer-license">Developer transfer authorisation</label>
+        <textarea id="schoolbridge-transfer-license" value={license} onChange={e=>setLicense(e.target.value)} required rows={4} placeholder="Paste the one-time transfer authorisation"/>
+        {error&&<p className="error" role="alert">{error}</p>}
+        <button className="primary-button login-button" disabled={busy||license.trim().length<20}>{busy?'Verifying transfer...':'Apply developer transfer'}</button>
+      </form>
+    </section>
+  </main>
+}
+
 function getSelectedSchoolId(): string {
   if (typeof window === 'undefined') return ''
   const fromUrl = new URLSearchParams(window.location.search).get('school')
@@ -955,7 +995,7 @@ function App() {
           if(result.setup_completed && result.activated && result.installation_id) localStorage.setItem('schoolbridge-installation-id', result.installation_id)
           else localStorage.removeItem('schoolbridge-installation-id')
         } catch { /* Ignore unavailable browser storage. */ }
-        setSetupStatus({loading:false,setup_completed:Boolean(result.setup_completed),activated:Boolean(result.activated),activation_declined:Boolean(result.activation_declined),installation_id:result.installation_id||'',school_id:result.school_id||'',identity_locked:Boolean(result.identity_locked),error:''})
+        setSetupStatus({loading:false,setup_completed:Boolean(result.setup_completed),activated:Boolean(result.activated),activation_declined:Boolean(result.activation_declined),machine_mismatch:Boolean(result.machine_mismatch),machine_fingerprint:result.machine_fingerprint||'',installation_id:result.installation_id||'',school_id:result.school_id||'',identity_locked:Boolean(result.identity_locked),error:''})
       }
     }).catch(e=>{if(!cancelled)setSetupStatus({loading:false,setup_completed:false,activated:false,installation_id:'',school_id:selectedSchoolId,identity_locked:false,error:e instanceof Error?e.message:'Unable to check installation setup.'})})
     return ()=>{cancelled=true}
@@ -1484,6 +1524,8 @@ function App() {
   const className = (selectedClass?.name || '').toLowerCase().replace(/[.\s_-]/g, '')
   const selectedAcademicLevel = /^(s|senior\s*)[56]$/.test(className) || /senior\s*[56]/.test(className) ? 'A-Level' : /^(s|senior\s*)[1-4]$/.test(className) || /senior\s*[1-4]/.test(className) ? 'O-Level' : ''
   const [artsCombinations, sciencesCombinations] = (schoolConfig.a_level_combinations || '').split(/\r?\n/).reduce((groups: string[][], line: string) => { const match = line.match(/^(ARTS|SCIENCES)::(.*)$/i); if (match && match[2].trim()) groups[match[1].toUpperCase() === 'ARTS' ? 0 : 1].push(match[2].trim()); return groups }, [[], []])
+
+  if (!setupStatus.loading && setupStatus.machine_mismatch) return <MachineTransferWizard status={setupStatus}/>;
 
   if (!token && sessionRestoring) return <main className="login-page"><section className="login-card"><div className="brand-name">School<span>Bridge</span></div><p className="muted">Restoring your saved session…</p></section></main>;
 
