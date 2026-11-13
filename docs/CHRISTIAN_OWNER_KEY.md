@@ -60,3 +60,11 @@ Use a new unique license ID for every newly signed code. The code is bound to th
 - The private-key file and passphrase remain under the owner's control.
 
 **Never generate a production key or configure it on a school host until the corresponding owner-key code has passed CI and is included in the reviewed release intended for that school.**
+
+## Desktop installer packaging and CI test keys
+
+The production desktop build reads the owner's Base64 Ed25519 **public** verification key from `frontend/src-tauri/owner-activation-public-key.txt`. Keep the matching private key outside the repository. The packaging script validates the public key, stages it as `frontend/desktop-resources/owner-activation-public-key.txt`, and Tauri embeds that staged file in the installer.
+
+GitHub Actions creates a fresh random **CI-only test public key** to exercise this packaging path. Any installer or USB artifact produced by that workflow is test-only and must not be distributed to schools or treated as a production release. The workflow labels the desktop installer artifact accordingly.
+
+A production installer build remains blocked until the real owner's public key is provisioned in the source file on the trusted build machine. Do not substitute the CI test key or commit the private key.
