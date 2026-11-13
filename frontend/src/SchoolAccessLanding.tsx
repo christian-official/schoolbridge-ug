@@ -8,7 +8,7 @@ export default function SchoolAccessLanding({schoolId,schoolName}:{schoolId:stri
       <div className="brand-name">School<span>Bridge</span></div>
       <p className="login-subtitle">{schoolName} · Official access page</p>
       <h1>Welcome to {schoolName}</h1>
-      <p className="muted">Choose the access route for your role.</p>
+      <p className="muted">Choose the access route for your role. Parents and teachers use the QR registration pages; administrators and essential non-teaching staff use the installed Windows app.</p>
       <div className="school-access-actions">
         <a className="primary-button" href={base + '&audience=parent'}>Parent access</a>
         <a className="primary-button" href={base + '&audience=teacher'}>Teacher access</a>
