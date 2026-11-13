@@ -1,5 +1,6 @@
 import os
 import json
+import hashlib
 import pytest
 import sqlite3
 from datetime import date, datetime
