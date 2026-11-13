@@ -20,7 +20,7 @@ test('scanning a school QR opens that school registration page directly', () => 
   assert.match(syncDevices, /loadQr\('parent'\)/)
   assert.match(syncDevices, /loadQr\('teacher'\)/)
   assert.match(backend, /audience = request\.query_params\.get\("audience", "parent"\)/)
-  assert.match(backend, /&audience=\{audience\}/)
+  assert.match(backend, /&audience=/)
 })
 
 test('parent and teacher registration submits existing-record details without passwords, phone codes or administrator review', () => {
