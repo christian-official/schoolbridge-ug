@@ -3,6 +3,8 @@ import base64
 import hashlib
 import json
 import os
+import secrets
+import string
 import time
 
 from cryptography.exceptions import InvalidSignature
@@ -41,3 +43,56 @@ def verify_activation_license(token: str) -> dict:
 
 def license_fingerprint(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def generate_owner_challenge(sequence: str) -> tuple[str, list[str]]:
+    """Create five equally-sized mixed-character choices with one exact sequence match.
+
+    The owner sequence is supplied only through server-side configuration; it is
+    never returned separately or embedded in frontend assets.
+    """
+    if not isinstance(sequence, str) or len(sequence) != 6 or not sequence.isdigit():
+        raise RuntimeError("SCHOOLBRIDGE_OWNER_SEQUENCE must be configured as exactly six digits.")
+
+    digits = string.digits
+    letters = string.ascii_letters
+    symbols = "!@#$%^&*+="
+    target_length = 52
+
+    def make_option(include_sequence: bool) -> str:
+        # Every option has the same total length and exact character counts:
+        # 36 digits, 13 letters and 3 symbols. The correct sequence occupies
+        # six of the digit positions; decoys receive six unrelated digits.
+        digit_count = 36 - (6 if include_sequence else 0)
+        pool = (
+            [secrets.choice(digits) for _ in range(digit_count)]
+            + [secrets.choice(letters) for _ in range(13)]
+            + [secrets.choice(symbols) for _ in range(3)]
+        )
+        secrets.SystemRandom().shuffle(pool)
+        value = "".join(pool)
+        if include_sequence:
+            position = secrets.randbelow(len(value) + 1)
+            value = value[:position] + sequence + value[position:]
+        return value
+
+    correct = make_option(True)
+    while correct.count(sequence) != 1:
+        correct = make_option(True)
+
+    choices = [correct]
+    while len(choices) < 5:
+        candidate = make_option(False)
+        if sequence not in candidate and candidate not in choices:
+            choices.append(candidate)
+    secrets.SystemRandom().shuffle(choices)
+    if len(choices) != 5 or sum(sequence in item for item in choices) != 1:
+        raise RuntimeError("Unable to construct a unique owner activation challenge.")
+    if any(len(item) != target_length for item in choices):
+        raise RuntimeError("Owner activation challenge options have inconsistent lengths.")
+    return correct, choices
+
+
+def owner_challenge_option_hash(challenge_id: str, option: str) -> str:
+    """Bind a selected option to its challenge without storing the secret itself."""
+    return hashlib.sha256((challenge_id + ":" + option).encode("utf-8")).hexdigest()
