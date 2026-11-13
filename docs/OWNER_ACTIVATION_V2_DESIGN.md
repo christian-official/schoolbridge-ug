@@ -13,6 +13,7 @@ This document records the owner-approved activation experience for the Windows d
 - The other four options must not contain that substring.
 - Generate fresh random surrounding characters and a fresh option order for every new installation challenge. Do not reuse a fixed set of examples.
 - The backend reads the six-digit sequence only from the protected `SCHOOLBRIDGE_OWNER_SEQUENCE` environment setting. It must be provisioned outside the repository and must never be written into source, frontend bundles, logs, or installer defaults.
+- On Windows, the Tauri launcher imports the sequence from the developer provisioning environment into Windows Credential Manager on first launch, then supplies it only to the local backend process. If it has not been provisioned, the challenge endpoint fails closed rather than silently using a default.
 - The initial five-choice activation does not ask the installer for a Base64 key, private key, signed licence, or Ed25519 operation.
 - Permit one selection only. A wrong selection permanently declines that installation challenge; do not offer a retry or regenerate a new challenge after a wrong answer.
 - Never include the owner's sequence in frontend source, generated assets, logs, telemetry, API responses, or this repository. The verifier must run on the trusted side and use a protected provisioned secret.
