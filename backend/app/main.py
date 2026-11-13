@@ -5810,7 +5810,7 @@ def update_staff(staff_id: int, data: StaffUpdate, db: Session = Depends(get_db)
         if not new_staff_number:
             raise HTTPException(422, "Staff number cannot be blank.")
         duplicate = db.query(models.StaffMember.id).filter(
-            models.StaffMember.staff_number == new_staff_number,
+            func.lower(models.StaffMember.staff_number) == new_staff_number.lower(),
             models.StaffMember.id != staff.id,
         ).first()
         if duplicate:
