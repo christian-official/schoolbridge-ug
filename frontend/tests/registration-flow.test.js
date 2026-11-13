@@ -33,8 +33,9 @@ test('parent verification matches each child and guardian against records in the
   assert.match(backend, /models\.Student\.school_tenant_id == tenant_id/)
   assert.match(flow, /Add another child/)
   assert.match(flow, /children: children\.map/)
-  assert.match(flow, /admission_number/)
-  assert.match(flow, /date_of_birth/)
+  assert.doesNotMatch(flow, /admission_number|<label>Admission number/)
+  assert.match(flow, /Date of birth \(optional\)/)
+  assert.match(backend, /guardian_verified_students/)
 })
 
 test('teacher verification matches an active teaching staff record and opens the teacher dashboard', () => {
