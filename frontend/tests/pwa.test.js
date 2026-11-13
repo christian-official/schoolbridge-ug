@@ -96,8 +96,10 @@ test('offline passphrases, cached record snapshots and offline marks drafts are 
 test('Android uses the native install prompt when available and never promises a forced install', () => {
   assert.match(installUi, /beforeinstallprompt/)
   assert.match(installUi, /promptEvent\.prompt\(\)/)
-  assert.match(installUi, /Direct installation is not currently available in this browser/)
-  assert.doesNotMatch(installUi, /How to install|Install app|showAndroidSteps/)
+  assert.match(installUi, /Your browser has not offered the one-tap install option/)
+  assert.match(installUi, /showAndroidSteps/)
+  assert.match(installUi, /Install app/)
+  assert.match(installUi, /Add to Home screen/)
 })
 
 test('iOS explains the Safari Home Screen flow because iOS does not expose a web install prompt', () => {
