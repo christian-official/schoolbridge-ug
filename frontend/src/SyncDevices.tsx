@@ -92,8 +92,8 @@ export default function SyncDevices({ token, userId, schoolId, isAdmin }: Props)
     return () => { controller.abort(); if (objectUrl) objectUrl.split('|').forEach(URL.revokeObjectURL) }
   }, [isAdmin, schoolId, token])
 
-  function printSchoolQr() {
-    const printSheet = document.querySelector<HTMLElement>('.school-access-qr-print')
+  function printSchoolQr(audience: 'parent' | 'teacher') {
+    const printSheet = document.querySelector<HTMLElement>('.school-access-qr-print[data-audience="' + audience + '"]')
     if (!printSheet) return
     const originalParent = printSheet.parentElement
     const originalNextSibling = printSheet.nextSibling
@@ -140,13 +140,13 @@ export default function SyncDevices({ token, userId, schoolId, isAdmin }: Props)
       <p className="muted">Each QR opens the correct registration page directly. Staff use the school webpage to sign in and download the desktop app.</p>
       {qrUnavailableReason ? <p className="form-hint">{qrUnavailableReason}</p> : parentQrUrl && teacherQrUrl ? <div className="school-access-qr-grid">
         {([{label:'Parent access',url:parentQrUrl,link:parentAccessUrl},{label:'Teacher access',url:teacherQrUrl,link:teacherAccessUrl}] as const).map(item => <div className="school-access-qr-item" key={item.label}>
-          <div className="school-access-qr-print">
+          <div className="school-access-qr-print" data-audience={item.label === 'Parent access' ? 'parent' : 'teacher'}>
             <div className="school-access-qr-print-brand">SchoolBridge</div><h2>{schoolName}</h2>
             <img src={item.url} alt={item.label + ' QR code'} width="280" height="280"/>
             <strong>{item.label}</strong><p>Scan to open this registration page.</p><small>{item.link}</small>
           </div>
           <div className="school-access-qr-screen"><input readOnly value={item.link} aria-label={item.label + ' link'} onFocus={event=>event.currentTarget.select()}/>
-            <button className="secondary-button" type="button" onClick={()=>{void navigator.clipboard?.writeText(item.link).then(()=>setMessage(item.label+' link copied.')).catch(()=>setMessage('Select and copy the link manually.'))}}>Copy link</button>
+            <div className="proposal-review-actions"><button className="secondary-button" type="button" onClick={()=>{void navigator.clipboard?.writeText(item.link).then(()=>setMessage(item.label+' link copied.')).catch(()=>setMessage('Select and copy the link manually.'))}}>Copy link</button><button className="secondary-button" type="button" onClick={()=>printSchoolQr(item.label === 'Parent access' ? 'parent' : 'teacher')}>Print QR</button></div>
           </div>
         </div>)}
       </div> : <p className="form-hint">Preparing separate access QR codes…</p>}
