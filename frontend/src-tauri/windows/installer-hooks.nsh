@@ -12,17 +12,17 @@
   StrCpy $2 $0 10
 
   ${If} $2 == "Windows 10"
-    ${If} $1 < 19045
-      MessageBox MB_ICONSTOP|MB_OK "This SchoolBridge desktop package requires Windows 10 version 22H2 (build 19045) or newer. No files have been installed."
+    ${If} $1 < 16299
+      MessageBox MB_ICONSTOP|MB_OK "SchoolBridge requires Windows 10 version 1709 (build 16299) or newer. No files have been installed."
       Abort
     ${EndIf}
   ${ElseIf} $2 == "Windows 11"
-    ${If} $1 < 22631
-      MessageBox MB_ICONSTOP|MB_OK "This SchoolBridge desktop package requires Windows 11 version 23H2 (build 22631) or newer. No files have been installed."
+    ${If} $1 < 22000
+      MessageBox MB_ICONSTOP|MB_OK "SchoolBridge requires Windows 11 version 21H2 (build 22000) or newer. No files have been installed."
       Abort
     ${EndIf}
   ${Else}
-    MessageBox MB_ICONSTOP|MB_OK "This SchoolBridge desktop package does not support this Windows version. Windows 8 and 8.1 are not certified by the current Tauri/WebView2 runtime."
+    MessageBox MB_ICONSTOP|MB_OK "This SchoolBridge desktop package supports 64-bit Windows 10 version 1709 or newer, and Windows 11. No files have been installed."
     Abort
   ${EndIf}
 !macroend

@@ -1,61 +1,59 @@
-# Interim Windows installer safety gate — NOT Windows 8 compatibility completion
+# SchoolBridge Windows desktop compatibility
 
-## Scope and current status
+**Decision date:** 2026-11-13  
+**Status:** Windows 10/11 compatibility target adopted; minimum-version runtime acceptance remains required.
 
-This document records an interim safety gate for the existing Tauri/NSIS package only. It is **not completion of the SchoolBridge Windows compatibility objective**. The current installer check runs before installer files, registry values or shortcuts are written. It prevents installation on systems the current package cannot safely support; it does not satisfy the product requirement.
+## Compatibility target
 
-The current Tauri/WebView2 desktop package has this **technical compatibility floor**:
+The current desktop package uses Tauri 2, Microsoft WebView2, React and a bundled CPython 3.12 backend. Based on upstream platform requirements, the broadest defensible baseline for this architecture is:
 
-| Host | Minimum technical version | Architecture | Installer decision |
+| Host | Minimum documented platform candidate | Architecture | Installer policy |
 |---|---|---|---|
-| Windows 10 | 22H2, build 19045 | x64 | Allow |
-| Windows 11 | 23H2, build 22631 or newer | x64 | Allow |
-| Windows 8 / 8.1 | Not supported by current Tauri 2/WebView2 stack | Any | Reject |
-| Other Windows versions / unknown OS | Not validated | Any | Reject |
-| 32-bit Windows | Not supported by bundled desktop build | x86 | Reject |
+| Windows 10 | Version 1709, build 16299 or newer | x64 | Allow |
+| Windows 11 | Version 21H2, build 22000 or newer | x64 | Allow |
+| Windows 10 versions 1507, 1511, 1607 | Below documented WebView2 support floor | x64 | Reject |
+| Windows 8 / 8.1 | Retired product targets | Any | Reject |
+| 32-bit Windows | Not included in current packaged runtime | x86 | Reject |
+| Other Windows / unknown OS | Not validated | Any | Reject |
 
-The NSIS pre-install hook reads the Windows product name and build from the Windows NT CurrentVersion registry key, checks the 64-bit host, and aborts with an explanatory message when the package is not eligible. The CI validation job checks that the hook is configured and that its supported-version gates remain present. The actual NSIS bundle build compiles the hook.
+This is a technical compatibility floor, not proof that every build above it has passed real-machine acceptance. Microsoft lists Windows 10 SAC 1709 and later for WebView2. Current Rust MSVC targets require Windows 10 or newer. Windows 10 versions 1507–1607 are below the documented renderer floor.
 
-## Important distinction: app compatibility is not OS security support
+Official references:
+- WebView2 supported Windows versions: https://learn.microsoft.com/en-us/microsoft-edge/webview2
+- Edge supported operating systems: https://learn.microsoft.com/en-us/deployedge/microsoft-edge-supported-operating-systems
+- Rust Windows MSVC target requirements: https://github.com/rust-lang/rust/blob/main/src/doc/rustc/src/platform-support/windows-msvc.md
+- Windows 10 release/build reference: https://learn.microsoft.com/en-us/windows/release-health/release-information
 
-The minimum versions above describe the installer/runtime compatibility contract only. They do not mean that Microsoft still provides security updates for every edition at those version floors.
+## Installer enforcement
 
-As of 2026-11-13:
-- Windows 10 22H2 reached general end of support on 2025-10-14. Extended Security Updates are a separate enrolment programme; do not assume a school PC is enrolled.
-- Windows 11 23H2 reached end of updates on 2026-11-10.
-- Prefer a currently serviced Windows 11 release and keep the host fully patched. Check the exact edition and servicing channel against Microsoft's current lifecycle information before school deployment.
+The NSIS pre-install hook requires 64-bit Windows, allows Windows 10 build 16299 or newer and Windows 11 build 22000 or newer, and rejects earlier/unknown operating systems before installation. It checks the declared version floor only; it does not prove a machine has required updates, certificates, drivers or runtime prerequisites.
 
-Official lifecycle references:
+## Operating-system security is separate
+
+Windows 10 version 1709 is out of normal servicing. Windows 10 Home/Pro 22H2 also reached end of support on 2025-10-14. Some Enterprise/LTSC editions and ESU-enrolled devices have separate lifecycle dates; verify the exact edition and servicing channel.
+
+Microsoft says Edge and WebView2 remain supported on Windows 10 SAC 1709 and later, but explicitly describes support on out-of-support Windows 10 releases as a temporary bridge to upgrading. Edge/WebView2 updates on Windows 10 22H2 continue until at least October 2028; that does not mean Windows 10 itself is receiving OS security updates.
+
+For school deployments containing student/staff data, prefer a currently serviced Windows 11 release. Use Windows 10 only where the exact edition/device has a valid security-update path. Keep the OS patched, use encrypted tested backups, and disclose unsupported-host risks.
+
+Lifecycle references:
 - https://learn.microsoft.com/en-us/windows/release-health/release-information
-- https://learn.microsoft.com/en-us/windows/release-health/supported-versions-windows-client
-- https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information
+- https://learn.microsoft.com/en-us/lifecycle/products/windows-10-home-and-pro
+- https://learn.microsoft.com/en-us/deployedge/microsoft-edge-supported-operating-systems
 
-## Primary product objective — Windows 8.0 first
+## Acceptance still required
 
-The primary compatibility objective is a directly installable, standalone SchoolBridge desktop application for **Windows 8.0 first**, followed by Windows 8.1 and newer Windows releases. The current Tauri/WebView2 package does not meet this objective. Task 1.13 is therefore **not complete as a product compatibility task**; its OS rejection check is only a temporary fail-closed safeguard for this specific package.
+Test the actual packaged app on clean x64 machines/VMs representing:
+1. Windows 10 version 1709 (build 16299), minimum technical candidate;
+2. a currently serviced Windows 10 edition;
+3. a currently supported Windows 11 release.
 
-The next engineering milestone is a renewed architecture feasibility investigation (D1), not final audit or release-readiness sign-off. Keep the current guard until a tested alternative package exists; do not silently allow unsupported installation, pin obsolete browser engines, or weaken security.
+For each, verify disconnected USB install, offline WebView2, launch, owner activation, authentication, backend health, SQLite persistence, printing, file dialogs, uploads, restart, upgrade, backup/restore, repair and uninstall/data preservation. Record exact edition, build, architecture and WebView2 version.
 
-## Legacy Windows requirement remains open
+Modern-runner CI is build evidence only. Until minimum-build testing passes, call 1709 the documented minimum candidate, not certified compatibility.
 
-Windows 8.0 and Windows 8.1 remain explicit product compatibility requirements, but the current Tauri 2/WebView2 renderer is not an acceptable maintained runtime for either OS. The legacy track must find a maintained alternative renderer and backend strategy; it must not pin obsolete WebView2/Edge, use an end-of-life Python runtime, or weaken authentication, TLS, cryptography or password hashing to force installation.
+## Product decision
 
-See [Legacy Windows deployment track](LEGACY_WINDOWS_SUPPORT.md) and [Windows desktop runtime feasibility](WINDOWS_DESKTOP_RUNTIME_FEASIBILITY.md). The current installer rejecting Windows 8/8.1 is an interim safety guard only. It is not compatibility, delivery, or completion of the primary product requirement.
+Windows 8.0/8.1 are no longer product targets. The wxWidgets native Windows 8 prototype and its dedicated CI job are retired. Keep Tauri/React/Python and focus on Windows 10 1709+ and Windows 11.
 
-## Evidence and remaining acceptance
-
-Automated evidence:
-- NSIS hook is wired into `tauri.conf.json`.
-- CI validates the OS/architecture gate is present.
-- The desktop CI build compiles the NSIS installer and packages the offline WebView2 runtime.
-- Windows Server CI is a build/test environment only; it is not evidence of clean-machine Windows 10/11 acceptance.
-
-Still required before production:
-- Install and launch on clean physical Windows machines representing each supported, currently serviced edition.
-- Repeat installation with internet disconnected.
-- Verify first-run owner activation, local backend health, frontend rendering, SQLite creation and persistence after restart.
-- Test display scaling, keyboard navigation, printing, file dialogs, uploads and normal school workflows.
-- Test repair/uninstall behaviour and confirm school data is preserved.
-- Record exact OS edition, version, build, architecture, WebView2 runtime version and test results.
-
-Do not claim Windows 8/8.1 support or production certification from this CI gate.
+No change authorizes weakening TLS, cryptography, password hashing, authentication, activation signatures, package integrity or offline installation. No Base44 integration, merge to main or production deployment.

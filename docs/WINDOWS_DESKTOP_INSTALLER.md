@@ -8,7 +8,7 @@ The CI preparation flow builds the existing native backend package, stages a sel
 
 This is the D2 packaging implementation. It is not yet the final school acceptance sign-off: CI must pass, and a clean physical Windows 10/11 installation and upgrade/data-preservation test remain required.
 
-## Installed file and data boundaries
+## Windows compatibility target\n\nThe minimum documented technical candidate is 64-bit Windows 10 version 1709 (build 16299), or Windows 11 version 21H2 (build 22000) and newer. Windows 10 versions 1507, 1511 and 1607 are below the documented WebView2 support floor. Windows 8/8.1 are retired targets. This minimum is not a security recommendation: Windows 10 1709 is out of normal OS servicing. Prefer a currently supported Windows 11 release for school deployments. See [Windows compatibility](WINDOWS_COMPATIBILITY.md).\n\n## Installed file and data boundaries
 
 - The desktop executable and immutable backend/Python resources are installed by Tauri under the selected Windows application installation directory.
 - Tauri resolves the bundled resources through its resource directory; the application does not assume that the executable's parent directory is also the resource directory.
@@ -47,11 +47,11 @@ The generated `frontend/desktop-resources` directory is intentionally ignored by
 ## Remaining acceptance gates
 
 - Confirm the new GitHub Actions installer-bundle job passes.
-- Install on a clean physical Windows 10 22H2 and Windows 11 23H2-or-newer machine with internet disconnected.
+- Install on a clean Windows 10 version 1709 x64 VM, a currently serviced Windows 10 edition, and a currently supported Windows 11 machine with internet disconnected.
 - Confirm first-run resource resolution, backend health, frontend loading, and SQLite creation.
 - Configure the public verification key and complete owner activation and first-school setup.
 - Create records, close/reopen the app, and confirm persistence.
 - Upgrade over an existing installation and prove that the database, configuration, and logs are preserved.
 - Test repair and uninstall; uninstall must not silently delete school data.
 - Verify a backup and restore before school handover.
-- Keep Windows 8/8.1 marked blocked and not certified under the current Tauri/WebView2 architecture.
+- Windows 8/8.1 are retired targets. Windows 10 1507, 1511 and 1607 are below the documented WebView2 support floor.
