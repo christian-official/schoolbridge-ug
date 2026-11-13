@@ -1380,6 +1380,7 @@ function App() {
   useEffect(() => {
     if (!token) { setServerConnection('checking'); return }
     let cancelled = false
+    let consecutiveFailures = 0
     async function checkServerConnection() {
       const controller = new AbortController()
       const timeout = window.setTimeout(() => controller.abort(), 5000)
@@ -1390,9 +1391,16 @@ function App() {
           signal: controller.signal,
         })
         const result = await response.json().catch(() => null)
-        if (!cancelled) setServerConnection(response.ok && result?.status === 'ok' ? 'connected' : 'disconnected')
+        if (response.ok && result?.status === 'ok') {
+          consecutiveFailures = 0
+          if (!cancelled) setServerConnection('connected')
+        } else {
+          consecutiveFailures += 1
+          if (!cancelled && consecutiveFailures >= 2) setServerConnection('disconnected')
+        }
       } catch {
-        if (!cancelled) setServerConnection('disconnected')
+        consecutiveFailures += 1
+        if (!cancelled && consecutiveFailures >= 2) setServerConnection('disconnected')
       } finally {
         window.clearTimeout(timeout)
       }
