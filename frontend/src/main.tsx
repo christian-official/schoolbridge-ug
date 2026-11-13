@@ -4,6 +4,25 @@ import './index.css'
 import App from './App.tsx'
 import PWAInstallPrompt from './PWAInstallPrompt'
 
+// Capture the browser install event before React effects mount. Some browsers
+// dispatch it early during page startup, before the install UI can subscribe.
+declare global {
+  interface Window {
+    schoolBridgeInstallPrompt?: Event & {
+      prompt: () => Promise<void>
+      userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform?: string }>
+    }
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeinstallprompt', event => {
+    event.preventDefault()
+    window.schoolBridgeInstallPrompt = event as Window['schoolBridgeInstallPrompt']
+    window.dispatchEvent(new Event('schoolbridge:install-prompt'))
+  })
+}
+
 // Persist the school identity immediately when a user opens the official QR URL.
 // The installed PWA starts at '/', so it must be able to recover this school context.
 if (typeof window !== 'undefined') {
