@@ -16,6 +16,7 @@ import Phase4Workspace from './Phase4Workspace'
 import ParentLiaisonWorkspace from './ParentLiaison'
 import SyncDevices from './SyncDevices'
 import RegistrationFlow from './RegistrationFlow'
+import SchoolAccessLanding from './SchoolAccessLanding'
 import { clearLocalSyncData } from './syncStorage'
 import './App.css'
 import './DashboardRedesign.css'
@@ -938,9 +939,12 @@ function App() {
   const [password, setPassword] = useState('')
   const [loginError, setLoginError] = useState('')
   const [showRecovery, setShowRecovery] = useState(false)
-  // Only an explicit school QR URL starts Parent/Teacher registration. The installed PWA
-  // opens at '/', even when this browser previously scanned a QR code.
-  const [showRegistration, setShowRegistration] = useState(() => Boolean(new URLSearchParams(window.location.search).get('school')))
+  // School QR links carry an explicit audience so parents and teachers land on
+  // their own registration page. A plain school URL is the staff access webpage.
+  const schoolQuery = new URLSearchParams(window.location.search)
+  const schoolAudience = schoolQuery.get('audience') || ''
+  const [showRegistration, setShowRegistration] = useState(() => ['parent','teacher'].includes(schoolQuery.get('audience') || ''))
+  const showSchoolLanding = Boolean(schoolQuery.get('school') && !schoolAudience)
   const [loading, setLoading] = useState(false)
   const [sessionRestoring, setSessionRestoring] = useState(true)
   const [sessionError, setSessionError] = useState('')
@@ -1541,7 +1545,7 @@ function App() {
           <div className="brand-mark"><GraduationCap size={30} /></div>
           <div className="brand-name">School<span>Bridge</span></div>
           <p className="login-subtitle">Your school's operations, connected.</p>
-          {showRecovery ? <PasswordRecovery schoolId={selectedSchoolId} onBack={()=>setShowRecovery(false)}/> : showRegistration && selectedSchoolId ? qrSchoolError ? <><h1>School QR verification needed</h1><p className="error" role="alert">{qrSchoolError}</p><p className="form-hint">Scan your school's official SchoolBridge QR code again, then verify your existing details to reopen your account.</p><button type="button" className="secondary-button" onClick={()=>window.location.reload()}>Try again</button></> : qrSchoolName ? <RegistrationFlow schoolId={selectedSchoolId} schoolName={qrSchoolName} apiBaseUrl={API_BASE_URL} onAuthenticated={async accessToken=>{await storeSessionToken(accessToken);setToken(accessToken);setPassword('');setLoginError('')}}/> : <p className="muted">Verifying your school's QR access…</p> : <>
+          {showSchoolLanding && selectedSchoolId ? qrSchoolError ? <><h1>School page unavailable</h1><p className="error" role="alert">{qrSchoolError}</p><p className="form-hint">Check the school link or contact the school administrator.</p></> : qrSchoolName ? <SchoolAccessLanding schoolId={selectedSchoolId} schoolName={qrSchoolName}/> : <p className="muted">Verifying the school webpage…</p> : showRecovery ? <PasswordRecovery schoolId={selectedSchoolId} onBack={()=>setShowRecovery(false)}/> : showRegistration && selectedSchoolId ? qrSchoolError ? <><h1>School QR verification needed</h1><p className="error" role="alert">{qrSchoolError}</p><p className="form-hint">Scan your school's official QR code again, then verify your existing details to reopen your account.</p><button type="button" className="secondary-button" onClick={()=>window.location.reload()}>Try again</button></> : qrSchoolName ? <RegistrationFlow schoolId={selectedSchoolId} schoolName={qrSchoolName} audience={schoolAudience as 'parent'|'teacher'} apiBaseUrl={API_BASE_URL} onAuthenticated={async accessToken=>{await storeSessionToken(accessToken);setToken(accessToken);setPassword('');setLoginError('')}}/> : <p className="muted">Verifying your school's QR access…</p> : <>
             <h1>Welcome back</h1>
             <p className="muted">Sign in to your school workspace.</p>
             
@@ -1557,6 +1561,7 @@ function App() {
               </button>
             </form>
             <button type="button" className="recovery-link" onClick={()=>{setShowRecovery(true);setLoginError('')}}>Forgot your password?</button>
+            <a className="desktop-download-link" href="https://github.com/christian-official/schoolbridge-ug/releases/latest" target="_blank" rel="noreferrer">Download SchoolBridge for Windows</a>
 
             <p className="login-foot"><ShieldCheck size={15} /> Secure school access</p>
           </>}
