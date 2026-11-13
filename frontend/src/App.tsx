@@ -1906,17 +1906,58 @@ function EmptyState({ text }: { text: string }) {
 export default App
 
 
+function StaffAdmissionNumbers({token}:{token:string}) {
+  type StaffAdmissionRecord = {id:number;staff_number:string;first_name:string;last_name:string;category:string;position?:string}
+  const [items,setItems]=useState<StaffAdmissionRecord[]>([])
+  const [numbers,setNumbers]=useState<Record<number,string>>({})
+  const [search,setSearch]=useState('')
+  const [loading,setLoading]=useState(true)
+  const [savingId,setSavingId]=useState<number|null>(null)
+  const [error,setError]=useState('')
+  const [message,setMessage]=useState('')
+  const [refresh,setRefresh]=useState(0)
+  useEffect(()=>{
+    let cancelled=false
+    setLoading(true);setError('')
+    api<{items:StaffAdmissionRecord[]}>('staff?page=1&page_size=100',token)
+      .then(result=>{if(cancelled)return;setItems(result.items||[]);setNumbers(Object.fromEntries((result.items||[]).map(item=>[item.id,item.staff_number||''])))})
+      .catch(e=>{if(!cancelled)setError(e instanceof Error?e.message:'Unable to load staff admission records.')})
+      .finally(()=>{if(!cancelled)setLoading(false)})
+    return()=>{cancelled=true}
+  },[token,refresh])
+  async function saveNumber(person:StaffAdmissionRecord){
+    const staff_number=(numbers[person.id]||'').trim()
+    if(!staff_number){setError('Staff admission number cannot be blank.');return}
+    setSavingId(person.id);setError('');setMessage('')
+    try{
+      await api('staff/'+person.id,token,{method:'PATCH',body:JSON.stringify({staff_number})})
+      setItems(current=>current.map(item=>item.id===person.id?{...item,staff_number}:item))
+      setMessage('Staff admission number updated. Any linked login username that used the old staff number was updated too.')
+    }catch(e){setError(e instanceof Error?e.message:'Unable to update this staff admission number.')}
+    finally{setSavingId(null)}
+  }
+  const filtered=items.filter(person=>[person.first_name,person.last_name,person.staff_number,person.category,person.position].join(' ').toLowerCase().includes(search.toLowerCase()))
+  return <section className="panel settings-panel">
+    <div className="panel-heading"><div><h2>Staff admission numbers</h2><p>Review and correct the admission number assigned to each teaching or non-teaching staff member. Changes are saved to the staff record.</p></div><button type="button" className="secondary-button" onClick={()=>setRefresh(value=>value+1)} disabled={loading}>Refresh</button></div>
+    <label>Search staff<input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search by name, staff number or role"/></label>
+    {error&&<div className="form-error" role="alert">{error}</div>}
+    {message&&<div className="success-notice" role="status">{message}</div>}
+    {loading?<p className="form-hint">Loading staff admission records...</p>:!filtered.length?<div className="empty-state"><Users size={26}/><p>{items.length?'No staff match your search.':'No staff members have been registered yet.'}</p></div>:<div className="table-wrap"><table><thead><tr><th>Staff member</th><th>Category / role</th><th>Staff admission number</th><th>Action</th></tr></thead><tbody>{filtered.map(person=><tr key={person.id}><td><strong>{person.first_name} {person.last_name}</strong></td><td>{person.category}<small>{person.position||'—'}</small></td><td><input aria-label={'Staff admission number for '+person.first_name+' '+person.last_name} value={numbers[person.id]??person.staff_number} maxLength={40} onChange={e=>setNumbers(current=>({...current,[person.id]:e.target.value}))}/></td><td><button type="button" className="secondary-button" disabled={savingId!==null||!(numbers[person.id]||'').trim()||numbers[person.id]===person.staff_number} onClick={()=>void saveNumber(person)}>{savingId===person.id?'Saving...':'Save number'}</button></td></tr>)}</tbody></table></div>}
+    <p className="form-hint">Staff numbers must be unique. If a linked staff login uses the old staff number as its username, SchoolBridge updates that username with the number.</p>
+  </section>
+}
+
 function SchoolProfileAdmissionsHub({token,onProfileSaved}:{token:string;onProfileSaved:()=>void}) {
-  const [tab,setTab]=useState<'profile'|'students'|'teachers'>('profile')
+  const [tab,setTab]=useState<'profile'|'students'|'staff'>('profile')
   return <section className="settings-hub-subpage">
     <div className="settings-section-tabs" role="tablist" aria-label="School profile and admissions">
       <button type="button" role="tab" aria-selected={tab==='profile'} className={tab==='profile'?'active':''} onClick={()=>setTab('profile')}>School Profile</button>
       <button type="button" role="tab" aria-selected={tab==='students'} className={tab==='students'?'active':''} onClick={()=>setTab('students')}>Student Admissions</button>
-      <button type="button" role="tab" aria-selected={tab==='teachers'} className={tab==='teachers'?'active':''} onClick={()=>setTab('teachers')}>Teacher Admissions</button>
+      <button type="button" role="tab" aria-selected={tab==='staff'} className={tab==='staff'?'active':''} onClick={()=>setTab('staff')}>Staff Admissions</button>
     </div>
     {tab==='profile'&&<SchoolProfileSettings token={token} onSaved={onProfileSaved}/>}
     {tab==='students'&&<AdmissionNumberSettings token={token}/>}
-    {tab==='teachers'&&<section className="panel settings-panel"><div className="panel-heading"><div><h2>Teacher & staff admissions</h2><p>Staff are admitted through the Staff workspace, where their employment profile is created before login access is assigned.</p></div></div><div className="teacher-admission-checklist"><div><strong>01 · Staff identity</strong><span>Record the staff number, full name and contact details.</span></div><div><strong>02 · Employment details</strong><span>Choose teaching or non-teaching category, job title, department and house.</span></div><div><strong>03 · Teaching profile</strong><span>For teachers, record registered subjects and class responsibilities.</span></div><div><strong>04 · Account access</strong><span>Assign a login, role and permitted SchoolBridge workspaces under Users & Permissions.</span></div></div><p className="form-hint">Open Staff from the main menu to register a new teacher or staff member. Their account and permissions are managed separately after registration.</p></section>}
+    {tab==='staff'&&<StaffAdmissionNumbers token={token}/>}
   </section>
 }
 
