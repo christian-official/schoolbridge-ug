@@ -41,7 +41,7 @@ from .database import DATABASE_URL, Base, engine, get_db, SessionLocal, create_s
 from .migrations import upgrade_database
 from . import models
 from .sync_tracking import register_sync_tracking
-from .school_setup import verify_activation_license, license_fingerprint
+from .school_setup import verify_activation_license, license_fingerprint, generate_owner_challenge, owner_challenge_option_hash
 
 import jwt
 from datetime import timedelta, timezone
@@ -2422,13 +2422,13 @@ async def protect_school_data(request: Request, call_next):
 
 
 class SchoolActivationRequest(BaseModel):
-    license: str = Field(min_length=20, max_length=4096)
+    challenge_id: str = Field(min_length=36, max_length=36)
+    selected_option: str = Field(min_length=1, max_length=128)
     school_id: str | None = Field(default=None, min_length=36, max_length=36)
 
 
 class FirstSchoolSetupRequest(BaseModel):
     school_id: str | None = Field(default=None, min_length=36, max_length=36)
-    activation_license: str = Field(min_length=20, max_length=4096)
     school_name: str = Field(min_length=2, max_length=160)
     school_type: str = Field(pattern="^(Primary|Secondary|Combined)$")
     country: str = Field(min_length=2, max_length=80)
@@ -2534,41 +2534,84 @@ def school_setup_status(school: str | None = Query(default=None, min_length=36, 
         "activated": bool(state.activated_at),
         "setup_completed": bool(state.setup_completed_at),
         "requires_activation": not bool(state.activated_at),
+        "activation_declined": bool((state.activation_attempts or 0) >= 1 and not state.activated_at),
         "requires_setup": not bool(state.setup_completed_at),
         "identity_locked": bool(state.original_identity_json),
     }
 
 
-@app.post("/api/setup/activate", tags=["First-time Setup"])
-def activate_school_installation(data: SchoolActivationRequest, db: Session = Depends(get_db)):
-    resolve_school_tenant(db, data.school_id)
+@app.post("/api/setup/challenge", tags=["First-time Setup"])
+def create_school_activation_challenge(db: Session = Depends(get_db)):
     state = get_or_create_setup_state(db)
     if state.activated_at:
         raise HTTPException(409, "This SchoolBridge installation has already been activated.")
-    now = datetime.utcnow()
-    if state.activation_locked_until and state.activation_locked_until > now:
-        raise HTTPException(429, "Too many invalid activation attempts. Try again after the temporary security lock expires.")
+    if (state.activation_attempts or 0) >= 1:
+        raise HTTPException(403, "This installation has been declined. Contact the SchoolBridge developer.")
+    if state.activation_challenge_id and state.activation_challenge_options_json:
+        return {
+            "challenge_id": state.activation_challenge_id,
+            "options": json.loads(state.activation_challenge_options_json),
+        }
+
+    sequence = os.getenv("SCHOOLBRIDGE_OWNER_SEQUENCE", "").strip()
     try:
-        claims = verify_activation_license(data.license)
-        if claims.get("installation_id") != state.installation_id or claims.get("product") != "SchoolBridge" or claims.get("action", "activate") != "activate":
-            raise ValueError("License is for another installation.")
-    except (ValueError, RuntimeError):
-        state.activation_attempts = (state.activation_attempts or 0) + 1
-        if state.activation_attempts >= 5:
-            state.activation_locked_until = now + timedelta(minutes=15)
-        db.commit()
-        raise HTTPException(403, "The activation license is invalid or cannot be verified.")
-    state.activated_at = now
-    state.activation_license_hash = license_fingerprint(data.license)
-    state.activation_attempts = 0
-    state.activation_locked_until = None
-    db.add(models.AuditLog(
-        school_tenant_id=state.school_tenant_id,
-        actor_id=None, actor_username="SchoolBridge Owner",
-        action="installation_activated", entity_type="school_setup",
-        entity_id=state.id, details="Owner-signed activation license accepted.",
-    ))
+        correct_option, options = generate_owner_challenge(sequence)
+    except RuntimeError as exc:
+        raise HTTPException(503, str(exc))
+    challenge_id = str(uuid4())
+    state.activation_challenge_id = challenge_id
+    state.activation_challenge_options_json = json.dumps(options, separators=(",", ":"))
+    state.activation_correct_option_hash = owner_challenge_option_hash(challenge_id, correct_option)
     db.commit()
+    return {"challenge_id": challenge_id, "options": options}
+
+
+@app.post("/api/setup/activate", tags=["First-time Setup"])
+def activate_school_installation(data: SchoolActivationRequest, db: Session = Depends(get_db)):
+    state = get_or_create_setup_state(db)
+    if state.activated_at:
+        raise HTTPException(409, "This SchoolBridge installation has already been activated.")
+    if (state.activation_attempts or 0) >= 1:
+        raise HTTPException(403, "This installation has been declined. Contact the SchoolBridge developer.")
+    if not state.activation_challenge_id or not state.activation_challenge_options_json or not state.activation_correct_option_hash:
+        raise HTTPException(409, "Request the installation's activation challenge first.")
+    if not secrets.compare_digest(state.activation_challenge_id, data.challenge_id):
+        raise HTTPException(409, "This activation challenge is no longer valid.")
+
+    options = json.loads(state.activation_challenge_options_json)
+    selected_hash = owner_challenge_option_hash(data.challenge_id, data.selected_option)
+    is_correct = (
+        data.selected_option in options
+        and hmac.compare_digest(selected_hash, state.activation_correct_option_hash)
+    )
+    now = datetime.utcnow()
+    changes = {
+        "activation_attempts": 1,
+        "activation_challenge_options_json": None,
+        "activation_correct_option_hash": None,
+    }
+    if is_correct:
+        changes["activated_at"] = now
+    claimed = db.query(models.SchoolSetupState).filter(
+        models.SchoolSetupState.id == state.id,
+        models.SchoolSetupState.school_tenant_id == state.school_tenant_id,
+        models.SchoolSetupState.activation_challenge_id == data.challenge_id,
+        models.SchoolSetupState.activation_attempts == 0,
+        models.SchoolSetupState.activated_at.is_(None),
+    ).update(changes, synchronize_session=False)
+    if claimed != 1:
+        db.rollback()
+        raise HTTPException(409, "This activation attempt has already been used.")
+    if is_correct:
+        db.add(models.AuditLog(
+            school_tenant_id=state.school_tenant_id,
+            actor_id=None, actor_username="SchoolBridge Owner",
+            action="installation_activated", entity_type="school_setup",
+            entity_id=state.id, details="Owner sequence challenge accepted.",
+        ))
+    db.commit()
+    if not is_correct:
+        raise HTTPException(403, "Incorrect combination. This installation has been declined. Contact the SchoolBridge developer.")
     return {"message": "SchoolBridge installation activated.", "activated": True}
 
 
@@ -2578,8 +2621,6 @@ def complete_first_school_setup(data: FirstSchoolSetupRequest, db: Session = Dep
     state = get_or_create_setup_state(db)
     if not state.activated_at:
         raise HTTPException(403, "Activate this installation before completing school setup.")
-    if license_fingerprint(data.activation_license) != state.activation_license_hash:
-        raise HTTPException(403, "The owner activation license used for this installation is required to create the first administrator.")
     if state.setup_completed_at or db.query(models.User).count():
         raise HTTPException(409, "First-time setup has already been completed.")
     if get_tenant_singleton(db, models.SchoolProfile):
