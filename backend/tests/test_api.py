@@ -2842,12 +2842,16 @@ def test_owner_signed_identity_correction_is_audited_and_one_time(monkeypatch):
         serialization.Encoding.Raw, serialization.PublicFormat.Raw
     )
     monkeypatch.setenv("SCHOOLBRIDGE_LICENSE_PUBLIC_KEY", base64.b64encode(public_key).decode())
+    monkeypatch.setenv("SCHOOLBRIDGE_OWNER_SEQUENCE", "123456")
     with TestClient(app) as client:
         installation_id = client.get("/api/setup/status").json()["installation_id"]
-        activation = _signed_test_license(installation_id, private_key)
-        assert client.post("/api/setup/activate", json={"license": activation}).status_code == 200
+        challenge = client.post("/api/setup/challenge").json()
+        activation_choice = next(option for option in challenge["options"] if "123456" in option)
+        assert client.post("/api/setup/activate", json={
+            "challenge_id": challenge["challenge_id"],
+            "selected_option": activation_choice,
+        }).status_code == 200
         setup = client.post("/api/setup/complete", json={
-            "activation_license": activation,
             "school_name": "Original School", "school_type": "Secondary",
             "country": "Uganda", "school_structure": "Day",
             "admin_username": "identity-admin", "admin_email": "identity@example.invalid",
