@@ -16,11 +16,47 @@ use tauri::{Manager, RunEvent};
 
 const AUTH_CREDENTIAL_SERVICE: &str = "ug.co.schoolbridge.desktop";
 const AUTH_CREDENTIAL_ACCOUNT: &str = "session";
+const MACHINE_CREDENTIAL_ACCOUNT: &str = "machine-binding-v1";
 
 #[cfg(windows)]
 fn auth_credential_entry() -> Result<keyring::Entry, String> {
     keyring::Entry::new(AUTH_CREDENTIAL_SERVICE, AUTH_CREDENTIAL_ACCOUNT)
         .map_err(|error| format!("Could not access Windows Credential Manager: {error}"))
+}
+
+#[cfg(windows)]
+fn machine_binding_token() -> Result<String, String> {
+    let entry = keyring::Entry::new(AUTH_CREDENTIAL_SERVICE, MACHINE_CREDENTIAL_ACCOUNT)
+        .map_err(|error| format!("Could not access the protected SchoolBridge computer identity: {error}"))?;
+    match entry.get_password() {
+        Ok(token) if token.len() == 64 && token.bytes().all(|byte| byte.is_ascii_hexdigit()) => Ok(token),
+        Ok(_) => Err("The protected SchoolBridge computer identity is invalid. Contact the developer.".into()),
+        Err(keyring::Error::NoEntry) => {
+            let mut bytes = [0_u8; 32];
+            let status = unsafe {
+                windows_sys::Win32::Security::Cryptography::BCryptGenRandom(
+                    std::ptr::null_mut(),
+                    bytes.as_mut_ptr(),
+                    bytes.len() as u32,
+                    windows_sys::Win32::Security::Cryptography::BCRYPT_USE_SYSTEM_PREFERRED_RNG,
+                )
+            };
+            if status != 0 {
+                return Err("Windows could not create a protected SchoolBridge computer identity.".into());
+            }
+            let token = bytes.iter().map(|byte| format!("{byte:02x}")).collect::<String>();
+            entry.set_password(&token)
+                .map_err(|error| format!("Could not protect the SchoolBridge computer identity: {error}"))?;
+            Ok(token)
+        }
+        Err(error) => Err(format!("Could not read the protected SchoolBridge computer identity: {error}")),
+    }
+}
+
+#[cfg(not(windows))]
+fn machine_binding_token() -> Result<String, String> {
+    // Development-only fallback. Production desktop packages are Windows-only.
+    Ok("schoolbridge-nonwindows-development-binding".to_string())
 }
 
 #[cfg(windows)]
@@ -579,6 +615,7 @@ fn start_backend(resource_dir: &Path) -> Result<ManagedBackend, String> {
     let python = root.join("runtime").join("python.exe");
     let backend_dir = root.join("backend");
     let env_file = desktop_config_file(&python, &root)?;
+    let machine_binding = machine_binding_token()?;
     let static_dir = backend_dir.join("app").join("static");
     let data_dir = desktop_data_directory()?;
     let database_path = data_dir.join("schoolbridge.sqlite3");
@@ -631,6 +668,7 @@ fn start_backend(resource_dir: &Path) -> Result<ManagedBackend, String> {
         .env("SCHOOLBRIDGE_STATIC_DIR", &static_dir)
         .env("SCHOOLBRIDGE_CONFIG_FILE", &env_file)
         .env("SCHOOLBRIDGE_DATA_DIR", &data_dir)
+        .env("SCHOOLBRIDGE_MACHINE_BINDING_TOKEN", &machine_binding)
         // Force the desktop database into per-user local storage, never the USB
         // installation directory or the process working directory.
         .env("SCHOOLBRIDGE_DATABASE_URL", &database_url)
@@ -702,6 +740,7 @@ fn start_backend(resource_dir: &Path) -> Result<ManagedBackend, String> {
             .env("SCHOOLBRIDGE_STATIC_DIR", &static_dir)
             .env("SCHOOLBRIDGE_CONFIG_FILE", &env_file)
             .env("SCHOOLBRIDGE_DATA_DIR", &data_dir)
+            .env("SCHOOLBRIDGE_MACHINE_BINDING_TOKEN", &machine_binding)
             .env("SCHOOLBRIDGE_DATABASE_URL", &database_url)
             .env("SCHOOLBRIDGE_CORS_ORIGINS", format!("https://{bind_ip}:{port_text}"))
             .env("SCHOOLBRIDGE_ALLOWED_HOSTS", bind_ip.clone())
