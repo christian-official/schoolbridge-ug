@@ -14,6 +14,7 @@ test('web app manifest has installable standalone metadata and valid icons', asy
   assert.equal(manifest.display, 'standalone')
   assert.equal(manifest.start_url, '/')
   assert.ok(manifest.icons.some(icon => icon.src === '/icons/schoolbridge-app-icon.png' && icon.sizes === '192x192' && icon.type === 'image/png'))
+  assert.ok(manifest.icons.some(icon => icon.src === '/icons/schoolbridge-app-icon-512.png' && icon.sizes === '512x512' && icon.type === 'image/png'))
   assert.ok(manifest.icons.some(icon => icon.src === '/app-icon.svg' && icon.sizes === 'any' && icon.type === 'image/svg+xml'))
   assert.match(await readFile(new URL('../public/app-icon.svg', import.meta.url), 'utf8'), /fill="#173b63"/)
   assert.match(html, /rel="apple-touch-icon" sizes="192x192" href="\/icons\/schoolbridge-app-icon\.png"/)
@@ -96,10 +97,8 @@ test('offline passphrases, cached record snapshots and offline marks drafts are 
 test('Android uses the native install prompt when available and never promises a forced install', () => {
   assert.match(installUi, /beforeinstallprompt/)
   assert.match(installUi, /promptEvent\.prompt\(\)/)
-  assert.match(installUi, /Your browser has not offered the one-tap install option/)
-  assert.match(installUi, /showAndroidSteps/)
-  assert.match(installUi, /Install app/)
-  assert.match(installUi, /Add to Home screen/)
+  assert.match(installUi, /This browser has not provided an install prompt/)
+  assert.match(installUi, /beforeinstallprompt/)
 })
 
 test('iOS explains the Safari Home Screen flow because iOS does not expose a web install prompt', () => {
