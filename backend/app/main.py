@@ -41,7 +41,7 @@ from .database import DATABASE_URL, Base, engine, get_db, SessionLocal, create_s
 from .migrations import upgrade_database
 from . import models
 from .sync_tracking import register_sync_tracking
-from .school_setup import verify_activation_license, license_fingerprint, generate_owner_challenge, owner_challenge_option_hash
+from .school_setup import verify_activation_license, license_fingerprint, generate_owner_challenge, owner_challenge_option_hash, machine_binding_fingerprint
 
 import jwt
 from datetime import timedelta, timezone
@@ -2325,6 +2325,10 @@ async def protect_school_data(request: Request, call_next):
         setup_state = get_tenant_singleton(setup_db, models.SchoolSetupState)
         if not setup_state or not setup_state.setup_completed_at:
             return JSONResponse({"detail": "Complete SchoolBridge first-time setup before accessing school records."}, status_code=403)
+        try:
+            enforce_setup_machine_binding(setup_db, setup_state, bind_if_missing=True)
+        except HTTPException as exc:
+            return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
     finally:
         setup_db.close()
 
@@ -2454,6 +2458,23 @@ def get_or_create_setup_state(db: Session):
     return state
 
 
+def enforce_setup_machine_binding(db: Session, state, bind_if_missing: bool = False) -> str | None:
+    """Reject copied desktop databases when the Windows credential is absent or differs."""
+    fingerprint = machine_binding_fingerprint()
+    desktop_mode = bool(os.getenv("SCHOOLBRIDGE_DATA_DIR"))
+    if desktop_mode and fingerprint is None:
+        raise HTTPException(503, "The protected SchoolBridge computer identity is unavailable. Reinstall or contact the developer.")
+    if fingerprint is None:
+        return None
+    if state.machine_binding_hash:
+        if not hmac.compare_digest(state.machine_binding_hash, fingerprint):
+            raise HTTPException(403, "This SchoolBridge installation belongs to another computer. Developer-authorised transfer is required.")
+    elif bind_if_missing:
+        state.machine_binding_hash = fingerprint
+        db.commit()
+    return fingerprint
+
+
 
 class SchoolIdentityCorrectionRequest(BaseModel):
     license: str = Field(min_length=20, max_length=4096)
@@ -2528,6 +2549,7 @@ def apply_school_identity_correction(
 def school_setup_status(school: str | None = Query(default=None, min_length=36, max_length=36), db: Session = Depends(get_db)):
     tenant = resolve_school_tenant(db, school)
     state = get_or_create_setup_state(db)
+    enforce_setup_machine_binding(db, state, bind_if_missing=True)
     return {
         "installation_id": state.installation_id,
         "school_id": tenant.public_id if tenant else None,
@@ -2547,6 +2569,7 @@ def create_school_activation_challenge(
 ):
     resolve_school_tenant(db, school)
     state = get_or_create_setup_state(db)
+    enforce_setup_machine_binding(db, state, bind_if_missing=True)
     if state.activated_at:
         raise HTTPException(409, "This SchoolBridge installation has already been activated.")
     if (state.activation_attempts or 0) >= 1:
@@ -2574,6 +2597,9 @@ def create_school_activation_challenge(
 def activate_school_installation(data: SchoolActivationRequest, db: Session = Depends(get_db)):
     resolve_school_tenant(db, data.school_id)
     state = get_or_create_setup_state(db)
+    machine_fingerprint = enforce_setup_machine_binding(db, state, bind_if_missing=False)
+    if os.getenv("SCHOOLBRIDGE_DATA_DIR") and not state.machine_binding_hash:
+        raise HTTPException(409, "The computer identity must be established before activation.")
     if state.activated_at:
         raise HTTPException(409, "This SchoolBridge installation has already been activated.")
     if (state.activation_attempts or 0) >= 1:
@@ -2597,6 +2623,8 @@ def activate_school_installation(data: SchoolActivationRequest, db: Session = De
     }
     if is_correct:
         changes["activated_at"] = now
+    if machine_fingerprint:
+        changes["machine_binding_hash"] = machine_fingerprint
     claimed = db.query(models.SchoolSetupState).filter(
         models.SchoolSetupState.id == state.id,
         models.SchoolSetupState.school_tenant_id == state.school_tenant_id,
@@ -2624,6 +2652,7 @@ def activate_school_installation(data: SchoolActivationRequest, db: Session = De
 def complete_first_school_setup(data: FirstSchoolSetupRequest, db: Session = Depends(get_db)):
     tenant = resolve_school_tenant(db, data.school_id)
     state = get_or_create_setup_state(db)
+    enforce_setup_machine_binding(db, state, bind_if_missing=False)
     if not state.activated_at:
         raise HTTPException(403, "Activate this installation before completing school setup.")
     if state.setup_completed_at or db.query(models.User).count():
