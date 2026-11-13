@@ -11,12 +11,12 @@ The current desktop package uses Tauri 2, Microsoft WebView2, React and a bundle
 |---|---|---|---|
 | Windows 10 | Version 1709, build 16299 or newer | x64 | Allow |
 | Windows 11 | Version 21H2, build 22000 or newer | x64 | Allow |
-| Windows 10 versions 1507, 1511, 1607 | Below documented WebView2 support floor | x64 | Reject |
+| Windows 10 SAC 1507, 1511, 1607 | Below documented WebView2 support floor | x64 | Reject (Enterprise LTSC 2015/2016 are exceptions) |
 | Windows 8 / 8.1 | Retired product targets | Any | Reject |
 | 32-bit Windows | Not included in current packaged runtime | x86 | Reject |
 | Other Windows / unknown OS | Not validated | Any | Reject |
 
-This is a technical compatibility floor, not proof that every build above it has passed real-machine acceptance. Microsoft lists Windows 10 SAC 1709 and later for WebView2. Current Rust MSVC targets require Windows 10 or newer. Windows 10 versions 1507–1607 are below the documented renderer floor.
+This is a technical compatibility floor, not proof that every build above it has passed real-machine acceptance. Microsoft lists Windows 10 SAC 1709 and later for WebView2, with explicit Windows 10 Enterprise 2015 LTSC and Enterprise 2016 LTSC exceptions. Current Rust MSVC targets require Windows 10 or newer. Windows 10 SAC versions 1507–1607 are below the documented renderer floor; Microsoft's separate Enterprise LTSC 2015/2016 entries are exceptions.
 
 Official references:
 - WebView2 supported Windows versions: https://learn.microsoft.com/en-us/microsoft-edge/webview2
@@ -26,11 +26,11 @@ Official references:
 
 ## Installer enforcement
 
-The NSIS pre-install hook requires 64-bit Windows, allows Windows 10 build 16299 or newer and Windows 11 build 22000 or newer, and rejects earlier/unknown operating systems before installation. It checks the declared version floor only; it does not prove a machine has required updates, certificates, drivers or runtime prerequisites.
+The NSIS pre-install hook requires 64-bit Windows, allows Windows 10 build 16299 or newer, plus Enterprise LTSC 2015/2016 builds 10240 and 14393, and Windows 11 build 22000 or newer, and rejects earlier/unknown operating systems before installation. It checks the declared version floor only; it does not prove a machine has required updates, certificates, drivers or runtime prerequisites.
 
 ## Operating-system security is separate
 
-Windows 10 version 1709 is out of normal servicing. Windows 10 Home/Pro 22H2 also reached end of support on 2025-10-14. Some Enterprise/LTSC editions and ESU-enrolled devices have separate lifecycle dates; verify the exact edition and servicing channel.
+Windows 10 version 1709 is out of normal servicing. Enterprise LTSC 2015 and 2016 have their own lifecycle dates and are also now at or near end of extended servicing; verify the exact edition lifecycle. Windows 10 Home/Pro 22H2 also reached end of support on 2025-10-14. Some Enterprise/LTSC editions and ESU-enrolled devices have separate lifecycle dates; verify the exact edition and servicing channel.
 
 Microsoft says Edge and WebView2 remain supported on Windows 10 SAC 1709 and later, but explicitly describes support on out-of-support Windows 10 releases as a temporary bridge to upgrading. Edge/WebView2 updates on Windows 10 22H2 continue until at least October 2028; that does not mean Windows 10 itself is receiving OS security updates.
 

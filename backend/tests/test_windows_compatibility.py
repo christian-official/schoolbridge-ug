@@ -19,6 +19,14 @@ def test_installer_uses_documented_windows_10_1709_floor():
     assert '$1 < 19045' not in hook
 
 
+def test_installer_allows_documented_enterprise_ltsc_exceptions():
+    hook = _installer_hook()
+    assert '$3 == "EnterpriseS"' in hook
+    assert '$1 == 10240' in hook
+    assert '$1 == 14393' in hook
+    assert "Windows 10 Enterprise 2015/2016 LTSC" in hook
+
+
 def test_installer_uses_windows_11_21h2_floor():
     hook = _installer_hook()
     assert '$1 < 22000' in hook

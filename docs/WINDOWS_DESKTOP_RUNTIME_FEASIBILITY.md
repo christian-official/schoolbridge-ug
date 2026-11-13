@@ -13,12 +13,12 @@ The product remains a standalone desktop application delivered through an offlin
 
 | Component | Documented requirement | Consequence |
 |---|---|---|
-| Microsoft WebView2 | Windows 10 SAC 1709 and later; Windows 11 | Windows 10 1507, 1511 and 1607 are below the renderer floor |
+| Microsoft WebView2 | Windows 10 SAC 1709 and later; Windows 11 | Windows 10 SAC 1507, 1511 and 1607 are below the renderer floor; Enterprise LTSC 2015/2016 are explicit WebView2 exceptions |
 | Current Rust MSVC target | Windows 10 or newer client installs | Windows 10 is the lowest supported OS family |
 | Bundled CPython 3.12 backend | Supported on Windows 10 | No backend rewrite is required solely for the Windows 10 baseline |
 | Tauri desktop package | Uses WebView2 on Windows | Complete package must be validated on the minimum Windows 10 build |
 
-**Provisional technical floor:** Windows 10 version 1709, OS build 16299, x64; Windows 11 version 21H2, build 22000, x64. The installer gate enforces these floors, but neither is claimed to have passed clean-machine SchoolBridge acceptance.
+**Provisional technical floor:** Windows 10 SAC version 1709, OS build 16299, x64; Enterprise LTSC 2015 (build 10240) and LTSC 2016 (build 14393) are explicit WebView2 exceptions; Windows 11 version 21H2, build 22000, x64. The installer gate enforces these floors, but neither is claimed to have passed clean-machine SchoolBridge acceptance.
 
 Sources:
 - https://learn.microsoft.com/en-us/microsoft-edge/webview2
@@ -28,11 +28,11 @@ Sources:
 
 ## Why Windows 10 1507 is not the minimum
 
-Microsoft's current WebView2 documentation lists Windows 10 SAC 1709 and later. Windows 10 versions 1507, 1511 and 1607 are below that documented floor. Current Rust MSVC targets also require Windows 10 or newer. Supporting 1507–1607 would require a different renderer/toolchain strategy; it is not a simple installer setting. Do not pin an obsolete browser runtime to bypass upstream platform requirements.
+Microsoft's current WebView2 documentation lists Windows 10 SAC 1709 and later. Windows 10 SAC versions 1507, 1511 and 1607 are below that documented floor; Microsoft separately lists Enterprise LTSC 2015 and 2016 as supported exceptions. Current Rust MSVC targets also require Windows 10 or newer. Supporting 1507–1607 would require a different renderer/toolchain strategy; it is not a simple installer setting. Do not pin an obsolete browser runtime to bypass upstream platform requirements.
 
 ## Installer and package requirements
 
-The NSIS pre-install hook targets Windows 10 build 16299+ and Windows 11 build 22000+, x64 only. The installer embeds the offline WebView2 runtime installer. Verify that the bundled runtime installs and launches without a network connection on the minimum Windows 10 candidate.
+The NSIS pre-install hook targets Windows 10 build 16299+, Enterprise LTSC 2015/2016 exceptions (builds 10240/14393), and Windows 11 build 22000+, x64 only. The installer embeds the offline WebView2 runtime installer. Verify that the bundled runtime installs and launches without a network connection on the minimum Windows 10 candidate.
 
 The backend remains CPython 3.12 + FastAPI + SQLite. Preserve per-user configuration/data separation, child-process lifecycle ownership, secure owner activation and existing API contracts.
 

@@ -9,7 +9,7 @@ The Windows 8-first native rewrite has been stopped in favour of broad compatibi
 
 - Windows 10 version 1709 (build 16299) or newer, x64 — documented minimum technical candidate.
 - Windows 11 version 21H2 (build 22000) or newer, x64 — initial build floor.
-- Windows 10 versions 1507, 1511 and 1607 remain below Microsoft's documented WebView2 support floor.
+- Windows 10 SAC versions 1507, 1511 and 1607 remain below Microsoft's documented WebView2 support floor; Enterprise LTSC 2015/2016 are explicit exceptions.
 - Windows 8.0 and 8.1 are retired and rejected.
 
 The minimum technical candidate is not a security recommendation. Windows 10 1709 is out of normal OS support. Prefer a currently serviced Windows 11 release and verify the exact lifecycle of any Windows 10 edition before deployment.
