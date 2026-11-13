@@ -17,6 +17,7 @@ use tauri::{Manager, RunEvent};
 const AUTH_CREDENTIAL_SERVICE: &str = "ug.co.schoolbridge.desktop";
 const AUTH_CREDENTIAL_ACCOUNT: &str = "session";
 const MACHINE_CREDENTIAL_ACCOUNT: &str = "machine-binding-v1";
+const OWNER_SEQUENCE_CREDENTIAL_ACCOUNT: &str = "owner-sequence-v1";
 
 #[cfg(windows)]
 fn auth_credential_entry() -> Result<keyring::Entry, String> {
@@ -56,6 +57,31 @@ fn machine_binding_token() -> Result<String, String> {
 #[cfg(not(windows))]
 fn machine_binding_token() -> Result<String, String> {
     Err("Protected computer binding is available only in the Windows desktop application.".into())
+}
+
+#[cfg(windows)]
+fn protected_owner_sequence() -> Result<Option<String>, String> {
+    let entry = keyring::Entry::new(AUTH_CREDENTIAL_SERVICE, OWNER_SEQUENCE_CREDENTIAL_ACCOUNT)
+        .map_err(|error| format!("Could not access protected owner activation settings: {error}"))?;
+    match entry.get_password() {
+        Ok(sequence) if sequence.len() == 6 && sequence.bytes().all(|byte| byte.is_ascii_digit()) => Ok(Some(sequence)),
+        Ok(_) => Err("The protected owner activation setting is invalid. Contact the developer.".into()),
+        Err(keyring::Error::NoEntry) => {
+            let Ok(sequence) = std::env::var("SCHOOLBRIDGE_OWNER_SEQUENCE") else { return Ok(None) };
+            if sequence.len() != 6 || !sequence.bytes().all(|byte| byte.is_ascii_digit()) {
+                return Err("SCHOOLBRIDGE_OWNER_SEQUENCE must contain exactly six digits.".into());
+            }
+            entry.set_password(&sequence)
+                .map_err(|error| format!("Could not protect the owner activation setting: {error}"))?;
+            Ok(Some(sequence))
+        }
+        Err(error) => Err(format!("Could not read protected owner activation settings: {error}")),
+    }
+}
+
+#[cfg(not(windows))]
+fn protected_owner_sequence() -> Result<Option<String>, String> {
+    Ok(std::env::var("SCHOOLBRIDGE_OWNER_SEQUENCE").ok())
 }
 
 #[cfg(windows)]
@@ -615,6 +641,7 @@ fn start_backend(resource_dir: &Path) -> Result<ManagedBackend, String> {
     let backend_dir = root.join("backend");
     let env_file = desktop_config_file(&python, &root)?;
     let machine_binding = machine_binding_token()?;
+    let owner_sequence = protected_owner_sequence()?;
     let static_dir = backend_dir.join("app").join("static");
     let data_dir = desktop_data_directory()?;
     let database_path = data_dir.join("schoolbridge.sqlite3");
@@ -668,6 +695,7 @@ fn start_backend(resource_dir: &Path) -> Result<ManagedBackend, String> {
         .env("SCHOOLBRIDGE_CONFIG_FILE", &env_file)
         .env("SCHOOLBRIDGE_DATA_DIR", &data_dir)
         .env("SCHOOLBRIDGE_MACHINE_BINDING_TOKEN", &machine_binding)
+        .env("SCHOOLBRIDGE_OWNER_SEQUENCE", owner_sequence.as_deref().unwrap_or(""))
         // Force the desktop database into per-user local storage, never the USB
         // installation directory or the process working directory.
         .env("SCHOOLBRIDGE_DATABASE_URL", &database_url)
@@ -740,6 +768,7 @@ fn start_backend(resource_dir: &Path) -> Result<ManagedBackend, String> {
             .env("SCHOOLBRIDGE_CONFIG_FILE", &env_file)
             .env("SCHOOLBRIDGE_DATA_DIR", &data_dir)
             .env("SCHOOLBRIDGE_MACHINE_BINDING_TOKEN", &machine_binding)
+            .env("SCHOOLBRIDGE_OWNER_SEQUENCE", owner_sequence.as_deref().unwrap_or(""))
             .env("SCHOOLBRIDGE_DATABASE_URL", &database_url)
             .env("SCHOOLBRIDGE_CORS_ORIGINS", format!("https://{bind_ip}:{port_text}"))
             .env("SCHOOLBRIDGE_ALLOWED_HOSTS", bind_ip.clone())
