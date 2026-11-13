@@ -21,10 +21,10 @@ SchoolBridge is designed to run on each school's own computer. The local school 
 |---|---|---|
 | Windows 8.0 | Blocked with the current maintained desktop runtime; not certified | Not certified |
 | Windows 8.1 | Blocked with the current Tauri/WebView2 desktop stack; not certified | Client compatibility is unverified; a separate browser does not satisfy the desktop requirement |
-| Windows 10 22H2 / Windows 11 23H2+ (64-bit) | Docker-free native package built; real-machine acceptance still required | Intended host and client platforms |
+| Windows 10 22H2 / Windows 11 23H2+ (64-bit) | Technical installer floor only; real-machine acceptance still required | Not a current security-support recommendation |
 | Newer supported Windows | Targeted; validate each release | Targeted; validate each release |
 
-Windows 8.0 is the starting compatibility target, followed by Windows 8.1 and newer Windows releases. Windows 8.0 and 8.1 remain explicit product requirements, but both are blocked pending a maintained desktop runtime and independent clean-machine acceptance. A browser opened separately is not the SchoolBridge desktop application. See [legacy Windows installation engineering](docs/LEGACY_WINDOWS_SUPPORT.md).
+The Windows 10 22H2 / Windows 11 23H2+ row describes the installer's technical minimum only, not a recommendation to deploy those releases. Check Microsoft's current lifecycle and servicing status and use a currently supported, fully patched Windows edition. Windows 8.0 and 8.1 remain explicit product requirements, but both are blocked pending a maintained desktop runtime and independent clean-machine acceptance. A browser opened separately is not the SchoolBridge desktop application. See [legacy Windows installation engineering](docs/LEGACY_WINDOWS_SUPPORT.md).
 
 ## Current development and release status
 
