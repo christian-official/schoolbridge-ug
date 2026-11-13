@@ -2620,23 +2620,15 @@ def _signed_test_license(installation_id, private_key, extra_claims=None):
     return "CHRISTIAN:" + encode(payload) + "." + encode(signature)
 
 
-def test_first_install_requires_activation_and_creates_admin_atomically(monkeypatch):
-    import base64
-    from cryptography.hazmat.primitives import serialization
-    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-
+def test_first_install_requires_one_choice_and_creates_admin_atomically(monkeypatch):
+    monkeypatch.setenv("SCHOOLBRIDGE_OWNER_SEQUENCE", "123456")
     reset_new_installation()
-    private_key = Ed25519PrivateKey.generate()
-    public_key = private_key.public_key().public_bytes(
-        serialization.Encoding.Raw, serialization.PublicFormat.Raw
-    )
-    monkeypatch.setenv("SCHOOLBRIDGE_LICENSE_PUBLIC_KEY", base64.b64encode(public_key).decode())
 
     with TestClient(app) as client:
         status = client.get("/api/setup/status")
         assert status.status_code == 200
-        installation_id = status.json()["installation_id"]
         assert status.json()["requires_activation"] is True
+        installation_id = status.json()["installation_id"]
 
         blocked_login = client.post(
             "/api/auth/login",
@@ -2644,30 +2636,27 @@ def test_first_install_requires_activation_and_creates_admin_atomically(monkeypa
         )
         assert blocked_login.status_code == 403
 
-        license_token = _signed_test_license(installation_id, private_key)
-        activated = client.post("/api/setup/activate", json={"license": license_token})
+        challenge = client.post("/api/setup/challenge")
+        assert challenge.status_code == 200, challenge.text
+        payload = challenge.json()
+        assert len(payload["options"]) == 5
+        assert sum("123456" in option for option in payload["options"]) == 1
+        assert len({len(option) for option in payload["options"]}) == 1
+        correct_option = next(option for option in payload["options"] if "123456" in option)
+
+        activated = client.post("/api/setup/activate", json={
+            "challenge_id": payload["challenge_id"],
+            "selected_option": correct_option,
+        })
         assert activated.status_code == 200, activated.text
-        assert client.post("/api/setup/activate", json={"license": license_token}).status_code == 409
+        assert client.post("/api/setup/activate", json={
+            "challenge_id": payload["challenge_id"],
+            "selected_option": correct_option,
+        }).status_code == 409
 
-        # Activation alone must not let a different browser visitor claim the
-        # first administrator without the exact owner-signed license.
-        different_license = _signed_test_license(installation_id, private_key, {
-            "license_id": "different-owner-license",
-        })
-        unauthorised_setup = client.post("/api/setup/complete", json={
-            "activation_license": different_license,
-            "school_name": "Unapproved School",
-            "school_type": "Secondary",
-            "country": "Uganda",
-            "school_structure": "Day",
-            "admin_username": "unauthorised-admin",
-            "admin_email": "unauthorised@example.invalid",
-            "admin_password": "LongTestPassword123!",
-        })
-        assert unauthorised_setup.status_code == 403
-
+        # The owner selection is the sole first-install activation step; no
+        # pasted licence or second owner-key confirmation is required.
         completed = client.post("/api/setup/complete", json={
-            "activation_license": license_token,
             "school_name": "River Valley School",
             "school_type": "Combined",
             "country": "Uganda",
@@ -2681,6 +2670,7 @@ def test_first_install_requires_activation_and_creates_admin_atomically(monkeypa
         })
         assert completed.status_code == 200, completed.text
         assert completed.json()["school"]["school_type"] == "Combined"
+        assert completed.json()["school"]["installation_id"] == installation_id
         with SessionLocal() as db:
             profile = db.get(models.SchoolProfile, 1)
             assert profile.report_logo == "data:image/png;base64,bG9nbw=="
@@ -2702,7 +2692,6 @@ def test_first_install_requires_activation_and_creates_admin_atomically(monkeypa
         with SessionLocal() as db:
             assert db.query(models.AuditLog).filter_by(action="installation_activated").count() == 1
             assert db.query(models.AuditLog).filter_by(action="school_first_setup_completed").count() == 1
-
 
 def test_fresh_install_blocks_school_records_until_setup_is_complete():
     reset_new_installation()
