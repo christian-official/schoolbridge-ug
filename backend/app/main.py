@@ -2619,6 +2619,8 @@ def apply_machine_transfer(data: MachineTransferRequest, db: Session = Depends(g
         claims.get("installation_id") != state.installation_id
         or claims.get("product") != "SchoolBridge"
         or claims.get("action") != "machine_transfer"
+        or not claims.get("expires_at")
+        or int(claims["expires_at"]) > int(datetime.utcnow().timestamp()) + 7 * 24 * 60 * 60
         or not isinstance(claims.get("machine_binding_hash"), str)
         or not hmac.compare_digest(claims["machine_binding_hash"], destination_fingerprint)
     ):
