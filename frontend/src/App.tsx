@@ -1544,7 +1544,7 @@ function App() {
     if (setupStatus.loading) return <main className="login-page"><section className="login-card"><div className="brand-name">School<span>Bridge</span></div><p className="muted">Verifying your school QR code…</p></section></main>
     if (setupStatus.error || qrSchoolError) return <main className="login-page"><section className="login-card"><div className="brand-name">School<span>Bridge</span></div><h1>School QR verification needed</h1><p className="error" role="alert">{qrSchoolError || setupStatus.error}</p><p className="form-hint">Scan your school's current QR code or contact the school administrator.</p></section></main>
     if (!qrSchoolName) return <main className="login-page"><section className="login-card"><div className="brand-name">School<span>Bridge</span></div><p className="muted">Verifying your school identity…</p></section></main>
-    return <RegistrationFlow schoolId={selectedSchoolId} schoolName={qrSchoolName} audience={schoolAudience as 'parent'|'teacher'} apiBaseUrl={API_BASE_URL} onAuthenticated={async accessToken=>{await storeSessionToken(accessToken);setUser(null);setToken(accessToken);setPassword('');setLoginError('')}}/>
+    return <RegistrationFlow schoolId={selectedSchoolId} schoolName={qrSchoolName} audience={schoolAudience as 'parent'|'teacher'} apiBaseUrl={API_BASE_URL} onAuthenticated={async accessToken=>{await storeSessionToken(accessToken);setShowRegistration(false);setUser(null);setToken(accessToken);setPassword('');setLoginError('')}}/>
   }
   if (!token && sessionRestoring) return <main className="login-page"><section className="login-card"><div className="brand-name">School<span>Bridge</span></div><p className="muted">Restoring your saved session…</p></section></main>;
 
