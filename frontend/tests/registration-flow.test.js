@@ -6,11 +6,17 @@ const flow = await readFile(new URL('../src/RegistrationFlow.tsx', import.meta.u
 const app = await readFile(new URL('../src/App.tsx', import.meta.url), 'utf8')
 const backend = await readFile(new URL('../../backend/app/main.py', import.meta.url), 'utf8')
 const syncDevices = await readFile(new URL('../src/SyncDevices.tsx', import.meta.url), 'utf8')
+const landing = await readFile(new URL('../src/SchoolAccessLanding.tsx', import.meta.url), 'utf8')
 
 test('scanning a school QR opens that school registration page directly', () => {
   assert.match(app, /schoolQuery.get\('audience'\)/)
   assert.match(app, /showSchoolLanding = Boolean\(schoolQuery.get\('school'\) && !schoolAudience\)/)
   assert.match(app, /SchoolAccessLanding/)
+  assert.ok(app.indexOf('Explicit public school routes take priority') < app.indexOf('if (token && !user)'), 'public QR routes must override an existing saved staff session')
+  assert.match(landing, /audience=parent/)
+  assert.match(landing, /audience=teacher/)
+  assert.match(landing, /audience=staff/)
+  assert.match(landing, /releases\/latest/)
   assert.match(app, /audience=\{schoolAudience as 'parent'\|'teacher'\}/)
   assert.match(app, /<h1>Welcome back<\/h1>/)
   assert.doesNotMatch(app, /Essential staff access/)
