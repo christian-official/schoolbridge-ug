@@ -95,6 +95,8 @@ def main() -> None:
             "school_structure": args.school_structure,
         }
     if args.action == "machine_transfer":
+        if not args.expires_at:
+            parser.error("Machine transfer authorisations must include --expires-at.")
         if not args.machine_binding_hash or len(args.machine_binding_hash) != 64 or any(
             character not in "0123456789abcdef" for character in args.machine_binding_hash.lower()
         ):
