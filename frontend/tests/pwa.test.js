@@ -93,11 +93,15 @@ test('offline passphrases, cached record snapshots and offline marks drafts are 
   assert.match(devices, /async function revoke\(/)
 })
 
-test('Android users always receive an install path when the browser install prompt is unavailable', () => {
-  assert.match(installUi, /setIsAndroid\(/)
-  assert.match(installUi, /!installEvent && !isAppleMobile && !isAndroid && !waitingWorker/)
-  assert.match(installUi, /showAndroidSteps && isAndroid && !installEvent/)
-  assert.match(installUi, /Install app/)
-  assert.match(installUi, /Add to Home screen/)
-  assert.match(installUi, /How to install/)
+test('Android uses the native install prompt when available and never promises a forced install', () => {
+  assert.match(installUi, /beforeinstallprompt/)
+  assert.match(installUi, /promptEvent\.prompt\(\)/)
+  assert.match(installUi, /Direct installation is not currently available in this browser/)
+  assert.doesNotMatch(installUi, /How to install|Install app|showAndroidSteps/)
+})
+
+test('iOS explains the Safari Home Screen flow because iOS does not expose a web install prompt', () => {
+  assert.match(installUi, /Add SchoolBridge to your Home Screen/)
+  assert.match(installUi, /In Safari, tap/)
+  assert.match(installUi, /Add to Home Screen/)
 })
