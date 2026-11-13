@@ -244,7 +244,7 @@ test('real Chromium completes the first-install owner activation and school setu
     assert.equal(setupPayload.admin_username, 'first-admin')
     assert.equal(setupPayload.admin_email, 'admin@example.invalid')
     assert.equal(setupPayload.admin_password, 'LongTestPassword123!')
-    assert.equal(setupPayload.activation_license, 'signed-owner-license-token')
+    assert.equal(Object.hasOwn(setupPayload, 'activation_license'), false, 'owner activation is completed separately and its selection is never sent with school details')
     assert.ok(setupPayload.report_logo.startsWith('data:image/png;base64,'))
     assert.equal(setupPayload.house_names, 'Lions\\nEagles')
     assert.equal(await page.getByLabel('Password').count(), 1)
