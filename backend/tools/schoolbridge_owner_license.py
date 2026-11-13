@@ -46,7 +46,8 @@ def main() -> None:
     sign.add_argument("--installation-id", required=True)
     sign.add_argument("--license-id", required=True)
     sign.add_argument("--expires-at", type=int)
-    sign.add_argument("--action", choices=["activate", "school_identity_correction"], default="activate")
+    sign.add_argument("--action", choices=["activate", "school_identity_correction", "machine_transfer"], default="activate")
+    sign.add_argument("--machine-binding-hash")
     sign.add_argument("--school-name")
     sign.add_argument("--school-type", choices=["Primary", "Secondary", "Combined"])
     sign.add_argument("--country")
@@ -93,6 +94,12 @@ def main() -> None:
             "country": args.country,
             "school_structure": args.school_structure,
         }
+    if args.action == "machine_transfer":
+        if not args.machine_binding_hash or len(args.machine_binding_hash) != 64 or any(
+            character not in "0123456789abcdef" for character in args.machine_binding_hash.lower()
+        ):
+            parser.error("Machine transfer licenses require --machine-binding-hash with a 64-character SHA-256 fingerprint.")
+        claims["machine_binding_hash"] = args.machine_binding_hash.lower()
     if args.expires_at:
         claims["expires_at"] = args.expires_at
     payload = json.dumps(claims, sort_keys=True, separators=(",", ":")).encode("utf-8")
