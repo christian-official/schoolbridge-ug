@@ -2297,7 +2297,7 @@ def delete_timetable_entry(
 @app.middleware("http")
 async def protect_school_data(request: Request, call_next):
     path = request.url.path
-    public_paths = {"/api/health", "/api/auth/login", "/api/setup/status", "/api/setup/challenge", "/api/setup/activate", "/api/setup/complete", "/api/public/school", "/api/public/registration"}
+    public_paths = {"/api/health", "/api/auth/login", "/api/setup/status", "/api/setup/challenge", "/api/setup/activate", "/api/setup/complete", "/api/setup/transfer-request", "/api/setup/transfer", "/api/public/school", "/api/public/registration"}
 
     # Browser CORS preflight requests must reach CORSMiddleware without auth.
     if request.method == "OPTIONS":
@@ -2480,6 +2480,11 @@ class SchoolIdentityCorrectionRequest(BaseModel):
     license: str = Field(min_length=20, max_length=4096)
 
 
+class MachineTransferRequest(BaseModel):
+    license: str = Field(min_length=20, max_length=4096)
+    school_id: str | None = Field(default=None, min_length=36, max_length=36)
+
+
 @app.post("/api/setup/identity-correction", tags=["First-time Setup"])
 def apply_school_identity_correction(
     data: SchoolIdentityCorrectionRequest,
@@ -2549,7 +2554,15 @@ def apply_school_identity_correction(
 def school_setup_status(school: str | None = Query(default=None, min_length=36, max_length=36), db: Session = Depends(get_db)):
     tenant = resolve_school_tenant(db, school)
     state = get_or_create_setup_state(db)
-    enforce_setup_machine_binding(db, state, bind_if_missing=True)
+    machine_fingerprint = machine_binding_fingerprint()
+    if os.getenv("SCHOOLBRIDGE_DATA_DIR") and machine_fingerprint is None:
+        raise HTTPException(503, "The protected SchoolBridge computer identity is unavailable. Contact the developer.")
+    machine_mismatch = bool(
+        state.machine_binding_hash and machine_fingerprint
+        and not hmac.compare_digest(state.machine_binding_hash, machine_fingerprint)
+    )
+    if not machine_mismatch:
+        enforce_setup_machine_binding(db, state, bind_if_missing=True)
     return {
         "installation_id": state.installation_id,
         "school_id": tenant.public_id if tenant else None,
@@ -2557,9 +2570,87 @@ def school_setup_status(school: str | None = Query(default=None, min_length=36, 
         "setup_completed": bool(state.setup_completed_at),
         "requires_activation": not bool(state.activated_at),
         "activation_declined": bool((state.activation_attempts or 0) >= 1 and not state.activated_at),
+        "machine_mismatch": machine_mismatch,
+        "machine_fingerprint": machine_fingerprint if machine_mismatch else None,
         "requires_setup": not bool(state.setup_completed_at),
         "identity_locked": bool(state.original_identity_json),
     }
+
+
+@app.get("/api/setup/transfer-request", tags=["First-time Setup"])
+def create_machine_transfer_request(
+    school: str | None = Query(default=None, min_length=36, max_length=36),
+    db: Session = Depends(get_db),
+):
+    resolve_school_tenant(db, school)
+    state = get_or_create_setup_state(db)
+    machine_fingerprint = machine_binding_fingerprint()
+    if os.getenv("SCHOOLBRIDGE_DATA_DIR") and machine_fingerprint is None:
+        raise HTTPException(503, "The protected destination computer identity is unavailable.")
+    if not state.machine_binding_hash:
+        raise HTTPException(409, "This installation has no previous computer binding to transfer.")
+    if machine_fingerprint and hmac.compare_digest(state.machine_binding_hash, machine_fingerprint):
+        raise HTTPException(409, "This installation is already on its registered computer.")
+    if not machine_fingerprint:
+        raise HTTPException(503, "A protected destination computer identity is required.")
+    return {
+        "installation_id": state.installation_id,
+        "destination_machine_fingerprint": machine_fingerprint,
+        "message": "Send both values to the SchoolBridge developer to request a one-time transfer authorisation.",
+    }
+
+
+@app.post("/api/setup/transfer", tags=["First-time Setup"])
+def apply_machine_transfer(data: MachineTransferRequest, db: Session = Depends(get_db)):
+    resolve_school_tenant(db, data.school_id)
+    state = get_or_create_setup_state(db)
+    destination_fingerprint = machine_binding_fingerprint()
+    if os.getenv("SCHOOLBRIDGE_DATA_DIR") and destination_fingerprint is None:
+        raise HTTPException(503, "The protected destination computer identity is unavailable.")
+    if not destination_fingerprint or not state.machine_binding_hash:
+        raise HTTPException(409, "A registered source and protected destination computer are required.")
+    if hmac.compare_digest(state.machine_binding_hash, destination_fingerprint):
+        raise HTTPException(409, "This installation is already on its registered computer.")
+    try:
+        claims = verify_activation_license(data.license)
+    except (ValueError, RuntimeError):
+        raise HTTPException(403, "The developer transfer authorisation is invalid.")
+    if (
+        claims.get("installation_id") != state.installation_id
+        or claims.get("product") != "SchoolBridge"
+        or claims.get("action") != "machine_transfer"
+        or not isinstance(claims.get("machine_binding_hash"), str)
+        or not hmac.compare_digest(claims["machine_binding_hash"], destination_fingerprint)
+    ):
+        raise HTTPException(403, "This authorisation does not approve transfer to this computer.")
+    fingerprint = license_fingerprint(data.license)
+    if db.query(models.SchoolMachineTransfer.id).filter_by(license_hash=fingerprint).first():
+        raise HTTPException(409, "This developer transfer authorisation has already been used.")
+    previous_fingerprint = state.machine_binding_hash
+    db.add(models.SchoolMachineTransfer(
+        school_tenant_id=state.school_tenant_id,
+        installation_id=state.installation_id,
+        license_hash=fingerprint,
+        license_id=str(claims["license_id"]),
+        previous_machine_hash=previous_fingerprint,
+        new_machine_hash=destination_fingerprint,
+    ))
+    state.machine_binding_hash = destination_fingerprint
+    db.add(models.AuditLog(
+        school_tenant_id=state.school_tenant_id,
+        actor_id=None,
+        actor_username="SchoolBridge Developer",
+        action="installation_machine_transferred",
+        entity_type="school_setup",
+        entity_id=state.id,
+        details="Developer-authorised one-time computer transfer applied.",
+    ))
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "This developer transfer authorisation has already been used.")
+    return {"message": "Developer-authorised transfer completed.", "transferred": True}
 
 
 @app.post("/api/setup/challenge", tags=["First-time Setup"])
