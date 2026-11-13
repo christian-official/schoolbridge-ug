@@ -5,7 +5,8 @@ import test from 'node:test'
 const syncDevices = await readFile(new URL('../src/SyncDevices.tsx', import.meta.url), 'utf8')
 
 test('manual school QR access link uses the public school ID, not the local installation ID', () => {
-  assert.match(syncDevices, /setSchoolAccessUrl\(destination \+ encodeURIComponent\(identity\.school_id\)\)/)
+  assert.match(syncDevices, /setParentAccessUrl\(destination \+ '&audience=parent'\)/)
+  assert.match(syncDevices, /setTeacherAccessUrl\(destination \+ '&audience=teacher'\)/)
   assert.doesNotMatch(syncDevices, /setSchoolAccessUrl\(destination \+ encodeURIComponent\(identity\.installation_id\)\)/)
 })
 
