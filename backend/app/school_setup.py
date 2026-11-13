@@ -96,3 +96,11 @@ def generate_owner_challenge(sequence: str) -> tuple[str, list[str]]:
 def owner_challenge_option_hash(challenge_id: str, option: str) -> str:
     """Bind a selected option to its challenge without storing the secret itself."""
     return hashlib.sha256((challenge_id + ":" + option).encode("utf-8")).hexdigest()
+
+
+def machine_binding_fingerprint() -> str | None:
+    """Hash the machine token supplied by the trusted desktop launcher."""
+    token = os.getenv("SCHOOLBRIDGE_MACHINE_BINDING_TOKEN", "").strip()
+    if not token:
+        return None
+    return hashlib.sha256(("SchoolBridge-machine-v1:" + token).encode("utf-8")).hexdigest()
