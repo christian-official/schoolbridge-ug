@@ -5835,7 +5835,10 @@ def update_staff(staff_id: int, data: StaffUpdate, db: Session = Depends(get_db)
         staff.phone_verified_by = None
     for key, value in changes.items():
         setattr(staff, key, value)
-    write_audit(db, admin, "staff_updated", "staff", staff.id, ", ".join(changes.keys()))
+    audit_details = ", ".join(changes.keys())
+    if "staff_number" in changes:
+        audit_details += f"; staff number changed from {old_staff_number} to {staff.staff_number}"
+    write_audit(db, admin, "staff_updated", "staff", staff.id, audit_details)
     try:
         db.commit()
     except IntegrityError:
