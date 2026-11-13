@@ -2365,6 +2365,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .first-setup-card{width:min(100%,680px);max-width:680px;margin:auto}
 .first-setup-card h1{margin:18px 0 8px}
 .first-setup-card form{display:grid;gap:12px;text-align:left}
+.owner-activation-options{display:grid;gap:8px;min-width:0;margin:0;padding:0;border:0}
+.owner-activation-options legend{margin-bottom:8px;color:#334155;font-size:13px;font-weight:750}
+.first-setup-card .owner-activation-option{display:flex;align-items:flex-start;gap:10px;min-width:0;padding:12px;border:1px solid #d5deea;border-radius:10px;background:#f8fafc;cursor:pointer}
+.first-setup-card .owner-activation-option input{flex:0 0 17px;width:17px;min-width:17px;margin:3px 0 0;padding:0}
+.owner-activation-option span{display:block;min-width:0;overflow-x:auto;white-space:nowrap;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.6;letter-spacing:.01em}
+.first-setup-card .owner-activation-option:has(input:checked){border-color:#5282b6;background:#edf5fc}
 .first-setup-card label{display:grid;gap:6px;font-size:13px;font-weight:650;color:#334155}
 .first-setup-card input,.first-setup-card select,.first-setup-card textarea{width:100%;min-width:0;border:1px solid #d5deea;border-radius:10px;padding:11px 12px;background:#fff;color:#172b43;font:inherit}
 .first-setup-card textarea{resize:vertical}
