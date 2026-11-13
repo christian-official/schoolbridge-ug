@@ -38,7 +38,10 @@ jobs:
       - name: Configure
         shell: pwsh
         run: |
-          cmake -S desktop-legacy-native -B build/legacy-native -A x64 "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
+          $vcpkgRoot = $env:VCPKG_INSTALLATION_ROOT
+          if (-not $vcpkgRoot) { $vcpkgRoot = $env:VCPKG_ROOT }
+          if (-not $vcpkgRoot) { throw "vcpkg root is not available." }
+          cmake -S desktop-legacy-native -B build/legacy-native -A x64 "-DCMAKE_TOOLCHAIN_FILE=$vcpkgRoot/scripts/buildsystems/vcpkg.cmake"
 
       - name: Build
         shell: pwsh
