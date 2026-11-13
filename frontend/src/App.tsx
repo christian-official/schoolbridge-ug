@@ -684,6 +684,7 @@ type FirstSetupStatus = {
   loading: boolean
   setup_completed: boolean
   activated: boolean
+  activation_declined?: boolean
   installation_id: string
   school_id?: string
   identity_locked: boolean
@@ -691,7 +692,9 @@ type FirstSetupStatus = {
 }
 
 function FirstTimeSetupWizard({status,onStatusChange}:{status:FirstSetupStatus;onStatusChange:(next:FirstSetupStatus)=>void}) {
-  const [license,setLicense]=useState('')
+  const [challengeId,setChallengeId]=useState('')
+  const [challengeOptions,setChallengeOptions]=useState<string[]>([])
+  const [selectedOption,setSelectedOption]=useState('')
   const [busy,setBusy]=useState(false)
   const [error,setError]=useState('')
   const draftKey=`schoolbridge-first-setup-draft:${status.installation_id}`
@@ -720,6 +723,23 @@ function FirstTimeSetupWizard({status,onStatusChange}:{status:FirstSetupStatus;o
       house_names:typeof draft.house_names==='string'?draft.house_names:defaults.house_names,
     }
   })
+  useEffect(()=>{
+    if(status.loading || status.activated || status.activation_declined) return
+    let cancelled=false
+    const schoolQuery=status.school_id?'?school='+encodeURIComponent(status.school_id):''
+    fetchSchoolBridge(`${API_BASE_URL}/api/setup/challenge${schoolQuery}`,{method:'POST'})
+      .then(async response=>{
+        const result=await response.json().catch(()=>({}))
+        if(!response.ok)throw new Error(result.detail||'Unable to load the owner activation choices.')
+        if(!cancelled){
+          setChallengeId(result.challenge_id||'')
+          setChallengeOptions(Array.isArray(result.options)?result.options:[])
+          setSelectedOption('')
+        }
+      })
+      .catch(e=>{if(!cancelled)setError(e instanceof Error?e.message:'Unable to load the owner activation choices.')})
+    return ()=>{cancelled=true}
+  },[status.loading,status.activated,status.activation_declined,status.installation_id,status.school_id])
   useEffect(()=>{
     // Persist only non-secret school profile fields for this browser tab/session.
     // Never persist the activation code, logo data, administrator identity or password.
@@ -755,14 +775,19 @@ function FirstTimeSetupWizard({status,onStatusChange}:{status:FirstSetupStatus;o
     reader.readAsDataURL(file)
   }
   async function activate(event:React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();setBusy(true);setError('')
+    event.preventDefault()
+    if(!challengeId || !selectedOption) return
+    setBusy(true);setError('')
     try {
       const response=await fetchSchoolBridge(`${API_BASE_URL}/api/setup/activate`,{
         method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({license,school_id:status.school_id||undefined}),
+        body:JSON.stringify({challenge_id:challengeId,selected_option:selectedOption,school_id:status.school_id||undefined}),
       })
       const result=await response.json().catch(()=>({}))
-      if(!response.ok)throw new Error(result.detail||'Installation activation failed.')
+      if(!response.ok){
+        if(response.status===403)onStatusChange({...status,activation_declined:true,error:result.detail||'This installation has been declined.'})
+        throw new Error(result.detail||'Installation activation failed.')
+      }
       try { localStorage.setItem('schoolbridge-installation-id', status.installation_id) } catch { /* Ignore unavailable browser storage. */ }
       onStatusChange({...status,activated:true,error:''})
     } catch(e) { setError(e instanceof Error?e.message:'Installation activation failed.') }
@@ -773,7 +798,7 @@ function FirstTimeSetupWizard({status,onStatusChange}:{status:FirstSetupStatus;o
     try {
       const response=await fetchSchoolBridge(`${API_BASE_URL}/api/setup/complete`,{
         method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({...school,school_id:status.school_id||undefined,activation_license:license}),
+        body:JSON.stringify({...school,school_id:status.school_id||undefined}),
       })
       const result=await response.json().catch(()=>({}))
       if(!response.ok)throw new Error(result.detail||'School setup could not be completed.')
@@ -783,7 +808,6 @@ function FirstTimeSetupWizard({status,onStatusChange}:{status:FirstSetupStatus;o
       } catch { /* Ignore unavailable browser storage. */ }
       onStatusChange({...status,setup_completed:true,activated:true,identity_locked:true,error:''})
       setSchool({...school,admin_password:''})
-      setLicense('')
     } catch(e) { setError(e instanceof Error?e.message:'School setup could not be completed.') }
     finally { setBusy(false) }
   }
@@ -793,26 +817,30 @@ function FirstTimeSetupWizard({status,onStatusChange}:{status:FirstSetupStatus;o
       <div className="brand-name">School<span>Bridge</span></div>
       <p className="login-subtitle">Secure first-time school installation</p>
       <div className="first-setup-progress"><span className={status.activated?'complete':''}>1. Owner activation</span><span className={status.activated?'active':''}>2. School setup</span></div>
-      {!status.activated ? <>
-        <h1>Activate this installation</h1>
-        <p className="muted">This installation must be authorised by the SchoolBridge owner before school records or administrator accounts can be created.</p>
+      {status.activation_declined ? <>
+        <h1>Installation declined</h1>
+        <p className="muted">The single owner-selection attempt was incorrect. This installation cannot be retried or reset. Contact the SchoolBridge developer for an authorised transfer or replacement installation.</p>
+        {error&&<p className="error" role="alert">{error}</p>}
+      </> : !status.activated ? <>
+        <h1>Verify owner authorisation</h1>
+        <p className="muted">Select the one combination containing your registered six-digit sequence. You have one selection only.</p>
         <div className="installation-id-panel"><small>UNIQUE INSTALLATION ID</small><strong>{status.installation_id}</strong><button type="button" className="secondary-button" onClick={()=>void navigator.clipboard?.writeText(status.installation_id)}>Copy installation ID</button></div>
         <form onSubmit={activate}>
-          <label htmlFor="schoolbridge-license">CHRISTIAN Owner Key activation code</label>
-          <textarea id="schoolbridge-license" value={license} onChange={e=>setLicense(e.target.value)} required rows={4} placeholder="Paste the CHRISTIAN activation code here"/>
+          <fieldset className="owner-activation-options" disabled={busy||!challengeId||challengeOptions.length!==5}>
+            <legend>Choose one of the five combinations</legend>
+            {challengeOptions.map((option,index)=><label className="owner-activation-option" key={index}>
+              <input type="radio" name="owner-activation-option" value={option} checked={selectedOption===option} onChange={()=>setSelectedOption(option)}/>
+              <span>{String(index+1).padStart(2,'0')}. {option}</span>
+            </label>)}
+          </fieldset>
           {error&&<p className="error" role="alert">{error}</p>}
-          <button className="primary-button login-button" disabled={busy||license.trim().length<20}>{busy?'Verifying license...':'Activate installation'}</button>
+          <button className="primary-button login-button" disabled={busy||!challengeId||challengeOptions.length!==5||!selectedOption}>{busy?'Verifying selection...':'Confirm selection'}</button>
         </form>
       </> : <>
         <h1>Set up your school</h1>
         <p className="muted">Enter the school's official details and create its first administrator account. The original school identity will be protected after setup.</p>
-        <p className="form-hint">If this page is refreshed, school identity and contact fields are restored in this browser tab. The activation code, logo file and administrator credentials are not saved; keep the code available and re-enter those details if needed.</p>
+        <p className="form-hint">If this page is refreshed, school identity and contact fields are restored in this browser tab. The school profile draft is saved only for this browser tab; administrator credentials are not saved.</p>
         <form onSubmit={completeSetup}>
-          <div className="first-setup-section"><h3>Owner authorisation</h3>
-            <label htmlFor="schoolbridge-license-confirm">Confirm CHRISTIAN Owner Key activation code</label>
-            <textarea id="schoolbridge-license-confirm" value={license} onChange={e=>setLicense(e.target.value)} required rows={3} placeholder="Paste the same CHRISTIAN activation code used to activate this installation"/>
-            <p className="form-hint">The same CHRISTIAN activation code is required to create the first administrator. Your private owner key is never entered or stored on this school setup page.</p>
-          </div>
           <div className="first-setup-section"><h3>School identity</h3>
             <label>Official school name *<input required minLength={2} maxLength={160} value={school.school_name} onChange={e=>setSchool({...school,school_name:e.target.value})}/></label>
             <div className="first-setup-grid">
