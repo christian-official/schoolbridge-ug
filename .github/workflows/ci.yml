@@ -488,16 +488,23 @@ jobs:
             "NSIS_HOOK_PREINSTALL",
             "RunningX64",
             "Windows 10",
-            "19045",
+            "16299",
+            "EnterpriseS",
+            "10240",
+            "14393",
             "Windows 11",
-            "22631",
-            "Windows 8 and 8.1"
+            "22000"
           )) {
             if ($hook -notmatch [regex]::Escape($required)) {
               throw "Desktop Windows compatibility preflight is missing: $required"
             }
           }
-          Write-Host "Desktop installer OS and architecture preflight is configured."
+          foreach ($retired in @("19045", "22631", "Windows 8 and 8.1")) {
+            if ($hook -match [regex]::Escape($retired)) {
+              throw "Desktop Windows compatibility preflight still contains retired gate: $retired"
+            }
+          }
+          Write-Host "Desktop installer supports the documented Windows 10/11 compatibility floor."
       - name: Parse PowerShell scripts and verify official runtime signatures
         shell: pwsh
         env:
