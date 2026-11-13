@@ -1,8 +1,8 @@
-# Windows compatibility — Task 1.13
+# Interim Windows installer safety gate — NOT Windows 8 compatibility completion
 
 ## Scope and current status
 
-This task adds an early, fail-closed operating-system and architecture check to the standalone Tauri/NSIS installer. The check runs before installer files, registry values or shortcuts are written.
+This document records an interim safety gate for the existing Tauri/NSIS package only. It is **not completion of the SchoolBridge Windows compatibility objective**. The current installer check runs before installer files, registry values or shortcuts are written. It prevents installation on systems the current package cannot safely support; it does not satisfy the product requirement.
 
 The current Tauri/WebView2 desktop package has this **technical compatibility floor**:
 
@@ -30,11 +30,17 @@ Official lifecycle references:
 - https://learn.microsoft.com/en-us/windows/release-health/supported-versions-windows-client
 - https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information
 
+## Primary product objective — Windows 8.0 first
+
+The primary compatibility objective is a directly installable, standalone SchoolBridge desktop application for **Windows 8.0 first**, followed by Windows 8.1 and newer Windows releases. The current Tauri/WebView2 package does not meet this objective. Task 1.13 is therefore **not complete as a product compatibility task**; its OS rejection check is only a temporary fail-closed safeguard for this specific package.
+
+The next engineering milestone is a renewed architecture feasibility investigation (D1), not final audit or release-readiness sign-off. Keep the current guard until a tested alternative package exists; do not silently allow unsupported installation, pin obsolete browser engines, or weaken security.
+
 ## Legacy Windows requirement remains open
 
 Windows 8.0 and Windows 8.1 remain explicit product compatibility requirements, but the current Tauri 2/WebView2 renderer is not an acceptable maintained runtime for either OS. The legacy track must find a maintained alternative renderer and backend strategy; it must not pin obsolete WebView2/Edge, use an end-of-life Python runtime, or weaken authentication, TLS, cryptography or password hashing to force installation.
 
-See [Legacy Windows deployment track](LEGACY_WINDOWS_SUPPORT.md) and [Windows desktop runtime feasibility](WINDOWS_DESKTOP_RUNTIME_FEASIBILITY.md). The current installer rejecting Windows 8/8.1 is an honest guard, not completion of the legacy Windows requirement.
+See [Legacy Windows deployment track](LEGACY_WINDOWS_SUPPORT.md) and [Windows desktop runtime feasibility](WINDOWS_DESKTOP_RUNTIME_FEASIBILITY.md). The current installer rejecting Windows 8/8.1 is an interim safety guard only. It is not compatibility, delivery, or completion of the primary product requirement.
 
 ## Evidence and remaining acceptance
 
