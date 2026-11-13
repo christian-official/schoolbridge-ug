@@ -2557,8 +2557,6 @@ def school_setup_status(school: str | None = Query(default=None, min_length=36, 
     tenant = resolve_school_tenant(db, school)
     state = get_or_create_setup_state(db)
     machine_fingerprint = machine_binding_fingerprint()
-    if os.getenv("SCHOOLBRIDGE_DATA_DIR") and machine_fingerprint is None:
-        raise HTTPException(503, "The protected SchoolBridge computer identity is unavailable. Contact the developer.")
     machine_mismatch = bool(
         state.machine_binding_hash and machine_fingerprint
         and not hmac.compare_digest(state.machine_binding_hash, machine_fingerprint)
