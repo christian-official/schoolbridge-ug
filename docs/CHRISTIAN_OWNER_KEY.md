@@ -34,7 +34,7 @@ When a school moves an installation, the destination screen displays:
 The developer uses those two values to create an expiring, single-use transfer authorisation:
 
 ```powershell
-python backend\tools\schoolbridge_owner_license.py sign-license --private-key "$HOME\SchoolBridgeOwner\christian-owner-private.pem" --installation-id "PASTE-INSTALLATION-ID" --license-id "SB-TRANSFER-UNIQUE-001" --action machine_transfer --machine-binding-hash "PASTE-DESTINATION-FINGERPRINT" --expires-at 1794614400
+python backend\tools\schoolbridge_owner_license.py sign-license --private-key "$HOME\SchoolBridgeOwner\christian-owner-private.pem" --installation-id "PASTE-INSTALLATION-ID" --license-id "SB-TRANSFER-UNIQUE-001" --action machine_transfer --machine-binding-hash "PASTE-DESTINATION-FINGERPRINT" --expires-at "UNIX-TIMESTAMP-WITHIN-SEVEN-DAYS"
 ```
 
 Use a new unique license ID for every transfer and set an expiry within seven days. Send the resulting token to the school contact. It is bound to the named installation and destination fingerprint, and the backend rejects reuse.
