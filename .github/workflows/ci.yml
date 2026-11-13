@@ -91,8 +91,14 @@ jobs:
           New-Item -ItemType Directory -Path $tamperCopy -Force | Out-Null
           Copy-Item (Join-Path $package "*") $tamperCopy -Recurse -Force
           Add-Content (Join-Path $tamperCopy "SchoolBridge-Setup.exe") "tamper"
-          & pwsh -NoProfile -File (Join-Path $tamperCopy "Verify-USB.ps1")
-          if ($LASTEXITCODE -eq 0) { throw "USB verifier accepted a modified installer." }
+          $tamperRejected = $false
+          try {
+            & (Join-Path $tamperCopy "Verify-USB.ps1")
+          } catch {
+            $tamperRejected = $true
+            Write-Host "Tamper correctly rejected: $($_.Exception.Message)"
+          }
+          if (-not $tamperRejected) { throw "USB verifier accepted a modified installer." }
           Write-Host "USB tamper detection passed."
       - name: Publish CI test-key desktop USB package (not for production)
         uses: actions/upload-artifact@v4
