@@ -1,140 +1,87 @@
-# Legacy Windows deployment track (Windows 8 and 8.1)
+# Windows 8-first native desktop delivery track
 
-## Goal
+**Status: IN DEVELOPMENT — NOT CERTIFIED.**  
+**Priority: Windows 8.0 first, then Windows 8.1.**
 
-Provide a separately packaged, USB-installable SchoolBridge host for schools whose computers cannot run the current Docker Desktop + WSL 2 deployment. The target operating systems are **Windows 8 and Windows 8.1**. This track must not change or weaken the existing Windows 10/11 installer.
+This document supersedes earlier exploratory proposals for a local web server plus separate browser, an embedded legacy browser, or a Python-only compatibility package. Those are not the agreed product deliverable.
 
-This document records the engineering plan; it is not a compatibility certification. Do not advertise either legacy OS as supported until the clean-machine acceptance matrix below passes.
+## Binding product requirement
 
-## Existing architecture findings
+SchoolBridge must be a directly installable, standalone desktop application for Windows 8.0 first, then Windows 8.1 and newer Windows releases.
 
-- The current school USB package is Linux-container based: PostgreSQL, a FastAPI backend, and an Nginx-served React frontend. It requires Docker Desktop and WSL 2.
-- The backend already has a substantial SQLite path: SQLite connection safety settings, migrations, consistent backups, integrity checks, restore validation and rollback are implemented. The health endpoint identifies SQLite as single-host mode.
-- SQLite is therefore the strongest starting point for a single-computer legacy deployment. A SQLite database must remain on the host's local disk; it must never be shared directly over a network drive. Other devices connect to the host application over the school's LAN.
-- The frontend is built into static files, but today Nginx serves those files and proxies /api/ to the backend. A legacy package needs a supported local static-file/API serving arrangement without Docker or Nginx.
-- The current backend dependency ranges are intentionally modern and unpinned. They cannot simply be installed on an old Python runtime and called compatible.
+The USB package must contain the application and all required runtimes, install and launch without internet access, and preserve authentication, school data, backups, updates and integrity checks. Docker, WSL2, a separately installed browser, or a localhost server opened in an external browser do not satisfy this requirement.
 
-## Deployment design to validate
+The live SQLite database belongs on the host computer's local disk, never on the USB drive or a shared network folder. Other school devices may connect through a deliberately secured LAN service; they must not access the SQLite file directly.
 
-Build a distinct SchoolBridge-Legacy-Windows package with these boundaries:
+## Existing implementation and blockers
 
-1. **Local database:** SQLite on the host computer's local disk, with the existing migration, backup, restore and integrity safeguards retained.
-2. **Application runtime:** a separately bundled, version-pinned Windows Python runtime and a frozen set of dependencies. Select the oldest runtime only after checking every direct and transitive dependency, wheel availability, TLS behaviour and security implications on both OS versions.
-3. **Frontend delivery:** serve the production-built frontend and /api/ from one local origin. Preserve SPA deep links, service-worker behaviour, upload limits and the existing API paths. Do not rely on a modern browser being preinstalled; define and test a browser baseline.
-4. **Background operation:** choose a Windows 8-compatible, maintainable way to start, stop, restart and recover the backend after reboot and unexpected process exit. Do not assume modern Windows service tooling works on Windows 8.
-5. **Installer and updates:** provide an offline USB installer, package integrity verification, safe upgrade/rollback, and clear operator instructions. Never include production secrets or the owner's private signing key.
-6. **Network access:** bind the service deliberately for single-computer and optional LAN use. Preserve authentication, role permissions, owner activation, audit trails and backup protections. Do not expose the database port or allow direct network access to the SQLite file.
+- The current desktop shell is Tauri 2 using Microsoft WebView2. WebView2 109 was the final release for Windows 8/8.1 and is no longer maintained there. This is not an acceptable renderer for the legacy deliverable.
+- The current backend bundles CPython 3.12. Its documented Windows support does not include Windows 8.0. Python 3.12's Windows 8.1 capability does not make Windows 8.1 itself security-supported.
+- The existing backend is FastAPI with modern dependency ranges, SQLAlchemy, Alembic, password hashing, JWT and cryptography dependencies. It cannot be declared compatible with an old interpreter without a complete dependency and security review.
+- The Docker/WSL2 prototype is not the required deliverable.
+- The current installer rejection is an interim fail-closed safety check for the Tauri/WebView2 package. It is not compatibility completion and must remain until a replacement package is actually proven.
 
-## Compatibility gates
+## Native desktop shell candidate
 
-The target matrix is Windows 8 and Windows 8.1, tested separately on clean, fully patched virtual machines or physical PCs. CPU architecture (x86/x64) is a separate explicit gate: do not claim 32-bit support unless every runtime and dependency is available and tested for it.
+An isolated proof of concept now exists under `desktop-legacy-native/`.
 
-Before selecting the runtime, record evidence for:
-- supported Python/runtime versions on Windows 8 and 8.1;
-- compatible builds/wheels for FastAPI, Pydantic, SQLAlchemy, Alembic, Uvicorn, password hashing and cryptography dependencies;
-- a reproducible, offline dependency bundle with hashes and no runtime internet requirement;
-- supported features of the eventual embedded desktop rendering engine, including service worker, IndexedDB, Web Crypto, file uploads and printing;
-- code signing / installer behaviour and OS-level TLS limitations;
-- security patch status and the operational risk of running unsupported Windows.
+Candidate: wxWidgets 3.2.x with native controls and no embedded browser. Upstream documentation currently lists Windows 8 among its supported platforms and documents its Windows port for Windows 7 or later:
+- https://github.com/wxWidgets/wxWidgets
+- https://github.com/wxWidgets/wxWidgets/blob/master/docs/msw/install.md
+- https://wxwidgets.org/news/2026/10/wxwidgets-3.2.12-and-3.3.4-released/
 
-If a required security dependency has no safe compatible build, stop and report the blocker. Do not downgrade cryptography, password hashing, authentication, TLS, or integrity checks merely to force installation.
+This is a candidate, not a selected production architecture. The initial source only creates a minimal native window. The CI job builds it on a modern Windows runner; that is compile evidence only, not Windows 8 runtime evidence.
 
-## Required acceptance tests for each OS
+The native shell means the existing React UI cannot simply be assumed to render inside it. A native UI migration or a separately proven maintained renderer is required. Do not use the old Internet Explorer WebBrowser control or pin an obsolete Chromium/WebView runtime.
 
-- Install from USB while disconnected from the internet.
-- Verify all package hashes and reject a modified or incomplete package.
-- Start automatically after reboot and recover from an application restart.
-- Complete owner activation, first-time school setup, admin and teacher login.
-- Exercise student/staff records, attendance, marks, fees, reports, printing and file uploads.
-- Verify permissions, audit logging, session expiry and password handling.
-- Verify SQLite migrations, concurrent staff use, backup, restore, integrity checks and rollback.
-- Verify browser access on the host and a second device over a local LAN.
-- Verify offline-supported workflows and confirm unsupported modules are not represented as fully offline.
-- Upgrade an existing installation without losing data; test rollback after an interrupted/failed upgrade.
-- Repeat critical checks after a clean reboot with internet disconnected.
+## Backend strategy — unresolved
 
-A CI script-parse or package-build job is not a substitute for these real-machine tests.
+Windows 8.0 has no currently supported CPython 3.12 runtime. Do not ship an end-of-life Python runtime and describe it as secure or maintained.
 
-## Security and support statement
+Investigate a maintained native backend/service implementation and a portability boundary around the existing API and data model. Any candidate must preserve the existing security model and prove:
+- TLS protocol and certificate validation behaviour on Windows 8.0;
+- maintained cryptographic primitives and password hashing;
+- signed owner activation and package/update integrity;
+- SQLite transaction safety, migrations, integrity checks, backup and restore;
+- role/tenant isolation, audit events and session expiry;
+- a reproducible, fully offline dependency bundle.
 
-Windows 8 and Windows 8.1 are out of Microsoft support. A legacy installer can improve deployment reach, but it cannot restore OS security updates. The installer must display this risk, require an authorised operator to acknowledge it, recommend an isolated local network and encrypted external backups, and never describe the host as security-equivalent to a currently supported Windows release.
+If no safe maintained backend stack can meet Windows 8.0, report the exact blocker rather than weakening security. Windows 8.1 must be evaluated independently; do not assume the same runtime result.
 
-## Delivery sequence
+## Required engineering sequence
 
-- **L0 — Runtime feasibility:** dependency/runtime/browser audit for both OS versions and architectures; select or reject a viable runtime.
-- **L1 — Single-host application:** serve the built frontend and API from one local origin and run against local SQLite without containers.
-- **L2 — Windows lifecycle:** reliable startup, shutdown, logs, health checks, backup scheduling and safe update/rollback.
-- **L3 — USB installer:** offline bundle, integrity manifest, preflight checks and operator documentation.
-- **L4 — Acceptance:** automated tests plus separate clean-machine Windows 8 and Windows 8.1 acceptance evidence.
+1. **D1 — Native shell feasibility (Windows 8.0 first):** compile the wxWidgets prototype with an explicitly recorded toolchain, CRT and Windows API baseline. Test launch, display scaling, keyboard input, file dialogs and shutdown on a clean Windows 8.0 x64 machine. Repeat separately on Windows 8.1.
+2. **D2 — Backend feasibility:** select and test a maintained runtime/service strategy. Prove SQLite, migrations, authentication, TLS, cryptography, activation and backup/restore on each OS. No EOL runtime or weakened security.
+3. **D3 — SchoolBridge UI migration:** implement the actual school workflows in the selected native UI/renderer. Preserve accessibility, role-based navigation, printing, uploads and existing API/data contracts.
+4. **D4 — Desktop lifecycle:** implement single-instance behaviour, startup/shutdown, child/service ownership, logs, health checks, crash recovery and safe configuration storage.
+5. **D5 — Offline USB installer:** package the native UI, backend, SQLite, migrations and all dependencies. Verify hashes/signatures, disconnected installation, repair, upgrade, rollback and uninstall without deleting school data.
+6. **D6 — Acceptance:** pass the complete workflow and security matrix independently on Windows 8.0 and Windows 8.1. Modern Windows CI is not a substitute for those machines.
 
-Keep this track separate from the current Docker/WSL2 package. The existing Windows 10/11 path remains unchanged.
+## Acceptance matrix for each operating system
 
-## Verified legacy platform facts (checked 2026-11-11)
+- Clean install from USB with internet disconnected.
+- Application opens as a desktop app without external browser, Docker or WSL2.
+- Owner activation and administrator/teacher authentication work.
+- Student/staff records, attendance, examinations, fees, reports, printing and file uploads work.
+- Role permissions, tenant isolation, audit logging, session expiry and password handling pass.
+- SQLite migrations, integrity checks, backup, restore and rollback pass.
+- Restart, reboot, crash recovery and data persistence pass.
+- LAN access, if enabled, uses authenticated HTTPS and does not expose the database file.
+- Upgrade preserves existing school data; repair and uninstall do not silently delete it.
+- Exact OS edition/build, architecture, toolchain, runtime and dependency versions are recorded.
 
-These facts narrow the feasible deployment options and supersede any assumption that Windows 8 and 8.1 can share one supported Python host runtime:
+## Security and support warning
 
-- **Windows 8.0** left Microsoft support on 2016-01-13. **Windows 8.1** left Microsoft support on 2023-01-10. Neither receives Windows security updates.
-- Current Python documentation states Python 3.12 supports Windows 8.1 and newer; Python 3.11 also supports Windows 8.1 and newer. This does not include Windows 8.0.
-- Python 3.8 is end-of-life (2024-10-07) and receives no security updates. Therefore, the existing Python/FastAPI backend has no currently supported CPython runtime documented for a native Windows 8.0 host. Do not ship an EOL Python runtime to bridge that gap.
-- Windows 8.1 can technically run a currently security-maintained CPython 3.12 runtime, but that does not make the Windows 8.1 operating system secure or supported. A native host prototype still requires an explicit risk decision and real-machine validation.
-- Microsoft Edge 109 was the final Edge release for Windows 8/8.1 and is no longer maintained. No external browser is accepted as the SchoolBridge desktop shell. The eventual desktop package must provide its own supported rendering/runtime layer (or a fully native UI) and prove compatibility on each target OS; an ordinary browser smoke test is not desktop acceptance.
+Windows 8.0 and Windows 8.1 are out of Microsoft support and do not receive normal OS security updates. A compatible application cannot restore missing operating-system security fixes. Any deployment must clearly disclose this risk and should be isolated to a trusted local network with controlled access and encrypted backups. Never describe these hosts as security-equivalent to currently supported Windows.
 
-## D1 runtime feasibility decision — REOPENED
+## Explicit non-goals
 
-See [Windows desktop runtime feasibility](WINDOWS_DESKTOP_RUNTIME_FEASIBILITY.md). The current Tauri 2/WebView2 stack is a no-go for Windows 8.0 and 8.1 because the available WebView2 runtime is frozen at version 109 and no longer receives security updates. Windows 8.0 also has no supported CPython 3.12 runtime. **That rules out the current architecture, not the Windows 8 product requirement.** The previous instruction to continue supported-Windows desktop packaging as the next milestone is superseded. D1 must now be reopened to identify and prototype a genuinely viable architecture, starting with Windows 8.0. Keep the current installer's fail-closed check as a temporary safety measure until a replacement has been proven; do not mistake it for task completion.
+- No Base44 integration.
+- No Docker or WSL2 requirement for the Windows 8 deliverable.
+- No separate-browser or localhost-browser workaround.
+- No obsolete WebView2, Edge, Electron or embedded browser pinning.
+- No end-of-life Python/runtime presented as maintained.
+- No weakening of TLS, cryptography, password hashing, authentication or package integrity.
+- No merge to main or production deployment as part of feasibility work.
 
-## Confirmed product requirement: native installation on both legacy systems
-
-The product owner has explicitly confirmed that **Windows 8.0 and Windows 8.1 must each receive a directly installable SchoolBridge package**. Browser-only access through another computer is not an acceptable completion of this requirement.
-
-This is a delivery requirement, not a claim that the current stack already supports either OS. The engineering track must continue until each OS has a tested local installation, local database, application startup/recovery, offline operation, upgrade and restore path.
-
-### Native-install architecture work
-
-- Keep the Windows 10/11 Docker-free installer as a separate target; do not regress it.
-- Build a single-computer package that starts SchoolBridge locally and stores its SQLite database on that computer's local disk.
-- For Windows 8.1, validate a pinned maintained Python 3.12 runtime against every direct and transitive dependency, then package the application and frontend without requiring preinstalled Python or Node.js.
-- For Windows 8.0, do not label an EOL CPython runtime as secure or supported. Evaluate a maintained alternative runtime or a deliberately isolated compatibility backend. If that requires a backend portability layer, implement it as a separate workstream rather than silently dropping Windows 8.0.
-- The installer must detect OS version and architecture before making changes, refuse unsupported package combinations, and explain legacy-OS security risk.
-- A Windows 8/8.1 deliverable is not complete merely because its installer opens. Each system must pass the full acceptance matrix on a clean machine, including disconnected installation and operation.
-
-### Delivery gates
-
-1. **Runtime proof:** produce a reproducible runtime/dependency matrix for Windows 8.0 and 8.1, including cryptography, TLS, password hashing, database drivers and offline wheels. No EOL runtime may be presented as security-maintained.
-2. **Local app proof:** run the API, built frontend and SQLite database on the target computer with no Docker, WSL2, external server or internet dependency.
-3. **Lifecycle proof:** demonstrate startup after reboot, process recovery, logs, backup scheduling, safe upgrade and rollback.
-4. **Installer proof:** generate OS-aware offline installers with checksums and preflight checks.
-5. **Machine acceptance:** pass the full clean-machine test suite independently on Windows 8.0 and Windows 8.1 before advertising either as supported.
-
-Until those gates pass, report each OS as **in development / not yet certified**, not as supported. Do not replace this native-install requirement with browser-only access.
-
-
-## Binding product delivery requirements
-
-The following requirements take precedence over earlier exploratory rollout suggestions in this document:
-
-- Windows 8.0 is the starting compatibility target. Windows 8.1 and newer Windows versions must follow; Windows 10/11 must not become the minimum product requirement.
-- The deliverable is an installed desktop application. A local web server that asks staff to open a separate browser is not completion. An embedded rendering component is acceptable only if it is part of the installed desktop application and passes the OS-specific compatibility and security gates.
-- The full installer travels on USB. The USB must contain the application, desktop runtime, backend/runtime dependencies, database setup, migrations, configuration templates, install/uninstall/repair/upgrade tools, integrity manifest and operator documentation. Installation and ordinary operation must not download anything.
-- Offline means usable, not merely cached. The app must launch, authenticate, access the school's local database and perform supported workflows with internet disconnected. The USB is for installation and recovery; the live database belongs on the computer's local disk, not on the removable drive.
-- No Docker Desktop or WSL2 prerequisite for the Windows 8 starting target.
-- No weakening security to force compatibility. Do not silently pin an obsolete browser/runtime, downgrade cryptography or password hashing, or claim an unsupported OS is secure.
-- Preserve newer Windows support. A compatibility implementation for Windows 8 must not regress Windows 10/11 and newer targets.
-
-## Current engineering blockers — explicitly not complete
-
-1. The existing prepare-usb.ps1 packages Docker Desktop + WSL2 images and installers. Its host preparation script rejects Windows 8/8.1.
-2. The current Docker-free package bundles CPython 3.12, FastAPI and SQLite, but the launcher starts Uvicorn and instructs the operator to open a localhost URL in a separate browser. It is not a desktop application.
-3. Python's currently maintained Windows runtime path does not cover Windows 8.0. Python 3.12 supports Windows 8.1, but the OS itself is out of support. A complete dependency and security review is still required.
-4. Electron 22 was the last Electron major to support Windows 8/8.1, and its support ended in 2023. Pinning it is not an acceptable long-term secure desktop-shell solution.
-5. No clean-machine Windows 8 or Windows 8.1 acceptance evidence exists. Hosted Windows Server CI does not prove either target.
-
-## Required next engineering sequence — corrected priority
-
-- **D1 — Reopened runtime and desktop-shell feasibility (NEXT):** evaluate maintained native UI/runtime and backend strategies for Windows 8.0 first. Record exact versions, security-support status, architecture (x86/x64), required OS APIs, TLS/cryptography and dependency compatibility. Prototype on Windows 8.0 before selecting an architecture. Reject options that depend on obsolete browser engines or unsupported runtimes.
-- D2 — Desktop application foundation: create the actual desktop window, secure local API/database lifecycle, startup/shutdown, logs, crash recovery and single-instance behaviour. Do not launch an external browser.
-- D3 — Offline USB build: produce a reproducible USB package containing all required verified components and no online installation dependency. Include install, repair, upgrade, rollback and uninstall paths.
-- D4 — Offline operations: verify first-run setup, authentication, school workflows, persistence, restart, backup and restore with internet disconnected. Keep permission-scoped sync and conflict controls.
-- D5 — OS acceptance: test Windows 8.0, Windows 8.1 and newer Windows versions independently on clean machines. Do not mark an OS supported from static analysis or modern hosted CI alone.
-
-Until D1–D5 pass, the Windows 8 desktop USB product is in development, not certified. Do not substitute browser access, a Docker/WSL2 package or a Windows 10-only installer and call the requirement complete.
+Until D1–D6 pass, both legacy operating systems remain **in development / not certified**.
