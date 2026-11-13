@@ -1,0 +1,57 @@
+name: Legacy Windows native shell proof
+
+on:
+  push:
+    branches:
+      - feature/student-staff-finance
+    paths:
+      - "desktop-legacy-native/**"
+      - ".github/workflows/legacy-native-shell.yml"
+  pull_request:
+    paths:
+      - "desktop-legacy-native/**"
+      - ".github/workflows/legacy-native-shell.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-native-shell:
+    name: Build wxWidgets native shell (compile proof only)
+    runs-on: windows-2022
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install wxWidgets dependency
+        shell: pwsh
+        run: |
+          if (-not $env:VCPKG_ROOT) {
+            throw "VCPKG_ROOT is not available on this runner."
+          }
+          & "$env:VCPKG_ROOT\vcpkg.exe" install wxwidgets:x64-windows
+          if ($LASTEXITCODE -ne 0) {
+            throw "wxWidgets installation failed."
+          }
+
+      - name: Configure
+        shell: pwsh
+        run: |
+          cmake -S desktop-legacy-native -B build/legacy-native -A x64 "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
+
+      - name: Build
+        shell: pwsh
+        run: |
+          cmake --build build/legacy-native --config Release --parallel
+          if ($LASTEXITCODE -ne 0) {
+            throw "Native shell compilation failed."
+          }
+
+      - name: Upload compile-only prototype
+        uses: actions/upload-artifact@v4
+        with:
+          name: SchoolBridge-Legacy-Native-Shell-COMPILE-ONLY
+          path: build/legacy-native/Release/SchoolBridgeLegacyShell.exe
+          if-no-files-found: error
+          retention-days: 7
