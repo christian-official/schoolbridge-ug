@@ -62,20 +62,22 @@ export default function PWAInstallPrompt() {
     setIsAppleMobile(appleMobile)
     setIsAndroid(/android/i.test(navigator.userAgent))
 
-    const handleInstallPrompt = (event: Event) => {
-      event.preventDefault()
+    const handleInstallPrompt = (event?: Event) => {
+      const promptEvent = (event ?? window.schoolBridgeInstallPrompt) as InstallPromptEvent | undefined
+      if (!promptEvent) return
       setInstallError('')
-      setInstallEvent(event as InstallPromptEvent)
+      setInstallEvent(promptEvent)
     }
     const handleInstalled = () => {
       setInstallEvent(null)
       setDismissed(true)
     }
 
-    window.addEventListener('beforeinstallprompt', handleInstallPrompt)
+    window.addEventListener('schoolbridge:install-prompt', handleInstallPrompt)
+    handleInstallPrompt()
     window.addEventListener('appinstalled', handleInstalled)
     return () => {
-      window.removeEventListener('beforeinstallprompt', handleInstallPrompt)
+      window.removeEventListener('schoolbridge:install-prompt', handleInstallPrompt)
       window.removeEventListener('appinstalled', handleInstalled)
     }
   }, [])
@@ -89,9 +91,11 @@ export default function PWAInstallPrompt() {
       await promptEvent.prompt()
       const choice = await promptEvent.userChoice
       setInstallEvent(null)
+      window.schoolBridgeInstallPrompt = undefined
       if (choice.outcome === 'accepted') setDismissed(true)
     } catch {
       setInstallEvent(null)
+      window.schoolBridgeInstallPrompt = undefined
       setInstallError('SchoolBridge could not open the install prompt. Please try again later or continue in your browser.')
     }
   }
