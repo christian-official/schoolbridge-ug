@@ -1,11 +1,11 @@
-# SchoolBridge release-readiness audit
+# Historical SchoolBridge release-readiness snapshot — not the active roadmap
 
 **Audit snapshot:** 2026-11-13  
 **Branch:** `feature/student-staff-finance`  
 **Audited commit before this document:** `539245bc65068faf468f28d20d4d8e60156a5b08`  
 **Status:** Engineering audit recorded; **not approved for production release**.
 
-This document consolidates the evidence and outstanding gates visible in the repository and CI. It is not a substitute for a full school acceptance exercise, security penetration test, or owner release approval.
+This document consolidates evidence and outstanding release gates as a historical snapshot. It is not a substitute for a full school acceptance exercise, security penetration test, or owner release approval. **It does not close or supersede the primary Windows 8.0-first product objective. The previous move toward a final audit was premature. The active next milestone is reopened D1 architecture feasibility for Windows 8.0, followed by Windows 8.1.**
 
 ## Verified engineering evidence
 
@@ -29,7 +29,7 @@ No recorded physical-machine acceptance evidence is present for a currently serv
 
 The installer compatibility floor is not a recommendation to deploy an end-of-support Windows release. Check Microsoft's current lifecycle status for the exact edition and servicing channel at release time.
 
-### 3. Windows 8.0 and 8.1 product requirement
+### 3. Windows 8.0 and 8.1 product requirement — primary objective still open
 
 Both legacy OS versions remain explicit product requirements. The current desktop stack is a no-go for both because its available WebView2 runtime is obsolete; Windows 8.0 also lacks a currently maintained CPython Windows runtime path for this backend. They remain **blocked / not certified**. A separately engineered maintained renderer/backend strategy and independent acceptance on each OS are required. Do not represent the Windows 10/11 installer as satisfying this requirement.
 
@@ -53,5 +53,7 @@ The open product backlog still includes consolidated student lifecycle, staff on
 - [ ] Review the complete test evidence and obtain explicit product-owner approval before merging or deploying.
 
 ## Release decision
+
+**NO-GO for production release at this audit snapshot. This is not the next development milestone.** Resume the Windows 8.0-first architecture feasibility work documented in [Windows 8.0-first architecture options](WINDOWS_8_ARCHITECTURE_OPTIONS.md).
 
 **NO-GO for production release at this audit snapshot.** The successful CI run is valuable automated evidence, but production-key provisioning, real-machine acceptance, legacy Windows delivery, offline completeness, and other product/security gates remain open. Keep work on the feature branch; do not merge or deploy based on CI success alone.
