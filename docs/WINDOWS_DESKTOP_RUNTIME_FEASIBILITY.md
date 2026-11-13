@@ -13,8 +13,9 @@ SchoolBridge must be a directly installable, standalone desktop application that
 - The Windows renderer is Microsoft Edge WebView2.
 - The desktop process starts and supervises the local Python/FastAPI backend.
 - The native backend package currently bundles CPython 3.12 and SQLite.
-- The existing native Windows installer explicitly accepts Windows 10 22H2, Windows 11 23H2+, and the Windows Server 2022 CI runner; it rejects Windows 8 and 8.1.
-- The Tauri bundle is currently disabled in frontend/src-tauri/tauri.conf.json.
+- The current NSIS pre-install hook allows 64-bit Windows 10 22H2 (build 19045+) and Windows 11 23H2+ (build 22631+); it rejects Windows 8, Windows 8.1, and other unlisted Windows versions.
+- GitHub Actions uses a Windows Server 2022 runner to compile and validate the installer, but it does not execute the installer on that runner; the runner is not an accepted installation target.
+- The Tauri bundle is active in frontend/src-tauri/tauri.conf.json and CI builds an NSIS installer with the offline WebView2 installer included. This current bundle remains unsuitable for Windows 8/8.1 because its WebView2 runtime is no longer maintained on those systems.
 
 ## Compatibility findings for the current stack
 
