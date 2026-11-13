@@ -2762,6 +2762,39 @@ def test_desktop_machine_binding_rejects_a_copied_installation(monkeypatch):
         assert moved.status_code == 403
         assert "another computer" in moved.json()["detail"].lower()
 
+
+def test_developer_transfer_is_bound_to_destination_and_single_use(monkeypatch):
+    import base64
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    reset_new_installation()
+    private_key = Ed25519PrivateKey.generate()
+    public_key = private_key.public_key().public_bytes(
+        serialization.Encoding.Raw, serialization.PublicFormat.Raw
+    )
+    monkeypatch.setenv("SCHOOLBRIDGE_LICENSE_PUBLIC_KEY", base64.b64encode(public_key).decode())
+    monkeypatch.setenv("SCHOOLBRIDGE_DATA_DIR", "desktop-transfer-test-data")
+    monkeypatch.setenv("SCHOOLBRIDGE_MACHINE_BINDING_TOKEN", "source-computer-token")
+    with TestClient(app) as client:
+        installation_id = client.get("/api/setup/status").json()["installation_id"]
+        monkeypatch.setenv("SCHOOLBRIDGE_MACHINE_BINDING_TOKEN", "destination-computer-token")
+        status = client.get("/api/setup/status")
+        assert status.status_code == 200
+        assert status.json()["machine_mismatch"] is True
+        destination_hash = hashlib.sha256(
+            b"SchoolBridge-machine-v1:destination-computer-token"
+        ).hexdigest()
+        request = _signed_test_license(installation_id, private_key, {
+            "action": "machine_transfer",
+            "machine_binding_hash": destination_hash,
+        })
+        transferred = client.post("/api/setup/transfer", json={"license": request})
+        assert transferred.status_code == 200, transferred.text
+        assert client.get("/api/setup/status").json()["machine_mismatch"] is False
+        with SessionLocal() as db:
+            assert db.query(models.SchoolMachineTransfer).count() == 1
+
 def test_demo_data_is_disabled_by_default(monkeypatch):
     reset_new_installation()
     monkeypatch.delenv("SCHOOLBRIDGE_SEED_DEMO_DATA", raising=False)
