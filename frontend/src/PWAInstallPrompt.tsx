@@ -9,11 +9,11 @@ type InstallPromptEvent = Event & {
 
 export default function PWAInstallPrompt() {
   const [installEvent, setInstallEvent] = useState<InstallPromptEvent | null>(null)
+  const [installError, setInstallError] = useState('')
   const [isOffline, setIsOffline] = useState(() => !navigator.onLine)
   const [isAppleMobile, setIsAppleMobile] = useState(false)
   const [isAndroid, setIsAndroid] = useState(false)
   const [showAppleSteps, setShowAppleSteps] = useState(false)
-  const [showAndroidSteps, setShowAndroidSteps] = useState(false)
   const [dismissed, setDismissed] = useState(false)
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null)
   const [applyingUpdate, setApplyingUpdate] = useState(false)
@@ -64,6 +64,7 @@ export default function PWAInstallPrompt() {
 
     const handleInstallPrompt = (event: Event) => {
       event.preventDefault()
+      setInstallError('')
       setInstallEvent(event as InstallPromptEvent)
     }
     const handleInstalled = () => {
@@ -80,44 +81,50 @@ export default function PWAInstallPrompt() {
   }, [])
 
   async function install() {
-    if (!installEvent) return
-    await installEvent.prompt()
-    const choice = await installEvent.userChoice
-    setInstallEvent(null)
-    if (choice.outcome === 'accepted') setDismissed(true)
+    const promptEvent = installEvent
+    if (!promptEvent) return
+
+    setInstallError('')
+    try {
+      await promptEvent.prompt()
+      const choice = await promptEvent.userChoice
+      setInstallEvent(null)
+      if (choice.outcome === 'accepted') setDismissed(true)
+    } catch {
+      setInstallEvent(null)
+      setInstallError('SchoolBridge could not open the install prompt. Please try again later or continue in your browser.')
+    }
   }
 
-  const hideInstallCard = (dismissed && !waitingWorker) || (!installEvent && !isAppleMobile && !isAndroid && !waitingWorker)
+  const hideInstallCard = (dismissed && !waitingWorker) ||
+    (!installEvent && !isAppleMobile && !isAndroid && !waitingWorker)
   if (hideInstallCard && !isOffline) return null
 
   return (
     <>
       {isOffline && <div className="pwa-offline-banner" role="status" aria-live="polite"><WifiOff size={17} /><span><strong>You're offline.</strong> SchoolBridge's saved app shell is available. Use a prepared offline workspace for saved records; changes requiring the server need a connection.</span></div>}
       {!hideInstallCard && <aside className="pwa-install-card" aria-label="Install SchoolBridge">
-      <div className="pwa-install-icon"><Download size={19} /></div>
-      <div className="pwa-install-copy">
-        {waitingWorker ? <><strong>SchoolBridge update ready</strong><span>Refresh the app to use the latest version.</span></> : <><strong>Use SchoolBridge like an app</strong><span>{isAppleMobile ? 'Add a SchoolBridge icon to your iPhone or iPad.' : 'Install SchoolBridge on this device for quick access.'}</span></>}
-        {showAppleSteps && isAppleMobile && (
-          <span className="pwa-apple-steps">In Safari, tap <Share size={14} aria-label="Share" /> Share, then choose <strong>Add to Home Screen</strong>.</span>
-        )}
-        {showAndroidSteps && isAndroid && !installEvent && (
-          <span className="pwa-android-steps">In Chrome, open the <strong>⋮ menu</strong>, then choose <strong>Install app</strong> or <strong>Add to Home screen</strong>. If neither appears, check Chrome's menu again after the page finishes loading.</span>
-        )}
-      </div>
-      {waitingWorker ? (
-        <button type="button" className="pwa-install-action" onClick={applyUpdate} disabled={applyingUpdate}>{applyingUpdate ? 'Updating…' : 'Update now'}</button>
-      ) : installEvent ? (
-        <button type="button" className="pwa-install-action" onClick={() => void install()}>Install</button>
-      ) : isAndroid ? (
-        <button type="button" className="pwa-install-action" onClick={() => setShowAndroidSteps(value => !value)}>
-          {showAndroidSteps ? 'Hide steps' : 'How to install'}
-        </button>
-      ) : (
-        <button type="button" className="pwa-install-action" onClick={() => setShowAppleSteps(value => !value)}>
-          {showAppleSteps ? 'Hide steps' : 'How to add'}
-        </button>
-      )}
-      <button type="button" className="pwa-dismiss" aria-label="Dismiss install suggestion" onClick={() => setDismissed(true)}><X size={17} /></button>
+        <div className="pwa-install-icon"><Download size={19} /></div>
+        <div className="pwa-install-copy">
+          {waitingWorker ? <><strong>SchoolBridge update ready</strong><span>Refresh the app to use the latest version.</span></> :
+            isAppleMobile ? <><strong>Add SchoolBridge to your Home Screen</strong><span>Install from Safari to open SchoolBridge like an app.</span></> :
+              installEvent ? <><strong>Install SchoolBridge</strong><span>Add the app to your device for quick access.</span></> :
+                <><strong>SchoolBridge is ready to use</strong><span>{isAndroid ? 'Direct installation is not currently available in this browser. You can keep using SchoolBridge here.' : 'You can keep using SchoolBridge in this browser.'}</span></>}
+          {showAppleSteps && isAppleMobile && (
+            <span className="pwa-apple-steps">In Safari, tap <Share size={14} aria-label="Share" /> Share, then choose <strong>Add to Home Screen</strong>.</span>
+          )}
+          {installError && <span className="pwa-install-error" role="status">{installError}</span>}
+        </div>
+        {waitingWorker ? (
+          <button type="button" className="pwa-install-action" onClick={applyUpdate} disabled={applyingUpdate}>{applyingUpdate ? 'Updating…' : 'Update now'}</button>
+        ) : installEvent ? (
+          <button type="button" className="pwa-install-action" onClick={() => void install()}>Install</button>
+        ) : isAppleMobile ? (
+          <button type="button" className="pwa-install-action" onClick={() => setShowAppleSteps(value => !value)}>
+            {showAppleSteps ? 'Hide steps' : 'Add to Home Screen'}
+          </button>
+        ) : null}
+        <button type="button" className="pwa-dismiss" aria-label="Dismiss install suggestion" onClick={() => setDismissed(true)}><X size={17} /></button>
       </aside>}
     </>
   )
