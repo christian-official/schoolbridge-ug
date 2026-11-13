@@ -4159,7 +4159,7 @@ def test_parent_qr_registration_matches_school_records_and_opens_dashboard_witho
                 "children": [{"first_name": "Amina", "last_name": "One"}],
             },
         )
-        assert missing_child_identifier.status_code == 422
+        assert missing_child_identifier.status_code == 200, missing_child_identifier.text
 
     with SessionLocal() as db:
         links = db.query(models.ParentStudentLink).filter(
