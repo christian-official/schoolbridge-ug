@@ -18,7 +18,7 @@ test('device management resolves the public school identity in the signed-in adm
 
 test('school QR printing isolates the print sheet from the dashboard', async () => {
   const styles = await readFile(new URL('../src/App.css', import.meta.url), 'utf8')
-  assert.match(syncDevices, /querySelector<HTMLElement>\('\.school-access-qr-print'\)/)
+  assert.match(syncDevices, /querySelector<HTMLElement>\('\.school-access-qr-print\[data-audience="' \+ audience/)
   assert.match(syncDevices, /document\.body\.appendChild\(printSheet\)/)
   assert.match(syncDevices, /originalParent\.insertBefore\(printSheet, originalNextSibling\)/)
   assert.match(styles, /html body\[data-schoolbridge-print="school-qr"\] > \*/)
