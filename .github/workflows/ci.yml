@@ -475,6 +475,29 @@ jobs:
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
+      - name: Validate desktop Windows compatibility preflight
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $config = Get-Content "frontend/src-tauri/tauri.conf.json" -Raw | ConvertFrom-Json
+          if ($config.bundle.windows.nsis.installerHooks -ne "./windows/installer-hooks.nsh") {
+            throw "The NSIS installer is not wired to the Windows compatibility preflight."
+          }
+          $hook = Get-Content "frontend/src-tauri/windows/installer-hooks.nsh" -Raw
+          foreach ($required in @(
+            "NSIS_HOOK_PREINSTALL",
+            "RunningX64",
+            "Windows 10",
+            "19045",
+            "Windows 11",
+            "22631",
+            "Windows 8 and 8.1"
+          )) {
+            if ($hook -notmatch [regex]::Escape($required)) {
+              throw "Desktop Windows compatibility preflight is missing: $required"
+            }
+          }
+          Write-Host "Desktop installer OS and architecture preflight is configured."
       - name: Parse PowerShell scripts and verify official runtime signatures
         shell: pwsh
         env:
