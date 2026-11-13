@@ -2762,6 +2762,10 @@ def test_desktop_machine_binding_rejects_a_copied_installation(monkeypatch):
         moved = client.get("/api/setup/status")
         assert moved.status_code == 403
         assert "another computer" in moved.json()["detail"].lower()
+        monkeypatch.delenv("SCHOOLBRIDGE_MACHINE_BINDING_TOKEN", raising=False)
+        missing = client.get("/api/setup/status")
+        assert missing.status_code == 403
+        assert "identity" in missing.json()["detail"].lower()
 
 
 def test_developer_transfer_is_bound_to_destination_and_single_use(monkeypatch):
