@@ -144,6 +144,14 @@ test('real Chromium completes the first-install owner activation and school setu
         identity_locked: false,
       }),
     }))
+    await page.route('**/api/setup/challenge', route => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        challenge_id: 'browser-test-challenge',
+        options: ['1234567890A', '9988776655B', '8877665544C', '7766554433D', '6655443322E'],
+      }),
+    }))
     await page.route('**/api/setup/activate', async route => {
       activationPayload = route.request().postDataJSON()
       installationActivated = true
@@ -172,17 +180,19 @@ test('real Chromium completes the first-install owner activation and school setu
     })
 
     await page.goto(baseUrl)
-    await page.getByRole('heading', { name: 'Activate this installation' }).waitFor()
+    await page.getByRole('heading', { name: 'Verify owner authorisation' }).waitFor()
     assert.equal(await page.getByText(installationId).count(), 1)
     await page.setViewportSize({ width: 360, height: 800 })
     const activationLayout = await page.evaluate(() => ({ viewport: innerWidth, document: document.documentElement.scrollWidth }))
     assert.ok(activationLayout.document <= activationLayout.viewport, `activation page must fit mobile viewport: ${JSON.stringify(activationLayout)}`)
     await page.setViewportSize({ width: 1280, height: 900 })
-    await page.getByLabel('CHRISTIAN Owner Key activation code').fill('signed-owner-license-token')
-    await page.getByRole('button', { name: 'Activate installation' }).click()
+    await page.getByRole('radio').nth(0).check()
+    await page.getByRole('button', { name: 'Confirm selection' }).click()
     await page.getByRole('heading', { name: 'Set up your school' }).waitFor()
-    assert.deepEqual(activationPayload, { license: 'signed-owner-license-token' })
-    assert.equal(await page.getByLabel('Confirm CHRISTIAN Owner Key activation code').inputValue(), 'signed-owner-license-token')
+    assert.deepEqual(activationPayload, {
+      challenge_id: 'browser-test-challenge',
+      selected_option: '1234567890A',
+    })
     await page.setViewportSize({ width: 360, height: 800 })
     const schoolSetupLayout = await page.evaluate(() => ({ viewport: innerWidth, document: document.documentElement.scrollWidth }))
     assert.ok(schoolSetupLayout.document <= schoolSetupLayout.viewport, `school setup page must fit mobile viewport: ${JSON.stringify(schoolSetupLayout)}`)
@@ -197,16 +207,12 @@ test('real Chromium completes the first-install owner activation and school setu
     await page.getByLabel('Private password *').fill('LongTestPassword123!')
     await page.reload({ waitUntil: 'networkidle' })
     await page.getByRole('heading', { name: 'Set up your school' }).waitFor()
-    assert.equal(await page.getByLabel('Confirm CHRISTIAN Owner Key activation code').inputValue(), '')
     assert.equal(await page.getByLabel('Official school name *').inputValue(), 'River Valley School')
     assert.equal(await page.getByLabel('Country *').inputValue(), 'Uganda')
     assert.equal(await page.getByLabel('Administrator username *').inputValue(), '')
     assert.equal(await page.getByLabel('Administrator email *').inputValue(), '')
     assert.equal(await page.getByLabel('Private password *').inputValue(), '')
-    const setupDraft = await page.evaluate(() => Object.values(sessionStorage).join(' '))
-    assert.ok(!setupDraft.includes('signed-owner-license-token'))
     assert.ok(!setupDraft.includes('LongTestPassword123!'))
-    await page.getByLabel('Confirm CHRISTIAN Owner Key activation code').fill('signed-owner-license-token')
     await page.getByLabel('Administrator username *').fill('first-admin')
     await page.getByLabel('Administrator email *').fill('admin@example.invalid')
     await page.getByLabel('Private password *').fill('LongTestPassword123!')
