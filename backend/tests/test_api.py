@@ -2642,6 +2642,10 @@ def test_first_install_requires_one_choice_and_creates_admin_atomically(monkeypa
         assert len(payload["options"]) == 5
         assert sum("123456" in option for option in payload["options"]) == 1
         assert len({len(option) for option in payload["options"]}) == 1
+        for option in payload["options"]:
+            assert sum(character.isdigit() for character in option) == 36
+            assert sum(character.isalpha() for character in option) == 13
+            assert sum(not character.isalnum() for character in option) == 3
         correct_option = next(option for option in payload["options"] if "123456" in option)
 
         activated = client.post("/api/setup/activate", json={
@@ -2738,6 +2742,25 @@ def test_wrong_owner_choice_permanently_declines_installation(monkeypatch):
         status = client.get("/api/setup/status")
         assert status.json()["activation_declined"] is True
 
+
+
+def test_desktop_machine_binding_rejects_a_copied_installation(monkeypatch):
+    reset_new_installation()
+    monkeypatch.setenv("SCHOOLBRIDGE_DATA_DIR", "desktop-test-data")
+    monkeypatch.setenv("SCHOOLBRIDGE_MACHINE_BINDING_TOKEN", "first-computer-protected-token")
+    with TestClient(app) as client:
+        first = client.get("/api/setup/status")
+        assert first.status_code == 200, first.text
+        with SessionLocal() as db:
+            state = db.get(models.SchoolSetupState, 1)
+            original_binding = state.machine_binding_hash
+            assert original_binding
+
+        # A copied database presented by another desktop credential must fail closed.
+        monkeypatch.setenv("SCHOOLBRIDGE_MACHINE_BINDING_TOKEN", "different-computer-protected-token")
+        moved = client.get("/api/setup/status")
+        assert moved.status_code == 403
+        assert "another computer" in moved.json()["detail"].lower()
 
 def test_demo_data_is_disabled_by_default(monkeypatch):
     reset_new_installation()
