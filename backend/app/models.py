@@ -539,6 +539,7 @@ class SchoolSetupState(Base):
     activation_challenge_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     activation_challenge_options_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     activation_correct_option_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    machine_binding_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     setup_completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     original_identity_json: Mapped[str | None] = mapped_column(Text, nullable=True)
 
