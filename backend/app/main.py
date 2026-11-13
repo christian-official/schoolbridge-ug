@@ -2541,7 +2541,11 @@ def school_setup_status(school: str | None = Query(default=None, min_length=36, 
 
 
 @app.post("/api/setup/challenge", tags=["First-time Setup"])
-def create_school_activation_challenge(db: Session = Depends(get_db)):
+def create_school_activation_challenge(
+    school: str | None = Query(default=None, min_length=36, max_length=36),
+    db: Session = Depends(get_db),
+):
+    resolve_school_tenant(db, school)
     state = get_or_create_setup_state(db)
     if state.activated_at:
         raise HTTPException(409, "This SchoolBridge installation has already been activated.")
