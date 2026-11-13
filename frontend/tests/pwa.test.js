@@ -33,7 +33,11 @@ test('document declares mobile and Apple home-screen metadata', () => {
 
 test('production entry registers the service worker and exposes install guidance', () => {
   assert.match(entry, /serviceWorker\.register\('\/service-worker\.js'\)/)
-  assert.match(installUi, /beforeinstallprompt/)
+  // The browser event is captured in the production entry before React mounts;
+  // the prompt UI consumes the forwarded event through the shared window property.
+  assert.match(entry, /beforeinstallprompt/)
+  assert.match(entry, /event\.preventDefault\(\)/)
+  assert.match(entry, /schoolBridgeInstallPrompt/)
   assert.match(installUi, /Add to Home Screen/)
   assert.match(entry, /schoolbridge:pwa-update/)
   assert.match(installUi, /Update now/)
@@ -95,10 +99,10 @@ test('offline passphrases, cached record snapshots and offline marks drafts are 
 })
 
 test('Android uses the native install prompt when available and never promises a forced install', () => {
-  assert.match(installUi, /beforeinstallprompt/)
+  assert.match(entry, /beforeinstallprompt/)
+  assert.match(entry, /schoolBridgeInstallPrompt/)
   assert.match(installUi, /promptEvent\.prompt\(\)/)
   assert.match(installUi, /This browser has not provided an install prompt/)
-  assert.match(installUi, /beforeinstallprompt/)
 })
 
 test('iOS explains the Safari Home Screen flow because iOS does not expose a web install prompt', () => {
