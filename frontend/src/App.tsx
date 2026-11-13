@@ -1576,7 +1576,8 @@ function App() {
               </button>
             </form>
             <button type="button" className="recovery-link" onClick={()=>{setShowRecovery(true);setLoginError('')}}>Forgot your password?</button>
-            <a className="desktop-download-link" href="https://github.com/christian-official/schoolbridge-ug/releases/latest" target="_blank" rel="noreferrer">Download SchoolBridge for Windows</a>
+            {!isTauriDesktop && <a className="desktop-download-link" href="https://github.com/christian-official/schoolbridge-ug/releases/latest" target="_blank" rel="noreferrer">Download SchoolBridge for Windows</a>}
+            {isTauriDesktop && <p className="form-hint">This desktop app is for administrators and authorised essential non-teaching staff. Parents and teachers should use their school's separate QR access page in a browser.</p>}
 
             <p className="login-foot"><ShieldCheck size={15} /> Secure school access</p>
           </>}
