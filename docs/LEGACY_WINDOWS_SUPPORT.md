@@ -79,9 +79,9 @@ These facts narrow the feasible deployment options and supersede any assumption 
 - Windows 8.1 can technically run a currently security-maintained CPython 3.12 runtime, but that does not make the Windows 8.1 operating system secure or supported. A native host prototype still requires an explicit risk decision and real-machine validation.
 - Microsoft Edge 109 was the final Edge release for Windows 8/8.1 and is no longer maintained. No external browser is accepted as the SchoolBridge desktop shell. The eventual desktop package must provide its own supported rendering/runtime layer (or a fully native UI) and prove compatibility on each target OS; an ordinary browser smoke test is not desktop acceptance.
 
-## D1 runtime feasibility decision
+## D1 runtime feasibility decision — REOPENED
 
-See [Windows desktop runtime feasibility](WINDOWS_DESKTOP_RUNTIME_FEASIBILITY.md). The current Tauri 2/WebView2 stack is a no-go for Windows 8.0 and 8.1 because the available WebView2 runtime for those systems is frozen at version 109 and no longer receives security updates. Windows 8.0 also has no supported CPython 3.12 runtime. Keep both legacy OS targets blocked / not certified; do not bypass OS checks or ship obsolete browser/runtime components. Continue supported-Windows desktop packaging separately without treating it as completion of the legacy requirement.
+See [Windows desktop runtime feasibility](WINDOWS_DESKTOP_RUNTIME_FEASIBILITY.md). The current Tauri 2/WebView2 stack is a no-go for Windows 8.0 and 8.1 because the available WebView2 runtime is frozen at version 109 and no longer receives security updates. Windows 8.0 also has no supported CPython 3.12 runtime. **That rules out the current architecture, not the Windows 8 product requirement.** The previous instruction to continue supported-Windows desktop packaging as the next milestone is superseded. D1 must now be reopened to identify and prototype a genuinely viable architecture, starting with Windows 8.0. Keep the current installer's fail-closed check as a temporary safety measure until a replacement has been proven; do not mistake it for task completion.
 
 ## Confirmed product requirement: native installation on both legacy systems
 
@@ -129,9 +129,9 @@ The following requirements take precedence over earlier exploratory rollout sugg
 4. Electron 22 was the last Electron major to support Windows 8/8.1, and its support ended in 2023. Pinning it is not an acceptable long-term secure desktop-shell solution.
 5. No clean-machine Windows 8 or Windows 8.1 acceptance evidence exists. Hosted Windows Server CI does not prove either target.
 
-## Required next engineering sequence
+## Required next engineering sequence — corrected priority
 
-- D1 — Runtime and desktop-shell feasibility: evaluate a maintained, genuinely Windows 8-compatible desktop UI/runtime and backend strategy. Record exact versions, security-support status, architecture (x86/x64), required OS APIs and dependency compatibility. Reject options that depend on obsolete browser engines or unsupported runtimes.
+- **D1 — Reopened runtime and desktop-shell feasibility (NEXT):** evaluate maintained native UI/runtime and backend strategies for Windows 8.0 first. Record exact versions, security-support status, architecture (x86/x64), required OS APIs, TLS/cryptography and dependency compatibility. Prototype on Windows 8.0 before selecting an architecture. Reject options that depend on obsolete browser engines or unsupported runtimes.
 - D2 — Desktop application foundation: create the actual desktop window, secure local API/database lifecycle, startup/shutdown, logs, crash recovery and single-instance behaviour. Do not launch an external browser.
 - D3 — Offline USB build: produce a reproducible USB package containing all required verified components and no online installation dependency. Include install, repair, upgrade, rollback and uninstall paths.
 - D4 — Offline operations: verify first-run setup, authentication, school workflows, persistence, restart, backup and restore with internet disconnected. Keep permission-scoped sync and conflict controls.
