@@ -136,8 +136,8 @@ export default function SyncDevices({ token, userId, schoolId, isAdmin }: Props)
   return <section className="panel settings-panel sync-devices-panel">
     <div className="panel-heading"><div><h2>Registered devices</h2><p>Review browsers and computers registered to your SchoolBridge account.</p></div><button className="secondary-button" type="button" onClick={() => void load()} disabled={loading || busy}>Refresh</button></div>
     {isAdmin && !isTauriDesktop && <section className="offline-record-tools school-access-qr">
-      <h3>Separate parent and teacher access QR codes</h3>
-      <p className="muted">Each QR opens the correct registration page directly. Staff use the school webpage to sign in and download the desktop app.</p>
+      <h3>School mobile access QR codes</h3>
+      <p className="muted">Separate parent and teacher QR codes each open the correct registration page directly. Staff use the school webpage to sign in and download the desktop app.</p>
       {qrUnavailableReason ? <p className="form-hint">{qrUnavailableReason}</p> : parentQrUrl && teacherQrUrl ? <div className="school-access-qr-grid">
         {([{label:'Parent access',url:parentQrUrl,link:parentAccessUrl},{label:'Teacher access',url:teacherQrUrl,link:teacherAccessUrl}] as const).map(item => <div className="school-access-qr-item" key={item.label}>
           <div className="school-access-qr-print" data-audience={item.label === 'Parent access' ? 'parent' : 'teacher'}>
