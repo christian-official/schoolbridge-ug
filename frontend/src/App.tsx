@@ -939,6 +939,7 @@ function App() {
   const [password, setPassword] = useState('')
   const [loginError, setLoginError] = useState('')
   const [showRecovery, setShowRecovery] = useState(false)
+  const [showDesktopStaffLogin, setShowDesktopStaffLogin] = useState(false)
   // School QR links carry an explicit audience so parents and teachers land on
   // their own registration page. A plain school URL is the staff access webpage.
   const schoolQuery = new URLSearchParams(window.location.search)
@@ -1561,25 +1562,38 @@ function App() {
           <div className="brand-name">School<span>Bridge</span></div>
           <p className="login-subtitle">Your school's operations, connected.</p>
           {showSchoolLanding && selectedSchoolId ? qrSchoolError ? <><h1>School page unavailable</h1><p className="error" role="alert">{qrSchoolError}</p><p className="form-hint">Check the school link or contact the school administrator.</p></> : qrSchoolName ? <SchoolAccessLanding schoolId={selectedSchoolId} schoolName={qrSchoolName}/> : <p className="muted">Verifying the school webpage…</p> : showRecovery ? <PasswordRecovery schoolId={selectedSchoolId} onBack={()=>setShowRecovery(false)}/> : showRegistration && selectedSchoolId ? qrSchoolError ? <><h1>School QR verification needed</h1><p className="error" role="alert">{qrSchoolError}</p><p className="form-hint">Scan your school's official QR code again, then verify your existing details to reopen your account.</p><button type="button" className="secondary-button" onClick={()=>window.location.reload()}>Try again</button></> : qrSchoolName ? <RegistrationFlow schoolId={selectedSchoolId} schoolName={qrSchoolName} audience={schoolAudience as 'parent'|'teacher'} apiBaseUrl={API_BASE_URL} onAuthenticated={async accessToken=>{await storeSessionToken(accessToken);setToken(accessToken);setPassword('');setLoginError('')}}/> : <p className="muted">Verifying your school's QR access…</p> : <>
-            <h1>Welcome back</h1>
-            <p className="muted">Sign in to your school workspace.</p>
-            
-            {!selectedSchoolId && <p className="form-hint">If your school uses shared online access, open its official SchoolBridge QR code first.</p>}
-            <form onSubmit={login}>
-              <label htmlFor="username">Username</label>
-              <input id="username" value={username} onChange={e => setUsername(e.target.value)} placeholder="Enter your username" required />
-              <label htmlFor="password">Password</label>
-              <input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter your password" autoComplete="current-password" required />
-              {loginError && <p className="error">{loginError}</p>}
-              <button className="primary-button login-button" disabled={loading || Boolean(qrSchoolError) || (Boolean(selectedSchoolId) && !qrSchoolName)}>
-                {loading ? <><LoaderCircle className="spin" size={18} /> Signing in...</> : 'Sign in'}
-              </button>
-            </form>
-            <button type="button" className="recovery-link" onClick={()=>{setShowRecovery(true);setLoginError('')}}>Forgot your password?</button>
-            {!isTauriDesktop && <a className="desktop-download-link" href="https://github.com/christian-official/schoolbridge-ug/releases/latest" target="_blank" rel="noreferrer">Download SchoolBridge for Windows</a>}
-            {isTauriDesktop && <p className="form-hint">This desktop app is for administrators and authorised essential non-teaching staff. Parents and teachers should use their school's separate QR access page in a browser.</p>}
-
-            <p className="login-foot"><ShieldCheck size={15} /> Secure school access</p>
+            {isTauriDesktop && !showDesktopStaffLogin ? <>
+              <h1>Who is using SchoolBridge?</h1>
+              <p className="muted">This installed desktop application is for school administrators and authorised essential non-teaching staff.</p>
+              <div className="school-access-actions">
+                <button type="button" className="primary-button" onClick={() => setShowDesktopStaffLogin(true)}>Administrator / school staff</button>
+              </div>
+              <section className="desktop-parent-guidance">
+                <h2>Parent access</h2>
+                <p>Parents do not have desktop-app usernames or passwords. Your parent account works through your school's website and parent QR access page.</p>
+                <p>If you already signed in as a parent on the website, return to that browser tab. Your parent session is there; this installed staff application cannot use or transfer that browser session.</p>
+                <p className="form-hint">You do not need to install this desktop application to use your parent account.</p>
+              </section>
+              <p className="login-foot"><ShieldCheck size={15} /> Secure school access</p>
+            </> : <>
+              <h1>Welcome back</h1>
+              <p className="muted">Sign in to your school workspace.</p>
+              {!selectedSchoolId && <p className="form-hint">If your school uses shared online access, open its official SchoolBridge QR code first.</p>}
+              <form onSubmit={login}>
+                <label htmlFor="username">Username</label>
+                <input id="username" value={username} onChange={e => setUsername(e.target.value)} placeholder="Enter your username" required />
+                <label htmlFor="password">Password</label>
+                <input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter your password" autoComplete="current-password" required />
+                {loginError && <p className="error">{loginError}</p>}
+                <button className="primary-button login-button" disabled={loading || Boolean(qrSchoolError) || (Boolean(selectedSchoolId) && !qrSchoolName)}>
+                  {loading ? <><LoaderCircle className="spin" size={18} /> Signing in...</> : 'Sign in'}
+                </button>
+              </form>
+              <button type="button" className="recovery-link" onClick={()=>{setShowRecovery(true);setLoginError('')}}>Forgot your password?</button>
+              {isTauriDesktop && <button type="button" className="recovery-link" onClick={() => setShowDesktopStaffLogin(false)}>Back to role selection</button>}
+              {!isTauriDesktop && <a className="desktop-download-link" href="https://github.com/christian-official/schoolbridge-ug/releases/latest" target="_blank" rel="noreferrer">Download SchoolBridge for Windows</a>}
+              <p className="login-foot"><ShieldCheck size={15} /> Secure school access</p>
+            </>}
           </>}
         </section>
       </main>
