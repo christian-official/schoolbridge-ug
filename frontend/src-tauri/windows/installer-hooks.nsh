@@ -13,22 +13,20 @@
   StrCpy $2 $0 10
 
   ${If} $2 == "Windows 10"
-    ${If} $1 < 16299
-      ; Microsoft explicitly lists Windows 10 Enterprise 2015/2016 LTSC
-      ; as WebView2-supported exceptions below the 1709 build floor.
-      ${If} $3 == "EnterpriseS"
-        ${If} $1 == 10240
-          ; Windows 10 Enterprise 2015 LTSB
-        ${ElseIf} $1 == 14393
-          ; Windows 10 Enterprise 2016 LTSB
-        ${Else}
-          MessageBox MB_ICONSTOP|MB_OK "This Windows 10 build is below the SchoolBridge minimum. Windows 10 version 1709 (build 16299) or newer is required, except supported Enterprise LTSC 2015/2016 editions. No files have been installed."
-          Abort
-        ${EndIf}
-      ${Else}
-        MessageBox MB_ICONSTOP|MB_OK "SchoolBridge requires Windows 10 version 1709 (build 16299) or newer. Supported Enterprise LTSC 2015/2016 editions are also accepted. No files have been installed."
-        Abort
+    StrCpy $4 "0"
+    ${If} $1 >= 16299
+      StrCpy $4 "1"
+    ${ElseIf} $3 == "EnterpriseS"
+      ; Microsoft lists Windows 10 Enterprise 2015/2016 LTSB as WebView2-supported exceptions.
+      ${If} $1 == 10240
+        StrCpy $4 "1"
+      ${ElseIf} $1 == 14393
+        StrCpy $4 "1"
       ${EndIf}
+    ${EndIf}
+    ${If} $4 != "1"
+      MessageBox MB_ICONSTOP|MB_OK "SchoolBridge requires Windows 10 version 1709 (build 16299) or newer, except supported Enterprise 2015/2016 LTSB editions. No files have been installed."
+      Abort
     ${EndIf}
   ${ElseIf} $2 == "Windows 11"
     ${If} $1 < 22000
@@ -36,7 +34,7 @@
       Abort
     ${EndIf}
   ${Else}
-    MessageBox MB_ICONSTOP|MB_OK "This SchoolBridge desktop package supports 64-bit Windows 10 version 1709 or newer (plus Enterprise LTSC 2015/2016), and Windows 11. No files have been installed."
+    MessageBox MB_ICONSTOP|MB_OK "This SchoolBridge desktop package supports 64-bit Windows 10 version 1709 or newer (plus Enterprise 2015/2016 LTSB), and Windows 11. No files have been installed."
     Abort
   ${EndIf}
 !macroend
