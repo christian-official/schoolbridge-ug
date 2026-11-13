@@ -2462,6 +2462,8 @@ def enforce_setup_machine_binding(db: Session, state, bind_if_missing: bool = Fa
     """Reject copied desktop databases when the Windows credential is absent or differs."""
     fingerprint = machine_binding_fingerprint()
     desktop_mode = bool(os.getenv("SCHOOLBRIDGE_DATA_DIR"))
+    if state.machine_binding_hash and fingerprint is None:
+        raise HTTPException(403, "The protected computer identity for this installation is missing. Developer-authorised transfer is required.")
     if desktop_mode and fingerprint is None:
         raise HTTPException(503, "The protected SchoolBridge computer identity is unavailable. Reinstall or contact the developer.")
     if fingerprint is None:
