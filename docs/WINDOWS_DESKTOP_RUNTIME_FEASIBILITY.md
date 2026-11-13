@@ -1,7 +1,7 @@
 # Windows desktop runtime feasibility — Task 1.11 / D1
 
 **Assessment date:** 2026-11-12
-**Status:** D1 assessed; legacy Windows 8/8.1 desktop runtime is blocked pending a viable maintained runtime. This is an engineering decision record, not a compatibility certification.
+**Status:** D1 REOPENED. The existing Tauri 2/WebView2 architecture is rejected for Windows 8.0/8.1, but the product requirement remains active. The next task is to identify and prototype a viable maintained alternative, with Windows 8.0 first. This is an engineering decision record, not a compatibility certification.
 
 ## Existing implementation inspected
 
@@ -26,7 +26,7 @@ Sources checked:
 - Microsoft WebView2 supported Windows versions: https://learn.microsoft.com/en-us/microsoft-edge/webview2
 - Microsoft announcement that WebView2 109 was the final release for Windows 8/8.1: https://github.com/MicrosoftEdge/WebView2Announcements/issues/53
 
-## Decision
+## Decision about the CURRENT STACK (not the product objective)
 
 1. Do not ship or certify the current Tauri 2/WebView2 desktop shell on Windows 8 or 8.1. The available WebView2 runtime for those systems is frozen at version 109 and no longer receives security updates. Pinning it would create a known-obsolete browser engine in a school management application.
 2. Do not use an end-of-life Python runtime on Windows 8.0 to make the current FastAPI backend appear compatible. Do not weaken TLS, cryptography, password hashing, authentication, or package-integrity checks.
