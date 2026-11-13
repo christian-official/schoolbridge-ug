@@ -13,7 +13,7 @@ Passwords are reserved for administrator accounts and explicitly selected essent
 1. A parent scans the school's QR code.
 2. The QR opens the school's registration page directly and displays the verified school identity.
 3. The parent enters their full name and relationship to the child or children.
-4. For each child, the parent enters the child's first and last names and either the admission number or date of birth. Class is an optional additional check. A parent can submit up to ten children in one registration.
+4. For each child, the parent enters the child's first and last names. Date of birth and class are optional supporting checks; an admission number is never required. A parent can submit up to ten children in one registration.
 5. SchoolBridge searches only active student and guardian records belonging to the QR-selected school. The parent's name and relationship must match the recorded guardian information, and each child must resolve to exactly one active student record.
 6. If every submitted relationship is verified, SchoolBridge creates or resumes the parent's account, links the verified children, issues a secure session and opens the parent dashboard.
 7. The parent does not create a username or password, enter a phone number, wait for a text message, visit the school, or wait for an administrator to approve the registration.
@@ -28,7 +28,7 @@ If a child's identity is ambiguous, the student record is not found, or the guar
 4. On a unique match, SchoolBridge creates or resumes the teacher account, associates it with the verified staff record, issues a secure session and opens the teacher dashboard.
 5. The teacher does not receive a temporary password or need an administrator to create or approve a login.
 
-A teacher profile is entered into the Staff directory without creating a login. The directory generates the staff number, which the school shares with the teacher together with the reusable school QR code. The teacher activates access independently by matching those details.
+A teacher profile is entered into the Staff directory without creating a login. The directory generates the staff number, which an administrator can correct later from the staff profile. The school shares the current staff number with the teacher together with the reusable school QR code. The teacher activates access independently by matching those details.
 
 ## Password and account rules
 
@@ -53,7 +53,7 @@ A teacher profile is entered into the Staff directory without creating a login. 
 - Parent matching uses the child's exact first and last names plus an admission number or date of birth, and the parent's exact recorded name and relationship.
 - Teacher matching uses the exact recorded first and last names and staff number, and requires an active teaching staff record.
 - Multiple possible student or staff matches fail closed. SchoolBridge never guesses which record to link.
-- Matching never searches another school or returns candidate student/staff records to an unauthenticated applicant.
+- Parent matching uses the child's exact first and last names plus the parent's exact recorded guardian name and relationship; date of birth and class are optional supporting checks. Admission numbers are not required.\n- Matching never searches another school or returns candidate student/staff records to an unauthenticated applicant.
 - Registration attempts are rate-limited per school and client connection. Attempt identifiers are HMAC-hashed in the audit log.
 - Account creation and parent-child linking occur in one database transaction. Repeating the same verified registration resumes the existing account rather than creating a duplicate for the same identity and child set.
 - Existing teacher accounts are resumed by their linked staff record; legacy forced-password-change state is cleared when the teacher successfully activates through QR.
