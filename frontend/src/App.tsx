@@ -936,6 +936,11 @@ function getSelectedSchoolId(): string {
   catch { return '' }
 }
 
+function hasStoredBrowserSession(): boolean {
+  try { return Boolean(localStorage.getItem('sb_token') || sessionStorage.getItem('sb_token')) }
+  catch { return false }
+}
+
 function getSchoolAudience(): string {
   if (typeof window === 'undefined') return ''
   const fromUrl = new URLSearchParams(window.location.search).get('audience') || ''
@@ -960,7 +965,7 @@ function App() {
   // is deliberately blocked in an ordinary browser and only shown standalone.
   const schoolQuery = new URLSearchParams(window.location.search)
   const schoolAudience = getSchoolAudience()
-  const [showRegistration, setShowRegistration] = useState(() => isStandalonePwa && ['parent','teacher'].includes(getSchoolAudience()))
+  const [showRegistration, setShowRegistration] = useState(() => isStandalonePwa && ['parent','teacher'].includes(getSchoolAudience()) && !hasStoredBrowserSession())
   const showSchoolLanding = Boolean(schoolQuery.get('school') && !schoolAudience)
   const [loading, setLoading] = useState(false)
   const [sessionRestoring, setSessionRestoring] = useState(true)
@@ -971,8 +976,10 @@ function App() {
     const passwordlessRole = user?.role === 'parent' || user?.role === 'teacher'
     const schoolIdForReturn = selectedSchoolId || user?.school_id || ''
     if (passwordlessRole && schoolIdForReturn) {
-      try { localStorage.setItem('schoolbridge-selected-school-id', schoolIdForReturn) }
-      catch { /* The user can scan the school QR code again if browser storage is unavailable. */ }
+      try {
+        localStorage.setItem('schoolbridge-selected-school-id', schoolIdForReturn)
+        localStorage.setItem('schoolbridge-selected-audience', user?.role || '')
+      } catch { /* The user can scan the school QR code again if browser storage is unavailable. */ }
     }
     await clearStoredSessionToken()
     setToken('')
@@ -1564,7 +1571,7 @@ function App() {
     if (setupStatus.loading) return <main className="login-page"><section className="login-card"><div className="brand-name">School<span>Bridge</span></div><p className="muted">Verifying your school QR code…</p></section></main>
     if (setupStatus.error || qrSchoolError) return <main className="login-page"><section className="login-card"><div className="brand-name">School<span>Bridge</span></div><h1>School QR verification needed</h1><p className="error" role="alert">{qrSchoolError || setupStatus.error}</p><p className="form-hint">Scan your school's current QR code or contact the school administrator.</p></section></main>
     if (!qrSchoolName) return <main className="login-page"><section className="login-card"><div className="brand-name">School<span>Bridge</span></div><p className="muted">Verifying your school identity…</p></section></main>
-    return <RegistrationFlow schoolId={selectedSchoolId} schoolName={qrSchoolName} audience={schoolAudience as 'parent'|'teacher'} apiBaseUrl={API_BASE_URL} onAuthenticated={async accessToken=>{await storeSessionToken(accessToken);try{localStorage.removeItem('schoolbridge-selected-audience')}catch{/* Continue with the authenticated session. */}setShowRegistration(false);setUser(null);setToken(accessToken);setPassword('');setLoginError('')}}/>
+    return <RegistrationFlow schoolId={selectedSchoolId} schoolName={qrSchoolName} audience={schoolAudience as 'parent'|'teacher'} apiBaseUrl={API_BASE_URL} onAuthenticated={async accessToken=>{await storeSessionToken(accessToken);try{localStorage.removeItem('schoolbridge-selected-audience')}catch{/* Continue with the authenticated session. */}const cleanUrl=new URL(window.location.href);cleanUrl.searchParams.delete('school');cleanUrl.searchParams.delete('audience');window.history.replaceState({},'',cleanUrl.pathname+cleanUrl.search+cleanUrl.hash);setShowRegistration(false);setUser(null);setToken(accessToken);setPassword('');setLoginError('')}}/>
   }
   if (!token && sessionRestoring) return <main className="login-page"><section className="login-card"><div className="brand-name">School<span>Bridge</span></div><p className="muted">Restoring your saved session…</p></section></main>;
 
