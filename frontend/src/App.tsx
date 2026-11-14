@@ -1564,8 +1564,8 @@ function App() {
     if (!qrSchoolName) return <main className="login-page"><section className="login-card"><div className="brand-name">School<span>Bridge</span></div><p className="muted">Loading your school's access page…</p></section></main>
     return <SchoolAccessLanding schoolId={selectedSchoolId} schoolName={qrSchoolName}/>
   }
-  if (['parent','teacher'].includes(schoolAudience) && selectedSchoolId && !isStandalonePwa) {
-    return <PWAAccessGate schoolName={qrSchoolName || 'your school'} audience={schoolAudience as 'parent'|'teacher'}/>
+  if (['parent','teacher','staff'].includes(schoolAudience) && selectedSchoolId && !isStandalonePwa) {
+    return <PWAAccessGate schoolId={selectedSchoolId} schoolName={qrSchoolName || 'your school'} audience={schoolAudience as 'parent'|'teacher'|'staff'}/>
   }
   if (showRegistration && selectedSchoolId && isStandalonePwa) {
     if (setupStatus.loading) return <main className="login-page"><section className="login-card"><div className="brand-name">School<span>Bridge</span></div><p className="muted">Verifying your school QR code…</p></section></main>
