@@ -23,7 +23,7 @@ test('parent and teacher QR routes require PWA installation before in-app verifi
   assert.match(app, /getSchoolAudience\(\)/)
   assert.match(app, /schoolbridge-selected-audience/)
   assert.match(app, /!isStandalonePwa/)
-  assert.match(app, /<PWAAccessGate schoolName=/)
+  assert.match(app, /<PWAAccessGate schoolId=/)
   assert.match(pwaGate, /Install SchoolBridge first/)
   assert.match(pwaGate, /not on this website/)
   assert.match(pwaGate, /Add to Home Screen/)
