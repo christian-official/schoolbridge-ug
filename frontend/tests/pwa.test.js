@@ -164,9 +164,14 @@ test('all role-specific access links preserve school and audience in the install
  
 test('desktop staff login does not advertise a native Windows download and gives Chrome install steps', () => {
   assert.doesNotMatch(app, /Download SchoolBridge for Windows/)
-  assert.match(accessGate, /const chromeDesktop=/)
-  assert.match(accessGate, /Chrome.*Add to Home Screen/)
-  assert.match(accessGate, /promptEvent&&<button type="button" className="primary-button login-button"/)
+  assert.match(accessGate, /const edgeDesktop=/)
+  assert.match(accessGate, /const firefoxDesktop=/)
+  assert.match(accessGate, /const safariDesktop=/)
+  assert.match(accessGate, /showInstallButton=\!\(audience==='staff'&&desktop&&\!promptEvent\)/)
+  assert.match(accessGate, /App available/)
+  assert.match(accessGate, /Web apps/)
+  assert.match(accessGate, /File.*Add to Dock/)
+  assert.match(accessGate, /showInstallButton&&<button type="button" className="primary-button login-button"/)
   assert.match(accessGate, /Add to Home Screen/)
   assert.doesNotMatch(accessGate, /Install page as app/)
 })
