@@ -32,6 +32,7 @@ test('document declares mobile and Apple home-screen metadata', () => {
   assert.match(html, /document\.head\.appendChild\(link\)/)
   assert.match(html, /'parent', 'teacher', 'staff'/)
   assert.match(html, /audience=' \+ audience/)
+  assert.match(html, /id: school && \['parent', 'teacher', 'staff'\]\.includes\(audience\)/)
   assert.match(html, /rel="apple-touch-icon"/)
   assert.match(html, /name="apple-mobile-web-app-capable" content="yes"/)
 })
@@ -140,6 +141,7 @@ test('parent, teacher and staff access links install the PWA with school and rol
   assert.match(accessGate, /type Audience = 'parent' \| 'teacher' \| 'staff'/)
   assert.match(accessGate, /launch\.searchParams\.set\('school',schoolId\)/)
   assert.match(accessGate, /launch\.searchParams\.set\('audience',audience\)/)
+  assert.match(accessGate, /id:launch\.pathname\+launch\.search/)
   assert.match(accessGate, /manifestLink\.href=manifestObjectUrl/)
   assert.match(accessGate, /Install SchoolBridge/)
   assert.match(accessGate, /school-issued staff credentials/)
@@ -155,4 +157,12 @@ test('all role-specific access links preserve school and audience in the install
   assert.match(accessGate, /launch\.searchParams\.set\('audience',audience\)/)
   assert.match(accessGate, /manifestLink\.href=manifestObjectUrl/)
   assert.match(accessGate, /school-issued staff credentials/)
+})
+
+
+test('desktop staff login does not advertise a native Windows download and gives Chrome install steps', () => {
+  assert.doesNotMatch(app, /Download SchoolBridge for Windows/)
+  assert.match(accessGate, /const chromeDesktop=/)
+  assert.match(accessGate, /Install SchoolBridge.*address bar/)
+  assert.match(accessGate, /Install page as app/)
 })
