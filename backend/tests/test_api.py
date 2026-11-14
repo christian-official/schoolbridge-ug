@@ -3556,6 +3556,15 @@ def test_public_school_identity_and_admin_reusable_qr_are_scoped_to_current_orig
         assert "test-existing-installation" not in qr.text
         assert "<svg" in qr.text
 
+        staff_qr = client.get(
+            "/api/enrolment/school-qr.svg?origin=http://testserver&audience=staff",
+            headers=admin_headers,
+        )
+        assert staff_qr.status_code == 200, staff_qr.text
+        assert staff_qr.headers["content-type"].startswith("image/svg+xml")
+        assert "<svg" in staff_qr.text
+
+
         external_origin = client.get(
             "/api/enrolment/school-qr.svg?origin=https://attacker.example",
             headers=admin_headers,
