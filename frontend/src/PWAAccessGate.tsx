@@ -31,7 +31,7 @@ export default function PWAAccessGate({schoolName,audience,schoolId}:{schoolName
       if(choice.outcome==='accepted')setError('SchoolBridge was added. Open it from your Home Screen or app list.')
     }catch{setError('The install prompt could not be opened. Use your browser menu to install SchoolBridge, then open the installed app.')}
   }
-  return <main className="login-page school-access-page">
+  return <main className="login-page school-access-page" data-school-id={schoolId}>
     <section className="login-card school-access-card">
       <div className="brand-mark"><Download size={27}/></div>
       <div className="brand-name">School<span>Bridge</span></div>
