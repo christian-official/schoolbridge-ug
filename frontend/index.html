@@ -4,12 +4,14 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/app-icon.svg" />
     <link rel="apple-touch-icon" sizes="192x192" href="/icons/schoolbridge-app-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
     <script>
       // Select the role-aware manifest before the browser evaluates PWA installability.
       (() => {
         const params = new URLSearchParams(window.location.search)
         const school = params.get('school')
         const audience = params.get('audience')
+        if (!school || !['parent', 'teacher', 'staff'].includes(audience)) return
         const manifest = {
           id: school && ['parent', 'teacher', 'staff'].includes(audience)
             ? '/?school=' + encodeURIComponent(school) + '&audience=' + audience
