@@ -113,7 +113,7 @@ test('iOS explains the Safari Home Screen flow because iOS does not expose a web
 })
 
 
-test('parent and teacher QR context is retained for standalone app verification, never browser forms', () => {
+test('parent and teacher QR context is retained for standalone app verification, never browser forms', async () => {
   assert.match(app, /const isStandalonePwa[\s\S]*?display-mode: standalone/)
   assert.match(app, /getSchoolAudience\(\)/)
   assert.match(app, /schoolbridge-selected-audience/)
