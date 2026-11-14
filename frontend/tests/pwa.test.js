@@ -123,5 +123,6 @@ test('standalone PWA never sends an unauthenticated parent or teacher to generic
   assert.match(app, /Administrator \/ essential staff sign in/)
   assert.match(app, /Your browser sign-in may not automatically transfer when a PWA is installed/)
   assert.match(app, /Open your school's official SchoolBridge webpage or scan its QR code first/)
-  assert.ok(app.indexOf('if (isStandalonePwa && !schoolAudience') < app.indexOf('if(setupStatus.error)'), 'standalone PWA users should get role guidance before generic setup/login errors')
+  const unauthenticated = app.slice(app.indexOf('if (!token || !user) {'))
+  assert.ok(unauthenticated.indexOf('if (isStandalonePwa && !schoolAudience') < unauthenticated.indexOf('if(setupStatus.error)'), 'standalone PWA users should get role guidance before generic setup/login errors')
 })
