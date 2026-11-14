@@ -109,7 +109,7 @@ test('QR access opens the correct school registration flow on a mobile viewport 
       })
     })
 
-    await page.goto(baseUrl + '/?school=' + schoolId)
+    await page.goto(baseUrl + '/?school=' + schoolId + '&audience=parent')
     await page.getByRole('heading', { name: 'Join your school' }).waitFor()
     await page.getByText('Mobile QR Test School').waitFor()
     await page.getByRole('button', { name: 'Parent', exact: true }).click()
@@ -191,7 +191,7 @@ test('QR teacher registration verifies staff details and opens the teacher dashb
       }
       await route.fulfill({ status: 404, headers, body: JSON.stringify({ detail: 'Unexpected teacher QR browser-test request.' }) })
     })
-    await page.goto(baseUrl + '/?school=' + schoolId)
+    await page.goto(baseUrl + '/?school=' + schoolId + '&audience=teacher')
     await page.getByRole('heading', { name: 'Join your school' }).waitFor()
     await page.getByRole('button', { name: 'Teacher', exact: true }).click()
     await page.getByLabel('First name as recorded by the school').fill('Grace')
