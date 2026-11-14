@@ -8,7 +8,7 @@ const baseUrl = 'http://127.0.0.1:4174'
 const schoolId = '00000000-0000-4000-8000-000000000001'
 const configuredApiOrigin = process.env.VITE_API_BASE_URL || new URL(baseUrl).origin
 
-test('QR access opens the correct school registration flow on a mobile viewport and calls the shared API', async () => {
+test('QR access shows install guidance in the browser and registration only inside the installed PWA', async () => {
   const server = spawn('npm', ['run', 'preview', '--', '--host', '127.0.0.1', '--port', '4174', '--strictPort'], {
     stdio: 'ignore',
     shell: process.platform === 'win32',
@@ -109,7 +109,15 @@ test('QR access opens the correct school registration flow on a mobile viewport 
       })
     })
 
-    await page.goto(baseUrl + '/?school=' + schoolId + '&audience=parent')
+    const parentQrUrl = baseUrl + '/?school=' + schoolId + '&audience=parent'
+    await page.goto(parentQrUrl)
+    await page.getByRole('heading', { name: 'Install SchoolBridge first' }).waitFor()
+    assert.equal(await page.getByRole('heading', { name: 'Join your school' }).count(), 0, 'ordinary browser QR access must not display the verification form')
+    await page.addInitScript(() => {
+      const originalMatchMedia = window.matchMedia.bind(window)
+      window.matchMedia = (query) => query === '(display-mode: standalone)' ? { matches: true } : originalMatchMedia(query)
+    })
+    await page.goto(parentQrUrl)
     await page.getByRole('heading', { name: 'Join your school' }).waitFor()
     await page.getByText('Mobile QR Test School', { exact: true }).waitFor()
     await page.getByRole('button', { name: 'Continue as parent', exact: true }).click()
@@ -190,6 +198,10 @@ test('QR teacher registration verifies staff details and opens the teacher dashb
         await route.fulfill({ status: 200, headers, body: '[]' }); return
       }
       await route.fulfill({ status: 404, headers, body: JSON.stringify({ detail: 'Unexpected teacher QR browser-test request.' }) })
+    })
+    await page.addInitScript(() => {
+      const originalMatchMedia = window.matchMedia.bind(window)
+      window.matchMedia = (query) => query === '(display-mode: standalone)' ? { matches: true } : originalMatchMedia(query)
     })
     await page.goto(baseUrl + '/?school=' + schoolId + '&audience=teacher')
     await page.getByRole('heading', { name: 'Join your school' }).waitFor()
