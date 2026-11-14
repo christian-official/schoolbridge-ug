@@ -143,7 +143,7 @@ test('parent, teacher and staff access links install the PWA with school and rol
   assert.match(accessGate, /launch\.searchParams\.set\('audience',audience\)/)
   assert.match(accessGate, /id:launch\.pathname\+launch\.search/)
   assert.match(accessGate, /manifestLink\.href=manifestObjectUrl/)
-  assert.match(accessGate, /<button type="button" className="primary-button login-button" onClick=\{\(\)=>void install\(\)\}>Install SchoolBridge<\/button>/)
+  assert.match(accessGate, /<button type="button" className="primary-button login-button" onClick=\{\(\)=>void install\(\)\}>Add to Home Screen<\/button>/)
   assert.match(accessGate, /if\(!promptEvent\)/)
   assert.match(accessGate, /school-issued staff credentials/)
   assert.match(accessGate, /verification form will appear inside the installed app/)
@@ -164,9 +164,10 @@ test('all role-specific access links preserve school and audience in the install
 test('desktop staff login does not advertise a native Windows download and gives Chrome install steps', () => {
   assert.doesNotMatch(app, /Download SchoolBridge for Windows/)
   assert.match(accessGate, /const chromeDesktop=/)
-  assert.match(accessGate, /Install SchoolBridge.*address bar/)
+  assert.match(accessGate, /Chrome.*Add to Home Screen/)
   assert.match(accessGate, /<button type="button" className="primary-button login-button"/)
-  assert.match(accessGate, /Install page as app/)
+  assert.match(accessGate, /Add to Home Screen/)
+  assert.doesNotMatch(accessGate, /Install page as app/)
 })
 
 test('staff installation instructions support iPhone, Android and desktop without changing staff sign-in', () => {
@@ -175,7 +176,7 @@ test('staff installation instructions support iPhone, Android and desktop withou
   assert.match(accessGate, /On Android/)
   assert.match(accessGate, /Install app/)
   assert.match(accessGate, /Open SchoolBridge from your Home Screen or app list and sign in with your school-issued staff credentials/)
-  assert.match(accessGate, /Install on this computer/)
+  assert.match(accessGate, /Add to Home Screen/)
   assert.match(accessGate, /Install page as app/)
 })
 
