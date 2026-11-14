@@ -11,7 +11,9 @@
         const school = params.get('school')
         const audience = params.get('audience')
         const manifest = {
-          id: '/',
+          id: school && ['parent', 'teacher', 'staff'].includes(audience)
+            ? '/?school=' + encodeURIComponent(school) + '&audience=' + audience
+            : '/',
           name: 'SchoolBridge',
           short_name: 'SchoolBridge',
           start_url: school && ['parent', 'teacher', 'staff'].includes(audience)
