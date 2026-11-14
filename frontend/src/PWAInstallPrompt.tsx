@@ -129,7 +129,7 @@ export default function PWAInstallPrompt() {
         ) : installEvent ? (
           <button type="button" className="pwa-install-action" onClick={() => void install()}>Install</button>
         ) : isDesktop ? (
-          <button type="button" className="pwa-install-action" onClick={() => setShowDesktopSteps(value => !value)}>{showDesktopSteps ? 'Hide steps' : 'Install options'}</button>
+          <button type="button" className="pwa-install-action" onClick={() => setShowDesktopSteps(value => !value)}>{showDesktopSteps ? 'Hide instructions' : 'Install SchoolBridge'}</button>
         ) : isAppleMobile ? (
           <button type="button" className="pwa-install-action" onClick={() => setShowAppleSteps(value => !value)}>
             {showAppleSteps ? 'Hide steps' : 'Add to Home Screen'}
