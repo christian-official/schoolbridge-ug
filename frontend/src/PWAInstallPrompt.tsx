@@ -13,7 +13,9 @@ export default function PWAInstallPrompt() {
   const [isOffline, setIsOffline] = useState(() => !navigator.onLine)
   const [isAppleMobile, setIsAppleMobile] = useState(false)
   const [isAndroid, setIsAndroid] = useState(false)
+  const [isDesktop, setIsDesktop] = useState(false)
   const [showAppleSteps, setShowAppleSteps] = useState(false)
+  const [showDesktopSteps, setShowDesktopSteps] = useState(false)
   const [dismissed, setDismissed] = useState(false)
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null)
   const [applyingUpdate, setApplyingUpdate] = useState(false)
@@ -61,6 +63,7 @@ export default function PWAInstallPrompt() {
       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
     setIsAppleMobile(appleMobile)
     setIsAndroid(/android/i.test(navigator.userAgent))
+    setIsDesktop(!appleMobile && !/android/i.test(navigator.userAgent))
 
     const handleInstallPrompt = (event?: Event) => {
       const promptEvent = (event ?? window.schoolBridgeInstallPrompt) as InstallPromptEvent | undefined
@@ -101,7 +104,7 @@ export default function PWAInstallPrompt() {
   }
 
   const hideInstallCard = (dismissed && !waitingWorker) ||
-    (!installEvent && !isAppleMobile && !isAndroid && !waitingWorker)
+    (!installEvent && !isAppleMobile && !isAndroid && !isDesktop && !waitingWorker)
   if (hideInstallCard && !isOffline) return null
 
   return (
@@ -113,16 +116,20 @@ export default function PWAInstallPrompt() {
           {waitingWorker ? <><strong>SchoolBridge update ready</strong><span>Refresh the app to use the latest version.</span></> :
             isAppleMobile ? <><strong>Add SchoolBridge to your Home Screen</strong><span>Install from Safari to open SchoolBridge like an app.</span></> :
               installEvent ? <><strong>Install SchoolBridge</strong><span>Add the app to your device for quick access.</span></> :
-                <><strong>SchoolBridge is ready to use</strong><span>{isAndroid ? 'This browser has not provided an install prompt. Check its app-install controls, or continue using SchoolBridge here.' : 'You can keep using SchoolBridge in this browser.'}</span></>}
+                isDesktop ? <><strong>Install SchoolBridge on this computer</strong><span>Use your browser’s install option to add SchoolBridge to your apps.</span></> :
+                  <><strong>SchoolBridge is ready to use</strong><span>{isAndroid ? 'This browser has not provided an install prompt. Check its app-install controls, or continue using SchoolBridge here.' : 'You can keep using SchoolBridge in this browser.'}</span></>}
           {showAppleSteps && isAppleMobile && (
             <span className="pwa-apple-steps">In Safari, tap <Share size={14} aria-label="Share" /> Share, then choose <strong>Add to Home Screen</strong>.</span>
           )}
+          {showDesktopSteps && isDesktop && !installEvent && <span className="pwa-android-steps">{/edg\\//i.test(navigator.userAgent) ? <>In Edge, open <strong>… → Apps → Install this site as an app</strong>.</> : /firefox\\//i.test(navigator.userAgent) ? <>In Firefox for Windows 143+, use the <strong>Web apps</strong> icon in the address bar.</> : /safari/i.test(navigator.userAgent) && !/chrome|edg/i.test(navigator.userAgent) ? <>In Safari on macOS Sonoma or later, choose <strong>File → Add to Dock</strong>.</> : <>In Chrome, open <strong>⋮ → Cast, save, and share → Install page as app</strong>. If that option is unavailable, check your browser’s app-install menu.</>}</span>}
           {installError && <span className="pwa-install-error" role="status">{installError}</span>}
         </div>
         {waitingWorker ? (
           <button type="button" className="pwa-install-action" onClick={applyUpdate} disabled={applyingUpdate}>{applyingUpdate ? 'Updating…' : 'Update now'}</button>
         ) : installEvent ? (
           <button type="button" className="pwa-install-action" onClick={() => void install()}>Install</button>
+        ) : isDesktop ? (
+          <button type="button" className="pwa-install-action" onClick={() => setShowDesktopSteps(value => !value)}>{showDesktopSteps ? 'Hide steps' : 'Install options'}</button>
         ) : isAppleMobile ? (
           <button type="button" className="pwa-install-action" onClick={() => setShowAppleSteps(value => !value)}>
             {showAppleSteps ? 'Hide steps' : 'Add to Home Screen'}
