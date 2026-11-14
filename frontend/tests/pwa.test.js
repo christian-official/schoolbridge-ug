@@ -28,7 +28,10 @@ test('web app manifest has installable standalone metadata and valid icons', asy
 
 test('document declares mobile and Apple home-screen metadata', () => {
   assert.match(html, /name="viewport"[^>]*width=device-width/)
-  assert.match(html, /rel="manifest" href="\/manifest\.webmanifest"/)
+  assert.match(html, /Select the role-aware manifest before the browser evaluates PWA installability/)
+  assert.match(html, /document\.head\.appendChild\(link\)/)
+  assert.match(html, /'parent', 'teacher', 'staff'/)
+  assert.match(html, /audience=' \+ audience/)
   assert.match(html, /rel="apple-touch-icon"/)
   assert.match(html, /name="apple-mobile-web-app-capable" content="yes"/)
 })
