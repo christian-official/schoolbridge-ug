@@ -7,6 +7,7 @@ const manifest = JSON.parse(await readFile(new URL('../public/manifest.webmanife
 const html = await readFile(new URL('../index.html', import.meta.url), 'utf8')
 const entry = await readFile(new URL('../src/main.tsx', import.meta.url), 'utf8')
 const installUi = await readFile(new URL('../src/PWAInstallPrompt.tsx', import.meta.url), 'utf8')
+const app = await readFile(new URL('../src/App.tsx', import.meta.url), 'utf8')
 
 test('web app manifest has installable standalone metadata and valid icons', async () => {
   assert.equal(manifest.name, 'SchoolBridge')
@@ -109,4 +110,18 @@ test('iOS explains the Safari Home Screen flow because iOS does not expose a web
   assert.match(installUi, /Add SchoolBridge to your Home Screen/)
   assert.match(installUi, /In Safari, tap/)
   assert.match(installUi, /Add to Home Screen/)
+})
+
+
+test('standalone PWA never sends an unauthenticated parent or teacher to generic staff login', () => {
+  assert.match(app, /const isStandalonePwa[\s\S]*?display-mode: standalone/)
+  assert.match(app, /if \(isStandalonePwa && !schoolAudience && !showSchoolLanding && !showRegistration\)/)
+  assert.match(app, /Continue as parent/)
+  assert.match(app, /Continue as teacher/)
+  assert.match(app, /audience=parent/)
+  assert.match(app, /audience=teacher/)
+  assert.match(app, /Administrator \/ essential staff sign in/)
+  assert.match(app, /Your browser sign-in may not automatically transfer when a PWA is installed/)
+  assert.match(app, /Open your school's official SchoolBridge webpage or scan its QR code first/)
+  assert.ok(app.indexOf('if (isStandalonePwa && !schoolAudience') < app.indexOf('if(setupStatus.error)'), 'standalone PWA users should get role guidance before generic setup/login errors')
 })
