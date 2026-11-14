@@ -1,59 +1,59 @@
-# Historical SchoolBridge release-readiness snapshot — not the active roadmap
+# SchoolBridge release-readiness audit
 
-**Audit snapshot:** 2026-11-13  
+**Updated:** 2026-11-14  
 **Branch:** `feature/student-staff-finance`  
-**Audited commit before this document:** `539245bc65068faf468f28d20d4d8e60156a5b08`  
-**Status:** Engineering audit recorded; **not approved for production release**.
+**Current delivery decision:** PWA-first on Windows, Android and supported iOS devices  
+**Release status:** **Not approved for production release.**
 
-This document consolidates evidence and outstanding release gates as a historical snapshot. It is not a substitute for a full school acceptance exercise, security penetration test, or owner release approval. **It does not close or supersede the primary Windows 8.0-first product objective. The previous move toward a final audit was premature. The active next milestone is reopened D1 architecture feasibility for Windows 8.0, followed by Windows 8.1.**
+## Current access decision
 
-## Verified engineering evidence
+SchoolBridge is delivered to Windows users as an installable PWA. Administrators and essential staff open the school's normal access link, install the PWA from their browser, and sign in inside it. Parents and teachers use separate QR routes, install the PWA, and complete their role-specific verification inside the installed app.
 
-- CI run [#1348](https://github.com/christian-official/schoolbridge-ug/actions/runs/43337296367) completed successfully with all 8 jobs passing on the audited commit.
-- The Tauri/NSIS installer compiles with an early OS/architecture preflight. The current installer rejects 32-bit Windows and Windows 8/8.1; its technical floor is Windows 10 build 19045 or Windows 11 build 22631.
-- The CI pipeline builds a standalone offline Windows installer and assembles a USB package with a SHA-256 manifest. A tampered installer is rejected by the USB verifier.
-- CI also runs backend tests, native Windows SQLite tests, frontend lint/tests/build, PostgreSQL recovery integration, and a native Windows package install-and-boot check.
-- The CI activation key is test-only and randomly generated. The CI artifacts are not production installers.
-- The current desktop architecture stores mutable configuration, SQLite data and logs under the user's LocalAppData directory rather than the application installation directory. The desktop backend is designed to bind to loopback by default.
-- The legacy Windows runtime feasibility decision explicitly rejects the current Tauri 2/WebView2 stack for Windows 8 and 8.1 rather than pinning an obsolete browser runtime or weakening security.
+No QR scanner is required for Windows staff. A native Windows executable, NSIS installer and desktop USB package are deferred and are not current release deliverables. The earlier Task 1.11–1.13 native packaging work remains historical engineering work; it must not be presented as the current Windows access path.
 
-## Release blockers — must remain open
+## Latest verified CI evidence
 
-### 1. Production owner activation key
+CI run [#1509](https://github.com/christian-official/schoolbridge-ug/actions/runs/43576766020) completed successfully with all 8 jobs passing on commit `5efe24f6fb2f463ad6fb2443407620e7cde4ee95`. It included frontend lint/tests/build and real-browser PWA tests, backend tests, PostgreSQL recovery integration, Windows-hosted SQLite tests, and native packaging/prototype checks.
 
-The production Ed25519 public verification key has not been provisioned into a release build. CI's random test key is not the owner's production key. The private signing key must remain secret and must never be committed, packaged, or shared. No CI artifact may be handed to a school as a production build.
+That run predates the PWA-first CI workflow adjustment. Its native installer and USB artifacts used CI-only test credentials and are **not production releases**. The revised workflow removes native desktop installer, native package publishing, and Docker/WSL2 prototype packaging jobs. CI for this audit update is pending and must be checked before treating the workflow change as verified.
 
-### 2. Clean-machine Windows acceptance
+## Release blockers — remain open
 
-No recorded physical-machine acceptance evidence is present for a currently serviced Windows edition. Before release, record the exact edition, version, build, architecture and WebView2 runtime, then test offline installation, first launch, activation, backend/frontend health, SQLite persistence, restart, display scaling, keyboard use, printing, file dialogs, uploads, repair, upgrade, uninstall and data preservation.
+### 1. Production owner activation
 
-The installer compatibility floor is not a recommendation to deploy an end-of-support Windows release. Check Microsoft's current lifecycle status for the exact edition and servicing channel at release time.
+The production owner activation public verification key has not been provisioned into a trusted release configuration. CI/test credentials are not production credentials. Keep private signing material secret and out of source control, CI artifacts and school devices.
 
-### 3. Windows 8.0 and 8.1 product requirement — primary objective still open
+### 2. Real-device PWA acceptance
 
-Both legacy OS versions remain explicit product requirements. The current desktop stack is a no-go for both because its available WebView2 runtime is obsolete; Windows 8.0 also lacks a currently maintained CPython Windows runtime path for this backend. They remain **blocked / not certified**. A separately engineered maintained renderer/backend strategy and independent acceptance on each OS are required. Do not represent the Windows 10/11 installer as satisfying this requirement.
+Complete and record acceptance on supported Windows browsers, Android devices and iPhones/iPads. Verify:
+- Install from the ordinary school access link on Windows without a QR scanner.
+- Parent QR and teacher QR remain distinct and route to the correct role.
+- Browser landing pages show installation guidance rather than the verification form.
+- Verification is completed inside the installed PWA.
+- Standalone launch, refresh, sign-out and sign-in preserve or restore the correct school/role context.
+- iOS Safari Add to Home Screen and Android installation behaviour.
+- Updates, storage behaviour, permissions, display scaling, keyboard navigation, printing and file handling.
 
-### 4. Offline completeness and data protection
+Automated browser tests are useful evidence but do not replace physical-device acceptance.
 
-The service worker caches the app shell only; full offline record access and writes across all modules are not complete. The encrypted device snapshot is read-only and time-limited, not a general offline write/synchronisation queue. The live SQLite database is not encrypted at rest according to the desktop security notes. Database encryption, backup protection, snapshot key management and recovery validation remain separate work.
+### 3. Offline completeness and data protection
 
-### 5. Product and regression acceptance
+The service worker caches the app shell only; full offline record access and writes across all modules are not complete. The encrypted device snapshot is read-only and time-limited, not a general offline write/synchronisation queue. Database encryption at rest, backup protection, snapshot key management and recovery validation remain separate work.
 
-The open product backlog still includes consolidated student lifecycle, staff onboarding, exam publication, report-template/printing, gatehouse, timetable, tenant-isolation and usability corrections. These must be tracked and tested in small batches; this audit does not mark them complete. The development pull request remains a draft and requires the documented end-to-end checks against an existing school database before merge.
+### 4. Product and regression acceptance
+
+The open product backlog still includes report-template/printing corrections, student lifecycle, staff onboarding, exam publication, gatehouse, timetable, tenant isolation and usability corrections. Resolve and regression-test these in small batches. Complete end-to-end checks against a non-production school database before merge.
 
 ## Required release checklist
 
-- [ ] Provision and verify the production public activation key in a trusted release build; keep the private signing key offline.
-- [ ] Build a release USB package from the production-key installer and verify its manifest on a separate machine.
-- [ ] Complete clean-machine offline install, activation, operation, upgrade, repair, uninstall and backup/restore acceptance on currently serviced Windows hardware.
-- [ ] Complete the separate Windows 8.0 and Windows 8.1 architecture and acceptance work before claiming either legacy OS as supported.
-- [ ] Complete offline module-by-module acceptance and clearly label workflows that still require a connection.
-- [ ] Complete data-at-rest and backup/snapshot security decisions and tests.
-- [ ] Resolve and regression-test the open product correction batches, including tenant isolation and per-student report-print isolation.
-- [ ] Review the complete test evidence and obtain explicit product-owner approval before merging or deploying.
+- [ ] Verify production owner activation configuration without exposing private signing material.
+- [ ] Complete physical-device acceptance for Windows PWA, Android PWA and iOS PWA.
+- [ ] Verify role-specific parent/teacher QR journeys and staff access without QR.
+- [ ] Complete offline module-by-module acceptance and label workflows that require connectivity.
+- [ ] Complete data-at-rest, backup/snapshot security and recovery decisions/tests.
+- [ ] Resolve and regression-test open product corrections, including tenant and report-print isolation.
+- [ ] Review the latest CI evidence and obtain explicit product-owner approval before merging or deploying.
 
 ## Release decision
 
-**NO-GO for production release at this audit snapshot. This is not the next development milestone.** Resume the Windows 8.0-first architecture feasibility work documented in [Windows 8.0-first architecture options](WINDOWS_8_ARCHITECTURE_OPTIONS.md).
-
-**NO-GO for production release at this audit snapshot.** The successful CI run is valuable automated evidence, but production-key provisioning, real-machine acceptance, legacy Windows delivery, offline completeness, and other product/security gates remain open. Keep work on the feature branch; do not merge or deploy based on CI success alone.
+**NO-GO for production release.** The PWA-first access implementation and passing CI are engineering evidence, not production approval. Keep work on the feature branch. Do not merge, deploy, or publish a release without explicit authorization.
