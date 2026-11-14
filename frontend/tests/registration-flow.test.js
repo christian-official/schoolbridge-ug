@@ -10,7 +10,7 @@ const landing = await readFile(new URL('../src/SchoolAccessLanding.tsx', import.
 const pwaGate = await readFile(new URL('../src/PWAAccessGate.tsx', import.meta.url), 'utf8')
 
 test('parent and teacher QR routes require PWA installation before in-app verification', () => {
-  assert.match(app, /schoolQuery.get\('audience'\)/)
+  assert.match(app, /new URLSearchParams\(window.location.search\)\.get\('audience'\)/)
   assert.match(app, /showSchoolLanding = Boolean\(schoolQuery.get\('school'\) && !schoolAudience\)/)
   assert.match(app, /SchoolAccessLanding/)
   assert.ok(app.indexOf('Explicit public school routes take priority') < app.indexOf('if (token && !user)'), 'public QR routes must override an existing saved staff session')
