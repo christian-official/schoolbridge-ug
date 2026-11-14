@@ -3054,8 +3054,8 @@ def school_access_qr(
     if tenant is None:
         raise HTTPException(409, "This installation is not registered in the school directory.")
     audience = request.query_params.get("audience", "parent")
-    if audience not in {"parent", "teacher"}:
-        raise HTTPException(400, "The school QR audience must be parent or teacher.")
+    if audience not in {"parent", "teacher", "staff"}:
+        raise HTTPException(400, "The school QR audience must be parent, teacher or staff.")
     target = origin.rstrip("/") + "/?school=" + tenant.public_id + "&audience=" + audience
     qr = qrcode.QRCode(
         version=None,
