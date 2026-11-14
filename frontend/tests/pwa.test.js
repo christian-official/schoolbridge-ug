@@ -166,3 +166,13 @@ test('desktop staff login does not advertise a native Windows download and gives
   assert.match(accessGate, /Install SchoolBridge.*address bar/)
   assert.match(accessGate, /Install page as app/)
 })
+
+test('staff installation instructions support iPhone, Android and desktop without changing staff sign-in', () => {
+  assert.match(accessGate, /On iPhone or iPad/)
+  assert.match(accessGate, /Add to Home Screen/)
+  assert.match(accessGate, /On Android/)
+  assert.match(accessGate, /Install app/)
+  assert.match(accessGate, /Open SchoolBridge from your Home Screen or app list and sign in with your school-issued staff credentials/)
+  assert.match(accessGate, /Install on this computer/)
+  assert.match(accessGate, /Install page as app/)
+})
