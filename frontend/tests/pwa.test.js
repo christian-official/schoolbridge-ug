@@ -143,7 +143,8 @@ test('parent, teacher and staff access links install the PWA with school and rol
   assert.match(accessGate, /launch\.searchParams\.set\('audience',audience\)/)
   assert.match(accessGate, /id:launch\.pathname\+launch\.search/)
   assert.match(accessGate, /manifestLink\.href=manifestObjectUrl/)
-  assert.match(accessGate, /Install SchoolBridge/)
+  assert.match(accessGate, /<button type="button" className="primary-button login-button" onClick=\{\(\)=>void install\(\)\}>Install SchoolBridge<\/button>/)
+  assert.match(accessGate, /if\(!promptEvent\)/)
   assert.match(accessGate, /school-issued staff credentials/)
   assert.match(accessGate, /verification form will appear inside the installed app/)
 })
@@ -164,6 +165,7 @@ test('desktop staff login does not advertise a native Windows download and gives
   assert.doesNotMatch(app, /Download SchoolBridge for Windows/)
   assert.match(accessGate, /const chromeDesktop=/)
   assert.match(accessGate, /Install SchoolBridge.*address bar/)
+  assert.match(accessGate, /<button type="button" className="primary-button login-button"/)
   assert.match(accessGate, /Install page as app/)
 })
 
