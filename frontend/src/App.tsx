@@ -944,7 +944,7 @@ function hasStoredBrowserSession(): boolean {
 function getSchoolAudience(): string {
   if (typeof window === 'undefined') return ''
   const fromUrl = new URLSearchParams(window.location.search).get('audience') || ''
-  if (['parent', 'teacher'].includes(fromUrl)) {
+  if (['parent', 'teacher', 'staff'].includes(fromUrl)) {
     try { localStorage.setItem('schoolbridge-selected-audience', fromUrl) } catch { /* The QR URL remains available in this browser. */ }
     return fromUrl
   }
