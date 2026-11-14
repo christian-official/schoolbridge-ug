@@ -2,7 +2,7 @@
 
 ## Agreed product decision
 
-Parents and teachers use separate role-specific QR codes. The parent QR opens the parent registration page directly; the teacher QR opens the teacher registration page directly. The plain school webpage is the staff access page: administrators and authorised essential non-teaching staff sign in there and can download the Windows desktop application before signing in. SchoolBridge verifies parent and teacher details against that school's existing records and, when there is one unambiguous match, creates or resumes the appropriate account and opens the correct dashboard automatically.
+Parents and teachers use separate role-specific QR codes. Each QR opens an install-first mobile access route for the correct audience; the verification form is shown only after SchoolBridge is opened as an installed PWA, never in the ordinary browser webpage. The plain school webpage is the staff access page: administrators and authorised essential non-teaching staff download the Windows desktop application from its official release location, install it and then sign in inside the desktop app. Staff do not need a QR scanner. SchoolBridge verifies parent and teacher details against that school's existing records and, when there is one unambiguous match, creates or resumes the appropriate account and opens the correct dashboard automatically.
 
 There is no administrator-initiated parent or teacher account creation, no administrator approval queue, no SMS verification code, and no password creation for parents or teachers. The process is designed for schools whose source records may still be paper-based: the school enters its roster and guardian/staff details into SchoolBridge once; families and teachers then register themselves.
 
@@ -11,15 +11,17 @@ Passwords are reserved for administrator accounts and explicitly selected essent
 ## Public school access webpage
 
 1. The plain school URL opens the school's branded access page.
-2. The page offers separate Parent access and Teacher access routes, plus Administrator & essential staff sign-in.
-3. The Windows desktop download link is available on this page and on the staff sign-in page. The desktop installer is for administrators and authorised essential non-teaching staff; downloading it does not authenticate a user.
-4. Parent and teacher QR codes carry explicit audience values so each opens only its own registration flow. A generic school QR must not make a parent or teacher choose a role manually.
+2. The page offers separate Parent mobile access and Teacher mobile access routes, plus a Windows desktop download link for administrators and essential non-teaching staff.
+3. The Windows link opens the official release location. Staff download and install the desktop application, then sign in inside that application with school-issued credentials; downloading does not authenticate a user and no QR scanner is required.
+4. Parent and teacher QR codes carry explicit audience values. Scanning one opens its role-specific install guide; the registration form is only available after the installed PWA is launched. A generic school QR must not make a parent or teacher choose a role manually.
 
 ## Parent journey
 
-1. A parent scans the parent-specific school QR code.
-2. The QR opens the school's registration page directly and displays the verified school identity.
-3. The parent enters their full name and relationship to the child or children.
+1. A parent scans the parent-specific school QR code on their phone.
+2. The QR opens the school's parent install guide and retains the selected school and parent audience for the PWA journey.
+3. The parent installs SchoolBridge using the phone browser's supported install flow (Add to Home Screen on iPhone/iPad; Install app or Add to Home Screen on supported Android browsers).
+4. The parent launches SchoolBridge from the Home Screen or app list. The parent verification form appears inside the installed PWA, not on the ordinary website.
+5. The parent enters their full name and relationship to the child or children.
 4. For each child, the parent enters the child's first and last names. Date of birth and class are optional supporting checks; an admission number is never required. A parent can submit up to ten children in one registration.
 5. SchoolBridge searches only active student and guardian records belonging to the QR-selected school. The parent's name and relationship must match the recorded guardian information, and each child must resolve to exactly one active student record.
 6. If every submitted relationship is verified, SchoolBridge creates or resumes the parent's account, links the verified children, issues a secure session and opens the parent dashboard.
@@ -29,11 +31,13 @@ If a child's identity is ambiguous, the student record is not found, or the guar
 
 ## Teacher journey
 
-1. A teacher scans the teacher-specific school QR code and reaches the teacher registration page directly.
-2. The teacher selects **Teacher** and enters their first name, last name and staff number. Position and department can be supplied as additional checks.
-3. SchoolBridge matches those details against exactly one active teaching staff record belonging to the selected school.
-4. On a unique match, SchoolBridge creates or resumes the teacher account, associates it with the verified staff record, issues a secure session and opens the teacher dashboard.
-5. The teacher does not receive a temporary password or need an administrator to create or approve a login.
+1. A teacher scans the teacher-specific school QR code on their phone.
+2. The QR opens the teacher install guide and retains the selected school and teacher audience for the PWA journey.
+3. The teacher installs SchoolBridge using the phone browser's supported install flow, then launches it from the Home Screen or app list.
+4. The teacher verification form appears inside the installed PWA, not on the ordinary website. The teacher enters their first name, last name and staff number. Position and department can be supplied as additional checks.
+5. SchoolBridge matches those details against exactly one active teaching staff record belonging to the selected school.
+6. On a unique match, SchoolBridge creates or resumes the teacher account, associates it with the verified staff record, issues a secure session and opens the teacher dashboard.
+7. The teacher does not receive a temporary password or need an administrator to create or approve a login.
 
 A teacher profile is entered into the Staff directory without creating a login. The directory generates the staff number, which an administrator can correct later from the staff profile. The school shares the current staff number with the teacher together with the reusable school QR code. The teacher activates access independently by matching those details.
 
@@ -71,7 +75,7 @@ A teacher profile is entered into the Staff directory without creating a login. 
 The following are implemented on the existing feature branch:
 
 1. School QR generation and school identity resolution.
-2. QR query routing directly into the parent/teacher registration page.
+2. QR query routing into role-specific PWA installation guidance; registration is gated to standalone PWA mode.
 3. Separate parent and teacher detail forms.
 4. Automatic school-scoped matching against student/guardian and active teaching staff records.
 5. Direct role-based account creation/resumption and secure dashboard session issuance.
@@ -85,7 +89,7 @@ The latest GitHub Actions run is still queued behind earlier Windows installer j
 
 ## Hosted access and Windows desktop boundary
 
-The public school QR is generated from the hosted HTTPS SchoolBridge web workspace. The standalone Windows desktop backend binds locally and is not reachable by parents at home. The desktop QR panel remains unavailable by design. Remote parent access therefore requires the school's records and account services to be available through the shared hosted HTTPS deployment (or a separately validated network-accessible server architecture).
+The public school QR is generated from the hosted HTTPS SchoolBridge web workspace. Parent and teacher registration is presented only inside the installed PWA; the hosted webpage provides the role-specific install guide. The standalone Windows desktop backend binds locally and is not reachable by parents at home. The desktop QR panel remains unavailable by design. Remote parent access therefore requires the school's records and account services to be available through the shared hosted HTTPS deployment (or a separately validated network-accessible server architecture).
 
 Task 1.11 (Windows installer) is paused at its existing packaging checkpoint while this QR registration work is completed. Installer activation-key configuration and clean-machine installation/upgrade validation remain separate outstanding work.
 
