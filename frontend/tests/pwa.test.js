@@ -144,7 +144,9 @@ test('parent, teacher and staff access links install the PWA with school and rol
   assert.match(accessGate, /id:launch\.pathname\+launch\.search/)
   assert.match(accessGate, /manifestLink\.href=manifestObjectUrl/)
   assert.match(accessGate, /<button type="button" className="primary-button login-button" onClick=\{\(\)=>void install\(\)\}>Add to Home Screen<\/button>/)
-  assert.match(accessGate, /if\(!promptEvent\)/)
+  assert.match(accessGate, /await promptEvent\.prompt\(\)/)
+  assert.match(accessGate, /disabled=\{!promptEvent\}/)
+  assert.match(accessGate, /onClick=\{\(\)=>void install\(\)\}/)
   assert.match(accessGate, /school-issued staff credentials/)
   assert.match(accessGate, /verification form will appear inside the installed app/)
 })
@@ -177,7 +179,7 @@ test('staff installation instructions support iPhone, Android and desktop withou
   assert.match(accessGate, /Install app/)
   assert.match(accessGate, /Open SchoolBridge from your Home Screen or app list and sign in with your school-issued staff credentials/)
   assert.match(accessGate, /Add to Home Screen/)
-  assert.match(accessGate, /Install page as app/)
+  assert.doesNotMatch(accessGate, /Install page as app/)
 })
 
 
