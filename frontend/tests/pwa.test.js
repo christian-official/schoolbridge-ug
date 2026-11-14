@@ -8,6 +8,7 @@ const html = await readFile(new URL('../index.html', import.meta.url), 'utf8')
 const entry = await readFile(new URL('../src/main.tsx', import.meta.url), 'utf8')
 const installUi = await readFile(new URL('../src/PWAInstallPrompt.tsx', import.meta.url), 'utf8')
 const app = await readFile(new URL('../src/App.tsx', import.meta.url), 'utf8')
+const accessGate = await readFile(new URL('../src/PWAAccessGate.tsx', import.meta.url), 'utf8')
 
 test('web app manifest has installable standalone metadata and valid icons', async () => {
   assert.equal(manifest.name, 'SchoolBridge')
@@ -127,4 +128,17 @@ test('parent and teacher QR context is retained for standalone app verification,
   assert.match(gate, /Add to Home Screen/)
   assert.match(gate, /Install app/)
   assert.match(gate, /schoolBridgeInstallPrompt/)
+})
+
+
+test('parent, teacher and staff access links install the PWA with school and role in its launch URL', () => {
+  assert.match(app, /\['parent','teacher','staff'\]\.includes\(schoolAudience\)/)
+  assert.match(app, /PWAAccessGate schoolId=\{selectedSchoolId\}/)
+  assert.match(accessGate, /type Audience = 'parent' \| 'teacher' \| 'staff'/)
+  assert.match(accessGate, /launch\.searchParams\.set\('school',schoolId\)/)
+  assert.match(accessGate, /launch\.searchParams\.set\('audience',audience\)/)
+  assert.match(accessGate, /manifestLink\.href=manifestObjectUrl/)
+  assert.match(accessGate, /Install SchoolBridge/)
+  assert.match(accessGate, /school-issued staff credentials/)
+  assert.match(accessGate, /verification form will appear inside the installed app/)
 })
