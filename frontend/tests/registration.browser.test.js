@@ -111,8 +111,8 @@ test('QR access opens the correct school registration flow on a mobile viewport 
 
     await page.goto(baseUrl + '/?school=' + schoolId + '&audience=parent')
     await page.getByRole('heading', { name: 'Join your school' }).waitFor()
-    await page.getByText('Mobile QR Test School').waitFor()
-    await page.getByRole('button', { name: 'Parent', exact: true }).click()
+    await page.getByText('Mobile QR Test School', { exact: true }).waitFor()
+    await page.getByRole('button', { name: 'Continue as parent', exact: true }).click()
     await page.getByRole('dialog', { name: 'Parent details' }).waitFor()
     const registrationWidth = await page.evaluate(() => ({ viewport: innerWidth, document: document.documentElement.scrollWidth }))
     assert.ok(registrationWidth.document <= registrationWidth.viewport, `QR registration must fit a phone viewport: ${JSON.stringify(registrationWidth)}`)
@@ -140,7 +140,7 @@ test('QR access opens the correct school registration flow on a mobile viewport 
     await page.getByRole('button', { name: 'Sign out' }).click()
     await page.getByRole('heading', { name: 'Join your school' }).waitFor()
     assert.equal(await page.getByLabel('Password').count(), 0, 'a signed-out parent must return to passwordless QR verification')
-    await page.getByRole('button', { name: 'Parent', exact: true }).click()
+    await page.getByRole('button', { name: 'Continue as parent', exact: true }).click()
     await page.getByRole('dialog', { name: 'Parent details' }).waitFor()
     assert.equal(await page.getByRole('button', { name: 'Verify and open my dashboard' }).count(), 1, 'the existing parent must be able to verify again without creating a password account')
 
@@ -193,7 +193,7 @@ test('QR teacher registration verifies staff details and opens the teacher dashb
     })
     await page.goto(baseUrl + '/?school=' + schoolId + '&audience=teacher')
     await page.getByRole('heading', { name: 'Join your school' }).waitFor()
-    await page.getByRole('button', { name: 'Teacher', exact: true }).click()
+    await page.getByRole('button', { name: 'Continue as teacher', exact: true }).click()
     await page.getByLabel('First name as recorded by the school').fill('Grace')
     await page.getByLabel('Last name as recorded by the school').fill('Teacher')
     await page.getByLabel('Staff number').fill('ST-QR-001')
