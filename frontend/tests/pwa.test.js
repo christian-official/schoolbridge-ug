@@ -176,3 +176,13 @@ test('staff installation instructions support iPhone, Android and desktop withou
   assert.match(accessGate, /Install on this computer/)
   assert.match(accessGate, /Install page as app/)
 })
+
+
+test('school device management provides a school-specific staff QR and staff access link', async () => {
+  const devices = await readFile(new URL('../src/SyncDevices.tsx', import.meta.url), 'utf8')
+  assert.match(devices, /loadQr\('staff'\)/)
+  assert.match(devices, /audience:'staff'/)
+  assert.match(devices, /setStaffAccessUrl\(destination \+ '&audience=staff'\)/)
+  assert.match(devices, /Staff access/)
+  assert.match(devices, /school-issued staff credentials/)
+})
