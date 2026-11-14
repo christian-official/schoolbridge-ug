@@ -144,7 +144,7 @@ test('parent, teacher and staff access links install the PWA with school and rol
   assert.match(html, /encodeURIComponent\(school\).*audience/)
   assert.match(html, /start_url:/)
   assert.match(html, /id: school && \['parent', 'teacher', 'staff'\]\.includes\(audience\)/)
-  assert.match(accessGate, /promptEvent&&<button type="button" className="primary-button login-button" onClick=\{\(\)=>void install\(\)\}>Add to Home Screen<\/button>/)
+  assert.match(accessGate, /showInstallButton&&<button type="button" className="primary-button login-button" onClick=\{\(\)=>void install\(\)\}>Add to Home Screen<\/button>/)
   assert.doesNotMatch(accessGate, /disabled=\{!promptEvent\}/)
   assert.match(accessGate, /window.addEventListener\('schoolbridge:install-prompt',capture\)/)
   assert.doesNotMatch(accessGate, /URL.createObjectURL/)
@@ -162,7 +162,7 @@ test('all role-specific access links preserve school and audience in the install
   assert.match(accessGate, /school-issued staff credentials/)
 })
  
-test('desktop staff login does not advertise a native Windows download and gives Chrome install steps', () => {
+test('desktop staff login does not advertise a native Windows download and supports common desktop browsers', () => {
   assert.doesNotMatch(app, /Download SchoolBridge for Windows/)
   assert.match(accessGate, /const edgeDesktop=/)
   assert.match(accessGate, /const firefoxDesktop=/)
@@ -181,7 +181,7 @@ test('staff installation instructions support iPhone, Android and desktop withou
   assert.match(accessGate, /Add to Home Screen/)
   assert.match(accessGate, /On Android/)
   assert.match(accessGate, /Install app/)
-  assert.match(accessGate, /Open SchoolBridge from your Home Screen or app list and sign in with your school-issued staff credentials/)
+  assert.match(accessGate, /Open SchoolBridge and sign in with your school-issued staff credentials/)
   assert.match(accessGate, /Add to Home Screen/)
   assert.doesNotMatch(accessGate, /Install page as app/)
 })
