@@ -137,13 +137,13 @@ export default function SyncDevices({ token, userId, schoolId, isAdmin }: Props)
     <div className="panel-heading"><div><h2>Registered devices</h2><p>Review browsers and computers registered to your SchoolBridge account.</p></div><button className="secondary-button" type="button" onClick={() => void load()} disabled={loading || busy}>Refresh</button></div>
     {isAdmin && !isTauriDesktop && <section className="offline-record-tools school-access-qr">
       <h3>School mobile access QR codes</h3>
-      <p className="muted">Separate parent and teacher QR codes each open the correct registration page directly. Staff use the school webpage to sign in and download the desktop app.</p>
+      <p className="muted">Separate parent and teacher QR codes guide families and teachers to install the mobile app and verify inside it. Administrators and essential staff use the school webpage to download the Windows desktop app.</p>
       {qrUnavailableReason ? <p className="form-hint">{qrUnavailableReason}</p> : parentQrUrl && teacherQrUrl ? <div className="school-access-qr-grid">
         {([{label:'Parent access',url:parentQrUrl,link:parentAccessUrl},{label:'Teacher access',url:teacherQrUrl,link:teacherAccessUrl}] as const).map(item => <div className="school-access-qr-item" key={item.label}>
           <div className="school-access-qr-print" data-audience={item.label === 'Parent access' ? 'parent' : 'teacher'}>
             <div className="school-access-qr-print-brand">SchoolBridge</div><h2>{schoolName}</h2>
             <img src={item.url} alt={item.label + ' QR code'} width="280" height="280"/>
-            <strong>{item.label}</strong><p>Scan to open this registration page.</p><small>{item.link}</small>
+            <strong>{item.label}</strong><p>Scan to install SchoolBridge and complete verification in the app.</p><small>{item.link}</small>
           </div>
           <div className="school-access-qr-screen"><input readOnly value={item.link} aria-label={item.label + ' link'} onFocus={event=>event.currentTarget.select()}/>
             <div className="proposal-review-actions"><button className="secondary-button" type="button" onClick={()=>{void navigator.clipboard?.writeText(item.link).then(()=>setMessage(item.label+' link copied.')).catch(()=>setMessage('Select and copy the link manually.'))}}>Copy link</button><button className="secondary-button" type="button" onClick={()=>printSchoolQr(item.label === 'Parent access' ? 'parent' : 'teacher')}>Print QR</button></div>
