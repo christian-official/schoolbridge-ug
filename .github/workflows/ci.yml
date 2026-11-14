@@ -110,6 +110,80 @@ jobs:
           if ($installer.Length -lt 100MB) { throw "Offline installer is unexpectedly small; the bundled WebView2 runtime may be missing." }
           Get-FileHash -LiteralPath $installer.FullName -Algorithm SHA256 | Format-List
           Write-Host "CI-only installer verified: $($installer.FullName) ($($installer.Length) bytes)"
+      - name: Install and boot the packaged desktop application
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $bundle = "frontend/src-tauri/target/release/bundle/nsis"
+          $installer = Get-ChildItem -LiteralPath $bundle -Filter "*.exe" -File | Sort-Object Length -Descending | Select-Object -First 1
+          if (-not $installer) { throw "Verified Tauri installer is missing." }
+
+          $installDir = "C:\SchoolBridge-CI-Install"
+          if (Test-Path $installDir) { Remove-Item -LiteralPath $installDir -Recurse -Force }
+          $install = Start-Process -FilePath $installer.FullName -ArgumentList @("/S", "/D=$installDir") -Wait -PassThru
+          if ($install.ExitCode -ne 0) { throw "Silent offline desktop installation failed with exit code $($install.ExitCode)." }
+
+          $app = Join-Path $installDir "schoolbridge.exe"
+          if (-not (Test-Path -LiteralPath $app -PathType Leaf)) {
+            $found = Get-ChildItem -LiteralPath $installDir -Filter "schoolbridge.exe" -File -Recurse | Select-Object -First 1
+            if (-not $found) { throw "Installed SchoolBridge desktop executable was not found." }
+            $app = $found.FullName
+          }
+
+          $dataDir = Join-Path $env:LOCALAPPDATA "SchoolBridge\data"
+          $database = Join-Path $dataDir "schoolbridge.sqlite3"
+          $config = Join-Path $env:LOCALAPPDATA "SchoolBridge\config\.env"
+          $stdout = Join-Path $env:RUNNER_TEMP "schoolbridge-desktop.stdout.log"
+          $stderr = Join-Path $env:RUNNER_TEMP "schoolbridge-desktop.stderr.log"
+
+          function Start-SchoolBridge {
+            $script:desktop = Start-Process -FilePath $app -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+            $deadline = (Get-Date).AddSeconds(90)
+            while ((Get-Date) -lt $deadline) {
+              if ($script:desktop.HasExited) {
+                if (Test-Path $stdout) { Get-Content $stdout }
+                if (Test-Path $stderr) { Get-Content $stderr }
+                throw "SchoolBridge desktop exited before its local backend became ready."
+              }
+              try {
+                $health = Invoke-RestMethod -Uri "http://127.0.0.1:8080/api/health" -TimeoutSec 3
+                if ($health.status -eq "ok" -and $health.application -eq "SchoolBridge" -and $health.database.status -eq "connected" -and $health.database.type -eq "sqlite") { return }
+              } catch {}
+              Start-Sleep -Seconds 2
+            }
+            if (Test-Path (Join-Path $env:LOCALAPPDATA "SchoolBridge\logs\backend.log")) {
+              Get-Content (Join-Path $env:LOCALAPPDATA "SchoolBridge\logs\backend.log") -Tail 100
+            }
+            throw "SchoolBridge did not become healthy with its local SQLite database."
+          }
+
+          try {
+            Start-SchoolBridge
+            if (-not (Test-Path -LiteralPath $config -PathType Leaf)) { throw "First launch did not create persistent local configuration." }
+            if (-not (Test-Path -LiteralPath $database -PathType Leaf)) { throw "First launch did not create the local SQLite database." }
+            $page = Invoke-WebRequest -Uri "http://127.0.0.1:8080/" -UseBasicParsing
+            if ($page.StatusCode -ne 200 -or $page.Content -notmatch '<div id="root">') { throw "Installed desktop frontend was not served locally." }
+
+            Stop-Process -Id $script:desktop.Id -Force
+            $script:desktop.WaitForExit()
+            $deadline = (Get-Date).AddSeconds(20)
+            while ((Get-Date) -lt $deadline) {
+              try { Invoke-RestMethod -Uri "http://127.0.0.1:8080/api/health" -TimeoutSec 2 | Out-Null; Start-Sleep -Seconds 1 }
+              catch { break }
+            }
+
+            $env:SCHOOLBRIDGE_CI_DB = $database
+            python -c "import os,sqlite3; c=sqlite3.connect(os.environ['SCHOOLBRIDGE_CI_DB']); c.execute('CREATE TABLE IF NOT EXISTS desktop_install_ci_check (id INTEGER PRIMARY KEY, marker TEXT NOT NULL)'); c.execute('INSERT OR REPLACE INTO desktop_install_ci_check (id, marker) VALUES (1, ?)', ('persists-after-restart',)); c.commit(); c.close()"
+            if ($LASTEXITCODE -ne 0) { throw "Could not write the local database persistence marker." }
+
+            Start-SchoolBridge
+            python -c "import os,sqlite3; c=sqlite3.connect(os.environ['SCHOOLBRIDGE_CI_DB']); r=c.execute('SELECT marker FROM desktop_install_ci_check WHERE id=1').fetchone(); c.close(); assert r and r[0]=='persists-after-restart', 'Local database marker did not survive desktop restart'"
+            if ($LASTEXITCODE -ne 0) { throw "Local SQLite data did not survive desktop restart." }
+            Write-Host "Installed desktop booted locally; SQLite database and data survived restart."
+          } finally {
+            if ($script:desktop -and -not $script:desktop.HasExited) { Stop-Process -Id $script:desktop.Id -Force -ErrorAction SilentlyContinue }
+          }
+
       - name: Upload CI-only installer build
         uses: actions/upload-artifact@v4
         with:
