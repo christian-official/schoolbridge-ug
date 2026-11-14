@@ -137,6 +137,10 @@ function getStaffNavigation(user:User) {
 const configuredApiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 // Tauri's Windows WebView uses the tauri.localhost origin. The desktop app
 // always talks to its own loopback backend, never to a hosted school server.
+const isStandalonePwa = typeof window !== 'undefined' && !('__TAURI_INTERNALS__' in window) && (
+  window.matchMedia('(display-mode: standalone)').matches ||
+  Boolean((navigator as Navigator & { standalone?: boolean }).standalone)
+)
 const isTauriDesktop = typeof window !== 'undefined' && (
   '__TAURI_INTERNALS__' in window ||
   window.location.hostname === 'tauri.localhost' ||
@@ -1555,6 +1559,27 @@ function App() {
     if(setupStatus.loading) return <main className="login-page"><section className="login-card"><div className="brand-name">School<span>Bridge</span></div><p className="muted">Checking school installation...</p></section></main>
     if(setupStatus.error) return <main className="login-page"><section className="login-card"><div className="brand-name">School<span>Bridge</span></div><h1>{!navigator.onLine ? "You're offline" : setupStatus.error.includes("Select your school") ? "School selection required" : "Unable to check setup"}</h1><p className="error" role="alert">{setupStatus.error}</p><p className="form-hint">Connect to the school server and try again. For shared SchoolBridge access, open the official QR code provided by your school.</p><button className="secondary-button" onClick={()=>window.location.reload()}>Try again</button></section></main>
     if(!setupStatus.setup_completed) return <FirstTimeSetupWizard status={setupStatus} onStatusChange={setSetupStatus}/>
+    if (isStandalonePwa && !schoolAudience && !showSchoolLanding && !showRegistration) {
+      const schoolBase = selectedSchoolId ? '/?school=' + encodeURIComponent(selectedSchoolId) : ''
+      return <main className="login-page"><section className="login-card">
+        <div className="brand-mark"><GraduationCap size={30}/></div>
+        <div className="brand-name">School<span>Bridge</span></div>
+        <h1>Welcome to SchoolBridge</h1>
+        <p className="muted">Choose the access route for your account. Your browser sign-in may not automatically transfer when a PWA is installed, especially on iPhone.</p>
+        {selectedSchoolId ? <>
+          <div className="school-access-actions">
+            <a className="primary-button" href={schoolBase + '&audience=parent'}>Continue as parent</a>
+            <a className="primary-button" href={schoolBase + '&audience=teacher'}>Continue as teacher</a>
+            <a className="secondary-button" href={schoolBase + '&audience=staff'}>Administrator / essential staff sign in</a>
+          </div>
+          <p className="form-hint">Parents and teachers can verify again using their school's matching QR access route. Staff should use their school-issued credentials.</p>
+        </> : <>
+          <p className="form-hint">Open your school's official SchoolBridge webpage or scan its QR code first. Parent and teacher access is verified through the school's separate QR routes. Do not use staff credentials for a parent or teacher account.</p>
+          <p className="login-foot">If you are school staff, return to your assigned school webpage to sign in.</p>
+        </>}
+        <p className="login-foot"><ShieldCheck size={15}/> Secure school access</p>
+      </section></main>
+    }
     return (
       <main className="login-page">
         <section className="login-card">
