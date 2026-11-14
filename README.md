@@ -2,7 +2,7 @@
 
 **Local-first school management for primary and secondary schools.**
 
-SchoolBridge is designed to run on each school's own computer. The local school database is the primary source of truth. Render is for preview/development, not a school production dependency. A school can operate on one computer without internet or LAN; a local Wi-Fi/router or wired network is optional when additional staff devices need access.
+SchoolBridge provides school administration workflows through a Progressive Web App (PWA). The same installable web application is the current client on Windows, Android and supported iPhones/iPads.
 
 ## Planned capabilities
 
@@ -15,41 +15,32 @@ SchoolBridge is designed to run on each school's own computer. The local school 
 - Role-based access, audit logs and data backups
 - Data export and restore tools
 
-## Platform and installation status
+## Current access model
 
-| Windows version | Native host status | Client status |
-|---|---|---|
-| Windows 8.0 | Blocked with the current maintained desktop runtime; not certified | Not certified |
-| Windows 8.1 | Blocked with the current Tauri/WebView2 desktop stack; not certified | Client compatibility is unverified; a separate browser does not satisfy the desktop requirement |
-| Windows 10 22H2 / Windows 11 23H2+ (64-bit) | Technical installer floor only; real-machine acceptance still required | Not a current security-support recommendation |
-| Newer supported Windows | Targeted; validate each release | Targeted; validate each release |
+| User | Access |
+|---|---|
+| Administrators and essential staff | Open the school's SchoolBridge link in a supported browser, install the PWA, then sign in inside the installed app |
+| Teachers | Scan the teacher QR code, install the PWA, then complete verification inside the installed app |
+| Parents | Scan the parent QR code, install the PWA, then complete verification inside the installed app |
 
-The Windows 10 22H2 / Windows 11 23H2+ row describes the installer's technical minimum only, not a recommendation to deploy those releases. Check Microsoft's current lifecycle and servicing status and use a currently supported, fully patched Windows edition. Windows 8.0 and 8.1 remain explicit product requirements, but both are blocked pending a maintained desktop runtime and independent clean-machine acceptance. A browser opened separately is not the SchoolBridge desktop application. See [legacy Windows installation engineering](docs/LEGACY_WINDOWS_SUPPORT.md).
+Windows users do **not** need a QR scanner or a separate Windows executable. They use the ordinary school access link and the browser's Install app / Add to taskbar option. Parent and teacher QR routes remain role-specific and registration is gated to the installed PWA context.
 
-## Current development and release status
+A native Windows desktop installer and USB installer are **deferred**. Earlier Task 1.11–1.13 desktop/USB engineering work is retained as deferred work; it is not the current installation or release path. CI validates the PWA, frontend, backend and Windows-hosted backend tests, but does not publish Windows desktop installers.
 
-Phase 5 — Database & Offline Architecture includes database-safety, local deployment, device registration, change-journal, checkpoint and role-scoped snapshot foundations. Teacher mark drafts and selected attendance workflows have offline foundations, and Device Management supports explicit encrypted read-only snapshots. This does **not** mean every module supports offline records and writes.
+## Development and offline status
 
-### Current local package proof — not the final desktop application
+Phase 5 — Database & Offline Architecture includes database-safety, device registration, change-journal, checkpoint and role-scoped snapshot foundations. Teacher mark drafts and selected attendance workflows have offline foundations, and Device Management supports explicit encrypted read-only snapshots. This does **not** mean every module supports offline records and writes.
 
-The existing Docker-free package bundles CPython, FastAPI, the React build and SQLite, and CI checks installation and backend startup on a Windows Server 2022 runner. It then serves the frontend over localhost and requires a separate browser. It is therefore **not yet the agreed standalone desktop application**, and it does not establish Windows 8 or Windows 8.1 compatibility. Keep it as an engineering proof only; do not treat its artifact as the final USB release.
-
-The required deliverable is a USB-carried, fully offline installer that installs and launches SchoolBridge as desktop software on Windows 8 first, then Windows 8.1 and newer Windows releases. The package must include all required application/runtime components, local database setup, integrity verification, lifecycle handling, backup/restore and offline operator instructions. It must not require Docker Desktop, WSL2, an internet download, or a separately installed browser on the school computer.
-
-### Existing Docker/WSL2 USB prototype
-
-The existing prepare-usb.ps1 produces a Docker Desktop/WSL2 package and opens the app through a browser. It requires a Windows 10/11-class host and is **not** the required Windows 8-starting desktop USB deliverable. Retain it only as a separate prototype until the unified desktop installer is implemented. See [USB installation](docs/USB_INSTALLATION.md).
-
-The service worker caches the app shell only. Full offline record access and writes across all modules remain unfinished. Do not advertise SchoolBridge as fully offline across every module or as a certified turnkey installer until the corresponding acceptance gates pass.
+The service worker caches the app shell only. Full offline record access and writes across all modules remain unfinished. Do not advertise SchoolBridge as fully offline across every module or as a certified turnkey local installer until the corresponding acceptance gates pass.
 
 ## Development
 
-Backend: Python, FastAPI and SQLAlchemy. Single-host SQLite and multi-user local PostgreSQL are supported deployment paths. The native Windows package uses SQLite; the local Compose stack uses PostgreSQL.
+Backend: Python, FastAPI and SQLAlchemy. Single-host SQLite and multi-user local PostgreSQL are supported deployment paths.
 
 ## Principles
 
 - Local database is the school's primary source of truth.
-- No cloud account or internet required for ordinary local operations.
+- No cloud account or internet required for ordinary local operations where the configured deployment supports local access.
 - A LAN is optional for multi-device access, not installation.
 - Least-privilege roles, audit history, reliable backup and restore.
 - Never use real student data in development or testing.
