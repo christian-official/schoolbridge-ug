@@ -17,7 +17,7 @@ test('parent and teacher QR routes require PWA installation before in-app verifi
   assert.match(landing, /audience=parent/)
   assert.match(landing, /audience=teacher/)
   assert.match(landing, /Download SchoolBridge for Windows/)
-  assert.match(landing, /releases\\/latest/)
+  assert.match(landing, /releases\/latest/)
   assert.doesNotMatch(landing, /audience=staff/)
   assert.match(app, /getSchoolAudience\(\)/)
   assert.match(app, /schoolbridge-selected-audience/)
