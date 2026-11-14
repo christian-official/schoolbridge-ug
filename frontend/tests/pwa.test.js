@@ -196,3 +196,13 @@ test('school device management provides a school-specific staff QR and staff acc
   assert.match(devices, /Staff access/)
   assert.match(devices, /school-issued staff credentials/)
 })
+
+
+test('desktop users always see a SchoolBridge install action and the normal app uses its static manifest', () => {
+  assert.match(html, /rel="manifest" href="\\/manifest\\.webmanifest"/)
+  assert.match(installUi, /setIsDesktop\\(!appleMobile/)
+  assert.match(installUi, /Install SchoolBridge on this computer/)
+  assert.match(installUi, /Install SchoolBridge/)
+  assert.match(installUi, /Install this site as an app/)
+  assert.match(installUi, /Install page as app/)
+})
