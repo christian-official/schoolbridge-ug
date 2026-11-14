@@ -1639,7 +1639,6 @@ function App() {
               </form>
               <button type="button" className="recovery-link" onClick={()=>{setShowRecovery(true);setLoginError('')}}>Forgot your password?</button>
               {isTauriDesktop && <button type="button" className="recovery-link" onClick={() => setShowDesktopStaffLogin(false)}>Back to role selection</button>}
-              {!isTauriDesktop && <a className="desktop-download-link" href="https://github.com/christian-official/schoolbridge-ug/releases/latest" target="_blank" rel="noreferrer">Download SchoolBridge for Windows</a>}
               <p className="login-foot"><ShieldCheck size={15} /> Secure school access</p>
             </>}
           </>}
