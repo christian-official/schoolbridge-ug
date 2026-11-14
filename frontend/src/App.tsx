@@ -935,6 +935,17 @@ function getSelectedSchoolId(): string {
   catch { return '' }
 }
 
+function getSchoolAudience(): string {
+  if (typeof window === 'undefined') return ''
+  const fromUrl = new URLSearchParams(window.location.search).get('audience') || ''
+  if (['parent', 'teacher'].includes(fromUrl)) {
+    try { localStorage.setItem('schoolbridge-selected-audience', fromUrl) } catch { /* The QR URL remains available in this browser. */ }
+    return fromUrl
+  }
+  try { return localStorage.getItem('schoolbridge-selected-audience') || '' }
+  catch { return '' }
+}
+
 function App() {
   const selectedSchoolId = getSelectedSchoolId()
   const [token, setToken] = useState('')
@@ -944,11 +955,11 @@ function App() {
   const [loginError, setLoginError] = useState('')
   const [showRecovery, setShowRecovery] = useState(false)
   const [showDesktopStaffLogin, setShowDesktopStaffLogin] = useState(false)
-  // School QR links carry an explicit audience so parents and teachers land on
-  // their own registration page. A plain school URL is the staff access webpage.
+  // Parent/teacher QR context is retained for the installed PWA. Registration
+  // is deliberately blocked in an ordinary browser and only shown standalone.
   const schoolQuery = new URLSearchParams(window.location.search)
-  const schoolAudience = schoolQuery.get('audience') || ''
-  const [showRegistration, setShowRegistration] = useState(() => ['parent','teacher'].includes(schoolQuery.get('audience') || ''))
+  const schoolAudience = getSchoolAudience()
+  const [showRegistration, setShowRegistration] = useState(() => isStandalonePwa && ['parent','teacher'].includes(getSchoolAudience()))
   const showSchoolLanding = Boolean(schoolQuery.get('school') && !schoolAudience)
   const [loading, setLoading] = useState(false)
   const [sessionRestoring, setSessionRestoring] = useState(true)
@@ -1545,11 +1556,14 @@ function App() {
     if (!qrSchoolName) return <main className="login-page"><section className="login-card"><div className="brand-name">School<span>Bridge</span></div><p className="muted">Loading your school's access page…</p></section></main>
     return <SchoolAccessLanding schoolId={selectedSchoolId} schoolName={qrSchoolName}/>
   }
-  if (showRegistration && selectedSchoolId) {
+  if (['parent','teacher'].includes(schoolAudience) && selectedSchoolId && !isStandalonePwa) {
+    return <PWAAccessGate schoolName={qrSchoolName || 'your school'} audience={schoolAudience as 'parent'|'teacher'}/>
+  }
+  if (showRegistration && selectedSchoolId && isStandalonePwa) {
     if (setupStatus.loading) return <main className="login-page"><section className="login-card"><div className="brand-name">School<span>Bridge</span></div><p className="muted">Verifying your school QR code…</p></section></main>
     if (setupStatus.error || qrSchoolError) return <main className="login-page"><section className="login-card"><div className="brand-name">School<span>Bridge</span></div><h1>School QR verification needed</h1><p className="error" role="alert">{qrSchoolError || setupStatus.error}</p><p className="form-hint">Scan your school's current QR code or contact the school administrator.</p></section></main>
     if (!qrSchoolName) return <main className="login-page"><section className="login-card"><div className="brand-name">School<span>Bridge</span></div><p className="muted">Verifying your school identity…</p></section></main>
-    return <RegistrationFlow schoolId={selectedSchoolId} schoolName={qrSchoolName} audience={schoolAudience as 'parent'|'teacher'} apiBaseUrl={API_BASE_URL} onAuthenticated={async accessToken=>{await storeSessionToken(accessToken);setShowRegistration(false);setUser(null);setToken(accessToken);setPassword('');setLoginError('')}}/>
+    return <RegistrationFlow schoolId={selectedSchoolId} schoolName={qrSchoolName} audience={schoolAudience as 'parent'|'teacher'} apiBaseUrl={API_BASE_URL} onAuthenticated={async accessToken=>{await storeSessionToken(accessToken);try{localStorage.removeItem('schoolbridge-selected-audience')}catch{/* Continue with the authenticated session. */}setShowRegistration(false);setUser(null);setToken(accessToken);setPassword('');setLoginError('')}}/>
   }
   if (!token && sessionRestoring) return <main className="login-page"><section className="login-card"><div className="brand-name">School<span>Bridge</span></div><p className="muted">Restoring your saved session…</p></section></main>;
 
