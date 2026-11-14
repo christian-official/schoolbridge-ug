@@ -136,35 +136,32 @@ test('parent and teacher QR context is retained for standalone app verification,
 
 
 test('parent, teacher and staff access links install the PWA with school and role in its launch URL', () => {
-  assert.match(app, /\['parent','teacher','staff'\]\.includes\(schoolAudience\)/)
-  assert.match(app, /PWAAccessGate schoolId=\{selectedSchoolId\}/)
-  assert.match(accessGate, /type Audience = 'parent' \| 'teacher' \| 'staff'/)
-  assert.match(accessGate, /launch\.searchParams\.set\('school',schoolId\)/)
-  assert.match(accessGate, /launch\.searchParams\.set\('audience',audience\)/)
-  assert.match(accessGate, /id:launch\.pathname\+launch\.search/)
-  assert.match(accessGate, /manifestLink\.href=manifestObjectUrl/)
-  assert.match(accessGate, /<button type="button" className="primary-button login-button" onClick=\{\(\)=>void install\(\)\}>Add to Home Screen<\/button>/)
-  assert.doesNotMatch(accessGate, /disabled=\{!promptEvent\}/)
-  assert.match(accessGate, /window.addEventListener\('schoolbridge:install-prompt',capture\)/)
+  assert.match(app, /\\['parent','teacher','staff'\\]\\.includes\\(schoolAudience\\)/)
+  assert.match(app, /PWAAccessGate schoolId=\\{selectedSchoolId\\}/)
+  assert.match(accessGate, /type Audience = 'parent' \\| 'teacher' \\| 'staff'/)
+  assert.match(html, /const school = params\\.get\\('school'\\)/)
+  assert.match(html, /const audience = params\\.get\\('audience'\\)/)
+  assert.match(html, /encodeURIComponent\\(school\\).*audience/)
+  assert.match(html, /start_url:/)
+  assert.match(html, /id: school && \\['parent', 'teacher', 'staff'\\]\\.includes\\(audience\\)/)
+  assert.match(accessGate, /<button type="button" className="primary-button login-button" onClick=\\{\\(\\)=>void install\\(\\)\\}>Add to Home Screen<\\/button>/)
+  assert.doesNotMatch(accessGate, /disabled=\\{!promptEvent\\}/)
+  assert.match(accessGate, /window.addEventListener\\('schoolbridge:install-prompt',capture\\)/)
   assert.doesNotMatch(accessGate, /URL.createObjectURL/)
-  assert.match(accessGate, /await promptEvent\.prompt\(\)/)
-  assert.match(accessGate, /onClick=\{\(\)=>void install\(\)\}/)
+  assert.match(accessGate, /await promptEvent\\.prompt\\(\\)/)
+  assert.match(accessGate, /onClick=\\{\\(\\)=>void install\\(\\)\\}/)
   assert.match(accessGate, /school-issued staff credentials/)
   assert.match(accessGate, /verification form will appear inside the installed app/)
 })
 
-
 test('all role-specific access links preserve school and audience in the installed PWA launch URL', () => {
-  assert.match(app, /\['parent','teacher','staff'\]\.includes\(schoolAudience\)/)
-  assert.match(app, /PWAAccessGate schoolId=\{selectedSchoolId\}/)
-  assert.match(accessGate, /type Audience = 'parent' \| 'teacher' \| 'staff'/)
-  assert.match(accessGate, /launch\.searchParams\.set\('school',schoolId\)/)
-  assert.match(accessGate, /launch\.searchParams\.set\('audience',audience\)/)
-  assert.match(accessGate, /manifestLink\.href=manifestObjectUrl/)
+  assert.match(html, /const school = params\\.get\\('school'\\)/)
+  assert.match(html, /const audience = params\\.get\\('audience'\\)/)
+  assert.match(html, /start_url: school && \\['parent', 'teacher', 'staff'\\]\\.includes\\(audience\\)/)
+  assert.match(html, /id: school && \\['parent', 'teacher', 'staff'\\]\\.includes\\(audience\\)/)
   assert.match(accessGate, /school-issued staff credentials/)
 })
-
-
+ 
 test('desktop staff login does not advertise a native Windows download and gives Chrome install steps', () => {
   assert.doesNotMatch(app, /Download SchoolBridge for Windows/)
   assert.match(accessGate, /const chromeDesktop=/)
