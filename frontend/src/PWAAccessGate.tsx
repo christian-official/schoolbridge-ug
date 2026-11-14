@@ -28,8 +28,11 @@ export default function PWAAccessGate({schoolName,audience,schoolId}:{schoolName
     return()=>{window.removeEventListener('schoolbridge:install-prompt',capture);if(manifestLink&&previousManifest)manifestLink.href=previousManifest;if(manifestObjectUrl)URL.revokeObjectURL(manifestObjectUrl)}
   },[schoolId,audience])
   async function install(){
-    if(!promptEvent)return
     setError('')
+    if(!promptEvent){
+      setError(apple?'To install, open this page in Safari, tap Share, then Add to Home Screen.':android?'Your browser has not opened its install prompt yet. Use the browser menu and choose Install app or Add to Home Screen.':'Chrome has not opened its install prompt yet. Use ⋮ → Cast, save and share → Install page as app.')
+      return
+    }
     try{
       await promptEvent.prompt()
       const choice=await promptEvent.userChoice
@@ -46,7 +49,7 @@ export default function PWAAccessGate({schoolName,audience,schoolId}:{schoolName
       <h1>Install SchoolBridge first</h1>
       <p className="muted">{audience==='staff'?'This is your school staff access link. Install and open the SchoolBridge PWA, then sign in with your school-issued staff credentials.':'This QR code is for the '+audience+'. Install and open the SchoolBridge PWA before entering your details. Your verification form will appear inside the installed app, not on this website.'}</p>
       {audience==='staff'?<div className="form-hint"><strong>{apple?'On iPhone or iPad':android?'On Android':chromeDesktop?'Install on this computer':'Install SchoolBridge'}</strong><p>{apple?<>Open this staff link in Safari. Tap <Share size={14} aria-label="Share"/> Share, choose <strong>Add to Home Screen</strong>, then tap <strong>Add</strong>. Open SchoolBridge from your Home Screen and sign in with your school-issued staff credentials.</>:android?<>Tap the <strong>Install SchoolBridge</strong> button if it appears, or open your browser menu and choose <strong>Install app</strong> or <strong>Add to Home Screen</strong>. Open SchoolBridge from your Home Screen or app list and sign in with your school-issued staff credentials.</>:chromeDesktop?<>In Chrome, select the <strong>Install SchoolBridge</strong> icon at the right end of the address bar. If it is not shown, open <strong>⋮</strong>, choose <strong>Cast, save and share</strong>, then <strong>Install page as app</strong>. Open the installed app and sign in with your school-issued staff credentials.</>:<>Use your browser's <strong>Install</strong> or <strong>Add to Home Screen</strong> option. Open the installed SchoolBridge app and sign in with your school-issued staff credentials.</>}</p></div>:apple?<div className="form-hint"><strong>On iPhone or iPad</strong><p>Open this page in Safari. Tap <Share size={14} aria-label="Share"/> Share, choose <strong>Add to Home Screen</strong>, confirm, then open SchoolBridge from your Home Screen.</p></div>:android?<div className="form-hint"><strong>On Android</strong><p>Install SchoolBridge using the button below, or open your browser menu and choose <strong>Install app</strong> or <strong>Add to Home Screen</strong>. Then open SchoolBridge from your app list.</p></div>:<div className="form-hint"><strong>Use your phone</strong><p>Open this school QR link on your phone, install SchoolBridge from the browser's app-install option, then launch the installed app.</p></div>}
-      {promptEvent&&<button type="button" className="primary-button login-button" onClick={()=>void install()}>Install SchoolBridge</button>}
+      <button type="button" className="primary-button login-button" onClick={()=>void install()}>Install SchoolBridge</button>
       {error&&<p className="form-hint" role="status">{error}</p>}
       <p className="login-foot">After installation, open SchoolBridge to {audience==='staff'?'sign in with your staff credentials':'complete '+audience+' verification'} for {schoolName}.</p>
     </section>
