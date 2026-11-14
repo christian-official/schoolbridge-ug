@@ -57,6 +57,67 @@ jobs:
           SCHOOLBRIDGE_SECRET_KEY: ci-only-secret-key-not-for-production
         run: python -m pytest -q backend/tests
 
+  windows-desktop-installer:
+    name: windows / offline Tauri installer build
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Install NSIS
+        shell: pwsh
+        run: choco install nsis --yes --no-progress
+      - name: Stage official CPython embeddable runtime
+        shell: pwsh
+        run: |
+          $version = python -c "import sys; print('.'.join(map(str, sys.version_info[:3])))"
+          $zip = Join-Path $env:RUNNER_TEMP "python-embed.zip"
+          $getPip = Join-Path $env:RUNNER_TEMP "get-pip.py"
+          Invoke-WebRequest -Uri "https://www.python.org/ftp/python/$version/python-$version-embed-amd64.zip" -OutFile $zip
+          Invoke-WebRequest -Uri "https://bootstrap.pypa.io/get-pip.py" -OutFile $getPip
+          "PYTHON_EMBED_ZIP=$zip" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "GET_PIP_SCRIPT=$getPip" | Out-File -FilePath $env:GITHUB_ENV -Append
+      - name: Prepare offline Windows backend resources
+        shell: pwsh
+        run: |
+          ./scripts/prepare-native-windows.ps1 -PythonEmbedZip "$env:PYTHON_EMBED_ZIP" -GetPipScript "$env:GET_PIP_SCRIPT"
+      - name: Create ephemeral CI-only owner verification public key
+        shell: pwsh
+        run: |
+          $bytes = New-Object byte[] 32
+          $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+          try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }
+          $key = [Convert]::ToBase64String($bytes)
+          Set-Content -LiteralPath "frontend/src-tauri/owner-activation-public-key.txt" -Value $key -Encoding ASCII -NoNewline
+      - name: Stage Tauri desktop resources
+        shell: pwsh
+        run: ./scripts/prepare-tauri-resources.ps1
+      - name: Build offline Windows desktop installer
+        working-directory: frontend
+        shell: pwsh
+        run: npm run desktop:build
+      - name: Verify installer artifact
+        shell: pwsh
+        run: |
+          $bundle = "frontend/src-tauri/target/release/bundle/nsis"
+          $installer = Get-ChildItem -LiteralPath $bundle -Filter "*.exe" -File | Sort-Object Length -Descending | Select-Object -First 1
+          if (-not $installer) { throw "Tauri did not produce an NSIS Windows installer." }
+          if ($installer.Length -lt 100MB) { throw "Offline installer is unexpectedly small; the bundled WebView2 runtime may be missing." }
+          Get-FileHash -LiteralPath $installer.FullName -Algorithm SHA256 | Format-List
+          Write-Host "CI-only installer verified: $($installer.FullName) ($($installer.Length) bytes)"
+      - name: Upload CI-only installer build
+        uses: actions/upload-artifact@v4
+        with:
+          name: SchoolBridge-Tauri-Windows-CI-Test-Only
+          path: frontend/src-tauri/target/release/bundle/nsis/*.exe
+          if-no-files-found: error
+          retention-days: 14
+
   postgres-recovery-integration:
     name: backend / postgres-recovery-integration
     runs-on: ubuntu-24.04
