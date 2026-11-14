@@ -13,7 +13,10 @@ test('desktop app explains parent browser access before showing staff login', ()
   assert.match(app, /Back to role selection/)
 })
 
-test('public school landing does not offer the staff desktop installer to parents', () => {
-  assert.doesNotMatch(landing, /Download SchoolBridge for Windows/)
-  assert.match(landing, /Administrator &amp; essential staff sign in/)
+test('public school landing separates mobile parent and teacher access from staff Windows download', () => {
+  assert.match(landing, /Parent mobile access/)
+  assert.match(landing, /Teacher mobile access/)
+  assert.match(landing, /Download SchoolBridge for Windows/)
+  assert.match(landing, /No QR scanner is needed/)
+  assert.doesNotMatch(landing, /audience=staff/)
 })
