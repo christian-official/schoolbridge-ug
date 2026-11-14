@@ -5,10 +5,6 @@ import './App.css'
 type Audience = 'parent' | 'teacher'
 type InstallPrompt = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }> }
 
-declare global {
-  interface Window { schoolBridgeInstallPrompt?: InstallPrompt }
-}
-
 export default function PWAAccessGate({schoolName,audience}:{schoolName:string;audience:Audience}) {
   const [promptEvent,setPromptEvent]=useState<InstallPrompt|null>(()=>window.schoolBridgeInstallPrompt||null)
   const [error,setError]=useState('')
