@@ -16,8 +16,6 @@ test('parent and teacher QR routes require PWA installation before in-app verifi
   assert.ok(app.indexOf('Explicit public school routes take priority') < app.indexOf('if (token && !user)'), 'public QR routes must override an existing saved staff session')
   assert.match(landing, /audience=parent/)
   assert.match(landing, /audience=teacher/)
-  assert.match(landing, /audience=parent/)
-  assert.match(landing, /audience=teacher/)
   assert.match(landing, /Download SchoolBridge for Windows/)
   assert.match(landing, /releases\\/latest/)
   assert.doesNotMatch(landing, /audience=staff/)
