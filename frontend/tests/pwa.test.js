@@ -9,6 +9,7 @@ const entry = await readFile(new URL('../src/main.tsx', import.meta.url), 'utf8'
 const installUi = await readFile(new URL('../src/PWAInstallPrompt.tsx', import.meta.url), 'utf8')
 const app = await readFile(new URL('../src/App.tsx', import.meta.url), 'utf8')
 const accessGate = await readFile(new URL('../src/PWAAccessGate.tsx', import.meta.url), 'utf8')
+const accessGate = await readFile(new URL('../src/PWAAccessGate.tsx', import.meta.url), 'utf8')
 
 test('web app manifest has installable standalone metadata and valid icons', async () => {
   assert.equal(manifest.name, 'SchoolBridge')
@@ -119,7 +120,7 @@ test('parent and teacher QR context is retained for standalone app verification,
   assert.match(app, /getSchoolAudience\(\)/)
   assert.match(app, /schoolbridge-selected-audience/)
   assert.match(app, /isStandalonePwa && \['parent','teacher'\]/)
-  assert.match(app, /if \(\['parent','teacher'\]\.includes\(schoolAudience\) && selectedSchoolId && !isStandalonePwa\)/)
+  assert.match(app, /if \(\['parent','teacher','staff'\]\.includes\(schoolAudience\) && selectedSchoolId && !isStandalonePwa\)/)
   assert.match(app, /<PWAAccessGate schoolName=/)
   assert.match(app, /showRegistration && selectedSchoolId && isStandalonePwa/)
   const gate = await readFile(new URL('../src/PWAAccessGate.tsx', import.meta.url), 'utf8')
@@ -141,4 +142,15 @@ test('parent, teacher and staff access links install the PWA with school and rol
   assert.match(accessGate, /Install SchoolBridge/)
   assert.match(accessGate, /school-issued staff credentials/)
   assert.match(accessGate, /verification form will appear inside the installed app/)
+})
+
+
+test('all role-specific access links preserve school and audience in the installed PWA launch URL', () => {
+  assert.match(app, /\['parent','teacher','staff'\]\.includes\(schoolAudience\)/)
+  assert.match(app, /PWAAccessGate schoolId=\{selectedSchoolId\}/)
+  assert.match(accessGate, /type Audience = 'parent' \| 'teacher' \| 'staff'/)
+  assert.match(accessGate, /launch\.searchParams\.set\('school',schoolId\)/)
+  assert.match(accessGate, /launch\.searchParams\.set\('audience',audience\)/)
+  assert.match(accessGate, /manifestLink\.href=manifestObjectUrl/)
+  assert.match(accessGate, /school-issued staff credentials/)
 })
